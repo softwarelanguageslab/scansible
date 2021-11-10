@@ -270,6 +270,7 @@ class Scope:
     def __init__(self, level: ScopeLevel, is_cached: bool = False) -> None:
         self.level = level
         self.is_cached = is_cached
+        self.cached_results: dict[str, VariableValueRecord] = {}
         # Values of expressions valid in this scope
         self._expr_store: dict[str, TemplateRecord] = {}
         # Variables defined in this scope
@@ -566,10 +567,10 @@ class VarContext:
         logger.debug(f'Evaluating expression {expr!r}')
         prev_evaluated = self._get_template_record(expr)
         if prev_evaluated is not None:
-            return self._maybe_reevaluate(prev_evaluated, g, is_conditional)
+            return self._maybe_reevaluate(prev_evaluated, g, is_conditional, is_top_level=True)
 
         logger.debug(f'First time evaluating {expr!r}')
-        ret =  self._evaluate_template(expr, g, is_conditional)
+        ret = self._evaluate_template(expr, g, is_conditional, is_top_level=True)
         logger.debug(f'Finished first evaluation of {expr!r}')
         return ret
 
@@ -664,11 +665,6 @@ class VarContext:
             logger.debug('Template record of value has changed in current scope, variable too')
             return True
 
-        if (self._scopes.get_variable_value_scope(var.name) is self._scopes.last_scope
-                and self._scopes.last_scope.is_cached):
-            logger.debug('Variable is evaluated in the current scope, current scope is cached => variable has not changed')
-            return False
-
         tmpl_changed = self._template_result_has_changed(tr)
         if tmpl_changed:
             logger.debug('Expression result changed, so variable too')
@@ -682,7 +678,7 @@ class VarContext:
             return True
         return self._template_dependencies_have_changed(prev)
 
-    def _maybe_reevaluate(self, prev: TemplateRecord, g: Graph, is_conditional: bool) -> TemplateRecord:
+    def _maybe_reevaluate(self, prev: TemplateRecord, g: Graph, is_conditional: bool, is_top_level: bool = False) -> TemplateRecord:
         logger.debug(f'Checking whether {prev!r} needs to be re-evaluated')
         if not self._template_result_has_changed(prev):
             logger.debug(f'Result of {prev!r} has not changed, reusing previous result')
@@ -696,7 +692,7 @@ class VarContext:
             return TemplateRecord(iv, prev.expr_node, prev.used_variables, prev.may_be_dynamic, prev.is_literal)
 
         logger.debug('Template dependencies have changed, need to re-evaluate in full')
-        return self._evaluate_template(prev.expr_node.expr, g, is_conditional)
+        return self._evaluate_template(prev.expr_node.expr, g, is_conditional, is_top_level)
 
     def _get_variable_value_record(self, name: str, g: Graph) -> VariableValueRecord:
         """Get a variable value record for a variable.
@@ -743,25 +739,12 @@ class VarContext:
             vn = Variable(node_id=self.context.next_id(), name=name, version=vr.revision, value_version=new_val_rev, scope_level=self._scopes.get_variable_definition_scope(name).level.value)
             g.add_edge(tr.data_node, vn, DEF)
             new_vr = vr._replace(template_record=tr, var_node=vn)
-            if self._scopes.last_scope.is_cached and tr.may_be_dynamic:
-                # Current scope is cached and template is dynamic. Create a
-                # cached copy of the variable in this current scope for reuse.
-                logger.debug(f'Storing {new_vr!r} in current cached scope')
-                self._scopes.set_variable_value(name, new_vr, ScopeLevel.CURRENT_SCOPE)
-            else:
-                logger.debug(f'Storing {new_vr!r} in most general scope of template')
-                self._scopes.set_variable_value(name, new_vr, ScopeLevel.OF_TEMPLATE)
+            logger.debug(f'Storing {new_vr!r} in most general scope of template')
+            self._scopes.set_variable_value(name, new_vr, ScopeLevel.OF_TEMPLATE)
             return new_vr
 
         # Try to re-evaluate if necessary, e.g. when the template is dynamic
-        # or a nested expression has changed. Skip re-evaluating if the
-        # variable originates from this scope and this scope is cached
-        if (self._scopes.get_variable_value_scope(name) is self._scopes.last_scope
-                and self._scopes.last_scope.is_cached):
-            # Variable comes from this scope's cache, can reuse it
-            logger.debug(f'{name} comes from a cached scope, reusing as-is')
-            return vr
-
+        # or a nested expression has changed.
         new_tr = self._maybe_reevaluate(tr, g, False)
         if new_tr is vr.template_record:
             logger.debug(f'Initializer for {name} has not changed, reusing')
@@ -779,12 +762,8 @@ class VarContext:
         vn = Variable(node_id=self.context.next_id(), name=name, version=vr.revision, value_version=new_val_rev, scope_level=self._scopes.get_variable_definition_scope(name).level.value)
         new_vr = vr._replace(val_revision=new_val_rev, template_record=new_tr, var_node=vn)
 
-        if self._scopes.last_scope.is_cached and new_tr.may_be_dynamic:
-            logger.debug(f'Storing {new_vr!r} in current scope, since it is dynamic and the scope is cached')
-            self._scopes.set_variable_value(name, new_vr, ScopeLevel.CURRENT_SCOPE)
-        else:
-            logger.debug(f'Storing {new_vr!r} in scope of template or deeper')
-            self._scopes.set_variable_value(name, new_vr, ScopeLevel.OF_TEMPLATE)
+        logger.debug(f'Storing {new_vr!r} in scope of template or deeper')
+        self._scopes.set_variable_value(name, new_vr, ScopeLevel.OF_TEMPLATE)
 
         logger.debug(f'Adding variable node {vn!r}')
         g.add_node(vn)
@@ -792,7 +771,7 @@ class VarContext:
         g.add_edge(new_tr.data_node, vn, DEF)
         return new_vr
 
-    def _evaluate_template(self, expr: str, g: Graph, is_conditional: bool) -> TemplateRecord:
+    def _evaluate_template(self, expr: str, g: Graph, is_conditional: bool, is_top_level: bool = False) -> TemplateRecord:
         logger.debug(f'Evaluating template {expr!r}')
         en = Expression(node_id=self.context.next_id(), expr=expr)
         ast = TemplateExpressionAST.parse(expr, is_conditional, self._scopes.get_variable_mapping())
@@ -812,12 +791,21 @@ class VarContext:
         used_variables: list[tuple[str, int, int]] = []
         for var_name in ast.referenced_variables:
             logger.debug(f'Linking data for used variable {var_name}')
-            try:
-                vr = self._get_variable_value_record(var_name, g)
-            except RecursionError:
-                raise RecursionError(f'Recursive definition detected in {expr!r}') from None
+            should_use_cache = is_top_level and self._scopes.last_scope.is_cached
+            if (should_use_cache
+                    and (cached_val_record := self._scopes.last_scope.cached_results.get(var_name, None)) is not None):
+                logger.debug(f'Variable already evaluated in this cached scope, reusing {cached_val_record!r}')
+                vr = cached_val_record
+            else:
+                try:
+                    vr = self._get_variable_value_record(var_name, g)
+                except RecursionError:
+                    raise RecursionError(f'Recursive definition detected in {expr!r}') from None
             logger.debug(f'Determined that {expr!r} uses {vr!r}')
             g.add_edge(vr.var_node, en, USE)
+            if should_use_cache:
+                logger.debug(f'Saving {vr!r} in cache for reuse')
+                self._scopes.last_scope.cached_results[var_name] = vr
             used_variables.append((vr.var_node.name, vr.revision, vr.val_revision))
 
         tr = TemplateRecord(iv, en, used_variables, expr_may_be_dynamic(ast), False)

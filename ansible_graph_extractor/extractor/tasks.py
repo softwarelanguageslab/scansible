@@ -55,7 +55,7 @@ def task_extractor_factory(context: ExtractionContext, task: Task) -> TaskExtrac
 class GenericTaskExtractor(TaskExtractor):
     def extract_task(self, predecessors: list[n.ControlNode]) -> TaskExtractionResult:
         logger.debug(f'Extracting task with name "{self.name}"')
-        with self.context.vars.enter_scope(ScopeLevel.TASK_VARS):
+        with self.context.vars.enter_cached_scope(ScopeLevel.TASK_VARS):
             for var_name, var_value in self.kws.pop('vars', {}).items():
                 self.context.vars.register_variable(var_name, expr=var_value, graph=self.context.graph, level=ScopeLevel.TASK_VARS)
 
@@ -166,12 +166,13 @@ class GenericTaskExtractor(TaskExtractor):
 
 class SetFactTaskExtractor(TaskExtractor):
     def extract_task(self, predecessors: list[n.ControlNode]) -> TaskExtractionResult:
-        for var_name, var_value in self.kws.pop('args').items():
-            value_n = self.extract_value(var_value)
-            vn = self.context.vars.register_variable(var_name, ScopeLevel.SET_FACTS_REGISTERED, graph=self.context.graph)
+        with self.context.vars.enter_cached_scope(ScopeLevel.TASK_VARS):
+            for var_name, var_value in self.kws.pop('args').items():
+                value_n = self.extract_value(var_value)
+                vn = self.context.vars.register_variable(var_name, ScopeLevel.SET_FACTS_REGISTERED, graph=self.context.graph)
 
-            self.context.graph.add_node(vn)
-            self.context.graph.add_edge(value_n, vn, e.DEF)
+                self.context.graph.add_node(vn)
+                self.context.graph.add_edge(value_n, vn, e.DEF)
 
         for other_kw in self.kws:
             self.context.graph.errors.append(f'Cannot handle {other_kw} on set_fact yet!')
