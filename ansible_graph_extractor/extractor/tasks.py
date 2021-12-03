@@ -88,14 +88,14 @@ class GenericTaskExtractor(TaskExtractor):
         for pred in predecessors:
             self.context.graph.add_edge(pred, loop_node, e.ORDER)
 
-        if 'loop_control' in self.kws:
-            self.context.graph.errors.append('I cannot handle custom loops yet!')
+        loop_control = self.kws.pop('loop_control', {})
         if 'loop_with' in self.kws:
             self.context.graph.errors.append(f'I cannot handle looping style "{self.kws["loop_with"]}" yet!')
 
         # For some reason, loop vars have the same precedence as include params.
         with self.context.vars.enter_scope(ScopeLevel.INCLUDE_PARAMS):
-            loop_target_var = self.context.vars.register_variable('item', ScopeLevel.INCLUDE_PARAMS, graph=self.context.graph)
+            loop_var_name = loop_control.pop('loop_var', 'item')
+            loop_target_var = self.context.vars.register_variable(loop_var_name, ScopeLevel.INCLUDE_PARAMS, graph=self.context.graph)
             self.context.graph.add_edge(loop_source_var, loop_target_var, e.DEF_LOOP_ITEM)
 
             tn, cn = self._extract_bare_task([loop_node])
@@ -107,6 +107,9 @@ class GenericTaskExtractor(TaskExtractor):
             # task will be the next step in the loop.
             if cn is not None:
                 self.context.graph.add_edge(cn, loop_node, e.ORDER_BACK)
+
+            for loop_control_k in loop_control:
+                self.context.graph.errors.append(f'I cannot handle loop_control option {loop_control_k} yet!')
 
         # Any registered variable is defined both by the loop and the individual tasks
         self._define_registered_var([loop_node, tn])
@@ -167,12 +170,14 @@ class GenericTaskExtractor(TaskExtractor):
 class SetFactTaskExtractor(TaskExtractor):
     def extract_task(self, predecessors: list[n.ControlNode]) -> TaskExtractionResult:
         with self.context.vars.enter_cached_scope(ScopeLevel.TASK_VARS):
-            for var_name, var_value in self.kws.pop('args').items():
-                value_n = self.extract_value(var_value)
-                vn = self.context.vars.register_variable(var_name, ScopeLevel.SET_FACTS_REGISTERED, graph=self.context.graph)
-
-                self.context.graph.add_node(vn)
-                self.context.graph.add_edge(value_n, vn, e.DEF)
+            # Evaluate all values before defining the variables. Ansible does
+            # the same. We need to do this as one variable may be defined in
+            # terms of another variable that's `set_fact`ed
+            name_to_value = {var_name: self.extract_value(var_value) for var_name, var_value in self.kws.pop('args').items()}
+            for var_name, value_node in name_to_value.items():
+                var_node = self.context.vars.register_variable(var_name, ScopeLevel.SET_FACTS_REGISTERED, graph=self.context.graph)
+                self.context.graph.add_node(var_node)
+                self.context.graph.add_edge(value_node, var_node, e.DEF)
 
         for other_kw in self.kws:
             self.context.graph.errors.append(f'Cannot handle {other_kw} on set_fact yet!')
