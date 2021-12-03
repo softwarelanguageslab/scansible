@@ -71,4 +71,7 @@ class Literal(DataNode):
 class Expression(DataNode):
     """Node representing a template expression."""
     expr: constr(strict=True)  # type: ignore[valid-type]
+    # Whether this expression is idempotent. Does not take idempotency of
+    # dependences into account.
+    idempotent: bool
 

@@ -23,8 +23,11 @@ class TemplateRecord(NamedTuple):
     data_node: DataNode
     expr_node: Expression
     used_variables: list[tuple[str, int, int]]
-    may_be_dynamic: bool
     is_literal: bool
+
+    @property
+    def may_be_dynamic(self) -> bool:
+        return not self.expr_node.idempotent
 
     def __repr__(self) -> str:
         return f'TemplateRecord(expr={self.expr_node.expr!r}, data_node={self.data_node.node_id}, expr_node={self.expr_node.node_id})'
@@ -256,13 +259,13 @@ STATIC_TESTS = {
 }
 
 
-def expr_may_be_dynamic(ast: TemplateExpressionAST) -> bool:
-    return (ast.uses_now
-            or any(filter_op not in STATIC_FILTERS for filter_op in ast.used_filters)
-            or any(test_op not in STATIC_TESTS for test_op in ast.used_tests)
-            or any(
-                (not isinstance(lookup_op, LookupTargetLiteral))
-                 or (lookup_op.name not in STATIC_LOOKUP_PLUGINS)
+def is_idempotent_expression(ast: TemplateExpressionAST) -> bool:
+    return (not ast.uses_now
+            and all(filter_op in STATIC_FILTERS for filter_op in ast.used_filters)
+            and all(test_op in STATIC_TESTS for test_op in ast.used_tests)
+            and all(
+                (isinstance(lookup_op, LookupTargetLiteral))
+                 and (lookup_op.name in STATIC_LOOKUP_PLUGINS)
                 for lookup_op in ast.used_lookups))
 
 
@@ -689,7 +692,7 @@ class VarContext:
             logger.debug(f'Dependencies have not changed, but expression is not idempotent. Creating new IV ({iv_id}) to represent new result')
             iv = IntermediateValue(node_id=self.context.next_id(), identifier=iv_id)
             g.add_edge(prev.expr_node, iv, DEF)
-            return TemplateRecord(iv, prev.expr_node, prev.used_variables, prev.may_be_dynamic, prev.is_literal)
+            return TemplateRecord(iv, prev.expr_node, prev.used_variables, prev.is_literal)
 
         logger.debug('Template dependencies have changed, need to re-evaluate in full')
         return self._evaluate_template(prev.expr_node.expr, g, is_conditional, is_top_level)
@@ -773,15 +776,16 @@ class VarContext:
 
     def _evaluate_template(self, expr: str, g: Graph, is_conditional: bool, is_top_level: bool = False) -> TemplateRecord:
         logger.debug(f'Evaluating template {expr!r}')
-        en = Expression(node_id=self.context.next_id(), expr=expr)
         ast = TemplateExpressionAST.parse(expr, is_conditional, self._scopes.get_variable_mapping())
 
         if ast is None or ast.is_literal():
             logger.debug(f'{expr!r} is a literal or broken expression')
             ln = Literal(node_id=self.context.next_id(), value=expr, type='str')
             g.add_node(ln)
-            return TemplateRecord(ln, en, [], False, True)
+            en = Expression(node_id=self.context.next_id(), expr=expr, idempotent=True)
+            return TemplateRecord(ln, en, [], True)
 
+        en = Expression(node_id=self.context.next_id(), expr=expr, idempotent=is_idempotent_expression(ast))
         iv = IntermediateValue(node_id=self.context.next_id(), identifier=self.context.next_iv_id())
         logger.debug(f'Using IV {iv.identifier}')
         g.add_node(en)
@@ -808,6 +812,6 @@ class VarContext:
                 self._scopes.last_scope.cached_results[var_name] = vr
             used_variables.append((vr.var_node.name, vr.revision, vr.val_revision))
 
-        tr = TemplateRecord(iv, en, used_variables, expr_may_be_dynamic(ast), False)
+        tr = TemplateRecord(iv, en, used_variables, False)
         self._scopes.set_expression(expr, tr)
         return tr
