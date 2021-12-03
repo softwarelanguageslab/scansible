@@ -99,15 +99,16 @@ def extract_debug(input: str, output: str) -> None:
 
 @group.command()
 @click.argument('input', type=click.Path(file_okay=False, dir_okay=True, readable=True, exists=True))
-@click.argument('output', type=click.Path(dir_okay=False, file_okay=True, writable=True))
+@click.argument('output', type=click.Path(dir_okay=True, file_okay=False, writable=True))
 def detect(input: str, output: str) -> None:
     input_path = Path(input) / 'graphml'
     output_path = Path(output)
+    output_path.mkdir(exist_ok=True, parents=True)
 
     roles = [path for path in input_path.iterdir() if path.name.endswith('.xml')]
 
-    conflict_checker = ConflictingVariables()
-    with output_path.open('w') as output_stream:
+    conflict_checker = ConflictingVariables(output_path)
+    with (output_path / 'report.txt').open('w') as output_stream:
         for results in process_map(detect_one_graph, roles, chunksize=50, desc='Detecting'):
             if len(results) == 2:
                 path, error = results
@@ -124,12 +125,8 @@ def detect(input: str, output: str) -> None:
         conflict_checker.process()
         conflicts = conflict_checker.results
         output_stream.write('------------------\n')
-        output_stream.write(f'Found {len(conflicts)} Variable Conflicts\n')
-        output_stream.write(f'Caused by {len(conflict_checker.causing_glob)} unique roles\n')
-        output_stream.write(f'Impacting {len(conflict_checker.affected_loc)} unique roles\n')
+        output_stream.write(f'Found {len(conflicts)} Possible Variable Conflicts\n')
         output_stream.write('------------------\n')
-        for conflict in conflicts:
-            output_stream.write(conflict + '\n\n')
 
 
 @group.command()
