@@ -16,18 +16,16 @@ from .var_files import VariableFileExtractor
 from .task_files import TaskFileExtractor
 from .context import ExtractionContext, Files
 
-def extract_structural_graph(srm: StructuralRoleModel) -> Graph:
-    return StructuralGraphExtractor(srm).extract()
+def extract_structural_graph(role_path: Path, role_id: str, role_rev: str) -> Graph:
+    model = StructuralRoleModel.create(role_path, role_id, role_rev)
+    return StructuralGraphExtractor(role_path, model).extract()
 
 
 class StructuralGraphExtractor:
 
-    def __init__(self, model: StructuralRoleModel) -> None:
-        self.role = model.role_root
+    def __init__(self, role_path: Path, model: StructuralRoleModel) -> None:
         graph = Graph(model.role_id, model.role_rev)
-        self.context = ExtractionContext(
-                graph=graph,
-                files=Files.categorise(self.role))
+        self.context = ExtractionContext(graph, model.role_root, role_path)
 
     def extract(self) -> Graph:
         with self.context.vars.enter_scope(ScopeLevel.ROLE_DEFAULTS), self.context.vars.enter_scope(ScopeLevel.ROLE_VARS):
@@ -42,7 +40,10 @@ class StructuralGraphExtractor:
                 self.context.graph.errors.append('I cannot handle handlers yet!')
 
             if self.context.files.main_task_file is not None:
-                TaskFileExtractor(self.context, self.context.files.main_task_file).extract_tasks([])
+                with self.context.files.enter_included_file(self.context.files.main_task_file):
+                    TaskFileExtractor(self.context, self.context.files.main_task_file).extract_tasks([])
+            else:
+                logger.warning('No main task file')
 
             # logger.info('Finished extraction, now adding transitive edges')
 

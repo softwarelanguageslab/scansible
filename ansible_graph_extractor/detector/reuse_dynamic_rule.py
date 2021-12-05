@@ -53,4 +53,4 @@ class ReuseDynamicExpressionRule(Rule):
                         'Potential unsafe reuse of variable whose value may have been changed.',
                         f'Variable {node.name} is defined with expression {expr.expr}, which is dynamic and has been used before.',
                     ])
-                    yield RuleResult(role_name=graph.role_name, description=desc)
+                    yield RuleResult(rule_name='UnsafeReuseNotIdempotent', role_name=graph.role_name, description=desc)

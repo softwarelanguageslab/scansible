@@ -5,9 +5,10 @@ from ..models.graph import Graph
 from .base import RuleResult
 from .reuse_dynamic_rule import ReuseDynamicExpressionRule
 from .reuse_changed_rule import ReuseChangedVariableRule
+from .unnecessary_set_fact import UnnecessarySetFactRule
 from .conflicting_variables import getvars
 
-ALL_RULES = [ReuseDynamicExpressionRule(), ReuseChangedVariableRule()]
+ALL_RULES = [ReuseDynamicExpressionRule(), ReuseChangedVariableRule(), UnnecessarySetFactRule()]
 
 def detect_all(graph: Graph) -> list[RuleResult]:
     return [res for rule in ALL_RULES for res in rule.scan(graph)]

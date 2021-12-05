@@ -46,4 +46,4 @@ class ReuseChangedVariableRule(Rule):
                 'Potential unsafe reuse of variable whose value may have been changed.',
                 f'Variable {curr_usage.name}@{curr_usage.version} was previously used with value version {prev_usage.value_version}, but now with {curr_usage.value_version}',
                 'A dependency of the expression may have been changed, causing it to be re-evaluated.'])
-            yield RuleResult(role_name=graph.role_name, description=desc)
+            yield RuleResult(rule_name='UnsafeReuseChangedVars', role_name=graph.role_name, description=desc)

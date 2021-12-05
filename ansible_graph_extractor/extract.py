@@ -10,15 +10,14 @@ from .io.structural_models import parse_role
 from .extractor.main import extract_structural_graph
 from .io import neo4j, graphml, graphviz
 
-def extract_one(args: tuple[str, Path], log_reset: bool = True) -> tuple[str, str, str, str, str] | tuple[str, Exception]:
+def extract_one(args: tuple[str, Path], log_reset: bool = True) -> tuple[str, str, str, str, str, str] | tuple[str, Exception]:
     log_stream = StringIO()
     if log_reset:
         logger.remove()
         logger.add(log_stream, level='DEBUG')
     role_id, role_path = args
     try:
-        srm = parse_role(role_path, role_id)
-        sg = extract_structural_graph(srm)
+        sg = extract_structural_graph(role_path, role_id, 'HEAD')
         neo4j_str = neo4j.dump_graph(sg)
         graphml_str = graphml.dump_graph(sg)
         dot_str = graphviz.dump_graph(sg)

@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from loguru import logger
 
-from voyager.models.structural.role import Task
+from voyager.models.structural.role import Task, TaskFile
 
 from ..models import nodes as n
 from ..models import edges as e
-from .context import ExtractionContext, TaskExtractionResult, get_file_name
+from .context import ExtractionContext, TaskExtractionResult
 from .var_context import ScopeLevel
 from .var_files import VariableFileExtractor
 
@@ -23,6 +23,15 @@ class TaskExtractor:
 
     def extract_task(self, predecessors: list[n.ControlNode]) -> TaskExtractionResult:
         raise NotImplementedError('To be implemented by subclass')
+
+    def extract_conditional_value(self) -> n.DataNode | None:
+        if (condition := self.kws.pop('when', _SENTINEL)) is not _SENTINEL:
+            if not isinstance(condition, str):
+                self.context.graph.errors.append(f'Cannot handle {type(condition)} conditionals yet!')
+            else:
+                return self.extract_value(condition, is_conditional=True)
+
+        return None
 
     # TODO: This doesn't really belong here...
     def extract_value(self, value: str | list | int | float | dict | bool, is_conditional: bool = False) -> n.DataNode:  # type: ignore[type-arg]
@@ -129,18 +138,14 @@ class GenericTaskExtractor(TaskExtractor):
         first_node: n.ControlNode = tn
         self.context.graph.add_node(tn)
 
-        if (condition := self.kws.pop('when', _SENTINEL)) is not _SENTINEL:
-            if not isinstance(condition, str):
-                self.context.graph.errors.append(f'Cannot handle {type(condition)} conditionals yet!')
-            else:
-                # Add a conditional node, which uses the expression IV, and is
-                # succeeded by the task itself.
-                cn = n.Conditional(node_id=self.context.next_id())
-                self.context.graph.add_node(cn)
-                condition_val_node = self.extract_value(condition, is_conditional=True)
-                self.context.graph.add_edge(condition_val_node, cn, e.USE)
-                self.context.graph.add_edge(cn, tn, e.ORDER)
-                first_node = cn
+        if (condition_val_node := self.extract_conditional_value()) is not None:
+            # Add a conditional node, which uses the expression IV, and is
+            # succeeded by the task itself.
+            cn = n.Conditional(node_id=self.context.next_id())
+            self.context.graph.add_node(cn)
+            self.context.graph.add_edge(condition_val_node, cn, e.USE)
+            self.context.graph.add_edge(cn, tn, e.ORDER)
+            first_node = cn
 
         for pred in predecessors:
             self.context.graph.add_edge(pred, first_node, e.ORDER)
@@ -174,10 +179,13 @@ class SetFactTaskExtractor(TaskExtractor):
             # the same. We need to do this as one variable may be defined in
             # terms of another variable that's `set_fact`ed
             name_to_value = {var_name: self.extract_value(var_value) for var_name, var_value in self.kws.pop('args').items()}
+            cond_val = self.extract_conditional_value()
             for var_name, value_node in name_to_value.items():
                 var_node = self.context.vars.register_variable(var_name, ScopeLevel.SET_FACTS_REGISTERED, graph=self.context.graph)
                 self.context.graph.add_node(var_node)
                 self.context.graph.add_edge(value_node, var_node, e.DEF)
+                if cond_val is not None:
+                    self.context.graph.add_edge(cond_val, var_node, e.DEFINED_IF)
 
         for other_kw in self.kws:
             self.context.graph.errors.append(f'Cannot handle {other_kw} on set_fact yet!')
@@ -208,14 +216,7 @@ class IncludeVarsTaskExtractor(TaskExtractor):
             self.context.graph.errors.append(f'Cannot handle dynamic file name on {self.action} yet!')
             return result
 
-        folder, *_ = incl_name.split('/', 1)
-        name = get_file_name(incl_name)
-        if folder not in ('vars', 'defaults'):
-            self.context.graph.errors.append(f'Unsupported folder for {self.action}: {folder}')
-            return result
-
-        varfile_store = self.context.files.var_files if folder == 'vars' else self.context.files.defaults_files
-        varfile = varfile_store.get(name)  # type: ignore[attr-defined]
+        varfile = self.context.files.find_var_file(incl_name)
 
         if not varfile:
             self.context.graph.errors.append(f'Var file not found: {incl_name}')
@@ -255,8 +256,7 @@ class IncludeTaskExtractor(TaskExtractor):
                 self.context.graph.errors.append(f'Cannot handle {other_kw} on {self.action} yet!')
 
             logger.debug(incl_name)
-            filename = get_file_name(incl_name)
-            task_file = self.context.files.task_files.get(filename)
+            task_file = self.context.files.find_task_file(incl_name)
             if not task_file:
                 self.context.graph.errors.append(f'Task file not found: {filename}')
                 return abort_result
@@ -264,4 +264,5 @@ class IncludeTaskExtractor(TaskExtractor):
             # Delayed import to prevent circular imports. task_files imports
             # blocks, which in turn imports this module.
             from .task_files import TaskFileExtractor
-            return TaskFileExtractor(self.context, task_file).extract_tasks(predecessors)
+            with self.context.files.enter_included_file(task_file):
+                return TaskFileExtractor(self.context, task_file).extract_tasks(predecessors)

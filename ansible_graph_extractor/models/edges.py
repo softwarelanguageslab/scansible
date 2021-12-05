@@ -73,6 +73,17 @@ class Def(DataFlowEdge):
         if not isinstance(target, (Variable, IntermediateValue)):
             raise TypeError('Def edges can only define variables')
 
+
+class DefinedIf(DataFlowEdge):
+    """Edges representing conditional definitions."""
+    @classmethod
+    def raise_if_disallowed(cls, source: Node, target: Node) -> None:
+        if not isinstance(target, Variable):
+            raise TypeError('DefinedIf edges can only target variables')
+        if not isinstance(source, (IntermediateValue, Literal)):
+            raise TypeError('DefinedIf edges must originate from IVs or literals')
+
+
 class DefLoopItem(DataFlowEdge):
     """Edges representing data definitions for single loop items."""
     @classmethod
@@ -87,3 +98,4 @@ ORDER_BACK = Order(back=True)
 USE = Use()
 DEF = Def()
 DEF_LOOP_ITEM = DefLoopItem()
+DEFINED_IF = DefinedIf()

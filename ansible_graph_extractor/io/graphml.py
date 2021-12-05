@@ -77,6 +77,7 @@ class CustomGraphMLReader(GraphMLReader):
 
 edge_type_to_name = {
     'DEFLOOPITEM': 'DefLoopItem',
+    'DEFINEDIF': 'DefinedIf',
 }
 
 def dump_graph(g: Graph) -> str:
