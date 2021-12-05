@@ -537,7 +537,7 @@ socks = ["PySocks (>=1.5.6,!=1.5.7,<2.0)"]
 
 [[package]]
 name = "voyager"
-version = "2.0.2"
+version = "2.0.4"
 description = "Explorer of the (Ansible) Galaxy"
 category = "main"
 optional = false

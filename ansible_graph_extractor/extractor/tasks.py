@@ -258,7 +258,7 @@ class IncludeTaskExtractor(TaskExtractor):
             logger.debug(incl_name)
             task_file = self.context.files.find_task_file(incl_name)
             if not task_file:
-                self.context.graph.errors.append(f'Task file not found: {filename}')
+                self.context.graph.errors.append(f'Task file not found: {incl_name}')
                 return abort_result
 
             # Delayed import to prevent circular imports. task_files imports

@@ -77,7 +77,8 @@ class Files:
             found_file = _find_file_in_list(file_list, str(rel_path))
             if found_file is None:
                 logger.debug(f'Could not find already parsed {rel_path}')
-            return found_file
+            else:
+                return found_file
 
         # File isn't in the "right" directory, so we'll need to parse it. It
         # may not have been parsed previously because the directory was never

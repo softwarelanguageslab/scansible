@@ -25,6 +25,9 @@ class StructuralGraphExtractor:
 
     def __init__(self, role_path: Path, model: StructuralRoleModel) -> None:
         graph = Graph(model.role_id, model.role_rev)
+        graph.errors.extend([f'{bf.path}: {bf.reason}' for bf in model.role_root.broken_files])
+        for logstr in model.role_root.logs:
+            logger.debug(logstr)
         self.context = ExtractionContext(graph, model.role_root, role_path)
 
     def extract(self) -> Graph:
