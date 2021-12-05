@@ -2,6 +2,7 @@ import json
 import sys
 from pathlib import Path
 from textwrap import indent
+from collections import Counter
 
 import click
 from loguru import logger
@@ -58,7 +59,7 @@ def extract(input: str, output: str) -> None:
 
     tasks = [(role_id, input_path / role_path) for role_id, role_path in role_paths.items()]
     for result in process_map(extract_one, tasks, chunksize=50, desc='Extracting'):
-        if len(result) < 5:
+        if len(result) < 6:
             role_id, error = result
             logger.error(f'Failed to extract graph for {role_id}: {error}')
             (output_path / 'errors' / f'{role_id}.txt').write_text(str(error))
@@ -88,7 +89,13 @@ def extract_debug(input: str, output: str) -> None:
     (output_path / 'errors').mkdir(exist_ok=True, parents=True)
 
     task = (input_path.name, input_path)
-    (role_id, neo4j_str, graphml_str, dot_str, error_str, _) = extract_one(task, log_reset=False)
+    result = extract_one(task, log_reset=False)
+    if len(result) < 6:
+        path, error = result
+        logger.error(f'Failed to perform detection for {path}: {error}')
+        return
+
+    (role_id, neo4j_str, graphml_str, dot_str, error_str, _) = result
     if neo4j_str:
         (output_path / 'neo4j' / f'{role_id}.txt').write_text(neo4j_str)
         (output_path / 'graphml' / f'{role_id}.xml').write_text(graphml_str)
@@ -108,25 +115,35 @@ def detect(input: str, output: str) -> None:
     roles = [path for path in input_path.iterdir() if path.name.endswith('.xml')]
 
     conflict_checker = ConflictingVariables(output_path)
-    with (output_path / 'report.txt').open('w') as output_stream:
-        for results in process_map(detect_one_graph, roles, chunksize=50, desc='Detecting'):
-            if len(results) == 2:
-                path, error = results
-                logger.error(f'Failed to perform detection for {path}: {error}')
-                continue
-            role_name, warnings, def_vars = results
-            if warnings:
-                output_stream.write(role_name + '\n')
-                output_stream.write('-----\n')
-                output_stream.write('\n'.join('* ' + indent(res.description, '  ').lstrip() for res in warnings))
-                output_stream.write('\n')
-            conflict_checker.add_all(role_name, def_vars)
+    output_buffer = ''
+    warning_type_counter: Counter[str] = Counter()
+    for results in process_map(detect_one_graph, roles, chunksize=50, desc='Detecting'):
+        if len(results) == 2:
+            path, error = results
+            logger.error(f'Failed to perform detection for {path}: {error}')
+            continue
+        role_name, warnings, def_vars = results
+        if warnings:
+            lines = [role_name, '-----']
+            lines.extend('* ' + indent(res.description, '  ').lstrip() for res in warnings)
+            output_buffer += '\n'.join(lines)
+            output_buffer += '\n'
+            for warning in warnings:
+                warning_type_counter[warning.rule_name] += 1
+        conflict_checker.add_all(role_name, def_vars)
 
+    with (output_path / 'report.txt').open('w') as output_stream:
+        output_stream.write('------------------\n')
+        output_stream.write('Warnings summary:\n')
+        for rule_name, rule_count in sorted(warning_type_counter.items(), key=lambda x: x[1]):
+            output_stream.write(f'{rule_count}\t{rule_name}\n')
+        output_stream.write('------------------\n')
         conflict_checker.process()
         conflicts = conflict_checker.results
         output_stream.write('------------------\n')
         output_stream.write(f'Found {len(conflicts)} Possible Variable Conflicts\n')
         output_stream.write('------------------\n')
+        output_stream.write(output_buffer)
 
 
 @group.command()
