@@ -6,7 +6,7 @@ from ..models.nodes import Expression, Literal, IntermediateValue, Variable, Tas
 from ..models.edges import Def, DefinedIf
 from ..extractor.var_context import ScopeLevel
 from .base import Rule, RuleResult
-from .utils import get_nodes, get_node_predecessors, get_def_expression, get_used_variables, get_def_conditions
+from .utils import get_nodes, get_node_predecessors, get_def_expression, get_used_variables, get_def_conditions, find_variable_usages
 
 def get_var_origin(graph: Graph, node: Variable) -> Expression | Literal | Task | None:
     def_tasks = get_node_predecessors(graph, node, node_type=Task, edge_type=Def)
@@ -45,41 +45,36 @@ def is_idempotent_expr(graph: Graph, expr: Expression) -> bool:
     return all(is_idempotent_expr(graph, d) for d in used_exprs)
 
 
-class UnnecessarySetFactRule(Rule):
+class UnnecessaryIncludeVarsRule(Rule):
     def scan(self, graph: Graph, visinfo: object) -> list[RuleResult]:
-        set_facted_vars = [
+        included_vars = [
             node for node in get_nodes(graph, Variable)
-            if node.scope_level == ScopeLevel.SET_FACTS_REGISTERED.value]
+            if node.scope_level == ScopeLevel.INCLUDE_VARS.value]
+        # Group into unique definitions so we only emit a warning for the first value version
+        # We keep the other value versions so we can show all usages of this definition
+        grouped_included_vars: dict[tuple[str, int], set[Variable]] = defaultdict(set)
+        for v in included_vars:
+            grouped_included_vars[(v.name, v.version)].add(v)
 
         results: list[RuleResult] = []
-        for v in set_facted_vars:
-            vorigin = get_var_origin(graph, v)
-            assert vorigin is not None, f'Internal Error: {v!r} was defined with set_fact but has no definition'
-
-            if isinstance(vorigin, Task):
-                # register, not set_fact
-                continue
-
-            is_idempotent_def = isinstance(vorigin, Literal) or is_idempotent_expr(graph, vorigin)
+        for vs in grouped_included_vars.values():
+            vs_sorted = sorted(vs, key=lambda v: v.version)
+            v = vs_sorted[0]
             conditions = get_def_conditions(graph, v)
-            is_idempotent_condition = (not conditions) or all(is_idempotent_expr(graph, cond) for cond in conditions)
 
-            if is_idempotent_def and is_idempotent_condition:
-                warning_header = f'Unnecessary use of set_fact for variable "{v.name}@{v.version}"'
-                warning_body_lines = []
+            if not conditions:
+                warning_header = f'Unnecessary use of include_vars for variable "{v.name}@{v.version}"'
+                warning_body_lines = [
+                    f'Variable {v!r} is unconditionally included through include_vars.',
+                    f'Variables included through include_vars have unusually high precedence, which makes tracing values difficult.',
+                    f'Since this variable is unconditionally included, it can instead be placed into default variables, role variables, or a local scope, to prevent variable precedence issue.',
+                    f'All usages of {v.name}@{v.version}:']
+                for vval in vs_sorted:
+                    warning_body_lines.extend(f'\t{usage}' for usage in find_variable_usages(graph, vval))
 
-                if isinstance(vorigin, Literal):
-                    warning_body_lines.append(f'Variable {v!r} is defined by the literal `{vorigin.value}`')
-                else:
-                    warning_body_lines.append(f'Variable {v!r} is defined the expression `{vorigin.expr}`')
-                warning_body_lines.append('This initialiser is fully idempotent.')
-                if conditions:
-                    warning_body_lines.append('Moreover, all conditionals for this variable are idempotent:')
-                    warning_body_lines.extend([f' - `{condition.expr}`' for condition in conditions])
-                warning_body_lines.append('Therefore, greedily evaluating this initialiser serves no specific purpose and identical results can likely be achieved at lower precedence.')
                 results.append(RuleResult(
                     rule_category='Unnecessarily high precedence',
-                    rule_name='Unnecessary set_fact',
+                    rule_name='Unnecessary include_vars',
                     rule_subname='',
                     rule_header=warning_header,
                     rule_message='\n'.join(warning_body_lines),

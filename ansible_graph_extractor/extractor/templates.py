@@ -16,27 +16,30 @@ from pydantic import BaseModel
 ANSIBLE_GLOBALS = frozenset({'lookup', 'query', 'q', 'now', 'finalize', 'omit'})
 
 
-class LookupTarget:
-    pass
-
-
-class NamedLookupTarget(BaseModel, LookupTarget):
-    name: str
-
+class LookupTarget(BaseModel):
     class Config:
         frozen = True
 
 
+class NamedLookupTarget(LookupTarget):
+    name: str
+
+
 class LookupTargetLiteral(NamedLookupTarget):
-    pass
+    def __str__(self) -> str:
+        return f"'{self.name}'"
 
 
 class LookupTargetVariable(NamedLookupTarget):
-    pass
+    def __str__(self) -> str:
+        return self.name
 
 
 class LookupTargetUnknown(LookupTarget):
-    pass
+    value: str
+
+    def __str__(self) -> str:
+        return self.value
 
 
 def parse_wrapped_conditional(expr: str, env: Environment) -> nodes.Node:
@@ -53,6 +56,9 @@ def parse_conditional(
         expr: str, env: Environment, var_mappings: dict[str, str]
 ) -> tuple[nodes.Node, set[str]]:
     ast = env.parse(expr)
+    if not ast.body:
+        return ast, set()
+
     assert len(ast.body) == 1
     assert isinstance(ast.body[0], nodes.Output)
 
@@ -88,7 +94,7 @@ def create_lookup_target(node: nodes.Node) -> LookupTarget:
 
     if not isinstance(node, nodes.Const) or not isinstance(node.value, str):  # type: ignore[attr-defined]
         logger.warning(f'Not extracting lookup plugin target, not a string or variable: {node}')
-        return LookupTargetUnknown()
+        return LookupTargetUnknown(value=str(node))
 
     return LookupTargetLiteral(name=node.value)  # type: ignore[attr-defined]
 

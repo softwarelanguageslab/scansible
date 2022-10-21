@@ -1,0 +1,16 @@
+[flake8]
+exclude =
+    .git
+    __pycache__
+    __mypy_cache__
+    lib/stubs
+import-order-style = pycharm
+max-complexity = 10
+ignore =
+    # Indentation over-indented for hanging indent. We want 8 spaces for
+    # hanging indent as to now confuse it with a new block
+    E126
+    # Line break before binary operator is the convention adopted
+    W503
+per-file-ignores =
+    __init__.py:F401

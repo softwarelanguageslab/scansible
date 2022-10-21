@@ -12,6 +12,7 @@ class BlockExtractor:
     def __init__(self, context: ExtractionContext, block: Block) -> None:
         self.context = context
         self.block = block
+        self.location = f'{block.position_file_name}:{block.position_line_number}:{block.position_column_number}'
         self.kws = {k: v for k, v in self.block._raw_kws.items() if k != 'name'}
 
     def extract_block(self, predecessors: list[n.ControlNode]) -> TaskExtractionResult:
@@ -25,7 +26,7 @@ class BlockExtractor:
             # shadow variables registered in an outer block. However, it's
             # confirmed to be a bug, so we'll handle it as if it were
             # implemented correctly.
-            self.context.vars.register_variable(var_name, expr=var_value, graph=self.context.graph, level=ScopeLevel.BLOCK_VARS)
+            self.context.vars.register_variable(var_name, expr=var_value, level=ScopeLevel.BLOCK_VARS, location=self.location)
 
         # A block without a list of tasks should be impossible
         block_result = self._extract_children(self.kws.pop('block'), predecessors)
@@ -66,10 +67,12 @@ class BlockExtractor:
             next_predecessors = always_result.next_predecessors
         return TaskExtractionResult(
                 added_control_nodes=block_result.added_control_nodes + rescue_result.added_control_nodes + always_result.added_control_nodes,
+                added_variable_nodes=block_result.added_variable_nodes + rescue_result.added_variable_nodes + always_result.added_variable_nodes,
                 next_predecessors=next_predecessors)
 
     def _extract_children(self, child_list: list[Task | Block], predecessors: list[n.ControlNode]) -> TaskExtractionResult:
         added = []
+        added_vars = []
         for child in child_list:
             if isinstance(child, Block):
                 prev_result = BlockExtractor(self.context, child).extract_block(predecessors)
@@ -79,6 +82,7 @@ class BlockExtractor:
                 prev_result = task_extractor.extract_task(predecessors)
 
             predecessors = prev_result.next_predecessors
+            added_vars.extend(prev_result.added_variable_nodes)
             added.extend(prev_result.added_control_nodes)
 
-        return TaskExtractionResult(next_predecessors=predecessors, added_control_nodes=added)
+        return TaskExtractionResult(next_predecessors=predecessors, added_control_nodes=added, added_variable_nodes=added_vars)

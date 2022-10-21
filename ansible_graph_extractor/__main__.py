@@ -1,8 +1,9 @@
+import csv
 import json
 import sys
 from pathlib import Path
 from textwrap import indent
-from collections import Counter
+from collections import Counter, defaultdict
 
 import click
 from loguru import logger
@@ -12,9 +13,10 @@ from tqdm.contrib.concurrent import process_map
 from ansible_graph_extractor.extractor import extract_structural_graph
 from ansible_graph_extractor.io import graphml, neo4j, graphviz
 from ansible_graph_extractor.io.structural_models import import_all_role_heads, parse_role
-from ansible_graph_extractor.extract import extract_one
-from ansible_graph_extractor.detector import detect_one_graph
-from ansible_graph_extractor.detector.conflicting_variables import ConflictingVariables
+from ansible_graph_extractor.extract import extract_one, extract_full_repo, CommitInfo
+from ansible_graph_extractor import detector
+from ansible_graph_extractor.repo_scan import scan_repo_wrap
+from ansible_graph_extractor import utils
 
 @click.group()
 def group() -> None:
@@ -45,19 +47,54 @@ def run_extracted(input: str, output: str) -> None:
 @group.command()
 @click.argument('input', type=click.Path(file_okay=False, dir_okay=True, readable=True, exists=True))
 @click.argument('output', type=click.Path(dir_okay=True, file_okay=False, writable=True))
-def extract(input: str, output: str) -> None:
+@click.option('--full/-f', default=False)
+def extract(input: str, output: str, full: bool) -> None:
     input_path = Path(input)
     output_path = Path(output)
     (output_path / 'neo4j').mkdir(exist_ok=True, parents=True)
     (output_path / 'graphml').mkdir(exist_ok=True, parents=True)
+    (output_path / 'aux').mkdir(exist_ok=True, parents=True)
     (output_path / 'dot').mkdir(exist_ok=True, parents=True)
     (output_path / 'errors').mkdir(exist_ok=True, parents=True)
     (output_path / 'logs').mkdir(exist_ok=True, parents=True)
 
-    with (input_path / 'repoPaths.json').open('r') as f:
+    with (input_path / 'repoPaths_filtered.json').open('r') as f:
         role_paths = json.load(f)
 
-    tasks = [(role_id, input_path / role_path) for role_id, role_path in role_paths.items()]
+    if full:
+        extract_full(role_paths, input_path, output_path)
+    else:
+        extract_heads(role_paths, input_path, output_path)
+
+def extract_full(role_paths: dict[str, Path], input_path: Path, output_path: Path) -> None:
+    (output_path / 'status').mkdir(exist_ok=True, parents=True)
+
+    tasks = [(role_id, input_path / role_path, output_path) for role_id, role_path in role_paths.items()]
+    all_success_paths: list[str] = []
+    all_commit_infos: dict[str, list[CommitInfo]] = {}
+    for result in process_map(extract_full_repo, tasks, chunksize=15, desc='Extracting'):
+        role_id, success_paths, exceptions, commit_infos = result
+        all_success_paths.extend(success_paths)
+        if exceptions:
+            logger.error(f'Failed to extract some graphs for {role_id}: {len(exceptions)} exceptions, first is {exceptions[0]}')
+        all_commit_infos[role_id] = commit_infos
+
+    write_commits(all_commit_infos, output_path)
+    (output_path / 'index.json').write_text(json.dumps(all_success_paths))
+
+def write_commits(commit_infos: dict[str, list[CommitInfo]], output_path: Path) -> None:
+    with (output_path / 'commits.csv').open('w') as commits_f, (output_path / 'commit_parents.csv').open('w') as parents_f:
+        commit_writer = csv.writer(commits_f)
+        parents_writer = csv.writer(parents_f)
+        commit_writer.writerow(['role_id', 'commit_sha', 'commit_message'])
+        parents_writer.writerow(['role_id', 'commit_sha', 'parent'])
+        for role_id, commits in commit_infos.items():
+            commit_writer.writerows([role_id, sha, message] for sha, message, _ in commits)
+            for sha, _, parents in commits:
+                parents_writer.writerows([role_id, sha, parent_sha] for parent_sha in parents)
+
+def extract_heads(role_paths: dict[str, Path], input_path: Path, output_path: Path) -> None:
+    tasks = [(role_id, 'HEAD', input_path / role_path) for role_id, role_path in role_paths.items()]
     for result in process_map(extract_one, tasks, chunksize=50, desc='Extracting'):
         if len(result) < 6:
             role_id, error = result
@@ -65,12 +102,13 @@ def extract(input: str, output: str) -> None:
             (output_path / 'errors' / f'{role_id}.txt').write_text(str(error))
             continue
 
-        role_id, neo4j_str, graphml_str, dot_str, error_str, log_str = result
+        role_id, neo4j_str, graphml_str, dot_str, vis_str, error_str, log_str = result
         if neo4j_str:
             (output_path / 'neo4j' / f'{role_id}.txt').write_text(neo4j_str)
             (output_path / 'graphml' / f'{role_id}.xml').write_text(graphml_str)
             (output_path / 'dot' / f'{role_id}.dot').write_text(dot_str)
             (output_path / 'logs' / f'{role_id}.txt').write_text(log_str)
+            (output_path / 'aux' / f'{role_id}.vis.json').write_text(vis_str)
         if error_str:
             (output_path / 'errors' / f'{role_id}.txt').write_text(error_str)
 
@@ -85,21 +123,23 @@ def extract_debug(input: str, output: str) -> None:
     output_path = Path(output)
     (output_path / 'neo4j').mkdir(exist_ok=True, parents=True)
     (output_path / 'graphml').mkdir(exist_ok=True, parents=True)
+    (output_path / 'aux').mkdir(exist_ok=True, parents=True)
     (output_path / 'dot').mkdir(exist_ok=True, parents=True)
     (output_path / 'errors').mkdir(exist_ok=True, parents=True)
 
-    task = (input_path.name, input_path)
+    task = (input_path.name, 'HEAD', input_path)
     result = extract_one(task, log_reset=False)
     if len(result) < 6:
         path, error = result
-        logger.error(f'Failed to perform detection for {path}: {error}')
+        logger.error(f'Failed to perform extraction for {path}: {error}')
         return
 
-    (role_id, neo4j_str, graphml_str, dot_str, error_str, _) = result
+    (role_id, neo4j_str, graphml_str, dot_str, vis_str, error_str, _) = result
     if neo4j_str:
         (output_path / 'neo4j' / f'{role_id}.txt').write_text(neo4j_str)
         (output_path / 'graphml' / f'{role_id}.xml').write_text(graphml_str)
         (output_path / 'dot' / f'{role_id}.dot').write_text(dot_str)
+        (output_path / 'aux' / f'{role_id}.vis.json').write_text(vis_str)
     if error_str:
         (output_path / 'errors' / f'{role_id}.txt').write_text(error_str)
 
@@ -108,42 +148,11 @@ def extract_debug(input: str, output: str) -> None:
 @click.argument('input', type=click.Path(file_okay=False, dir_okay=True, readable=True, exists=True))
 @click.argument('output', type=click.Path(dir_okay=True, file_okay=False, writable=True))
 def detect(input: str, output: str) -> None:
-    input_path = Path(input) / 'graphml'
+    input_path = Path(input)
     output_path = Path(output)
     output_path.mkdir(exist_ok=True, parents=True)
 
-    roles = [path for path in input_path.iterdir() if path.name.endswith('.xml')]
-
-    conflict_checker = ConflictingVariables(output_path)
-    output_buffer = ''
-    warning_type_counter: Counter[str] = Counter()
-    for results in process_map(detect_one_graph, roles, chunksize=50, desc='Detecting'):
-        if len(results) == 2:
-            path, error = results
-            logger.error(f'Failed to perform detection for {path}: {error}')
-            continue
-        role_name, warnings, def_vars = results
-        if warnings:
-            lines = [role_name, '-----']
-            lines.extend('* ' + indent(res.description, '  ').lstrip() for res in warnings)
-            output_buffer += '\n'.join(lines)
-            output_buffer += '\n'
-            for warning in warnings:
-                warning_type_counter[warning.rule_name] += 1
-        conflict_checker.add_all(role_name, def_vars)
-
-    with (output_path / 'report.txt').open('w') as output_stream:
-        output_stream.write('------------------\n')
-        output_stream.write('Warnings summary:\n')
-        for rule_name, rule_count in sorted(warning_type_counter.items(), key=lambda x: x[1]):
-            output_stream.write(f'{rule_count}\t{rule_name}\n')
-        output_stream.write('------------------\n')
-        conflict_checker.process()
-        conflicts = conflict_checker.results
-        output_stream.write('------------------\n')
-        output_stream.write(f'Found {len(conflicts)} Possible Variable Conflicts\n')
-        output_stream.write('------------------\n')
-        output_stream.write(output_buffer)
+    detector.main(input_path, output_path)
 
 
 @group.command()
@@ -167,6 +176,119 @@ def compare(source: str, target: str) -> None:
             assert_graphs_match(src_graph, target_graph)
         except BaseException as e:
             tqdm.write(p.name + ': ' + str(e))
+
+@group.command()
+@click.argument('output')
+def convert_locations(output: str) -> None:
+    warnings_path = Path(output) / 'warnings.csv'
+    with warnings_path.open('r') as f:
+        warnings_it = csv.reader(f)
+        warnings = [next(warnings_it)]
+        warnings[0].append('warning_file')
+
+        for warning in tqdm(warnings_it):
+            warning.append(utils.extract_file_path(warning[-1]))
+            warnings.append(warning)
+
+        warnings_out_path = Path(output) / 'warnings_with_file_path.csv'
+        with warnings_out_path.open('w') as f:
+            csv.writer(f).writerows(warnings)
+
+@group.command()
+@click.argument('input', type=click.Path(file_okay=False, dir_okay=True, readable=True, exists=True))
+@click.argument('output', type=click.Path(dir_okay=True, file_okay=False, writable=True))
+def extract_all_locations(input: str, output: str) -> None:
+    input_path = Path(input)
+    output_path = Path(output)
+    output_path.mkdir(exist_ok=True, parents=True)
+
+    tasks = list(detector.create_tasks(input_path))
+    with (output_path / 'locations.csv').open('wt') as locf:
+        writer = csv.writer(locf)
+        writer.writerow(['role_name', 'commit', 'file_path'])
+        for result in process_map(utils.extract_all_locations, tasks, chunksize=50, desc='Extracting locations'):
+            role, commit, locations = result
+            writer.writerows((role, commit, loc) for loc in locations)
+
+
+@group.command()
+@click.argument('output')
+def extract_variable_names(output: str) -> None:
+    warnings_path = Path(output) / 'warnings.csv'
+    warnings_out_path = Path(output) / 'warnings_with_variable_name.csv'
+    with warnings_path.open('r') as f, warnings_out_path.open('w') as out_f:
+        warnings_reader = csv.reader(f)
+        warnings_writer = csv.writer(out_f)
+
+        header = next(warnings_reader)
+        header.append('warning_variable_name')
+        warnings_writer.writerow(header)
+
+        for warning in tqdm(warnings_reader):
+            warning.append(utils.extract_variable_name(warning))
+            warnings_writer.writerow(warning)
+
+@group.command()
+@click.argument('index')
+@click.argument('output')
+def scan_commits(index: str, output: str) -> None:
+    idx_path = Path(index)
+    output_path = Path(output)
+
+    idx = json.loads(idx_path.read_text())
+    with (output_path / 'warnings.csv').open('r') as warnings_f:
+        warnings_reader = csv.reader(warnings_f)
+        next(warnings_reader)  # skip header
+        role_to_warning_locations = defaultdict(set)
+        for name, _, cat, *_, file_name, _ in warnings_reader:
+            if cat == 'Sanity checks':
+                continue
+            role_to_warning_locations[name].add(file_name)
+
+    with (output_path / 'commit_added_path.csv').open('w') as f_added, (output_path / 'commit_removed_path.csv').open('w') as f_removed, (output_path / 'commit_renamed_path.csv').open('w') as f_renamed:
+        w_add = csv.writer(f_added)
+        w_rename = csv.writer(f_renamed)
+        w_remove = csv.writer(f_removed)
+        w_add.writerow(['role_id', 'commit_sha', 'parent_sha', 'added_file_path'])
+        w_remove.writerow(['role_id', 'commit_sha', 'parent_sha', 'removed_file_path'])
+        w_rename.writerow(['role_id', 'commit_sha', 'parent_sha', 'path_before', 'path_after'])
+
+        for role_name, role_warning_locations in tqdm(role_to_warning_locations.items()):
+            role_path = idx_path.parent / idx[role_name]
+            added, removed, renamed = utils.find_file_path_changes(role_path, role_warning_locations)
+            w_add.writerows((role_name, *a) for a in added)
+            w_remove.writerows((role_name, *r) for r in removed)
+            w_rename.writerows((role_name, *r) for r in renamed)
+
+
+@group.command()
+@click.argument('index')
+@click.argument('output')
+def add_commit_info(index: str, output: str) -> None:
+    idx_path = Path(index)
+    output_path = Path(output)
+
+    idx = json.loads(idx_path.read_text())
+    with (output_path / 'commits.csv').open('r') as commits_f:
+        commits_reader = csv.reader(commits_f)
+        next(commits_reader)  # skip header
+        role_to_commits = defaultdict(list)
+        for commit in commits_reader:
+            role_id, *_ = commit
+            role_to_commits[role_id].append(commit)
+
+    with (output_path / 'commits_with_date.csv').open('w') as f_date, (output_path / 'commit_tags.csv').open('w') as f_tags:
+        w_date = csv.writer(f_date)
+        w_tags = csv.writer(f_tags)
+        w_date.writerow(['role_id', 'commit_sha', 'commit_message', 'committed_datetime', 'committer', 'author'])
+        w_tags.writerow(['role_id', 'commit_sha', 'tag'])
+
+        for role_id, role_commits in tqdm(role_to_commits.items()):
+            role_meta_rel_path = Path('RepositoryMetadata').joinpath(*Path(idx[role_id]).parts[1:])
+            role_meta_path = idx_path.parent / (role_meta_rel_path.with_name(role_meta_rel_path.name + '.yaml'))
+            ext_commits, role_commit_tags = utils.extract_commit_info(role_meta_path, role_commits)
+            w_date.writerows(ext_commits)
+            w_tags.writerows(role_commit_tags)
 
 
 if __name__ == '__main__':

@@ -89,7 +89,10 @@ def dump_graph(g: Graph) -> str:
     return str(writer)
 
 
-def import_graph(graphml_str: str) -> Graph:
+def import_graph(graphml_str: str, role_id: str, role_version: str) -> Graph:
+    if not graphml_str:
+        return Graph(role_id, role_version)
+
     reader = CustomGraphMLReader()
 
     graphs = list(reader(string=graphml_str))

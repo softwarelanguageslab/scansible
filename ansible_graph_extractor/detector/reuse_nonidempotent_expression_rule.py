@@ -7,7 +7,7 @@ from ..models.edges import Def
 from .base import Rule, RuleResult
 from .utils import get_nodes, get_def_expression, determine_value_version_change_reason, ValueChangeReason, find_variable_usages
 
-class ReuseChangedVariableRule(Rule):
+class ReuseNonIdempotentExpressionRule(Rule):
     def scan(self, graph: Graph, visinfo: object) -> list[RuleResult]:
         var_nodes = get_nodes(graph, Variable)
 
@@ -31,30 +31,27 @@ class ReuseChangedVariableRule(Rule):
 
         # Sort the nodes so we can check each pair of (prev_value, next_value) individually.
         # In the following, for each of these pairs, we check their expressions
-        # and check whether they had been re-evaluated following a redefinition
-        # (i.e. different version, not different value version) of one of their
-        # dependencies. We don't care about new value versions due to redefinitions
-        # because of an upstream new value version. These occur under two circumstances:
-        # non-idempotent expressions (different check), and a cascade of a redefinition
-        # upstream. We ignore the latter, as we'll analyse the impact of a redefinition
-        # upstream, not here.
+        # and check whether they had been re-evaluated following a non-idempotent expression.
+        # (i.e. different value version) of one of their dependencies. We only
+        # care about changes due to non-idempotency of direct dependences,
+        # we'll check further issues downstream.
         nodes_sorted = sorted(nodes, key=lambda n: n.value_version)
         for v1, v2 in zip(nodes_sorted, nodes_sorted[1:]):
             value_version_change_reason, value_change_context = determine_value_version_change_reason(graph, v1, v2)
-            if value_version_change_reason != ValueChangeReason.DEPENDENCY_REDEFINED:
+            if value_version_change_reason != ValueChangeReason.EXPRESSION_NOT_IDEMPOTENT:
                 continue
-            assert isinstance(value_change_context, tuple) and len(value_change_context) == 2, 'Internal Error: Unexpected value change context type'
+            assert isinstance(value_change_context, Expression), 'Internal Error: Unexpected value change context type'
 
-            dep_v1, dep_v2 = value_change_context
-
-            warning_header = f'Potentially unsafe reuse of variable "{v2.name}@{v2.version}" due to potential change in dependence.'
+            warning_header = f'Potentially unsafe reuse of variable "{v2.name}@{v2.version}" due to potential non-idempotent expression.'
             warning_expl_lines = [
                 f'This variable was previously used as {v1!r}, but now as {v2!r}.',
-                f'The expression defining this variable has remained the same, however, it references a variable {dep_v1.name!r}.',
-                f'This dependence has potentially been changed since the previous usage.',
-                f'In the first usages of {v1.name!r}, {dep_v1.name!r} was defined in {dep_v1.location!r}',
-                f'In later usages of {v2.name!r}, {dep_v1.name!r} was defined in {dep_v2.location!r}',
+                f'The expression defining this variable has remained the same, however, it may not be idempotent.',
+                f'Therefore, its value may have changed since the previous evaluation.',
+                f'{value_change_context.expr!r} may be non-idempotent due to the usage of the following components:'
             ]
+            for non_idempotent_component in value_change_context.non_idempotent_components:
+                warning_expl_lines.append(f' - {non_idempotent_component}')
+
             warning_expl_lines.append(f'All usages of {v1!r}:')
             warning_expl_lines.extend(f'\t{usage}' for usage in find_variable_usages(graph, v1))
             warning_expl_lines.append(f'All usages of {v2!r}:')
@@ -63,7 +60,7 @@ class ReuseChangedVariableRule(Rule):
 
             yield RuleResult(
                     rule_category='Unsafe reuse',
-                    rule_name='Redefined dependence',
+                    rule_name='Expression not idempotent',
                     rule_subname='',
                     rule_header=warning_header,
                     rule_message=warning_expl,

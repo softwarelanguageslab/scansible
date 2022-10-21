@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Generator, Literal, Sequence, TypeVar, overload
 
+import json
 from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
 
@@ -141,19 +142,54 @@ class Files:
     def find_var_file(self, path: str) -> RoleVarFile | None:
         return self._find_file(path, 'vars')
 
-class ExtractionContext():
+
+class VisibilityInformation:
+    def __init__(self) -> None:
+        self._store: dict[tuple[str, int], set[tuple[str, int]]] = dict()
+
+    def set_info(self, var_name: str, def_version: int, visible_definitions: set[tuple[str, int]]) -> None:
+        assert (var_name, def_version) not in self._store, f'Internal Error: Visibility information already set for {var_name}@{def_version}'
+        self._store[(var_name, def_version)] = visible_definitions
+
+    def get_info(self, var_name: str, def_version: int) -> set[tuple[str, int]]:
+        assert (var_name, def_version) in self._store, f'Internal Error: Visibility information not stored for {var_name}@{def_version}'
+        return self._store[(var_name, def_version)]
+
+    def dump(self) -> str:
+        """Dump to JSON."""
+        as_lists = [[list(k), [list(v) for v in vals]] for k, vals in self._store.items()]
+        return json.dumps(as_lists)
+
+    @classmethod
+    def load(self, payload: str) -> VisibilityInformation:
+        inst = VisibilityInformation()
+        as_lists = json.loads(payload)
+        for k, vals in as_lists:
+            name, rev = k
+            vals_as_tuples = {(vname, vrev) for vname, vrev in vals}
+            inst.set_info(name, rev, vals_as_tuples)
+        return inst
+
+
+class ExtractionContext:
     vars: VarContext
     graph: Graph
     files: Files
     role: Role
+    play: Play | None
+    # Auxiliary information about variable visibility. We don't store this in
+    # the graph itself but in a companion file.
+    visibility_information: VisibilityInformation
     _next_id: int
     _next_iv_id: int
 
-    def __init__(self, graph: Graph, role: Role, role_path: Path) -> None:
+    def __init__(self, graph: Graph, role: Role, role_path: Path, is_pb: bool) -> None:
         self.vars = VarContext(self)
         self.graph = graph
         self.role = role
+        self.is_pb = is_pb
         self.files = Files(role, role_path)
+        self.visibility_information = VisibilityInformation()
         self._next_id = 0
         self._next_iv_id = 0
 
@@ -180,6 +216,7 @@ def get_file_name(f: ContainerFile | str) -> str:  # type: ignore[type-arg]
 
 class ExtractionResult(BaseModel):
     added_control_nodes: list[n.ControlNode]
+    added_variable_nodes: list[n.Variable]
 
 class TaskExtractionResult(ExtractionResult):
     next_predecessors: list[n.ControlNode]

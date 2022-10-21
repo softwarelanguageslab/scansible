@@ -1,5 +1,5 @@
 """Graph nodes."""
-from typing import Annotated, Any, ClassVar, Literal as LiteralT, Optional
+from typing import Annotated, Any, ClassVar, Literal as LiteralT, Optional, TYPE_CHECKING
 
 from pydantic import BaseModel, Field, constr
 
@@ -15,20 +15,10 @@ class FrozenBase(BaseModel):
 
 class Node(FrozenBase):
     """Base nodes."""
-    # TODO: This shouldn't be shared across all graphs, otherwise we may run
-    # into overflows.
-    # _next_id: ClassVar[int] = 0
-
-    # @classmethod
-    # def _get_id(cls) -> int:
-    #     warnings.warn('I am still using shared node IDs across all graphs, possible overflows!')
-    #     cls._next_id += 1
-    #     return cls._next_id - 1
-
     node_id: int
 
 class ControlNode(Node):
-    ...
+    location: str
 
 
 class DataNode(Node):
@@ -49,17 +39,33 @@ class Conditional(ControlNode):
     """Node representing a condition."""
 
 
-class Variable(DataNode):
-    """Node representing variables."""
-    name: constr(strict=True, min_length=1)  # type: ignore[valid-type]
-    version: int
-    value_version: int
-    scope_level: int
+if TYPE_CHECKING:
+    class Variable(DataNode):
+        name: str
+        version: int
+        value_version: int
+        scope_level: int
+        location: str
+
+else:
+    class Variable(DataNode):
+        """Node representing variables."""
+        name: constr(strict=True, min_length=1)
+        version: int
+        value_version: int
+        scope_level: int
+        location: str
+
+        def __repr__(self) -> str:
+            return f'{self.name}@{self.version}.{self.value_version}'
 
 
 class IntermediateValue(DataNode):
     """Node representing intermediate values."""
     identifier: int
+
+    def __repr__(self) -> str:
+        return f'${self.identifier}'
 
 
 class Literal(DataNode):
@@ -71,7 +77,16 @@ class Literal(DataNode):
 class Expression(DataNode):
     """Node representing a template expression."""
     expr: constr(strict=True)  # type: ignore[valid-type]
-    # Whether this expression is idempotent. Does not take idempotency of
-    # dependences into account.
-    idempotent: bool
+
+    # Should ideally be a list, but we can't easily serialise those
+    # Should be newline separated
+    non_idempotent_components_str: str = ''
+
+    @property
+    def non_idempotent_components(self) -> list[str]:
+        return self.non_idempotent_components_str.split('\n')
+
+    @property
+    def idempotent(self) -> bool:
+        return not self.non_idempotent_components_str
 
