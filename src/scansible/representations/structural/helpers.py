@@ -44,19 +44,16 @@ class ProjectPath:
         """
         return cls(root_path, '.')
 
-    def join(self, other: Path | str | ProjectPath) -> ProjectPath:
+    def join(self, other: Path | str) -> ProjectPath:
         """
         Join the current path with another path.
 
         :raises     AssertionError:  When the two project paths have different roots.
         """
-        if isinstance(other, ProjectPath):
-            assert other.root == self.root, 'Project paths with different roots'
-            other = other.relative
-        elif isinstance(other, str):
+        if isinstance(other, str):
             other = Path(other)
 
-        return ProjectPath(self.root, other)
+        return ProjectPath(self.root, self.relative / other)
 
 
     @property
