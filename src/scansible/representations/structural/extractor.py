@@ -17,6 +17,7 @@ import ansible.parsing.dataloader
 import ansible.parsing.mod_args
 
 from . import representation as rep
+from .helpers import ProjectPath, parse_file, validate_ansible_object, capture_output, find_all_files, find_file
 
 
 # Patch the ModuleArgsParser so that it doesn't verify whether the action exist.
@@ -30,71 +31,10 @@ class FatalError(Exception):
     pass
 
 
-class ProjectPath:
-    root: Path
-    relative: Path
-
-    def __init__(self, root_path: Path, file_path: Path | str) -> None:
-        assert root_path.is_absolute()
-        self.root = root_path
-
-        if not isinstance(file_path, Path):
-            file_path = Path(file_path)
-
-        if file_path.is_absolute():
-            self.relative = file_path.relative_to(root_path)
-        else:
-            self.relative = file_path
-
-    @classmethod
-    def from_root(cls, root_path: Path) -> ProjectPath:
-        return cls(root_path, '.')
-
-    def join(self, other: Path | str | ProjectPath) -> ProjectPath:
-        if isinstance(other, ProjectPath):
-            assert other.root == self.root, 'Project paths with different roots'
-            other = other.relative
-        elif isinstance(other, str):
-            other = Path(other)
-
-        return ProjectPath(self.root, other)
-
-
-    @property
-    def absolute(self) -> Path:
-        return (self.root / self.relative).resolve()
-
-
-def _parse_file(path: ProjectPath) -> object:
-    """Parse a YAML file using Ansible's parser."""
-    loader = ansible.parsing.dataloader.DataLoader()
-    return loader.load_from_file(str(path.absolute))
-
-
-def _validate_ansible_object(obj: ansible.playbook.base.FieldAttributeBase) -> None:
-    """Validate and mutate the given Ansible object."""
-
-    # We have to reimplement Ansible's logic because it eagerly templates certain
-    # expressions. We don't want that.
-    for (name, attribute) in obj._valid_attrs.items():
-        value = getattr(obj, name)
-        if value is None:
-            continue
-        if attribute.isa == 'class':
-            assert isinstance(value, ansible.playbook.base.FieldAttributeBase)
-            _validate_ansible_object(value)
-            continue
-
-        # templar argument is only used when attribute.isa is a class, which we
-        # handle specially above.
-        validated_value = obj.get_validated_value(name, attribute, value, None)
-        setattr(obj, name, validated_value)
-
-
 def extract_role_metadata_file(path: ProjectPath) -> rep.MetaFile:
     """Extract the structural representation of a metadata file."""
 
-    ds = _parse_file(path)
+    ds = parse_file(path)
     # Need to do the validation ourselves because role metadata parsing is
     # heavily under-validated in Ansible.
     assert ds, 'Empty role metadata'
@@ -138,7 +78,7 @@ def _extract_meta_dependencies(meta: dict[str, object]) -> list[rep.Dependency]:
 
 
 def extract_variable_file(path: ProjectPath) -> rep.VariableFile:
-    ds = _parse_file(path)
+    ds = parse_file(path)
     assert isinstance(ds, dict), 'Expected variable file to contain a dictionary'
 
     variables = extract_vars(ds)
@@ -153,7 +93,7 @@ def extract_vars(ds: dict[str, rep.AnyValue]) -> list[rep.Variable]:
 
 
 def extract_tasks_file(path: ProjectPath, handlers: bool = False) -> rep.TaskFile:
-    ds = _parse_file(path)
+    ds = parse_file(path)
     assert isinstance(ds, list), 'Expected task file to be a list'
 
     content = extract_list_of_tasks_or_blocks(ds, handlers)  # type: ignore[call-overload]
@@ -213,7 +153,7 @@ _PatchedBlock.__name__ = 'Block'
 def extract_block(ds: dict[str, rep.AnyValue]) -> rep.Block:
     raw_block = _PatchedBlock(ds)
     raw_block.load_data(ds)
-    _validate_ansible_object(raw_block)
+    validate_ansible_object(raw_block)
 
     children_block = extract_list_of_tasks_or_blocks(raw_block.block, handlers=False)
     children_rescue = extract_list_of_tasks_or_blocks(raw_block.rescue, handlers=False)
@@ -236,7 +176,7 @@ def extract_block(ds: dict[str, rep.AnyValue]) -> rep.Block:
 
 def extract_task(ds: dict[str, rep.AnyValue]) -> rep.Task:
     raw_task = ansible.playbook.task.Task.load(ds)
-    _validate_ansible_object(raw_task)
+    validate_ansible_object(raw_task)
 
     if raw_task.loop_control:
         raise FatalError('TODO: loop_control')
@@ -255,7 +195,7 @@ def extract_task(ds: dict[str, rep.AnyValue]) -> rep.Task:
 
 def extract_handler(ds: dict[str, rep.AnyValue]) -> rep.Handler:
     raw_handler = ansible.playbook.handler.Handler.load(ds)
-    _validate_ansible_object(raw_handler)
+    validate_ansible_object(raw_handler)
 
     if raw_handler.loop_control:
         raise FatalError('TODO: loop_control')
@@ -271,62 +211,6 @@ def extract_handler(ds: dict[str, rep.AnyValue]) -> rep.Handler:
         raw=ds,
         # TODO!
         loop_control=None)
-
-
-def find_file(dir_path: ProjectPath, file_name: str) -> ProjectPath | None:
-    loader = ansible.parsing.dataloader.DataLoader()
-    # DataLoader.find_vars_files is misnamed.
-    found_paths = loader.find_vars_files(str(dir_path.absolute), file_name, allow_dir=False)
-    assert len(found_paths) <= 1, f'Found multiple files for {file_name} in {dir_path.relative}'
-
-    if not found_paths:
-        return None
-
-    found_path = found_paths[0]
-    return dir_path.join(found_path.decode('utf-8'))
-
-
-def find_all_files(dir_path: ProjectPath) -> list[ProjectPath]:
-    results = []
-    for child in dir_path.absolute.iterdir():
-        child_path = dir_path.join(child)
-        if child.is_file() and child.suffix in ansible.constants.YAML_FILENAME_EXTENSIONS:
-            results.append(child_path)
-        elif child.is_dir():
-            results.extend(find_all_files(child_path))
-
-    return results
-
-
-ExtractedFileType = TypeVar('ExtractedFileType')
-
-
-def safe_extract(extractor: Callable[[ProjectPath], ExtractedFileType], file_path: ProjectPath | None, file_dict: dict[str, ExtractedFileType], broken_files: list[rep.BrokenFile]) -> None:
-    if file_path is None:
-        return
-
-    try:
-        extracted_file = extractor(file_path)
-        file_dict['/'.join(file_path.relative.parts[1:])] = extracted_file
-    except (ansible.errors.AnsibleError, AssertionError) as e:
-        broken_files.append(rep.BrokenFile(path=file_path.relative, reason=str(e)))
-
-
-def safe_extract_all(extractor: Callable[[ProjectPath], ExtractedFileType], dir_path: ProjectPath, file_dict: dict[str, ExtractedFileType], broken_files: list[rep.BrokenFile]) -> None:
-    for child_path in find_all_files(dir_path):
-        safe_extract(extractor, child_path, file_dict, broken_files)
-
-
-class _LogCapture:
-    def __init__(self) -> None:
-        self.logs: list[str] = []
-
-    def write(self, buf: str) -> int:
-        self.logs.append(buf)
-        return len(buf)
-
-    def flush(self) -> None:
-        pass
 
 
 class _PatchedPlay(ansible.playbook.play.Play):
@@ -351,7 +235,7 @@ _PatchedPlay.__name__ = 'Play'
 def extract_play(ds: dict[str, rep.AnyValue]) -> rep.Play:
     raw_play = _PatchedPlay()
     raw_play.load_data(ds)
-    _validate_ansible_object(raw_play)
+    validate_ansible_object(raw_play)
 
     play = rep.Play(
         name=raw_play.name,
@@ -382,18 +266,17 @@ def extract_playbook(path: Path, id: str, version: str) -> rep.StructuralModel:
 
     pb_path = ProjectPath.from_root(path)
 
-    log_capture = _LogCapture()
-    with redirect_stdout(log_capture), redirect_stderr(log_capture):  # type: ignore[type-var]
-        ds = _parse_file(pb_path)
+    with capture_output() as output:
+        ds = parse_file(pb_path)
         assert isinstance(ds, list) and bool(ds), 'Malformed or empty playbook'
 
         # Parse the plays in the playbook
         plays = [extract_play(play_ds) for play_ds in ds]
 
-    pb = rep.Playbook(plays=plays, logs=log_capture.logs, raw=ds)
+    pb = rep.Playbook(plays=plays, raw=ds)
     for play in plays:
         play.parent = pb
-    return rep.StructuralModel(root=pb, path=path, id=id, version=version)
+    return rep.StructuralModel(root=pb, path=path, id=id, version=version, logs=output.getvalue())
 
 
 def extract_role(path: Path, id: str, version: str, extract_all: bool = False) -> rep.StructuralModel:
@@ -426,27 +309,26 @@ def extract_role(path: Path, id: str, version: str, extract_all: bool = False) -
     meta_files: dict[str, rep.MetaFile] = {}
     broken_files: list[rep.BrokenFile] = []
 
-    log_capture = _LogCapture()
-    with redirect_stdout(log_capture), redirect_stderr(log_capture):  # type: ignore[type-var]
+    with capture_output() as output:
         meta_file_path = find_file(role_path, 'meta/main')
-        safe_extract(extract_role_metadata_file, meta_file_path, meta_files, broken_files)
+        _safe_extract(extract_role_metadata_file, meta_file_path, meta_files, broken_files)
         meta_file = next(iter(meta_files.values())) if meta_files else None
 
         if extract_all:
             get_dir = partial(ProjectPath, role_path.absolute)
 
-            safe_extract_all(partial(extract_tasks_file, handlers=False), get_dir('tasks'), task_files, broken_files)
-            safe_extract_all(partial(extract_tasks_file, handlers=True), get_dir('handlers'), handler_files, broken_files)
-            safe_extract_all(extract_variable_file, get_dir('vars'), vars_files, broken_files)
-            safe_extract_all(extract_variable_file, get_dir('defaults'), defaults_files, broken_files)
+            _safe_extract_all(partial(extract_tasks_file, handlers=False), get_dir('tasks'), task_files, broken_files)
+            _safe_extract_all(partial(extract_tasks_file, handlers=True), get_dir('handlers'), handler_files, broken_files)
+            _safe_extract_all(extract_variable_file, get_dir('vars'), vars_files, broken_files)
+            _safe_extract_all(extract_variable_file, get_dir('defaults'), defaults_files, broken_files)
         else:
             def get_main_path(dirname: str) -> ProjectPath | None:
                 return find_file(role_path, 'meta/main')
 
-            safe_extract(partial(extract_tasks_file, handlers=False), get_main_path('tasks'), task_files, broken_files)
-            safe_extract(partial(extract_tasks_file, handlers=True), get_main_path('handlers'), handler_files, broken_files)
-            safe_extract(extract_variable_file, get_main_path('defaults'), defaults_files, broken_files)
-            safe_extract(extract_variable_file, get_main_path('vars'), vars_files, broken_files)
+            _safe_extract(partial(extract_tasks_file, handlers=False), get_main_path('tasks'), task_files, broken_files)
+            _safe_extract(partial(extract_tasks_file, handlers=True), get_main_path('handlers'), handler_files, broken_files)
+            _safe_extract(extract_variable_file, get_main_path('defaults'), defaults_files, broken_files)
+            _safe_extract(extract_variable_file, get_main_path('vars'), vars_files, broken_files)
 
     role = rep.Role(
         task_files=task_files,
@@ -455,7 +337,6 @@ def extract_role(path: Path, id: str, version: str, extract_all: bool = False) -
         default_var_files=defaults_files,
         meta_file=meta_file,
         broken_files=broken_files,
-        logs=log_capture.logs,
     )
 
     return rep.StructuralModel(
@@ -463,5 +344,24 @@ def extract_role(path: Path, id: str, version: str, extract_all: bool = False) -
         path=path,
         id=id,
         version=version,
+        logs=output.getvalue()
     )
 
+
+ExtractedFileType = TypeVar('ExtractedFileType')
+
+
+def _safe_extract(extractor: Callable[[ProjectPath], ExtractedFileType], file_path: ProjectPath | None, file_dict: dict[str, ExtractedFileType], broken_files: list[rep.BrokenFile]) -> None:
+    if file_path is None:
+        return
+
+    try:
+        extracted_file = extractor(file_path)
+        file_dict['/'.join(file_path.relative.parts[1:])] = extracted_file
+    except (ansible.errors.AnsibleError, AssertionError) as e:
+        broken_files.append(rep.BrokenFile(path=file_path.relative, reason=str(e)))
+
+
+def _safe_extract_all(extractor: Callable[[ProjectPath], ExtractedFileType], dir_path: ProjectPath, file_dict: dict[str, ExtractedFileType], broken_files: list[rep.BrokenFile]) -> None:
+    for child_path in find_all_files(dir_path):
+        _safe_extract(extractor, child_path, file_dict, broken_files)

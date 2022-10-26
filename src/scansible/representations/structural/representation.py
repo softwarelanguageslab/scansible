@@ -220,8 +220,6 @@ class Role:
     handler_files: dict[str, TaskFile]
     #: Role's list of broken files.
     broken_files: list[BrokenFile]
-    #: Output from Ansible that was caught while parsing.
-    logs: list[str]
 
     #: The defaults/main file.
     main_defaults_file: VariableFile | None = field(init=False)
@@ -282,8 +280,6 @@ class Playbook:
 
     #: List of plays defined in this playbook.
     plays: list[Play]
-    #: Output from Ansible that was caught
-    logs: list[str]
 
     #: Raw information present in the playbook, some which may not explicitly be parsed.
     raw: Any = field(repr=False)
@@ -304,6 +300,8 @@ class StructuralModel:
     id: str
     #: A user-defined version for the role or playbook (often a git tag or commit SHA).
     version: str
+    #: Output from Ansible that was caught
+    logs: str
     #: Whether the model represents a role. Mutually exclusive with `is_playbook`.
     is_role: bool = field(init=False)
     #: Whether the model represents a playbook. Mutually exclusive with `is_role`.
