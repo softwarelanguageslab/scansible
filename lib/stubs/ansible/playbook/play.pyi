@@ -4,3 +4,5 @@ from ansible.playbook.taggable import Taggable
 
 class Play(Base, Taggable, CollectionSearch):
     def __init__(self) -> None: ...
+
+    hosts: list[str]
