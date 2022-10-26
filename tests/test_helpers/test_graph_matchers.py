@@ -1,8 +1,8 @@
 import pytest
 
-from ansible_graph_extractor.models.edges import DEF, USE, ORDER, ORDER_TRANS
-from ansible_graph_extractor.models.graph import Graph
-from ansible_graph_extractor.models.nodes import Expression, IntermediateValue, Task, Variable
+from scansible.models.edges import DEF, USE, ORDER, ORDER_TRANS
+from scansible.models.graph import Graph
+from scansible.models.nodes import Expression, IntermediateValue, Task, Variable
 
 from graph_matchers import assert_graphs_match, create_graph
 

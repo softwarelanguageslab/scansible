@@ -9,14 +9,14 @@ from enum import Enum
 
 from loguru import logger
 
-from ansible_graph_extractor.models.edges import DEF, DEFINED_IF, USE
-from ansible_graph_extractor.models.graph import Graph
-from ansible_graph_extractor.models.nodes import DataNode, Expression, IntermediateValue, Literal, Variable
+from scansible.models.edges import DEF, DEFINED_IF, USE
+from scansible.models.graph import Graph
+from scansible.models.nodes import DataNode, Expression, IntermediateValue, Literal, Variable
 
 if TYPE_CHECKING:
     from .context import ExtractionContext
 
-from ansible_graph_extractor.extractor.templates import TemplateExpressionAST, LookupTargetLiteral
+from scansible.extractor.templates import TemplateExpressionAST, LookupTargetLiteral
 
 class TemplateRecord(NamedTuple):
     """State of a template expression."""

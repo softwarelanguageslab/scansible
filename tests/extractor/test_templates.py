@@ -2,7 +2,7 @@ from typing import NamedTuple
 
 import pytest
 
-from ansible_graph_extractor.extractor.templates import TemplateExpressionAST, LookupTarget, LookupTargetLiteral, LookupTargetVariable
+from scansible.extractor.templates import TemplateExpressionAST, LookupTarget, LookupTargetLiteral, LookupTargetVariable
 
 
 class Case(NamedTuple):

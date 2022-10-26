@@ -4,7 +4,7 @@ import os
 import pytest
 from loguru import logger
 
-from ansible_graph_extractor.models.graph import Graph
+from scansible.models.graph import Graph
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'helpers'))
 

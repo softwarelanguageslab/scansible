@@ -1,13 +1,13 @@
 import pytest
 
-from ansible_graph_extractor.extractor.var_context import ScopeLevel, VarContext
-from ansible_graph_extractor.models.edges import DEF, USE
-from ansible_graph_extractor.models.nodes import Literal, Variable, Expression, IntermediateValue
-from ansible_graph_extractor.models.graph import Graph
+from scansible.extractor.var_context import ScopeLevel, VarContext
+from scansible.models.edges import DEF, USE
+from scansible.models.nodes import Literal, Variable, Expression, IntermediateValue
+from scansible.models.graph import Graph
 
 from graph_matchers import assert_graphs_match, create_graph
 
-from ansible_graph_extractor.io.neo4j import dump_graph
+from scansible.io.neo4j import dump_graph
 
 def describe_unmodified() -> None:
 

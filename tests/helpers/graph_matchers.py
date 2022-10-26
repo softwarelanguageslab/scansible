@@ -7,9 +7,9 @@ import pytest
 
 from pydantic import BaseModel
 
-from ansible_graph_extractor.models.edges import Edge
-from ansible_graph_extractor.models.graph import Graph
-from ansible_graph_extractor.models.nodes import Node, IntermediateValue
+from scansible.models.edges import Edge
+from scansible.models.graph import Graph
+from scansible.models.nodes import Node, IntermediateValue
 
 
 def _get_in_out_neighbours(g: Graph, n: Node) -> set[Node]:

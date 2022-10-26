@@ -10,13 +10,13 @@ from loguru import logger
 from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
 
-from ansible_graph_extractor.extractor import extract_structural_graph
-from ansible_graph_extractor.io import graphml, neo4j, graphviz
-from ansible_graph_extractor.io.structural_models import import_all_role_heads, parse_role
-from ansible_graph_extractor.extract import extract_one, extract_full_repo, CommitInfo
-from ansible_graph_extractor import detector
-from ansible_graph_extractor.repo_scan import scan_repo_wrap
-from ansible_graph_extractor import utils
+from scansible.extractor import extract_structural_graph
+from scansible.io import graphml, neo4j, graphviz
+from scansible.io.structural_models import import_all_role_heads, parse_role
+from scansible.extract import extract_one, extract_full_repo, CommitInfo
+from scansible import detector
+from scansible.repo_scan import scan_repo_wrap
+from scansible import utils
 
 @click.group()
 def group() -> None:

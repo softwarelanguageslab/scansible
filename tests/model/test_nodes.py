@@ -3,7 +3,7 @@ from typing import Any, Optional, Protocol
 import pytest
 from pytest_describe import behaves_like
 
-from ansible_graph_extractor.models.nodes import Expression, Literal, Node, Task, Variable
+from scansible.models.nodes import Expression, Literal, Node, Task, Variable
 
 class NodeFactory(Protocol):
 

@@ -5,9 +5,9 @@ from itertools import chain, product
 import pytest
 from pytest_describe import behaves_like
 
-from ansible_graph_extractor.models.edges import DEF, ORDER, USE, Edge, Keyword
-from ansible_graph_extractor.models.graph import Graph
-from ansible_graph_extractor.models.nodes import Expression, Literal, Node, Task, Variable
+from scansible.models.edges import DEF, ORDER, USE, Edge, Keyword
+from scansible.models.graph import Graph
+from scansible.models.nodes import Expression, Literal, Node, Task, Variable
 
 
 def describe_construction() -> None:

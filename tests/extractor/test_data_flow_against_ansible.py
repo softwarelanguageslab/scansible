@@ -22,13 +22,13 @@ except ImportError:
     from yaml import Dumper  # type: ignore[misc]
 from hypothesis import assume, given, example, Phase, settings, strategies as st
 
-from ansible_graph_extractor.extractor import extract_structural_graph
-from ansible_graph_extractor.extractor.var_context import ScopeLevel
-from ansible_graph_extractor.extractor.templates import TemplateExpressionAST
-from ansible_graph_extractor.io.structural_models import parse_role
-from ansible_graph_extractor.models.graph import Graph
-from ansible_graph_extractor.models import nodes, edges
-from ansible_graph_extractor.io.neo4j import dump_graph
+from scansible.extractor import extract_structural_graph
+from scansible.extractor.var_context import ScopeLevel
+from scansible.extractor.templates import TemplateExpressionAST
+from scansible.io.structural_models import parse_role
+from scansible.models.graph import Graph
+from scansible.models import nodes, edges
+from scansible.io.neo4j import dump_graph
 
 
 _considered_scopes = [

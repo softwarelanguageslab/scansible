@@ -2,10 +2,10 @@ from typing import Any
 
 import pytest
 
-from ansible_graph_extractor.models.edges import DEF, Keyword, ORDER, USE
-from ansible_graph_extractor.models.graph import Graph
-from ansible_graph_extractor.models.nodes import Expression, Literal, Node, Task, Variable
-from ansible_graph_extractor.io.graphml import dump_graph, import_graph
+from scansible.models.edges import DEF, Keyword, ORDER, USE
+from scansible.models.graph import Graph
+from scansible.models.nodes import Expression, Literal, Node, Task, Variable
+from scansible.io.graphml import dump_graph, import_graph
 
 from graph_matchers import assert_graphs_match, create_graph
 

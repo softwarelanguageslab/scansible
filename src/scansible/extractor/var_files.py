@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from voyager.models.structural.role import RoleVarFile, DefaultVarFile, RoleVariable, DefaultVariable
 
-from ansible_graph_extractor.models import nodes as n
+from scansible.models import nodes as n
 from .var_context import ScopeLevel
 from .context import ExtractionContext, ExtractionResult
 
