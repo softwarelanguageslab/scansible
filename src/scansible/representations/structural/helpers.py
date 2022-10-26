@@ -103,7 +103,8 @@ def find_file(dir_path: ProjectPath, file_name: str) -> ProjectPath | None:
     loader = ansible.parsing.dataloader.DataLoader()
     # DataLoader.find_vars_files is misnamed.
     found_paths = loader.find_vars_files(str(dir_path.absolute), file_name, allow_dir=False)
-    assert len(found_paths) <= 1, f'Found multiple files for {file_name} in {dir_path.relative}'
+    # found_paths should always have at most one element, since it can only have
+    # multiple elements when allow_dir=True
 
     if not found_paths:
         return None
