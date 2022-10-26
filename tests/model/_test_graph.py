@@ -200,20 +200,16 @@ def describe_order_edge() -> None:
     def edge_type() -> Edge:
         return ORDER
 
-    t1 = Task(action='file')
-    t2 = Task(action='command')
-    v = Variable(name='test', version=1)
-    e = Expression(expr='{{ test }}')
-    l = Literal(type='str', value='test')
+    t1 = Task(action='file', node_id=1, location='')
+    t2 = Task(action='command', node_id=2, location='')
+    v = Variable(name='test', version=1, value_version=1, scope_level=1, node_id=3, location='')
+    e = Expression(expr='{{ test }}', node_id=4, location='')
+    l = Literal(type='str', value='test', node_id=5, location='')
 
     @pytest.fixture(params=[(t1, t2)])
     def valid_source_and_target(request: Any) -> tuple[Node, Node]:
         return request.param
 
-    others = [
-        Variable(name='test', version=1), Expression(expr='{{ test }}'),
-        Literal(type='str', value='test'),
-    ]
     invalid_combos = set(product([t1, e, v, l], repeat=2)) - {(t1, t1)}
 
     @pytest.fixture(params=invalid_combos)
@@ -228,10 +224,10 @@ def describe_use_edge() -> None:
     def edge_type() -> Edge:
         return USE
 
-    t = Task(action='file')
-    v = Variable(name='test', version=1)
-    e = Expression(expr='{{ test }}')
-    l = Literal(type='str', value='test')
+    t = Task(action='file', node_id=1, location='')
+    v = Variable(name='test', version=1, value_version=1, scope_level=1, node_id=2, location='')
+    e = Expression(expr='{{ test }}', node_id=3, location='')
+    l = Literal(type='str', value='test', node_id=4, location='')
 
     @pytest.fixture(params=[(v, e)])
     def valid_source_and_target(request: Any) -> tuple[Node, Node]:
@@ -251,10 +247,10 @@ def describe_def_edge() -> None:
     def edge_type() -> Edge:
         return DEF
 
-    t = Task(action='file')
-    v = Variable(name='test', version=1)
-    e = Expression(expr='{{ test }}')
-    l = Literal(type='str', value='test')
+    t = Task(action='file', node_id=1, location='')
+    v = Variable(name='test', version=1, value_version=1, scope_level=1, node_id=2, location='')
+    e = Expression(expr='{{ test }}', node_id=3, location='')
+    l = Literal(type='str', value='test', node_id=4, location='')
 
     valid = set(product([e, l, t, v], [v]))
     @pytest.fixture(params=valid)
@@ -275,10 +271,10 @@ def describe_kw_edge() -> None:
     def edge_type() -> Edge:
         return Keyword(keyword='args.param')
 
-    t = Task(action='file')
-    v = Variable(name='test', version=1)
-    e = Expression(expr='{{ test }}')
-    l = Literal(type='str', value='test')
+    t = Task(action='file', node_id=1, location='')
+    v = Variable(name='test', version=1, value_version=1, scope_level=1, node_id=2, location='')
+    e = Expression(expr='{{ test }}', node_id=3, location='')
+    l = Literal(type='str', value='test', node_id=4, location='')
 
     valid = set(product([e, l, v], [t]))
     @pytest.fixture(params=valid)

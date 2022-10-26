@@ -18,14 +18,14 @@ def g() -> Graph:
 @pytest.fixture
 def pop_g(g: Graph) -> Graph:
     return create_graph({
-        't1': Task(action='file', name='task 1'),
-        't2': Task(action='command', name='task 2'),
-        'l1': Literal(type='str', value='echo "Hello"'),
-        'l2': Literal(type='bool', value=False),
-        'l3': Literal(type='int', value=0o777),
-        'v': Variable(name='filepath', version=1),
-        'e': Expression(expr='test/{{ filepath }}'),
-        'v2': Variable(name='$1', version=1),
+        't1': Task(action='file', name='task 1', node_id=1, location=''),
+        't2': Task(action='command', name='task 2', node_id=1, location=''),
+        'l1': Literal(type='str', value='echo "Hello"', node_id=1, location=''),
+        'l2': Literal(type='bool', value=False, node_id=1, location=''),
+        'l3': Literal(type='int', value=0o777, node_id=1, location=''),
+        'v': Variable(name='filepath', version=1, node_id=1, location='', value_version=1, scope_level=1),
+        'e': Expression(expr='test/{{ filepath }}', node_id=1, location=''),
+        'v2': Variable(name='$1', version=1, node_id=1, location='', value_version=1, scope_level=1),
     }, [
         ('t1', 't2', ORDER),
         ('l1', 't2', Keyword(keyword='args')),
@@ -57,6 +57,6 @@ def describe_import_graphml() -> None:
     def should_import_graph(pop_g: Graph) -> None:
         graphml = dump_graph(pop_g)
 
-        result = import_graph(graphml)
+        result = import_graph(graphml, 'test', 'test')
 
         assert_graphs_match(result, pop_g, ignore_graph_kws={'node_default', 'edge_default'})
