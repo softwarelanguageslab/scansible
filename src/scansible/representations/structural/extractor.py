@@ -10,6 +10,8 @@ from pathlib import Path
 import ansible
 import ansible.playbook
 import ansible.playbook.task
+import ansible.playbook.handler_task_include
+import ansible.playbook.task_include
 import ansible.playbook.block
 import ansible.playbook.handler
 import ansible.playbook.play
@@ -196,8 +198,69 @@ def extract_block(ds: dict[str, AnsibleValue]) -> rep.Block:
 
     return block
 
+@overload
+def _extract_import_task(ds: dict[str, AnsibleValue], action: str, args: Any, handler: Literal[False] = ...) -> rep.Task: ...
+@overload
+def _extract_import_task(ds: dict[str, AnsibleValue], action: str, args: Any, handler: Literal[True]) -> rep.Handler: ...
+def _extract_import_task(ds: dict[str, AnsibleValue], action: str, args: Any, handler: bool = False) -> rep.Task | rep.Handler:
+    # Special-case all import/include tasks, like what's done in ansible.playbook.helpers.load_list_of_tasks
+    if action in ansible.constants._ACTION_ALL_PROPER_INCLUDE_IMPORT_ROLES:
+        raise FatalError('TODO: Import/include on a role')
+
+    # Current Ansible version crashes when the old static key is used. Transform
+    # it to modern syntax.
+    if 'static' in ds:
+        assert 'include' in ds, '"static" directive without "include" action'
+        is_static = ds['static']
+        if isinstance(is_static, str):
+            assert is_static in ('yes', 'no'), f'Invalid boolean value for "static": {is_static}'
+            is_static = (is_static == 'yes')
+
+        include_args = ds['include']
+        del ds['include']
+        del ds['static']
+        if is_static:
+            ds['import_tasks'] = include_args
+        else:
+            ds['include_tasks'] = include_args
+
+    if handler:
+        ti = ansible.playbook.handler_task_include.HandlerTaskInclude.load(ds)
+        validate_ansible_object(ti)
+        return rep.Handler(
+            name=ti.name,
+            action=ti.action,
+            args=ti.args,
+            when=ti.when,
+            loop=ti.loop,
+            vars=extract_vars(ti.vars),
+            register=ti.register,
+            listen=ti.listen,
+            raw=ds,
+            # TODO!
+            loop_control=None)
+    else:
+        ti = ansible.playbook.task_include.TaskInclude.load(ds)
+        validate_ansible_object(ti)
+        return rep.Task(
+            name=ti.name,
+            action=ti.action,
+            args=ti.args,
+            when=ti.when,
+            loop=ti.loop,
+            vars=extract_vars(ti.vars),
+            register=ti.register,
+            raw=ds,
+            # TODO!
+            loop_control=None)
+
 
 def extract_task(ds: dict[str, AnsibleValue]) -> rep.Task:
+    args_parser = ansible.parsing.mod_args.ModuleArgsParser(ds)
+    (action, args, _) = args_parser.parse()
+    if action in ansible.constants._ACTION_ALL_INCLUDE_IMPORT_TASKS or action in ansible.constants._ACTION_ALL_PROPER_INCLUDE_IMPORT_ROLES:
+        return _extract_import_task(ds, action, args)
+
     raw_task = ansible.playbook.task.Task.load(ds)
     validate_ansible_object(raw_task)
 
@@ -218,6 +281,11 @@ def extract_task(ds: dict[str, AnsibleValue]) -> rep.Task:
 
 
 def extract_handler(ds: dict[str, AnsibleValue]) -> rep.Handler:
+    args_parser = ansible.parsing.mod_args.ModuleArgsParser(ds)
+    (action, args, _) = args_parser.parse()
+    if action in ansible.constants._ACTION_ALL_INCLUDE_IMPORT_TASKS or action in ansible.constants._ACTION_ALL_PROPER_INCLUDE_IMPORT_ROLES:
+        return _extract_import_task(ds, action, args, handler=True)
+
     raw_handler = ansible.playbook.handler.Handler.load(ds)
     validate_ansible_object(raw_handler)
 

@@ -290,6 +290,38 @@ def describe_extracting_tasks() -> None:
         }
         assert result.loop == ['hello', 'world']
 
+    def extracts_include_task() -> None:
+        result = ext.extract_task(_parse_yaml(dedent('''
+            include: test.yml
+        ''')))
+
+        assert result.action == 'include'
+        assert result.args == {
+            '_raw_params': 'test.yml'
+        }
+
+    def extracts_include_static_task() -> None:
+        result = ext.extract_task(_parse_yaml(dedent('''
+            include: test.yml
+            static: yes
+        ''')))
+
+        assert result.action == 'import_tasks'
+        assert result.args == {
+            '_raw_params': 'test.yml'
+        }
+
+    def extracts_include_nonstatic_task() -> None:
+        result = ext.extract_task(_parse_yaml(dedent('''
+            include: test.yml
+            static: no
+        ''')))
+
+        assert result.action == 'include_tasks'
+        assert result.args == {
+            '_raw_params': 'test.yml'
+        }
+
     def rejects_tasks_with_invalid_attribute_values() -> None:
         with pytest.raises(Exception):
             ext.extract_task(_parse_yaml(dedent('''
