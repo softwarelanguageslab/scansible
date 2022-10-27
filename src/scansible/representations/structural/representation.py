@@ -3,23 +3,86 @@ from __future__ import annotations
 
 from typing import (
         Any,
+        Callable,
         Dict,
         List,
+        Mapping,
         Union,
         TypeVar,
 )
 
+import types
 from pathlib import Path
 
+import attrs
 from attrs import define, frozen, field
+from attrs_strict import AttributeTypeError, type_validator as old_type_validator
 from ansible.parsing.yaml.objects import AnsibleSequence, AnsibleMapping, AnsibleUnicode
 
 
 # Type aliases
 VariableContainer = Union['VariableFile', 'Task', 'Block', 'Play']
 TaskContainer = Union['Block', 'Play', 'TaskFile']
-Scalar = Union[bool, int, float, AnsibleUnicode]
-AnyValue = Union[Scalar, AnsibleSequence, AnsibleMapping]
+Scalar = Union[bool, int, float, str]
+# These should be recursive types, but mypy doesn't support them so they'd be
+# Any anyway, and it also doesn't work with our type validation.
+AnyValue = Union[Scalar, list[Any], dict[str, Any]]
+
+def _convert_union_type(type_: Any) -> object:
+    if isinstance(type_, types.UnionType):
+        return Union.__getitem__(tuple(_convert_union_type(arg) for arg in type_.__args__))
+
+    if not isinstance(type_, types.GenericAlias):
+        return type_
+
+    if type_.__origin__ in (list, dict):
+        return types.GenericAlias(type_.__origin__, tuple(_convert_union_type(arg) for arg in type_.__args__))
+    return type_
+
+
+# Patch for https://github.com/bloomberg/attrs-strict/issues/80
+def type_validator(empty_ok: bool = True) -> Callable[[Any, attrs.Attribute[Any], Any], None]:
+    old_validator = old_type_validator(empty_ok)
+
+    # Convert types.UnionType into typing.Union recursively.
+    def convert_types(attribute: attrs.Attribute[Any]) -> None:
+        # Use object.__setattr__ to workaround frozen attr.Attribute
+        object.__setattr__(attribute, 'type', _convert_union_type(attribute.type))
+
+    def converting_validator(instance: Any, attribute: attrs.Attribute[Any], field: Any) -> None:
+        try:
+            convert_types(attribute)
+            old_validator(instance, attribute, field)
+        except AttributeTypeError as e:
+            # from __future__ import annotations leads to the original type
+            # annotation being a string, so it's possible that we couldn't
+            # convert the union type earlier because we got a string instead
+            # of types.UnionType. By now, attrs-strict should've resolved those
+            # types, so try again.
+            if not e.__context__ or e.__context__.__class__.__name__ != '_StringAnnotationError':
+                raise
+            convert_types(attribute)
+            old_validator(instance, attribute, field)
+
+    return converting_validator
+
+
+def default_field() -> Any:
+    return field(validator=type_validator())
+
+
+def validate_relative_path(inst: Any, attr: attrs.Attribute[Path], value: Path) -> None:
+    if not isinstance(value, Path):
+        raise TypeError(f'Expected {attr.name} to be a Path, got {value} of type {type(value)} instead')
+    if value.is_absolute():
+        raise ValueError(f'Expected {attr.name} to be a relative path, got absolute path {value} instead')
+
+
+def validate_absolute_path(inst: Any, attr: attrs.Attribute[Path], value: Path) -> None:
+    if not isinstance(value, Path):
+        raise TypeError(f'Expected {attr.name} to be a Path, got {value} of type {type(value)} instead')
+    if not value.is_absolute():
+        raise ValueError(f'Expected {attr.name} to be an absolute path, got relative path {value} instead')
 
 
 @frozen
@@ -29,9 +92,9 @@ class BrokenFile:
     """
 
     #: The path to the file.
-    path: Path
+    path: Path = field(validator=validate_relative_path)
     #: The reason why the file is broken.
-    reason: str
+    reason: str = default_field()
 
 
 @frozen
@@ -41,9 +104,9 @@ class Platform:
     """
 
     #: Platform name.
-    name: str
+    name: str = default_field()
     #: Platform version.
-    version: str
+    version: str | int | float = default_field()
 
 
 @frozen
@@ -62,9 +125,9 @@ class MetaFile:
     """
 
     #: The path to the file, relative to the project root.
-    file_path: Path
+    file_path: Path = field(validator=validate_relative_path)
     #: The metadata block contained in the file.
-    metablock: MetaBlock
+    metablock: MetaBlock = default_field()
 
 
 @define
@@ -73,16 +136,16 @@ class MetaBlock:
     Represents a role metadata block.
     """
 
-    #: The parent file of this metadata block.
-    parent: MetaFile = field(init=False, repr=False)
-    #: Platforms supported by the role
-    platforms: list[Platform]
-    #: Role dependencies
-    dependencies: list[Dependency]
-
     #: Raw information present in the metadata block, some which may not
     #: explicitly be parsed.
     raw: Any = field(repr=False)
+
+    #: The parent file of this metadata block.
+    parent: MetaFile = field(init=False, repr=False, validator=type_validator())
+    #: Platforms supported by the role
+    platforms: list[Platform] = default_field()
+    #: Role dependencies
+    dependencies: list[Dependency] = default_field()
 
 
 @define
@@ -92,12 +155,12 @@ class Variable:
     """
 
     #: Variable name.
-    name: str
+    name: str = default_field()
     #: Variable value.
-    value: AnyValue
+    value: AnyValue = default_field()
     #: Parent wherein the variable is defined. Either a file containing variables
     #: (in defaults/ or vars/), a task, a block, or a play.
-    parent: VariableContainer = field(init=False, repr=False)
+    parent: VariableContainer = field(init=False, repr=False, validator=type_validator())
 
 
 @define
@@ -107,9 +170,9 @@ class VariableFile:
     """
 
     #: The path to the file, relative to the project root.
-    file_path: Path
+    file_path: Path = field(validator=validate_relative_path)
     #: The variables contained within the file. The order is irrelevant.
-    variables: list[Variable]  # TODO: Use a set
+    variables: list[Variable] = default_field() # TODO: Use a set
 
 
 @define(slots=False)
@@ -118,25 +181,24 @@ class TaskBase:
     Represents a basic Ansible task.
     """
 
-    #: Parent block in which the task is contained.
-    parent: TaskContainer = field(init=False, repr=False)
-    #: Name of the task.
-    name: str | None
-    #: Action of the task.
-    action: str
-    #: Arguments to the action.
-    args: dict[str, AnyValue]
-    #: Condition on the task, or None if no condition.
-    when: list[str]
-    #: Loop on the task, or None if no loop.
-    loop: str | list[str] | None
-    #: Loop control defined on the task.
-    loop_control: Any  # TODO!
-    #: Variables defined on the task
-    vars: list[Variable]  # TODO: Should be a set, since order doesn't matter
-
     #: Raw information present in the task, some which may not explicitly be parsed.
     raw: Any = field(repr=False)
+    #: Parent block in which the task is contained.
+    parent: TaskContainer = field(init=False, repr=False, validator=type_validator())
+    #: Name of the task.
+    name: str | None = default_field()
+    #: Action of the task.
+    action: str = default_field()
+    #: Arguments to the action.
+    args: Mapping[str, AnyValue] = default_field()
+    #: Condition on the task, or None if no condition.
+    when: list[str] = default_field()
+    #: Loop on the task, or None if no loop.
+    loop: str | list[AnyValue] | None = default_field()
+    #: Loop control defined on the task.
+    loop_control: Any = default_field()  # TODO!
+    #: Variables defined on the task
+    vars: list[Variable] = default_field()  # TODO: Should be a set, since order doesn't matter
 
 
 @define(slots=False)
@@ -153,7 +215,7 @@ class Handler(TaskBase):
     """
 
     #: Topics on which the handler listens
-    listen: list[str]
+    listen: list[str] = default_field()
 
 
 @define
@@ -164,24 +226,23 @@ class Block:
 
     # TODO: This doesn't support handlers. Can handlers be placed in a block?
 
-    #: Parent block or file wherein this block is contained as a child.
-    parent: TaskContainer = field(init=False, repr=False)
-    #: Name of the block
-    name: str | None
-
-    #: The block's main task list.
-    block: list[Task | Block]
-    #: List of tasks in the block's rescue section, i.e. the tasks that will
-    #: execute when an exception occurs.
-    rescue: list[Task | Block]
-    #: List of tasks in the block's always section, like a try-catch's `finally`
-    #: handler.
-    always: list[Task | Block]
-    #: Set of variables defined on this block.
-    vars: list[Variable]  # TODO: Should be a set
-
     #: Raw information present in the block, some which may not explicitly be parsed.
     raw: Any = field(repr=False)
+    #: Parent block or file wherein this block is contained as a child.
+    parent: TaskContainer = field(init=False, repr=False, validator=type_validator())
+    #: Name of the block
+    name: str | None = default_field()
+
+    #: The block's main task list.
+    block: list[Task | Block] = default_field()
+    #: List of tasks in the block's rescue section, i.e. the tasks that will
+    #: execute when an exception occurs.
+    rescue: list[Task | Block] = default_field()
+    #: List of tasks in the block's always section, like a try-catch's `finally`
+    #: handler.
+    always: list[Task | Block] = default_field()
+    #: Set of variables defined on this block.
+    vars: list[Variable] = default_field()  # TODO: Should be a set
 
 
 @define
@@ -191,11 +252,11 @@ class TaskFile:
     """
 
     #: The path to the file, relative to the project root.
-    file_path: Path
+    file_path: Path = field(validator=validate_relative_path)
     #: The top-level tasks or blocks contained in the file, in the order of
     #: definition. Can also be a list of handlers, but handlers and task/blocks
     #: cannot be mixed.
-    tasks: list[Block | Task] | list[Handler]
+    tasks: list[Block | Task] | list[Handler] = default_field()
 
 
 @define
@@ -205,30 +266,30 @@ class Role:
     """
 
     #: Role's main metadata file.
-    meta_file: MetaFile | None
+    meta_file: MetaFile | None = default_field()
     #: Role's variable files in the defaults/* subdirectory, indexed by file name
     #: without directory prefix.
-    default_var_files: dict[str, VariableFile]
+    default_var_files: dict[str, VariableFile] = default_field()
     #: Role's variable files in the vars/* subdirectory, indexed by file name
     #: without directory prefix.
-    role_var_files: dict[str, VariableFile]
+    role_var_files: dict[str, VariableFile] = default_field()
     #: Role's task files in the tasks/* subdirectory, indexed by file name
     #: without directory prefix.
-    task_files: dict[str, TaskFile]
+    task_files: dict[str, TaskFile] = default_field()
     #: Role's task files in the handlers/* subdirectory, indexed by file name
     #: without directory prefix.
-    handler_files: dict[str, TaskFile]
+    handler_files: dict[str, TaskFile] = default_field()
     #: Role's list of broken files.
-    broken_files: list[BrokenFile]
+    broken_files: list[BrokenFile] = default_field()
 
     #: The defaults/main file.
-    main_defaults_file: VariableFile | None = field(init=False)
+    main_defaults_file: VariableFile | None = field(init=False, validator=type_validator())
     #: The vars/main file.
-    main_vars_file: VariableFile | None = field(init=False)
+    main_vars_file: VariableFile | None = field(init=False, validator=type_validator())
     #: The tasks/main file.
-    main_tasks_file: TaskFile | None = field(init=False)
+    main_tasks_file: TaskFile | None = field(init=False, validator=type_validator())
     #: The handlers/main file.
-    main_handlers_file: TaskFile | None = field(init=False)
+    main_handlers_file: TaskFile | None = field(init=False, validator=type_validator())
 
     def __attrs_post_init__(self) -> None:
 
@@ -255,21 +316,19 @@ class Play:
     """
 
     #: The playbook in which this play is contained.
-    parent: Playbook = field(init=False, repr=False)
-
-    #: The play's name.
-    name: str
-    #: The play's targetted hosts.
-    hosts: list[str]
-    #: The play's list of blocks.
-    tasks: list[Task | Block]
-    #: The play-level variables.
-    vars: list[Variable]  # TODO: Should be a set
-
-    # TODO: Handlers, pre- and post-tasks, roles, vars files, vars_prompt, etc?
-
+    parent: Playbook = field(init=False, repr=False, validator=type_validator())
     #: Raw information present in the play, some which may not explicitly be parsed.
     raw: Any = field(repr=False)
+    #: The play's name.
+    name: str = default_field()
+    #: The play's targetted hosts.
+    hosts: list[str] = default_field()
+    #: The play's list of blocks.
+    tasks: list[Task | Block] = default_field()
+    #: The play-level variables.
+    vars: list[Variable] = default_field()  # TODO: Should be a set
+
+    # TODO: Handlers, pre- and post-tasks, roles, vars files, vars_prompt, etc?
 
 
 @define
@@ -278,11 +337,10 @@ class Playbook:
     Represents an Ansible playbook.
     """
 
-    #: List of plays defined in this playbook.
-    plays: list[Play]
-
     #: Raw information present in the playbook, some which may not explicitly be parsed.
     raw: Any = field(repr=False)
+    #: List of plays defined in this playbook.
+    plays: list[Play] = default_field()
 
 
 @define
@@ -291,21 +349,21 @@ class StructuralModel:
     Represents a structural model of a single role or playbook version.
     """
 
-    #: The model root.
-    root: Role | Playbook
     #: The path to the role or playbook. For roles, this points to a directory,
     #: for playbooks, this points to the playbook file.
-    path: Path
+    path: Path = field(validator=validate_absolute_path)
+    #: The model root.
+    root: Role | Playbook = default_field()
     #: A user-defined ID for the role or playbook.
-    id: str
+    id: str = default_field()
     #: A user-defined version for the role or playbook (often a git tag or commit SHA).
-    version: str
+    version: str = default_field()
     #: Output from Ansible that was caught
-    logs: str
+    logs: str = default_field()
     #: Whether the model represents a role. Mutually exclusive with `is_playbook`.
-    is_role: bool = field(init=False)
+    is_role: bool = field(init=False, validator=type_validator())
     #: Whether the model represents a playbook. Mutually exclusive with `is_role`.
-    is_playbook: bool = field(init=False)
+    is_playbook: bool = field(init=False, validator=type_validator())
 
     def __attrs_post_init__(self) -> None:
         self.is_role = isinstance(self.root, Role)
@@ -320,6 +378,6 @@ class MultiStructuralModel:
     """
 
     #: A user-defined ID for the role or playbook.
-    id: str
+    id: str = default_field()
     #: Map of versions to structural models.
-    structural_models: dict[str, StructuralModel]
+    structural_models: dict[str, StructuralModel] = default_field()

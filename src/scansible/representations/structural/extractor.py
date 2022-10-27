@@ -1,7 +1,7 @@
 """Extraction logic for structural model."""
 from __future__ import annotations
 
-from typing import Callable, Literal, TypeVar, overload
+from typing import Any, Callable, Literal, TypeVar, overload, TYPE_CHECKING
 
 from contextlib import redirect_stderr, redirect_stdout
 from functools import partial
@@ -15,6 +15,10 @@ import ansible.playbook.handler
 import ansible.playbook.play
 import ansible.parsing.dataloader
 import ansible.parsing.mod_args
+
+if TYPE_CHECKING:
+    # This alias doesn't exist outside of the stub files
+    from ansible.playbook.base import Value as AnsibleValue
 
 from . import representation as rep
 from .helpers import ProjectPath, parse_file, validate_ansible_object, capture_output, find_all_files, find_file
@@ -49,10 +53,10 @@ def extract_role_metadata_file(path: ProjectPath) -> rep.MetaFile:
     return metafile
 
 
-def _extract_meta_platforms(meta: dict[str, object]) -> list[rep.Platform]:
-    galaxy_info = meta.get('galaxy_info', {})
+def _extract_meta_platforms(meta: dict[str, AnsibleValue]) -> list[rep.Platform]:
+    galaxy_info: Any = meta.get('galaxy_info', {})
     assert isinstance(galaxy_info, dict), f'galaxy_info expected to be a dictionary, got {galaxy_info!r}'
-    raw_platforms = galaxy_info.get('platforms', [])
+    raw_platforms: Any = galaxy_info.get('platforms', [])
     assert isinstance(raw_platforms, (tuple, list)), f'platforms expected to be a list, got {raw_platforms!r}'
 
     platforms: list[rep.Platform] = []
@@ -69,8 +73,8 @@ def _extract_meta_platforms(meta: dict[str, object]) -> list[rep.Platform]:
     return platforms
 
 
-def _extract_meta_dependencies(meta: dict[str, object]) -> list[rep.Dependency]:
-    deps = meta.get('dependencies', [])
+def _extract_meta_dependencies(meta: dict[str, AnsibleValue]) -> list[rep.Dependency]:
+    deps: Any = meta.get('dependencies', [])
     if deps:
         raise FatalError(f'TODO: Dependencies: {deps}')
 
@@ -88,7 +92,7 @@ def extract_variable_file(path: ProjectPath) -> rep.VariableFile:
     return varfile
 
 
-def extract_vars(ds: dict[str, rep.AnyValue]) -> list[rep.Variable]:
+def extract_vars(ds: dict[str, AnsibleValue]) -> list[rep.Variable]:
     return [rep.Variable(name=k, value=v) for k, v in ds.items()]
 
 
@@ -103,11 +107,11 @@ def extract_tasks_file(path: ProjectPath, handlers: bool = False) -> rep.TaskFil
     return tf
 
 @overload
-def extract_list_of_tasks_or_blocks(ds: list[dict[str, rep.AnyValue]], handlers: Literal[False]) -> list[rep.Task | rep.Block]: ...
+def extract_list_of_tasks_or_blocks(ds: list[dict[str, AnsibleValue]], handlers: Literal[False]) -> list[rep.Task | rep.Block]: ...
 @overload
-def extract_list_of_tasks_or_blocks(ds: list[dict[str, rep.AnyValue]], handlers: Literal[True]) -> list[rep.Handler]: ...
+def extract_list_of_tasks_or_blocks(ds: list[dict[str, AnsibleValue]], handlers: Literal[True]) -> list[rep.Handler]: ...
 
-def extract_list_of_tasks_or_blocks(ds: list[dict[str, rep.AnyValue]], handlers: bool = False) -> list[rep.Task | rep.Block] | list[rep.Handler]:
+def extract_list_of_tasks_or_blocks(ds: list[dict[str, AnsibleValue]], handlers: bool = False) -> list[rep.Task | rep.Block] | list[rep.Handler]:
     content = []
     for inner_ds in ds:
         assert isinstance(inner_ds, dict) and all(isinstance(k, str) for k in inner_ds), 'Task list content must be a list of dictionaries'
@@ -116,11 +120,11 @@ def extract_list_of_tasks_or_blocks(ds: list[dict[str, rep.AnyValue]], handlers:
 
 
 @overload
-def extract_task_or_block(ds: dict[str, rep.AnyValue], handlers: Literal[False]) -> rep.Task | rep.Block: ...
+def extract_task_or_block(ds: dict[str, AnsibleValue], handlers: Literal[False]) -> rep.Task | rep.Block: ...
 @overload
-def extract_task_or_block(ds: dict[str, rep.AnyValue], handlers: Literal[True]) -> rep.Handler: ...
+def extract_task_or_block(ds: dict[str, AnsibleValue], handlers: Literal[True]) -> rep.Handler: ...
 
-def extract_task_or_block(ds: dict[str, rep.AnyValue], handlers: bool = False) -> rep.Handler | rep.Task | rep.Block:
+def extract_task_or_block(ds: dict[str, AnsibleValue], handlers: bool = False) -> rep.Handler | rep.Task | rep.Block:
     if ansible.playbook.block.Block.is_block(ds):
         if handlers:
             raise FatalError('Found a block in what is supposed to be a handler, TODO?')
@@ -131,9 +135,9 @@ def extract_task_or_block(ds: dict[str, rep.AnyValue], handlers: bool = False) -
 
 class _PatchedBlock(ansible.playbook.block.Block):
 
-    block: list[dict[str, rep.AnyValue]]  # type: ignore[assignment]
-    rescue: list[dict[str, rep.AnyValue]]  # type: ignore[assignment]
-    always: list[dict[str, rep.AnyValue]]  # type: ignore[assignment]
+    block: list[dict[str, AnsibleValue]]  # type: ignore[assignment]
+    rescue: list[dict[str, AnsibleValue]]  # type: ignore[assignment]
+    always: list[dict[str, AnsibleValue]]  # type: ignore[assignment]
 
     def __init__(self, *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
@@ -150,7 +154,7 @@ class _PatchedBlock(ansible.playbook.block.Block):
 _PatchedBlock.__name__ = 'Block'
 
 
-def extract_block(ds: dict[str, rep.AnyValue]) -> rep.Block:
+def extract_block(ds: dict[str, AnsibleValue]) -> rep.Block:
     raw_block = _PatchedBlock(ds)
     raw_block.load_data(ds)
     validate_ansible_object(raw_block)
@@ -174,7 +178,7 @@ def extract_block(ds: dict[str, rep.AnyValue]) -> rep.Block:
     return block
 
 
-def extract_task(ds: dict[str, rep.AnyValue]) -> rep.Task:
+def extract_task(ds: dict[str, AnsibleValue]) -> rep.Task:
     raw_task = ansible.playbook.task.Task.load(ds)
     validate_ansible_object(raw_task)
 
@@ -193,7 +197,7 @@ def extract_task(ds: dict[str, rep.AnyValue]) -> rep.Task:
         loop_control=None)
 
 
-def extract_handler(ds: dict[str, rep.AnyValue]) -> rep.Handler:
+def extract_handler(ds: dict[str, AnsibleValue]) -> rep.Handler:
     raw_handler = ansible.playbook.handler.Handler.load(ds)
     validate_ansible_object(raw_handler)
 
@@ -215,7 +219,7 @@ def extract_handler(ds: dict[str, rep.AnyValue]) -> rep.Handler:
 
 class _PatchedPlay(ansible.playbook.play.Play):
 
-    tasks: list[dict[str, rep.AnyValue]]
+    tasks: list[dict[str, AnsibleValue]]
 
     def __init__(self, *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
@@ -232,7 +236,7 @@ class _PatchedPlay(ansible.playbook.play.Play):
 _PatchedPlay.__name__ = 'Play'
 
 
-def extract_play(ds: dict[str, rep.AnyValue]) -> rep.Play:
+def extract_play(ds: dict[str, AnsibleValue]) -> rep.Play:
     raw_play = _PatchedPlay()
     raw_play.load_data(ds)
     validate_ansible_object(raw_play)

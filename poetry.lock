@@ -28,6 +28,21 @@ tests = ["cloudpickle", "coverage[toml] (>=5.0.2)", "hypothesis", "mypy (>=0.900
 tests_no_zope = ["cloudpickle", "coverage[toml] (>=5.0.2)", "hypothesis", "mypy (>=0.900,!=0.940)", "pympler", "pytest (>=4.3.0)", "pytest-mypy-plugins"]
 
 [[package]]
+name = "attrs-strict"
+version = "1.0.0"
+description = "Runtime validators for attrs"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+attrs = ">=19.1.0"
+
+[package.extras]
+docs = ["Sphinx (>=3)"]
+test = ["covdefaults (>=2)", "pytest (>=6)", "pytest-cov (>=3)"]
+
+[[package]]
 name = "cffi"
 version = "1.15.1"
 description = "Foreign Function Interface for Python calling C code."
@@ -426,7 +441,7 @@ dev = ["black (>=19.3b0)", "pytest (>=4.6.2)"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "9ab7ff17378cdd6f62060ecd22fb6087cf59b7b3fd9eab9123560017a574cb31"
+content-hash = "1a239e280f0e70f3cf54289d35ab2947f0440e4674bc758420f1a453c780ead2"
 
 [metadata.files]
 ansible-core = [
@@ -436,6 +451,10 @@ ansible-core = [
 attrs = [
     {file = "attrs-22.1.0-py2.py3-none-any.whl", hash = "sha256:86efa402f67bf2df34f51a335487cf46b1ec130d02b8d39fd248abfd30da551c"},
     {file = "attrs-22.1.0.tar.gz", hash = "sha256:29adc2665447e5191d0e7c568fde78b21f9672d344281d0c6e1ab085429b22b6"},
+]
+attrs-strict = [
+    {file = "attrs_strict-1.0.0-py3-none-any.whl", hash = "sha256:c7a4d9e4521d6706906ea96204f05b95acd45c3f0fc0130837f0a33bc9678c0f"},
+    {file = "attrs_strict-1.0.0.tar.gz", hash = "sha256:6326c1e51c4fd2fffc9dd607dec06c31add64eedbd37a651ea88f663a37c3f18"},
 ]
 cffi = [
     {file = "cffi-1.15.1-cp27-cp27m-macosx_10_9_x86_64.whl", hash = "sha256:a66d3508133af6e8548451b25058d5812812ec3798c886bf38ed24a98216fab2"},
