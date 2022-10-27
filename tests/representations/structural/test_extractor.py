@@ -161,6 +161,15 @@ def describe_extracting_variables() -> None:
 
         assert result.variables == [rep.Variable('test', None)]
 
+    def allows_variable_files_to_be_empty(tmp_path: Path) -> None:
+        (tmp_path / 'main.yml').write_text(dedent('''
+            # just a comment
+        '''))
+
+        result = ext.extract_variable_file(ext.ProjectPath(tmp_path, 'main.yml'))
+
+        assert result.variables == []
+
     @pytest.mark.parametrize('content', [
         '- hello\n- world'  # list
         'test'  # string
@@ -623,6 +632,13 @@ def describe_extracting_tasks_file() -> None:
         assert result.tasks[1].block[0].args == {}
         assert result.tasks[1].rescue == []
         assert result.tasks[1].always == []
+
+    def allows_task_files_to_be_empty(tmp_path: Path) -> None:
+        (tmp_path / 'main.yml').write_text('# just a comment')
+
+        result = ext.extract_tasks_file(ext.ProjectPath(tmp_path, 'main.yml'))
+
+        assert result.tasks == []
 
     @pytest.mark.parametrize('content', [
         'hello: world'  # dict

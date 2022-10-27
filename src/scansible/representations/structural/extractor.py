@@ -97,9 +97,9 @@ def _extract_meta_dependencies(meta: dict[str, AnsibleValue]) -> list[rep.Depend
 
 def extract_variable_file(path: ProjectPath) -> rep.VariableFile:
     ds = parse_file(path)
-    assert isinstance(ds, dict), f'Expected variable file {path.relative} to contain a dictionary, got {type(ds)}'
+    assert ds is None or isinstance(ds, dict), f'Expected variable file {path.relative} to contain a dictionary, got {type(ds)}'
 
-    variables = extract_vars(ds)
+    variables = extract_vars(ds) if ds is not None else []
     varfile = rep.VariableFile(file_path=path.relative, variables=variables)
     for v in variables:
         v.parent = varfile
@@ -112,9 +112,9 @@ def extract_vars(ds: dict[str, AnsibleValue]) -> list[rep.Variable]:
 
 def extract_tasks_file(path: ProjectPath, handlers: bool = False) -> rep.TaskFile:
     ds = parse_file(path)
-    assert isinstance(ds, list), f'Expected task file {path.relative} to be a list, got {type(ds)}'
+    assert ds is None or isinstance(ds, list), f'Expected task file {path.relative} to be a list, got {type(ds)}'
 
-    content = extract_list_of_tasks_or_blocks(ds, handlers)  # type: ignore[call-overload]
+    content = extract_list_of_tasks_or_blocks(ds, handlers) if ds is not None else [] # type: ignore[call-overload]
     tf = rep.TaskFile(file_path=path.relative, tasks=content)
     for child in content:
         child.parent = tf
