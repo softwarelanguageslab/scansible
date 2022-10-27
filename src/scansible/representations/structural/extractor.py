@@ -155,6 +155,7 @@ _PatchedBlock.__name__ = 'Block'
 
 
 def extract_block(ds: dict[str, AnsibleValue]) -> rep.Block:
+    assert _PatchedBlock.is_block(ds), f'Not a block: {ds}'
     raw_block = _PatchedBlock(ds)
     raw_block.load_data(ds)
     validate_ansible_object(raw_block)
@@ -192,6 +193,7 @@ def extract_task(ds: dict[str, AnsibleValue]) -> rep.Task:
         when=raw_task.when,
         loop=raw_task.loop,
         vars=extract_vars(raw_task.vars),
+        register=raw_task.register,
         raw=ds,
         # TODO!
         loop_control=None)
@@ -212,6 +214,7 @@ def extract_handler(ds: dict[str, AnsibleValue]) -> rep.Handler:
         loop=raw_handler.loop,
         vars=extract_vars(raw_handler.vars),
         listen=raw_handler.listen,
+        register=raw_handler.register,
         raw=ds,
         # TODO!
         loop_control=None)
@@ -327,7 +330,7 @@ def extract_role(path: Path, id: str, version: str, extract_all: bool = False) -
             _safe_extract_all(extract_variable_file, get_dir('defaults'), defaults_files, broken_files)
         else:
             def get_main_path(dirname: str) -> ProjectPath | None:
-                return find_file(role_path, 'meta/main')
+                return find_file(role_path.join(dirname), 'main')
 
             _safe_extract(partial(extract_tasks_file, handlers=False), get_main_path('tasks'), task_files, broken_files)
             _safe_extract(partial(extract_tasks_file, handlers=True), get_main_path('handlers'), handler_files, broken_files)

@@ -141,7 +141,7 @@ class MetaBlock:
     raw: Any = field(repr=False)
 
     #: The parent file of this metadata block.
-    parent: MetaFile = field(init=False, repr=False, validator=type_validator())
+    parent: MetaFile = field(init=False, repr=False, eq=False, validator=type_validator())
     #: Platforms supported by the role
     platforms: list[Platform] = default_field()
     #: Role dependencies
@@ -160,7 +160,7 @@ class Variable:
     value: AnyValue = default_field()
     #: Parent wherein the variable is defined. Either a file containing variables
     #: (in defaults/ or vars/), a task, a block, or a play.
-    parent: VariableContainer = field(init=False, repr=False, validator=type_validator())
+    parent: VariableContainer = field(init=False, repr=False, eq=False, validator=type_validator())
 
 
 @define
@@ -184,7 +184,7 @@ class TaskBase:
     #: Raw information present in the task, some which may not explicitly be parsed.
     raw: Any = field(repr=False)
     #: Parent block in which the task is contained.
-    parent: TaskContainer = field(init=False, repr=False, validator=type_validator())
+    parent: TaskContainer = field(init=False, repr=False, eq=False, validator=type_validator())
     #: Name of the task.
     name: str | None = default_field()
     #: Action of the task.
@@ -197,6 +197,9 @@ class TaskBase:
     loop: str | list[AnyValue] | None = default_field()
     #: Loop control defined on the task.
     loop_control: Any = default_field()  # TODO!
+    #: Value given to the register keyword, i.e. variable name that will store
+    #: the result of this action.
+    register: str | None = default_field()
     #: Variables defined on the task
     vars: list[Variable] = default_field()  # TODO: Should be a set, since order doesn't matter
 
@@ -229,7 +232,7 @@ class Block:
     #: Raw information present in the block, some which may not explicitly be parsed.
     raw: Any = field(repr=False)
     #: Parent block or file wherein this block is contained as a child.
-    parent: TaskContainer = field(init=False, repr=False, validator=type_validator())
+    parent: TaskContainer = field(init=False, repr=False, eq=False, validator=type_validator())
     #: Name of the block
     name: str | None = default_field()
 
@@ -316,7 +319,7 @@ class Play:
     """
 
     #: The playbook in which this play is contained.
-    parent: Playbook = field(init=False, repr=False, validator=type_validator())
+    parent: Playbook = field(init=False, repr=False, eq=False, validator=type_validator())
     #: Raw information present in the play, some which may not explicitly be parsed.
     raw: Any = field(repr=False)
     #: The play's name.
