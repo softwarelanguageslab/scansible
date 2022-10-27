@@ -97,7 +97,7 @@ def _extract_meta_dependencies(meta: dict[str, AnsibleValue]) -> list[rep.Depend
 
 def extract_variable_file(path: ProjectPath) -> rep.VariableFile:
     ds = parse_file(path)
-    assert isinstance(ds, dict), 'Expected variable file to contain a dictionary'
+    assert isinstance(ds, dict), f'Expected variable file {path.relative} to contain a dictionary, got {type(ds)}'
 
     variables = extract_vars(ds)
     varfile = rep.VariableFile(file_path=path.relative, variables=variables)
@@ -112,7 +112,7 @@ def extract_vars(ds: dict[str, AnsibleValue]) -> list[rep.Variable]:
 
 def extract_tasks_file(path: ProjectPath, handlers: bool = False) -> rep.TaskFile:
     ds = parse_file(path)
-    assert isinstance(ds, list), 'Expected task file to be a list'
+    assert isinstance(ds, list), f'Expected task file {path.relative} to be a list, got {type(ds)}'
 
     content = extract_list_of_tasks_or_blocks(ds, handlers)  # type: ignore[call-overload]
     tf = rep.TaskFile(file_path=path.relative, tasks=content)
