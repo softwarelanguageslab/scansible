@@ -160,7 +160,7 @@ class Variable:
     #: Variable name.
     name: str = default_field()
     #: Variable value.
-    value: AnyValue = default_field()
+    value: AnyValue | None = default_field()
     #: Parent wherein the variable is defined. Either a file containing variables
     #: (in defaults/ or vars/), a task, a block, or a play.
     parent: VariableContainer = field(init=False, repr=False, eq=False, validator=type_validator())

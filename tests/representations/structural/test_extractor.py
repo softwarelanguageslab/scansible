@@ -152,6 +152,15 @@ def describe_extracting_variables() -> None:
             rep.Variable('test4', { 'this': 'is', 'a': 'dict' })
         ]
 
+    def allows_variable_values_to_be_none(tmp_path: Path) -> None:
+        (tmp_path / 'main.yml').write_text(dedent('''
+            test:
+        '''))
+
+        result = ext.extract_variable_file(ext.ProjectPath(tmp_path, 'main.yml'))
+
+        assert result.variables == [rep.Variable('test', None)]
+
     @pytest.mark.parametrize('content', [
         '- hello\n- world'  # list
         'test'  # string
