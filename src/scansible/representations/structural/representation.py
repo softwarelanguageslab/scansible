@@ -115,7 +115,10 @@ class Dependency:
     Represents a role dependency.
     """
 
-    # TODO!
+    #: The role that is depended upon.
+    role: str = default_field()
+    #: Optional condition on when to include a dependency.
+    when: list[str] = default_field()
 
 
 @define

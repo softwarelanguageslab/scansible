@@ -44,6 +44,43 @@ def describe_extracting_metadata_file() -> None:
             rep.Platform(name='Fedora', version=8),
         ]
 
+    @pytest.mark.parametrize('key', ['name', 'role'])
+    def extracts_simple_string_dependencies(tmp_path: Path, key: str) -> None:
+        (tmp_path / 'main.yml').write_text(dedent(f'''
+            dependencies:
+                - {key}: testrole
+        '''))
+
+        result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
+
+        assert result.metablock.dependencies == [rep.Dependency(role='testrole', when=[])]
+
+    def extracts_dependencies_with_condition(tmp_path: Path) -> None:
+        (tmp_path / 'main.yml').write_text(dedent('''
+            dependencies:
+                - role: testrole
+                  when: "{{ ansible_os_family == 'Debian' }}"
+        '''))
+
+        result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
+
+        assert result.metablock.dependencies == [rep.Dependency(role='testrole', when=["{{ ansible_os_family == 'Debian' }}"])]
+
+    def extracts_dependencies_with_multiple_conditions(tmp_path: Path) -> None:
+        (tmp_path / 'main.yml').write_text(dedent('''
+            dependencies:
+                - role: testrole
+                  when:
+                    - "{{ ansible_os_family == 'Debian' }}"
+                    - "{{ 1 + 1 == 2 }}"
+        '''))
+
+        result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
+
+        assert result.metablock.dependencies == [rep.Dependency(
+            role='testrole',
+            when=["{{ ansible_os_family == 'Debian' }}", '{{ 1 + 1 == 2 }}'])]
+
     def rejects_empty_metadata(tmp_path: Path) -> None:
         (tmp_path / 'main.yml').write_text('')
 

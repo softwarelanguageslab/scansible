@@ -74,11 +74,25 @@ def _extract_meta_platforms(meta: dict[str, AnsibleValue]) -> list[rep.Platform]
 
 
 def _extract_meta_dependencies(meta: dict[str, AnsibleValue]) -> list[rep.Dependency]:
-    deps: Any = meta.get('dependencies', [])
-    if deps:
-        raise FatalError(f'TODO: Dependencies: {deps}')
+    raw_deps: Any = meta.get('dependencies', [])
+    assert isinstance(raw_deps, list), f'Expected role dependencies to be a list, got {raw_deps}'
 
-    return []
+    deps: list[rep.Dependency] = []
+    for ds in raw_deps:
+        assert isinstance(ds, dict), f'Expected role dependency to be a list, got {ds}'
+        assert not (ds.keys() - {'name', 'role', 'when'}), f'Unsupported keys in role dependency: {ds}'
+        assert ('name' in ds) != ('role' in ds), f'Both "name" and "role" are specified in role dependency: {ds}'
+        name = ds.get('name', ds.get('role'))
+        assert isinstance(name, str), f'Expected role name to be a string, got {name}'
+        when = ds.get('when')
+        assert when is None or isinstance(when, str) or (isinstance(when, list) and all(isinstance(cond, str) for cond in when)), f'Malformed dependency condition: {when}'
+        if not when:
+            when = []
+        elif isinstance(when, str):
+            when = [when]
+        deps.append(rep.Dependency(role=name, when=when))
+
+    return deps
 
 
 def extract_variable_file(path: ProjectPath) -> rep.VariableFile:
