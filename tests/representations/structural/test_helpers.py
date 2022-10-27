@@ -174,3 +174,36 @@ def describe_capture_output() -> None:
             print('world')
 
         assert out.getvalue() == 'hello\nworld\n'
+
+def describe_prevent_undesired_operations() -> None:
+
+    def raises_when_load_list_of_tasks_is_called_when_active() -> None:
+        with h.prevent_undesired_operations():
+            with pytest.raises(h.FatalError):
+                from ansible.playbook.helpers import load_list_of_tasks
+                load_list_of_tasks()  # type: ignore[call-arg]
+
+    def raises_when_templar_template_is_called_when_active() -> None:
+        from ansible.template import Templar
+        import ansible.parsing.dataloader
+        with h.prevent_undesired_operations():
+            with pytest.raises(h.FatalError):
+                t = Templar(loader=ansible.parsing.dataloader.DataLoader())
+                t.template('{{ 1 + 1 }}')
+
+    def raises_when_templar_do_template_is_called_when_active() -> None:
+        from ansible.template import Templar
+        import ansible.parsing.dataloader
+        with h.prevent_undesired_operations():
+            with pytest.raises(h.FatalError):
+                t = Templar(loader=ansible.parsing.dataloader.DataLoader())
+                t.do_template('{{ 1 + 1 }}')
+
+    def allows_calls_when_inactive() -> None:
+        from ansible.template import Templar
+        import ansible.parsing.dataloader
+        with h.prevent_undesired_operations():
+            pass
+
+        t = Templar(loader=ansible.parsing.dataloader.DataLoader())
+        assert t.template('{{ 1 + 1 }}') == '2'

@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
-from typing import Generator
+from typing import Generator, Callable, Any, NoReturn
 
 import io
 from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
 
 import ansible.playbook.base
+
+
+class FatalError(Exception):
+    """Fatal error to stop all extraction."""
+    pass
 
 
 class ProjectPath:
@@ -145,3 +150,32 @@ def capture_output() -> Generator[io.StringIO, None, None]:
         stack.enter_context(redirect_stderr(buffer))
         stack.enter_context(redirect_stdout(buffer))
         yield buffer
+
+@contextmanager
+def prevent_undesired_operations() -> Generator[None, None, None]:
+    """
+    Context manager which, while active, blocks Ansible from performing
+    undesired operations such as evaluating template expressions or eagerly
+    loading included files.
+    """
+    from ansible.template import Templar
+    from ansible.playbook import helpers
+
+    old_load_list_of_tasks = helpers.load_list_of_tasks
+    old_templar_do_template = Templar.do_template
+    old_templar_template = Templar.template
+
+    def raise_if_called(name: str) -> Callable[[Any], NoReturn]:
+        def raiser(*args: object, **kwargs: object) -> NoReturn:
+            raise FatalError(f'{name} was called when it was not supposed to be called')
+        return raiser
+
+    helpers.load_list_of_tasks = raise_if_called('load_list_of_tasks')  # type: ignore[assignment]
+    Templar.do_template = raise_if_called('Templar.do_template')  # type: ignore[assignment]
+    Templar.template = raise_if_called('Templar.template')  # type: ignore[assignment]
+
+    yield
+
+    helpers.load_list_of_tasks = old_load_list_of_tasks
+    Templar.do_template = old_templar_do_template  # type: ignore[assignment]
+    Templar.template = old_templar_template  # type: ignore[assignment]

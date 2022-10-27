@@ -23,18 +23,13 @@ if TYPE_CHECKING:
     from ansible.playbook.base import Value as AnsibleValue
 
 from . import representation as rep
-from .helpers import ProjectPath, parse_file, validate_ansible_object, capture_output, find_all_files, find_file
+from .helpers import ProjectPath, parse_file, validate_ansible_object, capture_output, find_all_files, find_file, FatalError, prevent_undesired_operations
 
 
 # Patch the ModuleArgsParser so that it doesn't verify whether the action exist.
 # Otherwise it'll complain on non-builtin actions
 old_mod_args_parse = ansible.parsing.mod_args.ModuleArgsParser.parse
 ansible.parsing.mod_args.ModuleArgsParser.parse = lambda self, skip_action_validation=False: old_mod_args_parse(self, skip_action_validation=True)  # type: ignore[assignment]
-
-
-class FatalError(Exception):
-    """Fatal error to stop all extraction."""
-    pass
 
 
 def extract_role_metadata_file(path: ProjectPath) -> rep.MetaFile:
@@ -359,7 +354,7 @@ def extract_playbook(path: Path, id: str, version: str) -> rep.StructuralModel:
 
     pb_path = ProjectPath.from_root(path)
 
-    with capture_output() as output:
+    with capture_output() as output, prevent_undesired_operations():
         ds = parse_file(pb_path)
         assert isinstance(ds, list) and bool(ds), 'Malformed or empty playbook'
 
@@ -402,7 +397,7 @@ def extract_role(path: Path, id: str, version: str, extract_all: bool = False) -
     meta_files: dict[str, rep.MetaFile] = {}
     broken_files: list[rep.BrokenFile] = []
 
-    with capture_output() as output:
+    with capture_output() as output, prevent_undesired_operations():
         meta_file_path = find_file(role_path, 'meta/main')
         _safe_extract(extract_role_metadata_file, meta_file_path, meta_files, broken_files)
         meta_file = next(iter(meta_files.values())) if meta_files else None
