@@ -44,8 +44,18 @@ def describe_extracting_metadata_file() -> None:
             rep.Platform(name='Fedora', version=8),
         ]
 
+    def extracts_simple_string_dependencies(tmp_path: Path) -> None:
+        (tmp_path / 'main.yml').write_text(dedent(f'''
+            dependencies:
+                - testrole
+        '''))
+
+        result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
+
+        assert result.metablock.dependencies == [rep.Dependency(role='testrole', when=[])]
+
     @pytest.mark.parametrize('key', ['name', 'role'])
-    def extracts_simple_string_dependencies(tmp_path: Path, key: str) -> None:
+    def extracts_simple_dict_dependencies(tmp_path: Path, key: str) -> None:
         (tmp_path / 'main.yml').write_text(dedent(f'''
             dependencies:
                 - {key}: testrole

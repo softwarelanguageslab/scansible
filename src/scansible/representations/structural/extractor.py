@@ -79,7 +79,11 @@ def _extract_meta_dependencies(meta: dict[str, AnsibleValue]) -> list[rep.Depend
 
     deps: list[rep.Dependency] = []
     for ds in raw_deps:
-        assert isinstance(ds, dict), f'Expected role dependency to be a list, got {ds}'
+        assert isinstance(ds, (str, dict)), f'Expected role dependency to be a string or dict, got {ds}'
+        if isinstance(ds, str):
+            deps.append(rep.Dependency(role=ds, when=[]))
+            continue
+
         assert not (ds.keys() - {'name', 'role', 'when'}), f'Unsupported keys in role dependency: {ds}'
         assert ('name' in ds) != ('role' in ds), f'Both "name" and "role" are specified in role dependency: {ds}'
         name = ds.get('name', ds.get('role'))
