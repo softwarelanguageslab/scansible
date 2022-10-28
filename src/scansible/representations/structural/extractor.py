@@ -102,11 +102,22 @@ def extract_block(ds: dict[str, ans.AnsibleValue]) -> rep.Block:
     return block
 
 
+def _extract_loop_control(lc: ans.LoopControl | None) -> rep.LoopControl | None:
+    if lc is None:
+        return None
+
+    validate_ansible_object(lc)
+    return rep.LoopControl(
+        loop_var=lc.loop_var,
+        index_var=lc.index_var,
+        label=lc.label,
+        pause=lc.pause,
+        extended=lc.extended,
+    )
+
+
 def extract_task(ds: dict[str, ans.AnsibleValue]) -> rep.Task:
     raw_task, raw_ds = loaders.load_task(ds, False)
-
-    if raw_task.loop_control:
-        raise FatalError('TODO: loop_control')
 
     return rep.Task(
         name=raw_task.name,
@@ -114,18 +125,15 @@ def extract_task(ds: dict[str, ans.AnsibleValue]) -> rep.Task:
         args=raw_task.args,
         when=raw_task.when,
         loop=raw_task.loop,
+        loop_control=_extract_loop_control(raw_task.loop_control),
         vars=extract_list_of_variables(raw_task.vars),
         register=raw_task.register,
         raw=raw_ds,
-        # TODO!
-        loop_control=None)
+    )
 
 
 def extract_handler(ds: dict[str, ans.AnsibleValue]) -> rep.Handler:
     raw_handler, raw_ds = loaders.load_task(ds, True)
-
-    if raw_handler.loop_control:
-        raise FatalError('TODO: loop_control')
 
     return rep.Handler(
         name=raw_handler.name,
@@ -133,12 +141,12 @@ def extract_handler(ds: dict[str, ans.AnsibleValue]) -> rep.Handler:
         args=raw_handler.args,
         when=raw_handler.when,
         loop=raw_handler.loop,
+        loop_control=_extract_loop_control(raw_handler.loop_control),
         vars=extract_list_of_variables(raw_handler.vars),
         listen=raw_handler.listen,
         register=raw_handler.register,
         raw=raw_ds,
-        # TODO!
-        loop_control=None)
+    )
 
 
 def extract_play(ds: dict[str, ans.AnsibleValue]) -> rep.Play:

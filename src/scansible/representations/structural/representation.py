@@ -178,6 +178,26 @@ class VariableFile:
     variables: list[Variable] = default_field() # TODO: Use a set
 
 
+@define
+class LoopControl:
+    """
+    Represents the loop control directive value.
+    """
+
+    #: The loop variable name. `item` by default.
+    loop_var: str = default_field()
+    #: The index variable name.
+    index_var: str | None = default_field()
+    #: Loop label in output.
+    label: str | None = default_field()
+    #: Amount of time in seconds to pause between each iteration. Can be a
+    #: string in case this is an expression. 0 by default.
+    pause: str | int | float = default_field()
+    #: Whether to include more information in the loop items.
+    #: See https://docs.ansible.com/ansible/latest/user_guide/playbooks_loops.html#extended-loop-variables
+    extended: str | bool | None = default_field()
+
+
 @define(slots=False)
 class TaskBase:
     """
@@ -199,7 +219,7 @@ class TaskBase:
     #: Loop on the task, or None if no loop.
     loop: str | list[AnyValue] | None = default_field()
     #: Loop control defined on the task.
-    loop_control: Any = default_field()  # TODO!
+    loop_control: LoopControl | None = default_field()
     #: Value given to the register keyword, i.e. variable name that will store
     #: the result of this action.
     register: str | None = default_field()

@@ -5,6 +5,7 @@ from ansible.playbook.base import FieldAttributeBase
 from ansible.playbook.block import Block
 from ansible.playbook.handler import Handler
 from ansible.playbook.handler_task_include import HandlerTaskInclude
+from ansible.playbook.loop_control import LoopControl
 from ansible.playbook.play import Play
 from ansible.playbook.task import Task
 from ansible.playbook.task_include import TaskInclude

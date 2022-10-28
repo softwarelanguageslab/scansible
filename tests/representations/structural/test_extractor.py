@@ -236,6 +236,42 @@ def describe_extracting_tasks() -> None:
         }
         assert result.vars == [rep.Variable('file_path', 'test.txt')]
 
+    def extracts_task_with_loop() -> None:
+        result = ext.extract_task(_parse_yaml(dedent('''
+            name: test
+            debug: msg={{ item }}
+            loop: [hello, world]
+        ''')))
+
+        assert result.action == 'debug'
+        assert result.args == {'msg': '{{ item }}'}
+        assert result.loop == ['hello', 'world']
+
+    def extracts_task_with_expr_loop() -> None:
+        result = ext.extract_task(_parse_yaml(dedent('''
+            name: test
+            debug: msg={{ item }}
+            loop: '{{ somelist }}'
+        ''')))
+
+        assert result.action == 'debug'
+        assert result.args == {'msg': '{{ item }}'}
+        assert result.loop == '{{ somelist }}'
+
+    def extracts_task_with_loop_control() -> None:
+        result = ext.extract_task(_parse_yaml(dedent('''
+            name: test
+            debug: msg={{ myvar }}
+            loop: [hello, world]
+            loop_control:
+              loop_var: myvar
+        ''')))
+
+        assert result.action == 'debug'
+        assert result.args == {'msg': '{{ myvar }}'}
+        assert result.loop == ['hello', 'world']
+        assert result.loop_control.loop_var == 'myvar'
+
     def does_not_eagerly_evaluate_imports() -> None:
         result = ext.extract_task(_parse_yaml(dedent('''
             import_tasks: tasks.yml
