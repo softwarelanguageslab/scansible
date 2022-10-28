@@ -7,29 +7,14 @@ from contextlib import redirect_stderr, redirect_stdout
 from functools import partial
 from pathlib import Path
 
-import ansible
-import ansible.playbook
-import ansible.playbook.task
-import ansible.playbook.handler_task_include
-import ansible.playbook.task_include
-import ansible.playbook.block
-import ansible.playbook.handler
-import ansible.playbook.play
-import ansible.parsing.dataloader
-import ansible.parsing.mod_args
-
-if TYPE_CHECKING:
-    # This alias doesn't exist outside of the stub files
-    from ansible.playbook.base import Value as AnsibleValue
-
-from . import representation as rep
+from . import representation as rep, ansible_types as ans
 from .helpers import ProjectPath, parse_file, validate_ansible_object, capture_output, find_all_files, find_file, FatalError, prevent_undesired_operations
 
 
 # Patch the ModuleArgsParser so that it doesn't verify whether the action exist.
 # Otherwise it'll complain on non-builtin actions
-old_mod_args_parse = ansible.parsing.mod_args.ModuleArgsParser.parse
-ansible.parsing.mod_args.ModuleArgsParser.parse = lambda self, skip_action_validation=False: old_mod_args_parse(self, skip_action_validation=True)  # type: ignore[assignment]
+old_mod_args_parse = ans.ModuleArgsParser.parse
+ans.ModuleArgsParser.parse = lambda self, skip_action_validation=False: old_mod_args_parse(self, skip_action_validation=True)  # type: ignore[assignment]
 
 
 def extract_role_metadata_file(path: ProjectPath) -> rep.MetaFile:
@@ -50,7 +35,7 @@ def extract_role_metadata_file(path: ProjectPath) -> rep.MetaFile:
     return metafile
 
 
-def _extract_meta_platforms(meta: dict[str, AnsibleValue]) -> list[rep.Platform]:
+def _extract_meta_platforms(meta: dict[str, ans.AnsibleValue]) -> list[rep.Platform]:
     galaxy_info: Any = meta.get('galaxy_info', {})
     assert isinstance(galaxy_info, dict), f'galaxy_info expected to be a dictionary, got {galaxy_info!r}'
     raw_platforms: Any = galaxy_info.get('platforms', [])
@@ -70,7 +55,7 @@ def _extract_meta_platforms(meta: dict[str, AnsibleValue]) -> list[rep.Platform]
     return platforms
 
 
-def _extract_meta_dependencies(meta: dict[str, AnsibleValue]) -> list[rep.Dependency]:
+def _extract_meta_dependencies(meta: dict[str, ans.AnsibleValue]) -> list[rep.Dependency]:
     raw_deps: Any = meta.get('dependencies', [])
     assert isinstance(raw_deps, list), f'Expected role dependencies to be a list, got {raw_deps}'
 
@@ -107,7 +92,7 @@ def extract_variable_file(path: ProjectPath) -> rep.VariableFile:
     return varfile
 
 
-def extract_vars(ds: dict[str, AnsibleValue]) -> list[rep.Variable]:
+def extract_vars(ds: dict[str, ans.AnsibleValue]) -> list[rep.Variable]:
     return [rep.Variable(name=k, value=v) for k, v in ds.items()]
 
 
@@ -122,11 +107,11 @@ def extract_tasks_file(path: ProjectPath, handlers: bool = False) -> rep.TaskFil
     return tf
 
 @overload
-def extract_list_of_tasks_or_blocks(ds: list[dict[str, AnsibleValue]], handlers: Literal[False]) -> list[rep.Task | rep.Block]: ...
+def extract_list_of_tasks_or_blocks(ds: list[dict[str, ans.AnsibleValue]], handlers: Literal[False]) -> list[rep.Task | rep.Block]: ...
 @overload
-def extract_list_of_tasks_or_blocks(ds: list[dict[str, AnsibleValue]], handlers: Literal[True]) -> list[rep.Handler]: ...
+def extract_list_of_tasks_or_blocks(ds: list[dict[str, ans.AnsibleValue]], handlers: Literal[True]) -> list[rep.Handler]: ...
 
-def extract_list_of_tasks_or_blocks(ds: list[dict[str, AnsibleValue]], handlers: bool = False) -> list[rep.Task | rep.Block] | list[rep.Handler]:
+def extract_list_of_tasks_or_blocks(ds: list[dict[str, ans.AnsibleValue]], handlers: bool = False) -> list[rep.Task | rep.Block] | list[rep.Handler]:
     content = []
     for inner_ds in ds:
         assert isinstance(inner_ds, dict) and all(isinstance(k, str) for k in inner_ds), 'Task list content must be a list of dictionaries'
@@ -135,12 +120,12 @@ def extract_list_of_tasks_or_blocks(ds: list[dict[str, AnsibleValue]], handlers:
 
 
 @overload
-def extract_task_or_block(ds: dict[str, AnsibleValue], handlers: Literal[False]) -> rep.Task | rep.Block: ...
+def extract_task_or_block(ds: dict[str, ans.AnsibleValue], handlers: Literal[False]) -> rep.Task | rep.Block: ...
 @overload
-def extract_task_or_block(ds: dict[str, AnsibleValue], handlers: Literal[True]) -> rep.Handler: ...
+def extract_task_or_block(ds: dict[str, ans.AnsibleValue], handlers: Literal[True]) -> rep.Handler: ...
 
-def extract_task_or_block(ds: dict[str, AnsibleValue], handlers: bool = False) -> rep.Handler | rep.Task | rep.Block:
-    if ansible.playbook.block.Block.is_block(ds):
+def extract_task_or_block(ds: dict[str, ans.AnsibleValue], handlers: bool = False) -> rep.Handler | rep.Task | rep.Block:
+    if ans.Block.is_block(ds):
         if handlers:
             raise FatalError('Found a block in what is supposed to be a handler, TODO?')
         return extract_block(ds)
@@ -148,11 +133,11 @@ def extract_task_or_block(ds: dict[str, AnsibleValue], handlers: bool = False) -
     return extract_handler(ds) if handlers else extract_task(ds)
 
 
-class _PatchedBlock(ansible.playbook.block.Block):
+class _PatchedBlock(ans.Block):
 
-    block: list[dict[str, AnsibleValue]]  # type: ignore[assignment]
-    rescue: list[dict[str, AnsibleValue]]  # type: ignore[assignment]
-    always: list[dict[str, AnsibleValue]]  # type: ignore[assignment]
+    block: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
+    rescue: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
+    always: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
 
     def __init__(self, *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
@@ -169,7 +154,7 @@ class _PatchedBlock(ansible.playbook.block.Block):
 _PatchedBlock.__name__ = 'Block'
 
 
-def extract_block(ds: dict[str, AnsibleValue]) -> rep.Block:
+def extract_block(ds: dict[str, ans.AnsibleValue]) -> rep.Block:
     assert _PatchedBlock.is_block(ds), f'Not a block: {ds}'
     raw_block = _PatchedBlock(ds)
     raw_block.load_data(ds)
@@ -194,12 +179,12 @@ def extract_block(ds: dict[str, AnsibleValue]) -> rep.Block:
     return block
 
 @overload
-def _extract_import_task(ds: dict[str, AnsibleValue], action: str, args: Any, handler: Literal[False] = ...) -> rep.Task: ...
+def _extract_import_task(ds: dict[str, ans.AnsibleValue], action: str, args: Any, handler: Literal[False] = ...) -> rep.Task: ...
 @overload
-def _extract_import_task(ds: dict[str, AnsibleValue], action: str, args: Any, handler: Literal[True]) -> rep.Handler: ...
-def _extract_import_task(ds: dict[str, AnsibleValue], action: str, args: Any, handler: bool = False) -> rep.Task | rep.Handler:
+def _extract_import_task(ds: dict[str, ans.AnsibleValue], action: str, args: Any, handler: Literal[True]) -> rep.Handler: ...
+def _extract_import_task(ds: dict[str, ans.AnsibleValue], action: str, args: Any, handler: bool = False) -> rep.Task | rep.Handler:
     # Special-case all import/include tasks, like what's done in ansible.playbook.helpers.load_list_of_tasks
-    if action in ansible.constants._ACTION_ALL_PROPER_INCLUDE_IMPORT_ROLES:
+    if action in ans.C._ACTION_ALL_PROPER_INCLUDE_IMPORT_ROLES:
         raise FatalError('TODO: Import/include on a role')
 
     # Current Ansible version crashes when the old static key is used. Transform
@@ -220,22 +205,22 @@ def _extract_import_task(ds: dict[str, AnsibleValue], action: str, args: Any, ha
             ds['include_tasks'] = include_args
 
     if handler:
-        ti = ansible.playbook.handler_task_include.HandlerTaskInclude.load(ds)
-        validate_ansible_object(ti)
+        hti = ans.HandlerTaskInclude.load(ds)
+        validate_ansible_object(hti)
         return rep.Handler(
-            name=ti.name,
-            action=ti.action,
-            args=ti.args,
-            when=ti.when,
-            loop=ti.loop,
-            vars=extract_vars(ti.vars),
-            register=ti.register,
-            listen=ti.listen,
+            name=hti.name,
+            action=hti.action,
+            args=hti.args,
+            when=hti.when,
+            loop=hti.loop,
+            vars=extract_vars(hti.vars),
+            register=hti.register,
+            listen=hti.listen,
             raw=ds,
             # TODO!
             loop_control=None)
     else:
-        ti = ansible.playbook.task_include.TaskInclude.load(ds)
+        ti = ans.TaskInclude.load(ds)
         validate_ansible_object(ti)
         return rep.Task(
             name=ti.name,
@@ -250,13 +235,13 @@ def _extract_import_task(ds: dict[str, AnsibleValue], action: str, args: Any, ha
             loop_control=None)
 
 
-def extract_task(ds: dict[str, AnsibleValue]) -> rep.Task:
-    args_parser = ansible.parsing.mod_args.ModuleArgsParser(ds)
+def extract_task(ds: dict[str, ans.AnsibleValue]) -> rep.Task:
+    args_parser = ans.ModuleArgsParser(ds)
     (action, args, _) = args_parser.parse()
-    if action in ansible.constants._ACTION_ALL_INCLUDE_IMPORT_TASKS or action in ansible.constants._ACTION_ALL_PROPER_INCLUDE_IMPORT_ROLES:
+    if action in ans.C._ACTION_ALL_INCLUDE_IMPORT_TASKS or action in ans.C._ACTION_ALL_PROPER_INCLUDE_IMPORT_ROLES:
         return _extract_import_task(ds, action, args)
 
-    raw_task = ansible.playbook.task.Task.load(ds)
+    raw_task = ans.Task.load(ds)
     validate_ansible_object(raw_task)
 
     if raw_task.loop_control:
@@ -275,13 +260,13 @@ def extract_task(ds: dict[str, AnsibleValue]) -> rep.Task:
         loop_control=None)
 
 
-def extract_handler(ds: dict[str, AnsibleValue]) -> rep.Handler:
-    args_parser = ansible.parsing.mod_args.ModuleArgsParser(ds)
+def extract_handler(ds: dict[str, ans.AnsibleValue]) -> rep.Handler:
+    args_parser = ans.ModuleArgsParser(ds)
     (action, args, _) = args_parser.parse()
-    if action in ansible.constants._ACTION_ALL_INCLUDE_IMPORT_TASKS or action in ansible.constants._ACTION_ALL_PROPER_INCLUDE_IMPORT_ROLES:
+    if action in ans.C._ACTION_ALL_INCLUDE_IMPORT_TASKS or action in ans.C._ACTION_ALL_PROPER_INCLUDE_IMPORT_ROLES:
         return _extract_import_task(ds, action, args, handler=True)
 
-    raw_handler = ansible.playbook.handler.Handler.load(ds)
+    raw_handler = ans.Handler.load(ds)
     validate_ansible_object(raw_handler)
 
     if raw_handler.loop_control:
@@ -301,9 +286,9 @@ def extract_handler(ds: dict[str, AnsibleValue]) -> rep.Handler:
         loop_control=None)
 
 
-class _PatchedPlay(ansible.playbook.play.Play):
+class _PatchedPlay(ans.Play):
 
-    tasks: list[dict[str, AnsibleValue]]
+    tasks: list[dict[str, ans.AnsibleValue]]
 
     def __init__(self, *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
@@ -320,7 +305,7 @@ class _PatchedPlay(ansible.playbook.play.Play):
 _PatchedPlay.__name__ = 'Play'
 
 
-def extract_play(ds: dict[str, AnsibleValue]) -> rep.Play:
+def extract_play(ds: dict[str, ans.AnsibleValue]) -> rep.Play:
     raw_play = _PatchedPlay()
     raw_play.load_data(ds)
     validate_ansible_object(raw_play)
@@ -446,7 +431,7 @@ def _safe_extract(extractor: Callable[[ProjectPath], ExtractedFileType], file_pa
     try:
         extracted_file = extractor(file_path)
         file_dict['/'.join(file_path.relative.parts[1:])] = extracted_file
-    except (ansible.errors.AnsibleError, AssertionError) as e:
+    except (ans.AnsibleError, AssertionError) as e:
         broken_files.append(rep.BrokenFile(path=file_path.relative, reason=str(e)))
 
 
