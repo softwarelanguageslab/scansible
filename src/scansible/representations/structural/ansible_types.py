@@ -1,6 +1,7 @@
 """Facilitate access to Ansible playbook types."""
 from typing import TYPE_CHECKING
 
+from ansible.playbook.base import FieldAttributeBase
 from ansible.playbook.block import Block
 from ansible.playbook.handler import Handler
 from ansible.playbook.handler_task_include import HandlerTaskInclude
@@ -10,6 +11,7 @@ from ansible.playbook.task_include import TaskInclude
 
 from ansible.parsing.yaml.objects import AnsibleSequence, AnsibleMapping, AnsibleBaseYAMLObject
 from ansible.module_utils.parsing.convert_bool import boolean as convert_bool
+from ansible.template import Templar
 from ansible.parsing.dataloader import DataLoader
 from ansible.parsing.mod_args import ModuleArgsParser
 from ansible import constants as C

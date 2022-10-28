@@ -8,7 +8,7 @@ import io
 from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
 
-import ansible.playbook.base
+from . import ansible_types as ans
 
 
 class FatalError(Exception):
@@ -69,11 +69,11 @@ class ProjectPath:
 
 def parse_file(path: ProjectPath) -> object:
     """Parse a YAML file using Ansible's parser."""
-    loader = ansible.parsing.dataloader.DataLoader()
+    loader = ans.DataLoader()
     return loader.load_from_file(str(path.absolute))
 
 
-def validate_ansible_object(obj: ansible.playbook.base.FieldAttributeBase) -> None:
+def validate_ansible_object(obj: ans.FieldAttributeBase) -> None:
     """Validate and normalise the given Ansible object.
 
     Uses Ansible's own validators. Normalises the object by setting default
@@ -89,7 +89,7 @@ def validate_ansible_object(obj: ansible.playbook.base.FieldAttributeBase) -> No
         if value is None:
             continue
         if attribute.isa == 'class':
-            assert isinstance(value, ansible.playbook.base.FieldAttributeBase)
+            assert isinstance(value, ans.FieldAttributeBase)
             validate_ansible_object(value)
             continue
 
@@ -105,7 +105,7 @@ def find_file(dir_path: ProjectPath, file_name: str) -> ProjectPath | None:
 
     :raises     AssertionError:  When multiple files were found.
     """
-    loader = ansible.parsing.dataloader.DataLoader()
+    loader = ans.DataLoader()
     # DataLoader.find_vars_files is misnamed.
     found_paths = loader.find_vars_files(str(dir_path.absolute), file_name, allow_dir=False)
     # found_paths should always have at most one element, since it can only have
@@ -123,7 +123,7 @@ def find_all_files(dir_path: ProjectPath) -> list[ProjectPath]:
     results = []
     for child in dir_path.absolute.iterdir():
         child_path = dir_path.join(child)
-        if child.is_file() and child.suffix in ansible.constants.YAML_FILENAME_EXTENSIONS:
+        if child.is_file() and child.suffix in ans.C.YAML_FILENAME_EXTENSIONS:
             results.append(child_path)
         elif child.is_dir():
             results.extend(find_all_files(child_path))
