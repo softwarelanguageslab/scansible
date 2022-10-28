@@ -84,6 +84,7 @@ def validate_ansible_object(obj: ans.FieldAttributeBase) -> None:
 
     # We have to reimplement Ansible's logic because it eagerly templates certain
     # expressions. We don't want that.
+    templar = ans.Templar(ans.DataLoader())
     for (name, attribute) in obj._valid_attrs.items():
         value = getattr(obj, name)
         if value is None:
@@ -91,6 +92,12 @@ def validate_ansible_object(obj: ans.FieldAttributeBase) -> None:
         if attribute.isa == 'class':
             assert isinstance(value, ans.FieldAttributeBase)
             validate_ansible_object(value)
+            continue
+
+        # We need to ensure we don't retrieve the validated value if the
+        # original value is an expression. Ansible usually eagerly evaluates
+        # those, we don't.
+        if templar.is_template(value):
             continue
 
         # templar argument is only used when attribute.isa is a class, which we

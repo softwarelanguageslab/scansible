@@ -108,6 +108,13 @@ def describe_validate_ansible_object() -> None:
         with pytest.raises(Exception):
             h.validate_ansible_object(obj)
 
+    def does_not_validate_expression_values() -> None:
+        obj = Handler.load({ 'file': { 'path': 'x' }, 'become': '{{ test expr }}'})  # type: ignore[dict-item]
+
+        h.validate_ansible_object(obj)
+
+        assert obj.become == '{{ test expr }}'
+
 
 def describe_find_file() -> None:
 
