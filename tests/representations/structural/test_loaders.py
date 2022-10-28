@@ -536,6 +536,19 @@ def describe_load_task() -> None:
         assert 'static' in result[1]
         assert 'include_tasks' not in result[1]
 
+    def transforms_none_when() -> None:
+        # devops-cmp/ansible-nodejs/tasks/main.yml @ ce6141fb61f1573b705db7006683af59ea792978
+        result = loaders.load_task({  # type: ignore[call-overload]
+            'get_url': {
+                'url': '...',
+                'dest': '...',
+            },
+            'when': None,
+        }, as_handler=False)
+
+        assert result[0].when == []
+        assert result[1]['when'] is None
+
 def describe_load_block() -> None:
     def loads_correct_block() -> None:
         result = loaders.load_block({

@@ -267,6 +267,11 @@ def load_task(original_ds: dict[str, ans.AnsibleValue], as_handler: bool) -> tup
             # directive is present.
             _transform_task_static_include(ds)
 
+        # This can happen and Ansible doesn't do anything about it, it just
+        # ignores the when. Remove the directive so that defaults take over.
+        if 'when' in ds and ds['when'] is None:
+            del ds['when']  # type: ignore[unreachable]
+
         if not as_handler:
             ansible_cls = ans.Task if not is_include_tasks else ans.TaskInclude
         else:
