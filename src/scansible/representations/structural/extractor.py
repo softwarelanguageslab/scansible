@@ -11,12 +11,6 @@ from . import representation as rep, ansible_types as ans, loaders
 from .helpers import ProjectPath, parse_file, validate_ansible_object, capture_output, find_all_files, find_file, FatalError, prevent_undesired_operations
 
 
-# Patch the ModuleArgsParser so that it doesn't verify whether the action exist.
-# Otherwise it'll complain on non-builtin actions
-old_mod_args_parse = ans.ModuleArgsParser.parse
-ans.ModuleArgsParser.parse = lambda self, skip_action_validation=False: old_mod_args_parse(self, skip_action_validation=True)  # type: ignore[assignment]
-
-
 def extract_role_metadata_file(path: ProjectPath) -> rep.MetaFile:
     """Extract the structural representation of a metadata file."""
 
@@ -49,10 +43,9 @@ def extract_list_of_variables(ds: dict[str, ans.AnsibleValue]) -> list[rep.Varia
 
 
 def extract_tasks_file(path: ProjectPath, handlers: bool = False) -> rep.TaskFile:
-    ds = parse_file(path)
-    assert ds is None or isinstance(ds, list), f'Expected task file {path.relative} to be a list, got {type(ds)}'
+    ds, raw_ds = loaders.load_tasks_file(path)
 
-    content = extract_list_of_tasks_or_blocks(ds, handlers) if ds is not None else [] # type: ignore[call-overload]
+    content = extract_list_of_tasks_or_blocks(ds, handlers)  # type: ignore[call-overload]
     tf = rep.TaskFile(file_path=path.relative, tasks=content)
     for child in content:
         child.parent = tf
@@ -66,7 +59,6 @@ def extract_list_of_tasks_or_blocks(ds: list[dict[str, ans.AnsibleValue]], handl
 def extract_list_of_tasks_or_blocks(ds: list[dict[str, ans.AnsibleValue]], handlers: bool = False) -> list[rep.Task | rep.Block] | list[rep.Handler]:
     content = []
     for inner_ds in ds:
-        assert isinstance(inner_ds, dict) and all(isinstance(k, str) for k in inner_ds), 'Task list content must be a list of dictionaries'
         content.append(extract_task_or_block(inner_ds, handlers))  # type: ignore[call-overload]
     return content
 
@@ -85,32 +77,11 @@ def extract_task_or_block(ds: dict[str, ans.AnsibleValue], handlers: bool = Fals
     return extract_handler(ds) if handlers else extract_task(ds)
 
 
-class _PatchedBlock(ans.Block):
 
-    block: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
-    rescue: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
-    always: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
-
-    def __init__(self, *args: object, **kwargs: object) -> None:
-        super().__init__(*args, **kwargs)
-        # Remove the loaders from the block implementation, since they dispatch
-        # to ansible.playbook.helpers.load_list_of_tasks, which does eager
-        # loading of import_* tasks and inlines the imported roles/tasks into
-        # the block. We don't want that to happen.
-        self._load_block = None
-        self._load_rescue = None
-        self._load_always = None
-
-
-# Workaround for error messages using the wrong class name.
-_PatchedBlock.__name__ = 'Block'
 
 
 def extract_block(ds: dict[str, ans.AnsibleValue]) -> rep.Block:
-    assert _PatchedBlock.is_block(ds), f'Not a block: {ds}'
-    raw_block = _PatchedBlock(ds)
-    raw_block.load_data(ds)
-    validate_ansible_object(raw_block)
+    raw_block, raw_ds = loaders.load_block(ds)
 
     children_block = extract_list_of_tasks_or_blocks(raw_block.block, handlers=False)
     children_rescue = extract_list_of_tasks_or_blocks(raw_block.rescue, handlers=False)
@@ -122,7 +93,7 @@ def extract_block(ds: dict[str, ans.AnsibleValue]) -> rep.Block:
             rescue=children_rescue,
             always=children_always,
             vars=extract_list_of_variables(raw_block.vars),
-            raw=ds
+            raw=raw_ds
     )
 
     for child in children_block + children_rescue + children_always:
@@ -130,71 +101,9 @@ def extract_block(ds: dict[str, ans.AnsibleValue]) -> rep.Block:
 
     return block
 
-@overload
-def _extract_import_task(ds: dict[str, ans.AnsibleValue], action: str, args: Any, handler: Literal[False] = ...) -> rep.Task: ...
-@overload
-def _extract_import_task(ds: dict[str, ans.AnsibleValue], action: str, args: Any, handler: Literal[True]) -> rep.Handler: ...
-def _extract_import_task(ds: dict[str, ans.AnsibleValue], action: str, args: Any, handler: bool = False) -> rep.Task | rep.Handler:
-    # Special-case all import/include tasks, like what's done in ansible.playbook.helpers.load_list_of_tasks
-    if action in ans.C._ACTION_ALL_PROPER_INCLUDE_IMPORT_ROLES:
-        raise FatalError('TODO: Import/include on a role')
-
-    # Current Ansible version crashes when the old static key is used. Transform
-    # it to modern syntax.
-    if 'static' in ds:
-        assert 'include' in ds, '"static" directive without "include" action'
-        is_static = ds['static']
-        if isinstance(is_static, str):
-            assert is_static in ('yes', 'no'), f'Invalid boolean value for "static": {is_static}'
-            is_static = (is_static == 'yes')
-
-        include_args = ds['include']
-        del ds['include']
-        del ds['static']
-        if is_static:
-            ds['import_tasks'] = include_args
-        else:
-            ds['include_tasks'] = include_args
-
-    if handler:
-        hti = ans.HandlerTaskInclude.load(ds)
-        validate_ansible_object(hti)
-        return rep.Handler(
-            name=hti.name,
-            action=hti.action,
-            args=hti.args,
-            when=hti.when,
-            loop=hti.loop,
-            vars=extract_list_of_variables(hti.vars),
-            register=hti.register,
-            listen=hti.listen,
-            raw=ds,
-            # TODO!
-            loop_control=None)
-    else:
-        ti = ans.TaskInclude.load(ds)
-        validate_ansible_object(ti)
-        return rep.Task(
-            name=ti.name,
-            action=ti.action,
-            args=ti.args,
-            when=ti.when,
-            loop=ti.loop,
-            vars=extract_list_of_variables(ti.vars),
-            register=ti.register,
-            raw=ds,
-            # TODO!
-            loop_control=None)
-
 
 def extract_task(ds: dict[str, ans.AnsibleValue]) -> rep.Task:
-    args_parser = ans.ModuleArgsParser(ds)
-    (action, args, _) = args_parser.parse()
-    if action in ans.C._ACTION_ALL_INCLUDE_IMPORT_TASKS or action in ans.C._ACTION_ALL_PROPER_INCLUDE_IMPORT_ROLES:
-        return _extract_import_task(ds, action, args)
-
-    raw_task = ans.Task.load(ds)
-    validate_ansible_object(raw_task)
+    raw_task, raw_ds = loaders.load_task(ds, False)
 
     if raw_task.loop_control:
         raise FatalError('TODO: loop_control')
@@ -207,19 +116,13 @@ def extract_task(ds: dict[str, ans.AnsibleValue]) -> rep.Task:
         loop=raw_task.loop,
         vars=extract_list_of_variables(raw_task.vars),
         register=raw_task.register,
-        raw=ds,
+        raw=raw_ds,
         # TODO!
         loop_control=None)
 
 
 def extract_handler(ds: dict[str, ans.AnsibleValue]) -> rep.Handler:
-    args_parser = ans.ModuleArgsParser(ds)
-    (action, args, _) = args_parser.parse()
-    if action in ans.C._ACTION_ALL_INCLUDE_IMPORT_TASKS or action in ans.C._ACTION_ALL_PROPER_INCLUDE_IMPORT_ROLES:
-        return _extract_import_task(ds, action, args, handler=True)
-
-    raw_handler = ans.Handler.load(ds)
-    validate_ansible_object(raw_handler)
+    raw_handler, raw_ds = loaders.load_task(ds, True)
 
     if raw_handler.loop_control:
         raise FatalError('TODO: loop_control')
@@ -233,41 +136,20 @@ def extract_handler(ds: dict[str, ans.AnsibleValue]) -> rep.Handler:
         vars=extract_list_of_variables(raw_handler.vars),
         listen=raw_handler.listen,
         register=raw_handler.register,
-        raw=ds,
+        raw=raw_ds,
         # TODO!
         loop_control=None)
 
 
-class _PatchedPlay(ans.Play):
-
-    tasks: list[dict[str, ans.AnsibleValue]]
-
-    def __init__(self, *args: object, **kwargs: object) -> None:
-        super().__init__(*args, **kwargs)
-        # Similar to _PatchedBlock, remove loaders for tasks, handlers, and
-        # roles because of Ansible's eager processing.
-        self._load_tasks = None
-        self._load_pre_tasks = None
-        self._load_post_tasks = None
-        self._load_handlers = None
-        self._load_roles = None
-
-
-# Workaround for error messages using the wrong class name.
-_PatchedPlay.__name__ = 'Play'
-
-
 def extract_play(ds: dict[str, ans.AnsibleValue]) -> rep.Play:
-    raw_play = _PatchedPlay()
-    raw_play.load_data(ds)
-    validate_ansible_object(raw_play)
+    raw_play, raw_ds = loaders.load_play(ds)
 
     play = rep.Play(
         name=raw_play.name,
         hosts=raw_play.hosts,
         tasks=extract_list_of_tasks_or_blocks(raw_play.tasks, handlers=False),
         vars=extract_list_of_variables(raw_play.vars),
-        raw=ds
+        raw=raw_ds
     )
     for child in play.tasks:
         child.parent = play
@@ -292,8 +174,7 @@ def extract_playbook(path: Path, id: str, version: str) -> rep.StructuralModel:
     pb_path = ProjectPath.from_root(path)
 
     with capture_output() as output, prevent_undesired_operations():
-        ds = parse_file(pb_path)
-        assert isinstance(ds, list) and bool(ds), 'Malformed or empty playbook'
+        ds, raw_ds = loaders.load_playbook(pb_path)
 
         # Parse the plays in the playbook
         plays = [extract_play(play_ds) for play_ds in ds]
@@ -383,7 +264,7 @@ def _safe_extract(extractor: Callable[[ProjectPath], ExtractedFileType], file_pa
     try:
         extracted_file = extractor(file_path)
         file_dict['/'.join(file_path.relative.parts[1:])] = extracted_file
-    except (ans.AnsibleError, AssertionError) as e:
+    except (ans.AnsibleError, loaders.LoadError) as e:
         broken_files.append(rep.BrokenFile(path=file_path.relative, reason=str(e)))
 
 

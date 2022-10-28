@@ -9,6 +9,7 @@ from ansible.playbook.task import Task
 from ansible.playbook.task_include import TaskInclude
 
 from ansible.parsing.yaml.objects import AnsibleSequence, AnsibleMapping, AnsibleBaseYAMLObject
+from ansible.module_utils.parsing.convert_bool import boolean as convert_bool
 from ansible.parsing.dataloader import DataLoader
 from ansible.parsing.mod_args import ModuleArgsParser
 from ansible import constants as C

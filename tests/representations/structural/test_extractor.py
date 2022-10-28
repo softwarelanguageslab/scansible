@@ -1078,7 +1078,7 @@ def describe_extracting_roles() -> None:
                 default_var_files={'main.yml': defaults_file},
                 role_var_files={},
                 handler_files={},
-                broken_files=[rep.BrokenFile(Path('tasks/main.yml'), "Expected task file tasks/main.yml to be a list, got <class 'ansible.parsing.yaml.objects.AnsibleMapping'>")]),
+                broken_files=[rep.BrokenFile(Path('tasks/main.yml'), "Failed to load task file at tasks/main.yml: Wrong type encountered\n\nExpected task file to be list, got AnsibleMapping instead.\nActual value:\n{'file': {'path': 'hello'}, 'apt': {'name': 'test'}}")]),
             path=tmp_path,
             id='test',
             version='test2',

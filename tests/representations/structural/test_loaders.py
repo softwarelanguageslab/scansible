@@ -11,6 +11,8 @@ from scansible.representations.structural.loaders import LoadError
 
 LoadMetaType = Callable[[str], tuple[dict[str, 'ans.AnsibleValue'], Any]]
 LoadVarsType = Callable[[str], tuple[dict[str, 'ans.AnsibleValue'], Any]]
+LoadTasksFileType = Callable[[str], tuple[list[dict[str, 'ans.AnsibleValue']], Any]]
+LoadPlaybookType = Callable[[str], tuple[list[dict[str, 'ans.AnsibleValue']], Any]]
 
 @pytest.fixture()
 def load_meta(tmp_path: Path) -> LoadMetaType:
@@ -25,6 +27,23 @@ def load_vars(tmp_path: Path) -> LoadVarsType:
         (tmp_path / 'main.yml').write_text(yaml_content)
         return loaders.load_variable_file(h.ProjectPath(tmp_path, 'main.yml'))
     return inner
+
+
+@pytest.fixture()
+def load_tasks_file(tmp_path: Path) -> LoadTasksFileType:
+    def inner(yaml_content: str) -> tuple[list[dict[str, ans.AnsibleValue]], Any]:
+        (tmp_path / 'main.yml').write_text(yaml_content)
+        return loaders.load_tasks_file(h.ProjectPath(tmp_path, 'main.yml'))
+    return inner
+
+
+@pytest.fixture()
+def load_pb(tmp_path: Path) -> LoadPlaybookType:
+    def inner(yaml_content: str) -> tuple[list[dict[str, ans.AnsibleValue]], Any]:
+        (tmp_path / 'pb.yml').write_text(yaml_content)
+        return loaders.load_playbook(h.ProjectPath(tmp_path, 'pb.yml'))
+    return inner
+
 
 def describe_load_role_metadata() -> None:
 
@@ -380,4 +399,200 @@ def describe_load_variable_file() -> None:
             load_vars('''
                 - a
                 - b
+            ''')
+
+    def raises_on_wrong_name_type(load_vars: LoadVarsType) -> None:
+        with pytest.raises(LoadError, match='Expected variable name to be str'):
+            load_vars('''
+                1: 2
+            ''')
+
+def describe_load_task_file() -> None:
+
+    def loads_correct_file(load_tasks_file: LoadTasksFileType) -> None:
+        result = load_tasks_file('''
+            - name: test
+              file: {}
+            - block:
+                - file: {}
+        ''')
+
+        assert result[0] == [{
+            'name': 'test',
+            'file': {},
+        }, {
+            'block': [{
+                'file': {},
+            }]
+        }]
+
+    def normalises_empty_file(load_tasks_file: LoadTasksFileType) -> None:
+        result, raw_result = load_tasks_file('# just a comment')
+
+        assert result == []
+        assert raw_result is None
+
+    def raises_on_wrong_type(load_tasks_file: LoadTasksFileType) -> None:
+        with pytest.raises(LoadError, match='Expected task file to be list'):
+            load_tasks_file('''
+                a: 123
+            ''')
+
+    def raises_on_wrong_property_type(load_tasks_file: LoadTasksFileType) -> None:
+        with pytest.raises(LoadError, match=r'Expected task file content to be dict\[str, typing\.Any\]'):
+            load_tasks_file('''
+                - 1: 2
+            ''')
+
+
+def describe_load_task() -> None:
+
+    def loads_correct_task() -> None:
+        result = loaders.load_task({  # type: ignore[call-overload]
+            'file': {
+                'path': 'test.txt',
+                'state': 'present',
+            },
+            'when': 'x is not None'
+        }, as_handler=False)
+
+        assert isinstance(result[0], ans.Task)
+        assert result[0].action == 'file'
+        assert result[0].args == {'path': 'test.txt', 'state': 'present'}
+        assert result[0].when == ['x is not None']
+
+    def loads_correct_handler() -> None:
+        result = loaders.load_task({  # type: ignore[call-overload]
+            'file': {
+                'path': 'test.txt',
+                'state': 'present',
+            },
+            'when': 'x is not None',
+            'listen': 'test',
+        }, as_handler=True)
+
+        assert isinstance(result[0], ans.Handler)
+        assert result[0].action == 'file'
+        assert result[0].args == {'path': 'test.txt', 'state': 'present'}
+        assert result[0].when == ['x is not None']
+        assert result[0].listen == ['test']
+
+    def loads_correct_task_include() -> None:
+        result = loaders.load_task({  # type: ignore[call-overload]
+            'include_tasks': 'test.yml',
+            'when': 'x is not None'
+        }, as_handler=False)
+
+        assert isinstance(result[0], ans.TaskInclude)
+        assert result[0].action == 'include_tasks'
+        assert result[0].args == {'_raw_params': 'test.yml'}
+        assert result[0].when == ['x is not None']
+
+    def loads_correct_task_include_import() -> None:
+        result = loaders.load_task({  # type: ignore[call-overload]
+            'import_tasks': 'test.yml',
+            'when': 'x is not None'
+        }, as_handler=False)
+
+        assert isinstance(result[0], ans.TaskInclude)
+        assert result[0].action == 'import_tasks'
+        assert result[0].args == {'_raw_params': 'test.yml'}
+        assert result[0].when == ['x is not None']
+
+    def loads_correct_handler_include() -> None:
+        result = loaders.load_task({  # type: ignore[call-overload]
+            'include_tasks': 'test.yml',
+            'listen': 'test',
+        }, as_handler=True)
+
+        assert isinstance(result[0], ans.HandlerTaskInclude)
+        assert result[0].action == 'include_tasks'
+        assert result[0].args == {'_raw_params': 'test.yml'}
+        assert result[0].listen == ['test']
+
+    def transforms_static_include() -> None:
+        result = loaders.load_task({  # type: ignore[call-overload]
+            'include': 'test.yml',
+            'static': 'yes',
+        }, as_handler=False)
+
+        assert isinstance(result[0], ans.TaskInclude)
+        assert result[0].action == 'import_tasks'
+        assert result[0].args == {'_raw_params': 'test.yml'}
+        assert 'include' in result[1]
+        assert 'static' in result[1]
+        assert 'import_tasks' not in result[1]
+
+    def transforms_static_no_include() -> None:
+        result = loaders.load_task({  # type: ignore[call-overload]
+            'include': 'test.yml',
+            'static': 'no',
+        }, as_handler=False)
+
+        assert isinstance(result[0], ans.TaskInclude)
+        assert result[0].action == 'include_tasks'
+        assert result[0].args == {'_raw_params': 'test.yml'}
+        assert 'include' in result[1]
+        assert 'static' in result[1]
+        assert 'include_tasks' not in result[1]
+
+def describe_load_block() -> None:
+    def loads_correct_block() -> None:
+        result = loaders.load_block({
+            'block': [{'file': {}}],  # type: ignore[dict-item]
+            'rescue': [{'file': {}}],  # type: ignore[dict-item]
+        })
+
+        assert result[0].block == [{'file': {}}]
+        assert result[0].rescue == [{'file': {}}]
+        assert result[0].always == []
+
+    def raises_if_not_a_block() -> None:
+        with pytest.raises(LoadError, match='Not a block'):
+            loaders.load_block({
+                'file': {}  # type: ignore[dict-item]
+            })
+
+
+def describe_load_play() -> None:
+    def loads_correct_play() -> None:
+        result = loaders.load_play({
+            'hosts': 'hello',  # type: ignore[dict-item]
+            'tasks': [],  # type: ignore[dict-item]
+        })
+
+        assert result[0].hosts == ['hello']
+        assert result[0].tasks == []
+
+
+def describe_load_playbook() -> None:
+    def loads_correct_playbook(load_pb: LoadPlaybookType) -> None:
+        result = load_pb('''---
+            - hosts: servers
+              name: x
+              tasks: []
+            - hosts: databases
+              name: x
+              tasks: []
+        ''')
+
+        assert result[0] == [{
+            'hosts': 'servers',
+            'name': 'x',
+            'tasks': [],
+        }, {
+            'hosts': 'databases',
+            'name': 'x',
+            'tasks': [],
+        }]
+
+    def raises_on_empty_playbook(load_pb: LoadPlaybookType) -> None:
+        with pytest.raises(LoadError, match='Empty playbook'):
+            load_pb('# just a comment')
+
+    def raises_on_wrong_type(load_pb: LoadPlaybookType) -> None:
+        with pytest.raises(LoadError, match='Expected playbook to be list'):
+            load_pb('''
+                hosts: x
+                name: test
             ''')

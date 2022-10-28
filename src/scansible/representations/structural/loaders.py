@@ -7,14 +7,15 @@ parsed data structure without modifications.
 
 from __future__ import annotations
 
-from typing import Any, Type
+from typing import Any, Generator, Literal, Type, overload
 
 import types
+from contextlib import contextmanager
 from copy import deepcopy
 from pathlib import Path
 
 from . import ansible_types as ans
-from .helpers import ProjectPath, parse_file
+from .helpers import ProjectPath, parse_file, FatalError, validate_ansible_object
 
 class LoadError(Exception):
     """Raised when loading or validation failed."""
@@ -179,6 +180,174 @@ def load_variable_file(path: ProjectPath) -> tuple[dict[str, ans.AnsibleValue], 
         raise LoadTypeError('variable file', dict, ds, path.relative)
     for var_name in ds:
         if not isinstance(var_name, str):
-            raise LoadTypeError('variable', str, var_name, path.relative)
+            raise LoadTypeError('variable name', str, var_name, path.relative)
+
+    return ds, original_ds
+
+
+def load_tasks_file(path: ProjectPath) -> tuple[list[dict[str, ans.AnsibleValue]], Any]:
+    original_ds = parse_file(path)
+    ds = deepcopy(original_ds)
+
+    if ds is None:
+        ds = ans.AnsibleSequence()
+
+    if not isinstance(ds, list):
+        raise LoadTypeError('task file', list, ds, path.relative)
+    for content in ds:
+        if not isinstance(content, dict) or not all(isinstance(prop, str) for prop in content):
+            raise LoadTypeError('task file content', dict[str, Any], content, path.relative)
+
+    return ds, original_ds
+
+
+@contextmanager
+def _patch_modargs_parser() -> Generator[None, None, None]:
+    # Patch the ModuleArgsParser so that it doesn't verify whether the action exist.
+    # Otherwise it'll complain on non-builtin actions
+    old_mod_args_parse = ans.ModuleArgsParser.parse
+    ans.ModuleArgsParser.parse = lambda self, skip_action_validation=False: old_mod_args_parse(self, skip_action_validation=True)  # type: ignore[assignment]
+
+    try:
+        yield
+    finally:
+        ans.ModuleArgsParser.parse = old_mod_args_parse  # type: ignore[assignment]
+
+
+def _get_task_action(ds: dict[str, ans.AnsibleValue]) -> str:
+    args_parser = ans.ModuleArgsParser(ds)
+    (action, _, _) = args_parser.parse()
+    return action
+
+
+def _transform_task_static_include(ds: dict[str, ans.AnsibleValue]) -> None:
+    # Current Ansible version crashes when the old static key is used.
+    # Transform it to modern syntax, either into `import_tasks` if it's a
+    # static include, or `include_tasks` if it isn't.
+    if 'static' in ds:
+        is_static = ans.convert_bool(ds['static'])
+
+        include_args = ds['include']
+        del ds['include']
+        del ds['static']
+        if is_static:
+            ds['import_tasks'] = include_args
+        else:
+            ds['include_tasks'] = include_args
+
+
+def _task_is_include_import_tasks(action: str) -> bool:
+    return action in ans.C._ACTION_ALL_INCLUDE_IMPORT_TASKS
+
+def _task_is_include(action: str) -> bool:
+    return action in ans.C._ACTION_INCLUDE
+
+def _task_is_import_playbook(action: str) -> bool:
+    return action in ans.C._ACTION_IMPORT_PLAYBOOK
+
+def _task_is_include_import_role(action: str) -> bool:
+    return action in ans.C._ACTION_ALL_PROPER_INCLUDE_IMPORT_ROLES
+
+@overload
+def load_task(original_ds: dict[str, ans.AnsibleValue], as_handler: Literal[True]) -> tuple[ans.Handler, Any]: ...
+@overload
+def load_task(original_ds: dict[str, ans.AnsibleValue], as_handler: Literal[False]) -> tuple[ans.Task, Any]: ...
+def load_task(original_ds: dict[str, ans.AnsibleValue], as_handler: bool) -> tuple[ans.Task | ans.Handler, Any]:
+    ds = deepcopy(original_ds)
+
+    with _patch_modargs_parser():
+        action = _get_task_action(ds)
+        is_include_tasks = _task_is_include_import_tasks(action)
+
+        if _task_is_import_playbook(action) or _task_is_include_import_role(action):
+            raise FatalError(f'TODO: {action}')
+
+        if _task_is_include(action):
+            # Check for include/import tasks and transform them if the static
+            # directive is present.
+            _transform_task_static_include(ds)
+
+        if not as_handler:
+            ansible_cls = ans.Task if not is_include_tasks else ans.TaskInclude
+        else:
+            ansible_cls = ans.Handler if not is_include_tasks else ans.HandlerTaskInclude
+
+        raw_task = ansible_cls.load(ds)
+        validate_ansible_object(raw_task)
+
+    return raw_task, original_ds
+
+
+class _PatchedBlock(ans.Block):
+
+    block: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
+    rescue: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
+    always: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+        # Remove the loaders from the block implementation, since they dispatch
+        # to ansible.playbook.helpers.load_list_of_tasks, which does eager
+        # loading of import_* tasks and inlines the imported roles/tasks into
+        # the block. We don't want that to happen.
+        self._load_block = None
+        self._load_rescue = None
+        self._load_always = None
+
+
+# Workaround for error messages using the wrong class name.
+_PatchedBlock.__name__ = 'Block'
+
+
+def load_block(original_ds: dict[str, ans.AnsibleValue]) -> tuple[_PatchedBlock, Any]:
+    ds = deepcopy(original_ds)
+
+    if not _PatchedBlock.is_block(ds):
+        raise LoadError('block', 'Not a block', extra_msg=f'Expected block to contain "block" keyword, but it does not.\n\n{ds!r}')
+
+    raw_block = _PatchedBlock(ds)
+    raw_block.load_data(ds)
+    validate_ansible_object(raw_block)
+
+    return raw_block, ds
+
+
+class _PatchedPlay(ans.Play):
+
+    tasks: list[dict[str, ans.AnsibleValue]]
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+        # Similar to _PatchedBlock, remove loaders for tasks, handlers, and
+        # roles because of Ansible's eager processing.
+        self._load_tasks = None
+        self._load_pre_tasks = None
+        self._load_post_tasks = None
+        self._load_handlers = None
+        self._load_roles = None
+
+
+# Workaround for error messages using the wrong class name.
+_PatchedPlay.__name__ = 'Play'
+
+
+def load_play(original_ds: dict[str, ans.AnsibleValue]) -> tuple[_PatchedPlay, Any]:
+    ds = deepcopy(original_ds)
+
+    raw_play = _PatchedPlay()
+    raw_play.load_data(ds)
+    validate_ansible_object(raw_play)
+
+    return raw_play, original_ds
+
+
+def load_playbook(path: ProjectPath) -> tuple[list[dict[str, ans.AnsibleValue]], Any]:
+    original_ds = parse_file(path)
+    ds = deepcopy(original_ds)
+
+    if not ds:
+        raise LoadError('playbook', 'Empty playbook', path.relative)
+    if not isinstance(ds, list):
+        raise LoadTypeError('playbook', list, ds, path.relative)
 
     return ds, original_ds
