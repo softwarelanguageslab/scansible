@@ -174,8 +174,9 @@ def prevent_undesired_operations() -> Generator[None, None, None]:
     Templar.do_template = raise_if_called('Templar.do_template')  # type: ignore[assignment]
     Templar.template = raise_if_called('Templar.template')  # type: ignore[assignment]
 
-    yield
-
-    helpers.load_list_of_tasks = old_load_list_of_tasks
-    Templar.do_template = old_templar_do_template  # type: ignore[assignment]
-    Templar.template = old_templar_template  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        helpers.load_list_of_tasks = old_load_list_of_tasks
+        Templar.do_template = old_templar_do_template  # type: ignore[assignment]
+        Templar.template = old_templar_template  # type: ignore[assignment]
