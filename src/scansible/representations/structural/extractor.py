@@ -269,5 +269,8 @@ def _safe_extract(extractor: Callable[[ProjectPath], ExtractedFileType], file_pa
 
 
 def _safe_extract_all(extractor: Callable[[ProjectPath], ExtractedFileType], dir_path: ProjectPath, file_dict: dict[str, ExtractedFileType], broken_files: list[rep.BrokenFile]) -> None:
+    if not dir_path.absolute.is_dir():
+        return
+
     for child_path in find_all_files(dir_path):
         _safe_extract(extractor, child_path, file_dict, broken_files)
