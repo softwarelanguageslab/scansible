@@ -7,7 +7,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from functools import partial
 from pathlib import Path
 
-from . import representation as rep, ansible_types as ans
+from . import representation as rep, ansible_types as ans, loaders
 from .helpers import ProjectPath, parse_file, validate_ansible_object, capture_output, find_all_files, find_file, FatalError, prevent_undesired_operations
 
 
@@ -20,65 +20,18 @@ ans.ModuleArgsParser.parse = lambda self, skip_action_validation=False: old_mod_
 def extract_role_metadata_file(path: ProjectPath) -> rep.MetaFile:
     """Extract the structural representation of a metadata file."""
 
-    ds = parse_file(path)
-    # Need to do the validation ourselves because role metadata parsing is
-    # heavily under-validated in Ansible.
-    assert ds, 'Empty role metadata'
-    assert isinstance(ds, dict), 'Metadata file does not contain a dictionary'
+    ds, raw_ds = loaders.load_role_metadata(path)
 
-    platforms = _extract_meta_platforms(ds)
-    dependencies = _extract_meta_dependencies(ds)
+    ds_platforms: list[dict[str, Any]] = ds['galaxy_info']['platforms']  # type: ignore
+    ds_dependencies: list[dict[str, Any]] = ds['dependencies']  # type: ignore
 
-    metablock = rep.MetaBlock(platforms=platforms, dependencies=dependencies, raw=ds)
+    platforms = [rep.Platform(p['name'], v) for p in ds_platforms for v in p['versions']]
+    dependencies = [rep.Dependency(role=dep['name'], when=dep['when']) for dep in ds_dependencies]
+
+    metablock = rep.MetaBlock(platforms=platforms, dependencies=dependencies, raw=raw_ds)
     metafile = rep.MetaFile(metablock=metablock, file_path=path.relative)
     metablock.parent = metafile
     return metafile
-
-
-def _extract_meta_platforms(meta: dict[str, ans.AnsibleValue]) -> list[rep.Platform]:
-    galaxy_info: Any = meta.get('galaxy_info', {})
-    assert isinstance(galaxy_info, dict), f'galaxy_info expected to be a dictionary, got {galaxy_info!r}'
-    raw_platforms: Any = galaxy_info.get('platforms', [])
-    assert isinstance(raw_platforms, (tuple, list)), f'platforms expected to be a list, got {raw_platforms!r}'
-
-    platforms: list[rep.Platform] = []
-    for p in raw_platforms:
-        assert (
-                isinstance(p, dict)
-                and isinstance(p.get('name'), str)
-                and isinstance(p.get('versions'), list)
-                and all(isinstance(v, (str, int, float)) for v in p['versions'])
-            ), f'Malformed platform, got {p!r}'
-
-        platforms.extend(rep.Platform(p['name'], v) for v in p['versions'])
-
-    return platforms
-
-
-def _extract_meta_dependencies(meta: dict[str, ans.AnsibleValue]) -> list[rep.Dependency]:
-    raw_deps: Any = meta.get('dependencies', [])
-    assert isinstance(raw_deps, list), f'Expected role dependencies to be a list, got {raw_deps}'
-
-    deps: list[rep.Dependency] = []
-    for ds in raw_deps:
-        assert isinstance(ds, (str, dict)), f'Expected role dependency to be a string or dict, got {ds}'
-        if isinstance(ds, str):
-            deps.append(rep.Dependency(role=ds, when=[]))
-            continue
-
-        assert not (ds.keys() - {'name', 'role', 'when'}), f'Unsupported keys in role dependency: {ds}'
-        assert ('name' in ds) != ('role' in ds), f'Both "name" and "role" are specified in role dependency: {ds}'
-        name = ds.get('name', ds.get('role'))
-        assert isinstance(name, str), f'Expected role name to be a string, got {name}'
-        when = ds.get('when')
-        assert when is None or isinstance(when, str) or (isinstance(when, list) and all(isinstance(cond, str) for cond in when)), f'Malformed dependency condition: {when}'
-        if not when:
-            when = []
-        elif isinstance(when, str):
-            when = [when]
-        deps.append(rep.Dependency(role=name, when=when))
-
-    return deps
 
 
 def extract_variable_file(path: ProjectPath) -> rep.VariableFile:
