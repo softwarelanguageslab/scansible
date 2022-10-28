@@ -166,3 +166,19 @@ def _validate_meta_dependencies(ds: dict[str, ans.AnsibleValue]) -> None:
             raise LoadTypeError('role dependency', str | dict, dep)
 
     ds['dependencies'] = new_deps
+
+
+def load_variable_file(path: ProjectPath) -> tuple[dict[str, ans.AnsibleValue], Any]:
+    original_ds = parse_file(path)
+    ds = deepcopy(original_ds)
+
+    if ds is None:
+        ds = ans.AnsibleMapping()
+
+    if not isinstance(ds, dict):
+        raise LoadTypeError('variable file', dict, ds, path.relative)
+    for var_name in ds:
+        if not isinstance(var_name, str):
+            raise LoadTypeError('variable', str, var_name, path.relative)
+
+    return ds, original_ds

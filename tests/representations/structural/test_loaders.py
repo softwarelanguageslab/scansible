@@ -10,15 +10,23 @@ from scansible.representations.structural import loaders, ansible_types as ans, 
 from scansible.representations.structural.loaders import LoadError
 
 LoadMetaType = Callable[[str], tuple[dict[str, 'ans.AnsibleValue'], Any]]
+LoadVarsType = Callable[[str], tuple[dict[str, 'ans.AnsibleValue'], Any]]
+
+@pytest.fixture()
+def load_meta(tmp_path: Path) -> LoadMetaType:
+    def inner(yaml_content: str) -> tuple[dict[str, ans.AnsibleValue], Any]:
+        (tmp_path / 'main.yml').write_text(yaml_content)
+        return loaders.load_role_metadata(h.ProjectPath(tmp_path, 'main.yml'))
+    return inner
+
+@pytest.fixture()
+def load_vars(tmp_path: Path) -> LoadVarsType:
+    def inner(yaml_content: str) -> tuple[dict[str, ans.AnsibleValue], Any]:
+        (tmp_path / 'main.yml').write_text(yaml_content)
+        return loaders.load_variable_file(h.ProjectPath(tmp_path, 'main.yml'))
+    return inner
 
 def describe_load_role_metadata() -> None:
-
-    @pytest.fixture()
-    def load_meta(tmp_path: Path) -> LoadMetaType:
-        def inner(yaml_content: str) -> tuple[dict[str, ans.AnsibleValue], Any]:
-            (tmp_path / 'main.yml').write_text(yaml_content)
-            return loaders.load_role_metadata(h.ProjectPath(tmp_path, 'main.yml'))
-        return inner
 
     def loads_correct_metadata(load_meta: LoadMetaType) -> None:
         result = load_meta('''
@@ -339,3 +347,37 @@ def describe_load_role_metadata() -> None:
                         - name: test
                           test: test
                 ''')
+
+
+def describe_load_variable_file() -> None:
+
+    def loads_correct_file(load_vars: LoadVarsType) -> None:
+        result = load_vars('''
+            test: 123
+            hello:
+              x:
+               - 1
+               - b
+              y: true
+        ''')
+
+        assert result[0] == {
+            'test': 123,
+            'hello': {
+                'x': [1, 'b'],
+                'y': True,
+            }
+        }
+
+    def normalises_empty_file(load_vars: LoadVarsType) -> None:
+        result, raw_result = load_vars('# just a comment')
+
+        assert result == {}
+        assert raw_result is None
+
+    def raises_on_wrong_type(load_vars: LoadVarsType) -> None:
+        with pytest.raises(LoadError, match='Expected variable file to be dict'):
+            load_vars('''
+                - a
+                - b
+            ''')

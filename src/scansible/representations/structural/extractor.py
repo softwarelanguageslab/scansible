@@ -35,17 +35,16 @@ def extract_role_metadata_file(path: ProjectPath) -> rep.MetaFile:
 
 
 def extract_variable_file(path: ProjectPath) -> rep.VariableFile:
-    ds = parse_file(path)
-    assert ds is None or isinstance(ds, dict), f'Expected variable file {path.relative} to contain a dictionary, got {type(ds)}'
+    ds, raw_ds = loaders.load_variable_file(path)
 
-    variables = extract_vars(ds) if ds is not None else []
+    variables = extract_list_of_variables(ds)
     varfile = rep.VariableFile(file_path=path.relative, variables=variables)
     for v in variables:
         v.parent = varfile
     return varfile
 
 
-def extract_vars(ds: dict[str, ans.AnsibleValue]) -> list[rep.Variable]:
+def extract_list_of_variables(ds: dict[str, ans.AnsibleValue]) -> list[rep.Variable]:
     return [rep.Variable(name=k, value=v) for k, v in ds.items()]
 
 
@@ -122,7 +121,7 @@ def extract_block(ds: dict[str, ans.AnsibleValue]) -> rep.Block:
             block=children_block,
             rescue=children_rescue,
             always=children_always,
-            vars=extract_vars(raw_block.vars),
+            vars=extract_list_of_variables(raw_block.vars),
             raw=ds
     )
 
@@ -166,7 +165,7 @@ def _extract_import_task(ds: dict[str, ans.AnsibleValue], action: str, args: Any
             args=hti.args,
             when=hti.when,
             loop=hti.loop,
-            vars=extract_vars(hti.vars),
+            vars=extract_list_of_variables(hti.vars),
             register=hti.register,
             listen=hti.listen,
             raw=ds,
@@ -181,7 +180,7 @@ def _extract_import_task(ds: dict[str, ans.AnsibleValue], action: str, args: Any
             args=ti.args,
             when=ti.when,
             loop=ti.loop,
-            vars=extract_vars(ti.vars),
+            vars=extract_list_of_variables(ti.vars),
             register=ti.register,
             raw=ds,
             # TODO!
@@ -206,7 +205,7 @@ def extract_task(ds: dict[str, ans.AnsibleValue]) -> rep.Task:
         args=raw_task.args,
         when=raw_task.when,
         loop=raw_task.loop,
-        vars=extract_vars(raw_task.vars),
+        vars=extract_list_of_variables(raw_task.vars),
         register=raw_task.register,
         raw=ds,
         # TODO!
@@ -231,7 +230,7 @@ def extract_handler(ds: dict[str, ans.AnsibleValue]) -> rep.Handler:
         args=raw_handler.args,
         when=raw_handler.when,
         loop=raw_handler.loop,
-        vars=extract_vars(raw_handler.vars),
+        vars=extract_list_of_variables(raw_handler.vars),
         listen=raw_handler.listen,
         register=raw_handler.register,
         raw=ds,
@@ -267,7 +266,7 @@ def extract_play(ds: dict[str, ans.AnsibleValue]) -> rep.Play:
         name=raw_play.name,
         hosts=raw_play.hosts,
         tasks=extract_list_of_tasks_or_blocks(raw_play.tasks, handlers=False),
-        vars=extract_vars(raw_play.vars),
+        vars=extract_list_of_variables(raw_play.vars),
         raw=ds
     )
     for child in play.tasks:
