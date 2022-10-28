@@ -26,7 +26,7 @@ TaskContainer = Union['Block', 'Play', 'TaskFile']
 Scalar = Union[bool, int, float, str]
 # These should be recursive types, but mypy doesn't support them so they'd be
 # Any anyway, and it also doesn't work with our type validation.
-AnyValue = Union[Scalar, list[Any], dict[str, Any]]
+AnyValue = Union[Scalar, list[Any], dict[Scalar, Any]]
 
 def _convert_union_type(type_: Any) -> object:
     if isinstance(type_, types.UnionType):
