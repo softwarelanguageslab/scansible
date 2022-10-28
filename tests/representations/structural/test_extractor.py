@@ -1078,7 +1078,7 @@ def describe_extracting_roles() -> None:
                 default_var_files={'main.yml': defaults_file},
                 role_var_files={},
                 handler_files={},
-                broken_files=[rep.BrokenFile(Path('tasks/main.yml'), 'Expected task file to be a list')]),
+                broken_files=[rep.BrokenFile(Path('tasks/main.yml'), "Expected task file tasks/main.yml to be a list, got <class 'ansible.parsing.yaml.objects.AnsibleMapping'>")]),
             path=tmp_path,
             id='test',
             version='test2',
