@@ -270,7 +270,19 @@ def describe_extracting_tasks() -> None:
         assert result.action == 'debug'
         assert result.args == {'msg': '{{ myvar }}'}
         assert result.loop == ['hello', 'world']
+        assert result.loop_control is not None
         assert result.loop_control.loop_var == 'myvar'
+
+    def extracts_task_with_literal_boolean_when() -> None:
+        result = ext.extract_task(_parse_yaml(dedent('''
+            name: test
+            debug: msg={{ myvar }}
+            when: yes
+        ''')))
+
+        assert result.action == 'debug'
+        assert result.args == {'msg': '{{ myvar }}'}
+        assert result.when == [True]
 
     def does_not_eagerly_evaluate_imports() -> None:
         result = ext.extract_task(_parse_yaml(dedent('''

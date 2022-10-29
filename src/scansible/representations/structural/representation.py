@@ -215,7 +215,7 @@ class TaskBase:
     #: Arguments to the action.
     args: Mapping[str, AnyValue] = default_field()
     #: Condition on the task, or None if no condition.
-    when: list[str] = default_field()
+    when: list[str | bool] = default_field()
     #: Loop on the task, or None if no loop.
     loop: str | list[AnyValue] | None = default_field()
     #: Loop control defined on the task.
