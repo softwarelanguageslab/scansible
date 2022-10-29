@@ -510,6 +510,18 @@ def describe_load_task() -> None:
         assert result[0].args == {'_raw_params': 'test.yml'}
         assert result[0].listen == ['test']
 
+    def loads_correct_role_include() -> None:
+        result = loaders.load_task({  # type: ignore[call-overload]
+            'include_role': {
+                'name': 'test',
+                'tasks_from': 'test.yml',
+            },
+        }, as_handler=False)
+
+        assert isinstance(result[0], ans.IncludeRole)
+        assert result[0].action == 'include_role'
+        assert result[0].args == {'name': 'test', 'tasks_from': 'test.yml'}
+
     def transforms_static_include() -> None:
         result = loaders.load_task({  # type: ignore[call-overload]
             'include': 'test.yml',

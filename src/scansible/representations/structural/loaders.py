@@ -259,7 +259,7 @@ def load_task(original_ds: dict[str, ans.AnsibleValue], as_handler: bool) -> tup
         action = _get_task_action(ds)
         is_include_tasks = _task_is_include_import_tasks(action)
 
-        if _task_is_import_playbook(action) or _task_is_include_import_role(action):
+        if _task_is_import_playbook(action):
             raise FatalError(f'TODO: {action}')
 
         if _task_is_include(action):
@@ -272,7 +272,11 @@ def load_task(original_ds: dict[str, ans.AnsibleValue], as_handler: bool) -> tup
         if 'when' in ds and ds['when'] is None:
             del ds['when']  # type: ignore[unreachable]
 
-        if not as_handler:
+        # Use the correct Ansible representation so that more validation is done.
+        ansible_cls: Type[ans.Task]
+        if _task_is_include_import_role(action):
+            ansible_cls = ans.IncludeRole
+        elif not as_handler:
             ansible_cls = ans.Task if not is_include_tasks else ans.TaskInclude
         else:
             ansible_cls = ans.Handler if not is_include_tasks else ans.HandlerTaskInclude
