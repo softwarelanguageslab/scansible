@@ -11,6 +11,7 @@ from typing import (
         TypeVar,
 )
 
+import datetime
 import types
 from pathlib import Path
 
@@ -23,7 +24,7 @@ from ansible.parsing.yaml.objects import AnsibleSequence, AnsibleMapping, Ansibl
 # Type aliases
 VariableContainer = Union['VariableFile', 'Task', 'Block', 'Play']
 TaskContainer = Union['Block', 'Play', 'TaskFile']
-Scalar = Union[bool, int, float, str, 'VaultValue', None]
+Scalar = Union[bool, int, float, str, 'VaultValue', datetime.date, datetime.datetime, None]
 # These should be recursive types, but mypy doesn't support them so they'd be
 # Any anyway, and it also doesn't work with our type validation.
 AnyValue = Union[Scalar, list[Any], dict[Scalar, Any]]
