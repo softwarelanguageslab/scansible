@@ -199,8 +199,9 @@ class LoopControl:
     loop_var: str = default_field()
     #: The index variable name.
     index_var: str | None = default_field()
-    #: Loop label in output.
-    label: str | None = default_field()
+    #: Loop label in output. Should technically be a string only, but Ansible
+    #: doesn't complain about dicts and just templates and stringifies those.
+    label: AnyValue = default_field()
     #: Amount of time in seconds to pause between each iteration. Can be a
     #: string in case this is an expression. 0 by default.
     pause: str | int | float = default_field()
