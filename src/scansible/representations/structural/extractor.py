@@ -52,40 +52,35 @@ def extract_tasks_file(path: ProjectPath, handlers: bool = False) -> rep.TaskFil
     return tf
 
 @overload
-def extract_list_of_tasks_or_blocks(ds: list[dict[str, ans.AnsibleValue]], handlers: Literal[False]) -> list[rep.Task | rep.Block]: ...
+def extract_list_of_tasks_or_blocks(ds: list[dict[str, ans.AnsibleValue]], handlers: Literal[True]) -> list[rep.Handler | rep.Block]: ...
 @overload
-def extract_list_of_tasks_or_blocks(ds: list[dict[str, ans.AnsibleValue]], handlers: Literal[True]) -> list[rep.Handler]: ...
+def extract_list_of_tasks_or_blocks(ds: list[dict[str, ans.AnsibleValue]], handlers: Literal[False] = ...) -> list[rep.Task | rep.Block]: ...
 
-def extract_list_of_tasks_or_blocks(ds: list[dict[str, ans.AnsibleValue]], handlers: bool = False) -> list[rep.Task | rep.Block] | list[rep.Handler]:
+def extract_list_of_tasks_or_blocks(ds: list[dict[str, ans.AnsibleValue]], handlers: Literal[True, False] = False) -> list[rep.Task | rep.Block] | list[rep.Handler | rep.Block]:
     content = []
     for inner_ds in ds:
-        content.append(extract_task_or_block(inner_ds, handlers))  # type: ignore[call-overload]
-    return content
+        content.append(extract_task_or_block(inner_ds, handlers))
+    return content  # type: ignore[return-value]
 
 
 @overload
 def extract_task_or_block(ds: dict[str, ans.AnsibleValue], handlers: Literal[False]) -> rep.Task | rep.Block: ...
 @overload
-def extract_task_or_block(ds: dict[str, ans.AnsibleValue], handlers: Literal[True]) -> rep.Handler: ...
+def extract_task_or_block(ds: dict[str, ans.AnsibleValue], handlers: Literal[True]) -> rep.Handler | rep.Block: ...
 
-def extract_task_or_block(ds: dict[str, ans.AnsibleValue], handlers: bool = False) -> rep.Handler | rep.Task | rep.Block:
+def extract_task_or_block(ds: dict[str, ans.AnsibleValue], handlers: Literal[True, False] = False) -> rep.Handler | rep.Task | rep.Block:
     if ans.Block.is_block(ds):
-        if handlers:
-            raise FatalError('Found a block in what is supposed to be a handler, TODO?')
-        return extract_block(ds)
+        return extract_block(ds, handlers)
 
     return extract_handler(ds) if handlers else extract_task(ds)
 
 
-
-
-
-def extract_block(ds: dict[str, ans.AnsibleValue]) -> rep.Block:
+def extract_block(ds: dict[str, ans.AnsibleValue], handlers: Literal[True, False] = False) -> rep.Block:
     raw_block, raw_ds = loaders.load_block(ds)
 
-    children_block = extract_list_of_tasks_or_blocks(raw_block.block, handlers=False)
-    children_rescue = extract_list_of_tasks_or_blocks(raw_block.rescue, handlers=False)
-    children_always = extract_list_of_tasks_or_blocks(raw_block.always, handlers=False)
+    children_block = extract_list_of_tasks_or_blocks(raw_block.block, handlers=handlers)
+    children_rescue = extract_list_of_tasks_or_blocks(raw_block.rescue, handlers=handlers)
+    children_always = extract_list_of_tasks_or_blocks(raw_block.always, handlers=handlers)
 
     block = rep.Block(
             name=raw_block.name,

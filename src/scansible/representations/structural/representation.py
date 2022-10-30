@@ -250,8 +250,6 @@ class Block:
     Represents an Ansible block of tasks.
     """
 
-    # TODO: This doesn't support handlers. Can handlers be placed in a block?
-
     #: Raw information present in the block, some which may not explicitly be parsed.
     raw: Any = field(repr=False)
     #: Parent block or file wherein this block is contained as a child.
@@ -260,13 +258,13 @@ class Block:
     name: str | None = default_field()
 
     #: The block's main task list.
-    block: list[Task | Block] = default_field()
+    block: list[Task | Block] | list[Handler | Block] = default_field()
     #: List of tasks in the block's rescue section, i.e. the tasks that will
     #: execute when an exception occurs.
-    rescue: list[Task | Block] = default_field()
+    rescue: list[Task | Block] | list[Handler | Block] = default_field()
     #: List of tasks in the block's always section, like a try-catch's `finally`
     #: handler.
-    always: list[Task | Block] = default_field()
+    always: list[Task | Block] | list[Handler | Block] = default_field()
     #: Set of variables defined on this block.
     vars: list[Variable] = default_field()  # TODO: Should be a set
 
@@ -280,9 +278,9 @@ class TaskFile:
     #: The path to the file, relative to the project root.
     file_path: Path = field(validator=validate_relative_path)
     #: The top-level tasks or blocks contained in the file, in the order of
-    #: definition. Can also be a list of handlers, but handlers and task/blocks
-    #: cannot be mixed.
-    tasks: list[Block | Task] | list[Handler] = default_field()
+    #: definition. Can also be a list of handlers (or blocks thereof), but
+    #: handlers and tasks cannot be mixed.
+    tasks: list[Block | Task] | list[Block | Handler] = default_field()
 
 
 @define

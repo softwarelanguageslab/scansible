@@ -596,6 +596,7 @@ def describe_extracting_list_of_handlers() -> None:
         assert isinstance(result[0], rep.Handler)
         assert isinstance(result[1], rep.Handler)
 
+
 def describe_extracting_blocks() -> None:
 
     def extracts_standard_blocks() -> None:
@@ -612,6 +613,26 @@ def describe_extracting_blocks() -> None:
         assert result.block[0].action == 'file'
         assert result.block[0].name == 'test'
         assert isinstance(result.block[1], rep.Task)
+        assert result.block[1].action == 'file'
+        assert result.block[1].name == 'test2'
+        assert result.rescue == []
+        assert result.always == []
+        assert all(child.parent is result for child in result.block + result.rescue + result.always)
+
+    def extracts_block_of_handlers() -> None:
+        result = ext.extract_block(_parse_yaml(dedent('''
+            block:
+              - name: test
+                file: {}
+              - name: test2
+                file: {}
+        ''')), handlers=True)
+
+        assert len(result.block) == 2
+        assert isinstance(result.block[0], rep.Handler)
+        assert result.block[0].action == 'file'
+        assert result.block[0].name == 'test'
+        assert isinstance(result.block[1], rep.Handler)
         assert result.block[1].action == 'file'
         assert result.block[1].name == 'test2'
         assert result.rescue == []
