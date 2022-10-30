@@ -246,6 +246,7 @@ def describe_extracting_tasks() -> None:
         assert result.action == 'debug'
         assert result.args == {'msg': '{{ item }}'}
         assert result.loop == ['hello', 'world']
+        assert result.loop_with is None
 
     def extracts_task_with_expr_loop() -> None:
         result = ext.extract_task(_parse_yaml(dedent('''
@@ -257,6 +258,7 @@ def describe_extracting_tasks() -> None:
         assert result.action == 'debug'
         assert result.args == {'msg': '{{ item }}'}
         assert result.loop == '{{ somelist }}'
+        assert result.loop_with is None
 
     def extracts_task_with_loop_control() -> None:
         result = ext.extract_task(_parse_yaml(dedent('''
@@ -270,6 +272,7 @@ def describe_extracting_tasks() -> None:
         assert result.action == 'debug'
         assert result.args == {'msg': '{{ myvar }}'}
         assert result.loop == ['hello', 'world']
+        assert result.loop_with is None
         assert result.loop_control is not None
         assert result.loop_control.loop_var == 'myvar'
 
@@ -337,6 +340,7 @@ def describe_extracting_tasks() -> None:
             'path': '{{ item }}'
         }
         assert result.loop == ['hello', 'world']
+        assert result.loop_with == 'items'
 
     def extracts_include_task() -> None:
         result = ext.extract_task(_parse_yaml(dedent('''
@@ -863,6 +867,7 @@ def describe_extract_playbook() -> None:
                                 args={'path': 'test.txt', 'state': 'present'},
                                 when=[],
                                 loop=None,
+                                loop_with=None,
                                 loop_control=None,
                                 register=None,
                                 raw=raw_task,
@@ -919,6 +924,7 @@ def describe_extract_playbook() -> None:
                                 args={'path': 'test.txt', 'state': 'present'},
                                 when=[],
                                 loop=None,
+                                loop_with=None,
                                 loop_control=None,
                                 register=None,
                                 raw=raw_task,
@@ -994,6 +1000,7 @@ def describe_extracting_roles() -> None:
                     args={'path': 'hello'},
                     when=[],
                     loop=None,
+                    loop_with=None,
                     loop_control=None,
                     register=None,
                     raw={'file': {'path': 'hello'}},
@@ -1005,6 +1012,7 @@ def describe_extracting_roles() -> None:
                     args={'name': 'test'},
                     when=[],
                     loop=None,
+                    loop_with=None,
                     loop_control=None,
                     register=None,
                     raw={'apt': {'name': 'test'}},
@@ -1031,6 +1039,7 @@ def describe_extracting_roles() -> None:
                     args={'name': 'test'},
                     when=[],
                     loop=None,
+                    loop_with=None,
                     loop_control=None,
                     register=None,
                     raw={'name': 'restart x', 'service': {'name': 'test'}},
@@ -1082,6 +1091,7 @@ def describe_extracting_roles() -> None:
                     args={'path': 'hello'},
                     when=[],
                     loop=None,
+                    loop_with=None,
                     loop_control=None,
                     register=None,
                     raw={'file': {'path': 'hello'}},
@@ -1093,6 +1103,7 @@ def describe_extracting_roles() -> None:
                     args={'name': 'test'},
                     when=[],
                     loop=None,
+                    loop_with=None,
                     loop_control=None,
                     register=None,
                     raw={'apt': {'name': 'test'}},
@@ -1192,6 +1203,7 @@ def describe_extracting_roles() -> None:
                     args={'path': 'hello'},
                     when=[],
                     loop=None,
+                    loop_with=None,
                     loop_control=None,
                     register=None,
                     raw={'file': {'path': 'hello'}},
@@ -1203,6 +1215,7 @@ def describe_extracting_roles() -> None:
                     args={'_raw_params': 'other.yml'},
                     when=[],
                     loop=None,
+                    loop_with=None,
                     loop_control=None,
                     register=None,
                     raw={'import_tasks': 'other.yml'},
@@ -1217,6 +1230,7 @@ def describe_extracting_roles() -> None:
                     args={'name': 'test'},
                     when=[],
                     loop=None,
+                    loop_with=None,
                     loop_control=None,
                     register=None,
                     raw={'apt': {'name': 'test'}},

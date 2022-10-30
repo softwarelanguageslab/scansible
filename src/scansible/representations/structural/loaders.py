@@ -284,6 +284,7 @@ def load_task(original_ds: dict[str, ans.AnsibleValue], as_handler: bool) -> tup
         raw_task = ansible_cls.load(ds)
         validate_ansible_object(raw_task)
 
+
     return raw_task, original_ds
 
 

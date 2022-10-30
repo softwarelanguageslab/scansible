@@ -216,8 +216,13 @@ class TaskBase:
     args: Mapping[str, AnyValue] = default_field()
     #: Condition on the task, or None if no condition.
     when: list[str | bool] = default_field()
-    #: Loop on the task, or None if no loop.
-    loop: str | list[AnyValue] | None = default_field()
+    #: Loop on the task, or None if no loop. Can be a string (an expression),
+    #: a list of arbitrary values, or, when the loop comes from `with_dict`, a
+    #: dict of arbitrary items.
+    loop: str | list[AnyValue] | dict[Scalar, AnyValue] | None = default_field()
+    #: The type of loop used in old looping syntax (`with_*`), e.g.
+    #: `with_items` -> `items`.
+    loop_with: str | None = default_field()
     #: Loop control defined on the task.
     loop_control: LoopControl | None = default_field()
     #: Value given to the register keyword, i.e. variable name that will store
