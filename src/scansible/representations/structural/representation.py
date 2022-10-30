@@ -23,7 +23,7 @@ from ansible.parsing.yaml.objects import AnsibleSequence, AnsibleMapping, Ansibl
 # Type aliases
 VariableContainer = Union['VariableFile', 'Task', 'Block', 'Play']
 TaskContainer = Union['Block', 'Play', 'TaskFile']
-Scalar = Union[bool, int, float, str]
+Scalar = Union[bool, int, float, str, None]
 # These should be recursive types, but mypy doesn't support them so they'd be
 # Any anyway, and it also doesn't work with our type validation.
 AnyValue = Union[Scalar, list[Any], dict[Scalar, Any]]
@@ -160,7 +160,7 @@ class Variable:
     #: Variable name.
     name: str = default_field()
     #: Variable value.
-    value: AnyValue | None = default_field()
+    value: AnyValue = default_field()
     #: Parent wherein the variable is defined. Either a file containing variables
     #: (in defaults/ or vars/), a task, a block, or a play.
     parent: VariableContainer = field(init=False, repr=False, eq=False, validator=type_validator())
