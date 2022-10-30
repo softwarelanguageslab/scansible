@@ -162,6 +162,20 @@ def describe_extracting_variables() -> None:
             rep.Variable('test4', { 'this': 'is', 'a': 'dict' })
         ]
 
+    def extracts_vault_variables(tmp_path: Path) -> None:
+        # ioannis1/pg_config/defaults/main.yml
+        (tmp_path / 'main.yml').write_text(dedent('''
+            postgres_passwd:     !vault |
+                $ANSIBLE_VAULT;1.1;AES256
+                62396263313762316136336334303463366465303638626438616530343935623766626534366436
+        '''))
+
+        result = ext.extract_variable_file(ext.ProjectPath(tmp_path, 'main.yml'))
+
+        assert result.file_path == Path('main.yml')
+        assert all(v.parent is result for v in result.variables)
+        assert result.variables == [rep.Variable('postgres_passwd', rep.VaultValue(b'$ANSIBLE_VAULT;1.1;AES256\n62396263313762316136336334303463366465303638626438616530343935623766626534366436\n'))]
+
     def allows_variable_values_to_be_none(tmp_path: Path) -> None:
         (tmp_path / 'main.yml').write_text(dedent('''
             test:

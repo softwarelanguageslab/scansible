@@ -8,7 +8,7 @@ import io
 from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
 
-from . import ansible_types as ans
+from . import ansible_types as ans, representation as rep
 
 
 class FatalError(Exception):
@@ -187,3 +187,13 @@ def prevent_undesired_operations() -> Generator[None, None, None]:
         helpers.load_list_of_tasks = old_load_list_of_tasks
         Templar.do_template = old_templar_do_template  # type: ignore[assignment]
         Templar.template = old_templar_template  # type: ignore[assignment]
+
+
+def convert_ansible_values(obj: Any) -> Any:
+    if isinstance(obj, ans.AnsibleVaultEncryptedUnicode):
+        return rep.VaultValue(data=obj._ciphertext)
+    if isinstance(obj, list):
+        return [convert_ansible_values(el) for el in obj]
+    if isinstance(obj, dict):
+        return {k: convert_ansible_values(v) for k, v in obj.items()}
+    return obj

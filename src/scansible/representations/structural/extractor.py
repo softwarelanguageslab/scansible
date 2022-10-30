@@ -8,7 +8,7 @@ from functools import partial
 from pathlib import Path
 
 from . import representation as rep, ansible_types as ans, loaders
-from .helpers import ProjectPath, parse_file, validate_ansible_object, capture_output, find_all_files, find_file, FatalError, prevent_undesired_operations
+from .helpers import ProjectPath, parse_file, validate_ansible_object, capture_output, find_all_files, find_file, FatalError, prevent_undesired_operations, convert_ansible_values
 
 
 def extract_role_metadata_file(path: ProjectPath) -> rep.MetaFile:
@@ -39,7 +39,7 @@ def extract_variable_file(path: ProjectPath) -> rep.VariableFile:
 
 
 def extract_list_of_variables(ds: dict[str, ans.AnsibleValue]) -> list[rep.Variable]:
-    return [rep.Variable(name=k, value=v) for k, v in ds.items()]
+    return [rep.Variable(name=k, value=convert_ansible_values(v)) for k, v in ds.items()]
 
 
 def extract_tasks_file(path: ProjectPath, handlers: bool = False) -> rep.TaskFile:
@@ -117,7 +117,7 @@ def extract_task(ds: dict[str, ans.AnsibleValue]) -> rep.Task:
     return rep.Task(
         name=raw_task.name,
         action=raw_task.action,
-        args=raw_task.args,
+        args=convert_ansible_values(raw_task.args),
         when=raw_task.when,
         loop=raw_task.loop,
         loop_with=raw_task.loop_with,
@@ -134,7 +134,7 @@ def extract_handler(ds: dict[str, ans.AnsibleValue]) -> rep.Handler:
     return rep.Handler(
         name=raw_handler.name,
         action=raw_handler.action,
-        args=raw_handler.args,
+        args=convert_ansible_values(raw_handler.args),
         when=raw_handler.when,
         loop=raw_handler.loop,
         loop_with=raw_handler.loop_with,

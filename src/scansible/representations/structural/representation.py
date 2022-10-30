@@ -23,7 +23,7 @@ from ansible.parsing.yaml.objects import AnsibleSequence, AnsibleMapping, Ansibl
 # Type aliases
 VariableContainer = Union['VariableFile', 'Task', 'Block', 'Play']
 TaskContainer = Union['Block', 'Play', 'TaskFile']
-Scalar = Union[bool, int, float, str, None]
+Scalar = Union[bool, int, float, str, 'VaultValue', None]
 # These should be recursive types, but mypy doesn't support them so they'd be
 # Any anyway, and it also doesn't work with our type validation.
 AnyValue = Union[Scalar, list[Any], dict[Scalar, Any]]
@@ -83,6 +83,16 @@ def validate_absolute_path(inst: Any, attr: attrs.Attribute[Path], value: Path) 
         raise TypeError(f'Expected {attr.name} to be a Path, got {value} of type {type(value)} instead')
     if not value.is_absolute():
         raise ValueError(f'Expected {attr.name} to be an absolute path, got relative path {value} instead')
+
+
+@frozen
+class VaultValue:
+    """
+    Represents an Ansible encrypted vault value.
+    """
+
+    #: The encrypted data.
+    data: bytes
 
 
 @frozen
