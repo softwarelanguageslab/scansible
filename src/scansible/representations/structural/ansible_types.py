@@ -17,7 +17,7 @@ from ansible.template import Templar
 from ansible.parsing.dataloader import DataLoader
 from ansible.parsing.mod_args import ModuleArgsParser
 from ansible import constants as C
-from ansible.errors import AnsibleError
+from ansible.errors import AnsibleError, AnsibleParserError
 
 if TYPE_CHECKING:
     # This alias doesn't exist outside of the stub files

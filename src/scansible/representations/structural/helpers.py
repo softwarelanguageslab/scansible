@@ -102,7 +102,13 @@ def validate_ansible_object(obj: ans.FieldAttributeBase) -> None:
 
         # templar argument is only used when attribute.isa is a class, which we
         # handle specially above.
-        validated_value = obj.get_validated_value(name, attribute, value, None)
+        try:
+            validated_value = obj.get_validated_value(name, attribute, value, None)
+        except (TypeError, ValueError) as e:
+            # Re-raise these errors like Ansible's base post_validate does.
+            raise ans.AnsibleParserError(
+                f"the field '{name}' has an invalid value ({value}), and could not be converted to an {attribute.isa}. "
+                f"The error was: {e}", obj=obj.get_ds(), orig_exc=e)
         setattr(obj, name, validated_value)
 
 
