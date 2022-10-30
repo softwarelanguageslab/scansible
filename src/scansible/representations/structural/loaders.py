@@ -260,7 +260,9 @@ def load_task(original_ds: dict[str, ans.AnsibleValue], as_handler: bool) -> tup
         is_include_tasks = _task_is_include_import_tasks(action)
 
         if _task_is_import_playbook(action):
-            raise FatalError(f'TODO: {action}')
+            # This loader only gets called for tasks in task lists, so an
+            # import_playbook is illegal here.
+            raise LoadError('task', 'import_playbook is only allowed as a top-level playbook task')
 
         if _task_is_include(action):
             # Check for include/import tasks and transform them if the static
