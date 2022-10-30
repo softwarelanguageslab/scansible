@@ -234,7 +234,7 @@ class TaskBase:
     #: Arguments to the action.
     args: Mapping[str, AnyValue] = default_field()
     #: Name of the task.
-    name: str = default_field(default='')
+    name: str | None = default_field(default='')
     #: Condition on the task, or None if no condition.
     when: Sequence[str | bool] = default_field(factory=list)
     #: Loop on the task, or None if no loop. Can be a string (an expression),
@@ -290,7 +290,7 @@ class Block:
     #: handler.
     always: Sequence[Task | Block] | Sequence[Handler | Block] = default_field(factory=list)
     #: Name of the block
-    name: str = default_field(default='')
+    name: str | None = default_field(default='')
     #: Set of variables defined on this block.
     vars: Sequence[Variable] = default_field(factory=list)  # TODO: Should be a set
 
@@ -372,7 +372,7 @@ class Play:
     #: The play's targetted hosts.
     hosts: Sequence[str] = default_field()
     #: The play's name.
-    name: str = default_field(default='')
+    name: str | None = default_field(default='')
     #: The play's list of blocks.
     tasks: Sequence[Task | Block] = default_field(factory=list)
     #: The play-level variables.
