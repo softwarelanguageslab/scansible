@@ -68,8 +68,17 @@ def type_validator(empty_ok: bool = True) -> Callable[[Any, attrs.Attribute[Any]
     return converting_validator
 
 
-def default_field() -> Any:
-    return field(validator=type_validator())
+def default_field(default: Any = attrs.NOTHING, factory: Any = None) -> Any:
+    return field(validator=type_validator(), default=default, factory=factory)
+
+def parent_field() -> Any:
+    return field(init=False, repr=False, eq=False, validator=type_validator())
+
+def raw_field() -> Any:
+    return field(repr=False, eq=False)
+
+def path_field() -> Any:
+    return field(validator=validate_relative_path)
 
 
 def validate_relative_path(inst: Any, attr: attrs.Attribute[Path], value: Path) -> None:
@@ -103,7 +112,7 @@ class BrokenFile:
     """
 
     #: The path to the file.
-    path: Path = field(validator=validate_relative_path)
+    path: Path = path_field()
     #: The reason why the file is broken.
     reason: str = default_field()
 
@@ -129,7 +138,7 @@ class Dependency:
     #: The role that is depended upon.
     role: str = default_field()
     #: Optional condition on when to include a dependency.
-    when: list[str] = default_field()
+    when: list[str] = default_field(factory=list)
 
 
 @define
@@ -139,7 +148,7 @@ class MetaFile:
     """
 
     #: The path to the file, relative to the project root.
-    file_path: Path = field(validator=validate_relative_path)
+    file_path: Path = path_field()
     #: The metadata block contained in the file.
     metablock: MetaBlock = default_field()
 
@@ -152,14 +161,14 @@ class MetaBlock:
 
     #: Raw information present in the metadata block, some which may not
     #: explicitly be parsed.
-    raw: Any = field(repr=False)
+    raw: Any = raw_field()
 
     #: The parent file of this metadata block.
-    parent: MetaFile = field(init=False, repr=False, eq=False, validator=type_validator())
+    parent: MetaFile = parent_field()
     #: Platforms supported by the role
-    platforms: list[Platform] = default_field()
+    platforms: list[Platform] = default_field(factory=list)
     #: Role dependencies
-    dependencies: list[Dependency] = default_field()
+    dependencies: list[Dependency] = default_field(factory=list)
 
 
 @define
@@ -174,7 +183,7 @@ class Variable:
     value: AnyValue = default_field()
     #: Parent wherein the variable is defined. Either a file containing variables
     #: (in defaults/ or vars/), a task, a block, or a play.
-    parent: VariableContainer = field(init=False, repr=False, eq=False, validator=type_validator())
+    parent: VariableContainer = parent_field()
 
 
 @define
@@ -184,9 +193,9 @@ class VariableFile:
     """
 
     #: The path to the file, relative to the project root.
-    file_path: Path = field(validator=validate_relative_path)
+    file_path: Path = path_field()
     #: The variables contained within the file. The order is irrelevant.
-    variables: list[Variable] = default_field() # TODO: Use a set
+    variables: list[Variable] = default_field()  # TODO: Use a set
 
 
 @define
@@ -196,18 +205,18 @@ class LoopControl:
     """
 
     #: The loop variable name. `item` by default.
-    loop_var: str = default_field()
+    loop_var: str = default_field(default='item')
     #: The index variable name.
-    index_var: str | None = default_field()
+    index_var: str | None = default_field(default=None)
     #: Loop label in output. Should technically be a string only, but Ansible
     #: doesn't complain about dicts and just templates and stringifies those.
-    label: AnyValue = default_field()
+    label: AnyValue = default_field(default=None)
     #: Amount of time in seconds to pause between each iteration. Can be a
     #: string in case this is an expression. 0 by default.
-    pause: str | int | float = default_field()
+    pause: str | int | float = default_field(default=0)
     #: Whether to include more information in the loop items.
     #: See https://docs.ansible.com/ansible/latest/user_guide/playbooks_loops.html#extended-loop-variables
-    extended: str | bool | None = default_field()
+    extended: str | bool | None = default_field(default=None)
 
 
 @define(slots=False)
@@ -217,31 +226,32 @@ class TaskBase:
     """
 
     #: Raw information present in the task, some which may not explicitly be parsed.
-    raw: Any = field(repr=False)
+    raw: Any = raw_field()
+
     #: Parent block in which the task is contained.
-    parent: TaskContainer = field(init=False, repr=False, eq=False, validator=type_validator())
-    #: Name of the task.
-    name: str | None = default_field()
+    parent: TaskContainer = parent_field()
     #: Action of the task.
     action: str = default_field()
     #: Arguments to the action.
     args: Mapping[str, AnyValue] = default_field()
+    #: Name of the task.
+    name: str = default_field(default='')
     #: Condition on the task, or None if no condition.
-    when: list[str | bool] = default_field()
+    when: list[str | bool] = default_field(factory=list)
     #: Loop on the task, or None if no loop. Can be a string (an expression),
     #: a list of arbitrary values, or, when the loop comes from `with_dict`, a
     #: dict of arbitrary items.
-    loop: str | list[AnyValue] | dict[Scalar, AnyValue] | None = default_field()
+    loop: str | list[AnyValue] | dict[Scalar, AnyValue] | None = default_field(default=None)
     #: The type of loop used in old looping syntax (`with_*`), e.g.
     #: `with_items` -> `items`.
-    loop_with: str | None = default_field()
+    loop_with: str | None = default_field(default=None)
     #: Loop control defined on the task.
-    loop_control: LoopControl | None = default_field()
+    loop_control: LoopControl | None = default_field(default=None)
     #: Value given to the register keyword, i.e. variable name that will store
     #: the result of this action.
-    register: str | None = default_field()
+    register: str | None = default_field(default=None)
     #: Variables defined on the task
-    vars: list[Variable] = default_field()  # TODO: Should be a set, since order doesn't matter
+    vars: list[Variable] = default_field(factory=list)  # TODO: Should be a set, since order doesn't matter
 
 
 @define(slots=False)
@@ -258,7 +268,7 @@ class Handler(TaskBase):
     """
 
     #: Topics on which the handler listens
-    listen: list[str] = default_field()
+    listen: list[str] = default_field(factory=list)
 
 
 @define
@@ -268,22 +278,22 @@ class Block:
     """
 
     #: Raw information present in the block, some which may not explicitly be parsed.
-    raw: Any = field(repr=False)
+    raw: Any = raw_field()
     #: Parent block or file wherein this block is contained as a child.
-    parent: TaskContainer = field(init=False, repr=False, eq=False, validator=type_validator())
-    #: Name of the block
-    name: str | None = default_field()
+    parent: TaskContainer = parent_field()
 
     #: The block's main task list.
     block: list[Task | Block] | list[Handler | Block] = default_field()
     #: List of tasks in the block's rescue section, i.e. the tasks that will
     #: execute when an exception occurs.
-    rescue: list[Task | Block] | list[Handler | Block] = default_field()
+    rescue: list[Task | Block] | list[Handler | Block] = default_field(factory=list)
     #: List of tasks in the block's always section, like a try-catch's `finally`
     #: handler.
-    always: list[Task | Block] | list[Handler | Block] = default_field()
+    always: list[Task | Block] | list[Handler | Block] = default_field(factory=list)
+    #: Name of the block
+    name: str = default_field(default='')
     #: Set of variables defined on this block.
-    vars: list[Variable] = default_field()  # TODO: Should be a set
+    vars: list[Variable] = default_field(factory=list)  # TODO: Should be a set
 
 
 @define
@@ -293,7 +303,7 @@ class TaskFile:
     """
 
     #: The path to the file, relative to the project root.
-    file_path: Path = field(validator=validate_relative_path)
+    file_path: Path = path_field()
     #: The top-level tasks or blocks contained in the file, in the order of
     #: definition. Can also be a list of handlers (or blocks thereof), but
     #: handlers and tasks cannot be mixed.
@@ -357,17 +367,17 @@ class Play:
     """
 
     #: The playbook in which this play is contained.
-    parent: Playbook = field(init=False, repr=False, eq=False, validator=type_validator())
+    parent: Playbook = parent_field()
     #: Raw information present in the play, some which may not explicitly be parsed.
-    raw: Any = field(repr=False)
-    #: The play's name.
-    name: str = default_field()
+    raw: Any = raw_field()
     #: The play's targetted hosts.
     hosts: list[str] = default_field()
+    #: The play's name.
+    name: str = default_field(default='')
     #: The play's list of blocks.
-    tasks: list[Task | Block] = default_field()
+    tasks: list[Task | Block] = default_field(factory=list)
     #: The play-level variables.
-    vars: list[Variable] = default_field()  # TODO: Should be a set
+    vars: list[Variable] = default_field(factory=list)  # TODO: Should be a set
 
     # TODO: Handlers, pre- and post-tasks, roles, vars files, vars_prompt, etc?
 
@@ -379,7 +389,7 @@ class Playbook:
     """
 
     #: Raw information present in the playbook, some which may not explicitly be parsed.
-    raw: Any = field(repr=False)
+    raw: Any = raw_field()
     #: List of plays defined in this playbook.
     plays: list[Play] = default_field()
 

@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable, Type
 
 from pathlib import Path
 from textwrap import dedent
 
 import ansible.parsing.dataloader
 import pytest
+from pytest_describe import behaves_like
 
-from scansible.representations.structural import extractor as ext, representation as rep
+from scansible.representations.structural import extractor as ext, representation as rep, ansible_types as ans
 
 def _parse_yaml(yaml_content: str) -> Any:
     loader = ansible.parsing.dataloader.DataLoader()
@@ -35,14 +36,16 @@ def describe_extracting_metadata_file() -> None:
 
         result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
 
-        assert result.file_path == Path('main.yml')
         assert result.metablock.parent is result
-        assert result.metablock.dependencies == []
-        assert result.metablock.platforms == [
-            rep.Platform(name='Debian', version='any'),
-            rep.Platform(name='Fedora', version=7),
-            rep.Platform(name='Fedora', version=8),
-        ]
+        assert result == rep.MetaFile(
+            Path('main.yml'),
+            rep.MetaBlock(
+                platforms=[
+                    rep.Platform(name='Debian', version='any'),
+                    rep.Platform(name='Fedora', version=7),
+                    rep.Platform(name='Fedora', version=8),
+                ],
+                raw=None))
 
     def extracts_simple_string_dependencies(tmp_path: Path) -> None:
         (tmp_path / 'main.yml').write_text(dedent(f'''
@@ -52,7 +55,7 @@ def describe_extracting_metadata_file() -> None:
 
         result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
 
-        assert result.metablock.dependencies == [rep.Dependency(role='testrole', when=[])]
+        assert result.metablock.dependencies == [rep.Dependency(role='testrole')]
 
     @pytest.mark.parametrize('key', ['name', 'role'])
     def extracts_simple_dict_dependencies(tmp_path: Path, key: str) -> None:
@@ -63,7 +66,7 @@ def describe_extracting_metadata_file() -> None:
 
         result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
 
-        assert result.metablock.dependencies == [rep.Dependency(role='testrole', when=[])]
+        assert result.metablock.dependencies == [rep.Dependency(role='testrole')]
 
     def extracts_dependencies_with_condition(tmp_path: Path) -> None:
         (tmp_path / 'main.yml').write_text(dedent('''
@@ -204,38 +207,45 @@ def describe_extracting_variables() -> None:
         with pytest.raises(Exception):
             ext.extract_variable_file(ext.ProjectPath(tmp_path, 'main.yml'))
 
-def describe_extracting_tasks() -> None:
+TaskExtractor = Callable[[dict[str, 'ans.AnsibleValue']], rep.Task]
 
-    def extracts_standard_task() -> None:
-        result = ext.extract_task(_parse_yaml(dedent('''
+# Shared behaviour for task extractors
+def a_task_extractor() -> None:
+
+    def extracts_standard_task(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
+        result = extractor(_parse_yaml(dedent('''
             name: Ensure file exists
             file:
                 path: test.txt
                 state: present
         ''')))
 
-        assert result.action == 'file'
-        assert result.name == 'Ensure file exists'
-        assert result.args == {
-            'path': 'test.txt',
-            'state': 'present',
-        }
+        assert result == task_representation(
+            action='file',
+            args={
+                'path': 'test.txt',
+                'state': 'present',
+            },
+            name='Ensure file exists',
+            raw=None)
 
-    def extracts_standard_task_with_action_shorthand() -> None:
-        result = ext.extract_task(_parse_yaml(dedent('''
+    def extracts_standard_task_with_action_shorthand(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
+        result = extractor(_parse_yaml(dedent('''
             name: Ensure file exists
             file: path=test.txt state=present
         ''')))
 
-        assert result.action == 'file'
-        assert result.name == 'Ensure file exists'
-        assert result.args == {
-            'path': 'test.txt',
-            'state': 'present',
-        }
+        assert result == task_representation(
+            action='file',
+            args={
+                'path': 'test.txt',
+                'state': 'present',
+            },
+            name='Ensure file exists',
+            raw=None)
 
-    def extracts_task_with_vars() -> None:
-        result = ext.extract_task(_parse_yaml(dedent('''
+    def extracts_task_with_vars(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
+        result = extractor(_parse_yaml(dedent('''
             name: Ensure file exists
             file:
                 path: '{{ file_path }}'
@@ -243,39 +253,49 @@ def describe_extracting_tasks() -> None:
                 file_path: test.txt
         ''')))
 
-        assert result.action == 'file'
-        assert result.name == 'Ensure file exists'
-        assert result.args == {
-            'path': '{{ file_path }}',
-        }
-        assert result.vars == [rep.Variable('file_path', 'test.txt')]
+        assert result == task_representation(
+            action='file',
+            args={
+                'path': '{{ file_path }}',
+            },
+            name='Ensure file exists',
+            vars=[rep.Variable('file_path', 'test.txt')],
+            raw=None)
 
-    def extracts_task_with_loop() -> None:
-        result = ext.extract_task(_parse_yaml(dedent('''
+    def extracts_task_with_loop(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
+        result = extractor(_parse_yaml(dedent('''
             name: test
             debug: msg={{ item }}
             loop: [hello, world]
         ''')))
 
-        assert result.action == 'debug'
-        assert result.args == {'msg': '{{ item }}'}
-        assert result.loop == ['hello', 'world']
-        assert result.loop_with is None
+        assert result == task_representation(
+            action='debug',
+            args={
+                'msg': '{{ item }}',
+            },
+            name='test',
+            loop=['hello', 'world'],
+            raw=None)
 
-    def extracts_task_with_expr_loop() -> None:
-        result = ext.extract_task(_parse_yaml(dedent('''
+    def extracts_task_with_expr_loop(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
+        result = extractor(_parse_yaml(dedent('''
             name: test
             debug: msg={{ item }}
             loop: '{{ somelist }}'
         ''')))
 
-        assert result.action == 'debug'
-        assert result.args == {'msg': '{{ item }}'}
-        assert result.loop == '{{ somelist }}'
-        assert result.loop_with is None
+        assert result == task_representation(
+            action='debug',
+            args={
+                'msg': '{{ item }}',
+            },
+            name='test',
+            loop='{{ somelist }}',
+            raw=None)
 
-    def extracts_task_with_loop_control() -> None:
-        result = ext.extract_task(_parse_yaml(dedent('''
+    def extracts_task_with_loop_control(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
+        result = extractor(_parse_yaml(dedent('''
             name: test
             debug: msg={{ myvar }}
             loop: [hello, world]
@@ -283,64 +303,80 @@ def describe_extracting_tasks() -> None:
               loop_var: myvar
         ''')))
 
-        assert result.action == 'debug'
-        assert result.args == {'msg': '{{ myvar }}'}
-        assert result.loop == ['hello', 'world']
-        assert result.loop_with is None
-        assert result.loop_control is not None
-        assert result.loop_control.loop_var == 'myvar'
+        assert result == task_representation(
+            action='debug',
+            args={
+                'msg': '{{ myvar }}',
+            },
+            name='test',
+            loop=['hello', 'world'],
+            loop_control=rep.LoopControl(loop_var='myvar'),
+            raw=None)
 
-    def extracts_task_with_literal_boolean_when() -> None:
-        result = ext.extract_task(_parse_yaml(dedent('''
+    def extracts_task_with_literal_boolean_when(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
+        result = extractor(_parse_yaml(dedent('''
             name: test
             debug: msg={{ myvar }}
             when: yes
         ''')))
 
-        assert result.action == 'debug'
-        assert result.args == {'msg': '{{ myvar }}'}
-        assert result.when == [True]
+        assert result == task_representation(
+            action='debug',
+            args={
+                'msg': '{{ myvar }}',
+            },
+            name='test',
+            when=[True],
+            raw=None)
 
-    def does_not_eagerly_evaluate_imports() -> None:
-        result = ext.extract_task(_parse_yaml(dedent('''
+    def does_not_eagerly_evaluate_imports(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
+        result = extractor(_parse_yaml(dedent('''
             import_tasks: tasks.yml
         ''')))
 
-        assert result.action == 'import_tasks'
-        assert result.args == {
-            '_raw_params': 'tasks.yml'
-        }
+        assert result == task_representation(
+            action='import_tasks',
+            args={
+                '_raw_params': 'tasks.yml',
+            },
+            raw=None)
 
-    def does_not_eagerly_evaluate_expressions() -> None:
+    def does_not_eagerly_evaluate_expressions(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
         # register is a "static" field and Ansible will try to evaluate the
         # expression eagerly, which we should prevent
-        result = ext.extract_task(_parse_yaml(dedent('''
+        result = extractor(_parse_yaml(dedent('''
             name: test
             debug:
                 msg: hello
             register: '{{ expr }}'
         ''')))
 
-        assert result.action == 'debug'
-        assert result.args == {
-            'msg': 'hello'
-        }
-        assert result.register == '{{ expr }}'
+        assert result == task_representation(
+            action='debug',
+            args={
+                'msg': 'hello',
+            },
+            name='test',
+            register='{{ expr }}',
+            raw=None)
 
-    def does_not_eagerly_resolve_actions() -> None:
-        result = ext.extract_task(_parse_yaml(dedent('''
+    def does_not_eagerly_resolve_actions(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
+        result = extractor(_parse_yaml(dedent('''
             name: test
             action_that_doesnt_exist:
                 msg: hello
         ''')))
 
-        assert result.action == 'action_that_doesnt_exist'
-        assert result.args == {
-            'msg': 'hello'
-        }
+        assert result == task_representation(
+            action='action_that_doesnt_exist',
+            args={
+                'msg': 'hello',
+            },
+            name='test',
+            raw=None)
 
-    def normalises_deprecated_with_keyword() -> None:
-        result = ext.extract_task(_parse_yaml(dedent('''
+    def normalises_deprecated_with_keyword(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
+        result = extractor(_parse_yaml(dedent('''
             name: test
             file:
               path: '{{ item }}'
@@ -349,72 +385,81 @@ def describe_extracting_tasks() -> None:
               - world
         ''')))
 
-        assert result.action == 'file'
-        assert result.args == {
-            'path': '{{ item }}'
-        }
-        assert result.loop == ['hello', 'world']
-        assert result.loop_with == 'items'
+        assert result == task_representation(
+            action='file',
+            args={
+                'path': '{{ item }}',
+            },
+            name='test',
+            loop=['hello', 'world'],
+            loop_with='items',
+            raw=None)
 
-    def extracts_include_task() -> None:
-        result = ext.extract_task(_parse_yaml(dedent('''
+    def extracts_include_task(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
+        result = extractor(_parse_yaml(dedent('''
             include: test.yml
         ''')))
 
-        assert result.action == 'include'
-        assert result.args == {
-            '_raw_params': 'test.yml'
-        }
+        assert result == task_representation(
+            action='include',
+            args={
+                '_raw_params': 'test.yml',
+            },
+            raw=None)
 
-    def extracts_include_static_task() -> None:
-        result = ext.extract_task(_parse_yaml(dedent('''
+    def extracts_include_static_task(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
+        result = extractor(_parse_yaml(dedent('''
             include: test.yml
             static: yes
         ''')))
 
-        assert result.action == 'import_tasks'
-        assert result.args == {
-            '_raw_params': 'test.yml'
-        }
+        assert result == task_representation(
+            action='import_tasks',
+            args={
+                '_raw_params': 'test.yml',
+            },
+            raw=None)
 
-    def extracts_include_nonstatic_task() -> None:
-        result = ext.extract_task(_parse_yaml(dedent('''
+    def extracts_include_nonstatic_task(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
+        result = extractor(_parse_yaml(dedent('''
             include: test.yml
             static: no
         ''')))
 
-        assert result.action == 'include_tasks'
-        assert result.args == {
-            '_raw_params': 'test.yml'
-        }
+        assert result == task_representation(
+            action='include_tasks',
+            args={
+                '_raw_params': 'test.yml',
+            },
+            raw=None)
 
-    def rejects_tasks_with_invalid_attribute_values() -> None:
+    def rejects_tasks_with_invalid_attribute_values(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
         with pytest.raises(Exception):
-            ext.extract_task(_parse_yaml(dedent('''
+            extractor(_parse_yaml(dedent('''
                 name: test
                 file:
                     path: test.txt
                 vars: 0
             ''')))
 
-    def rejects_tasks_with_invalid_postvalidated_attribute_values() -> None:
+    def rejects_tasks_with_invalid_postvalidated_attribute_values(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
         with pytest.raises(Exception):
-            ext.extract_task(_parse_yaml(dedent('''
+            extractor(_parse_yaml(dedent('''
                 name: test
                 file:
                     path: test.txt
                 loop: 0
             ''')))
 
-    def rejects_tasks_with_no_action() -> None:
+    def rejects_tasks_with_no_action(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
         with pytest.raises(Exception):
-            ext.extract_task(_parse_yaml(dedent('''
+            extractor(_parse_yaml(dedent('''
                 name: test
             ''')))
 
-    def rejects_tasks_with_multiple_actions() -> None:
+    def rejects_tasks_with_multiple_actions(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
         with pytest.raises(Exception):
-            ext.extract_task(_parse_yaml(dedent('''
+            extractor(_parse_yaml(dedent('''
                 name: test
                 file:
                     path: test.txt
@@ -422,52 +467,30 @@ def describe_extracting_tasks() -> None:
                     name: test.txt
             ''')))
 
+
+@behaves_like(a_task_extractor)
+def describe_extracting_tasks() -> None:
+
+    @pytest.fixture()
+    def extractor() -> Callable[[dict[str, ans.AnsibleValue]], rep.Task]:
+        return ext.extract_task
+
+    @pytest.fixture()
+    def task_representation() -> Type[rep.Task]:
+        return rep.Task
+
+
+@behaves_like(a_task_extractor)
 def describe_extracting_handlers() -> None:
-    # TODO: refactor this so that it doesn't duplicate as many tests
 
-    def extracts_standard_handler() -> None:
-        result = ext.extract_handler(_parse_yaml(dedent('''
-            name: Ensure file exists
-            file:
-                path: test.txt
-                state: present
-        ''')))
+    @pytest.fixture()
+    def extractor() -> Callable[[dict[str, ans.AnsibleValue]], rep.Handler]:
+        return ext.extract_handler
 
-        assert result.action == 'file'
-        assert result.name == 'Ensure file exists'
-        assert result.args == {
-            'path': 'test.txt',
-            'state': 'present',
-        }
+    @pytest.fixture()
+    def task_representation() -> Type[rep.Handler]:
+        return rep.Handler
 
-    def extracts_standard_handler_with_action_shorthand() -> None:
-        result = ext.extract_handler(_parse_yaml(dedent('''
-            name: Ensure file exists
-            file: path=test.txt state=present
-        ''')))
-
-        assert result.action == 'file'
-        assert result.name == 'Ensure file exists'
-        assert result.args == {
-            'path': 'test.txt',
-            'state': 'present',
-        }
-
-    def extracts_handler_with_vars() -> None:
-        result = ext.extract_handler(_parse_yaml(dedent('''
-            name: Ensure file exists
-            file:
-                path: '{{ file_path }}'
-            vars:
-                file_path: test.txt
-        ''')))
-
-        assert result.action == 'file'
-        assert result.name == 'Ensure file exists'
-        assert result.args == {
-            'path': '{{ file_path }}',
-        }
-        assert result.vars == [rep.Variable('file_path', 'test.txt')]
 
     def extracts_handler_with_listen() -> None:
         result = ext.extract_handler(_parse_yaml(dedent('''
@@ -477,12 +500,12 @@ def describe_extracting_handlers() -> None:
             listen: a topic
         ''')))
 
-        assert result.action == 'file'
-        assert result.name == 'Ensure file exists'
-        assert result.args == {
-            'path': '{{ file_path }}',
-        }
-        assert result.listen == ['a topic']
+        assert result == rep.Handler(
+            action='file',
+            name='Ensure file exists',
+            args={'path': '{{ file_path }}'},
+            listen=['a topic'],
+            raw=None)
 
     def extracts_handler_with_list_of_listens() -> None:
         result = ext.extract_handler(_parse_yaml(dedent('''
@@ -494,113 +517,13 @@ def describe_extracting_handlers() -> None:
               - another topic
         ''')))
 
-        assert result.action == 'file'
-        assert result.name == 'Ensure file exists'
-        assert result.args == {
-            'path': '{{ file_path }}',
-        }
-        assert result.listen == ['a topic', 'another topic']
+        assert result == rep.Handler(
+            action='file',
+            name='Ensure file exists',
+            args={'path': '{{ file_path }}'},
+            listen=['a topic', 'another topic'],
+            raw=None)
 
-    def does_not_eagerly_evaluate_imports() -> None:
-        result = ext.extract_handler(_parse_yaml(dedent('''
-            import_tasks: tasks.yml
-        ''')))
-
-        assert result.action == 'import_tasks'
-        assert result.args == {
-            '_raw_params': 'tasks.yml'
-        }
-
-    def does_not_eagerly_evaluate_expressions() -> None:
-        # register is a "static" field and Ansible will try to evaluate the
-        # expression eagerly, which we should prevent
-        result = ext.extract_handler(_parse_yaml(dedent('''
-            name: test
-            debug:
-                msg: hello
-            register: '{{ expr }}'
-        ''')))
-
-        assert result.action == 'debug'
-        assert result.args == {
-            'msg': 'hello'
-        }
-        assert result.register == '{{ expr }}'
-
-    def does_not_eagerly_evaluate_expressions_in_name() -> None:
-        result = ext.extract_handler(_parse_yaml(dedent('''
-            name: restart {{ test }}
-            debug:
-                msg: hello
-        ''')))
-
-        assert result.action == 'debug'
-        assert result.args == {
-            'msg': 'hello'
-        }
-        assert result.name == 'restart {{ test }}'
-
-    def does_not_eagerly_resolve_actions() -> None:
-        result = ext.extract_handler(_parse_yaml(dedent('''
-            name: test
-            action_that_doesnt_exist:
-                msg: hello
-        ''')))
-
-        assert result.action == 'action_that_doesnt_exist'
-        assert result.args == {
-            'msg': 'hello'
-        }
-
-    def normalises_deprecated_with_keyword() -> None:
-        result = ext.extract_handler(_parse_yaml(dedent('''
-            name: test
-            file:
-              path: '{{ item }}'
-            with_items:
-              - hello
-              - world
-        ''')))
-
-        assert result.action == 'file'
-        assert result.args == {
-            'path': '{{ item }}'
-        }
-        assert result.loop == ['hello', 'world']
-
-    def rejects_handlers_with_invalid_attribute_values() -> None:
-        with pytest.raises(Exception):
-            ext.extract_handler(_parse_yaml(dedent('''
-                name: test
-                file:
-                    path: test.txt
-                vars: 0
-            ''')))
-
-    def rejects_handlers_with_invalid_postvalidated_attribute_values() -> None:
-        with pytest.raises(Exception):
-            ext.extract_handler(_parse_yaml(dedent('''
-                name: test
-                file:
-                    path: test.txt
-                loop: 0
-            ''')))
-
-    def rejects_handler_with_no_action() -> None:
-        with pytest.raises(Exception):
-            ext.extract_handler(_parse_yaml(dedent('''
-                name: test
-            ''')))
-
-    def rejects_handlers_with_multiple_actions() -> None:
-        with pytest.raises(Exception):
-            ext.extract_handler(_parse_yaml(dedent('''
-                name: test
-                file:
-                    path: test.txt
-                apt:
-                    name: test.txt
-            ''')))
 
 def describe_extracting_list_of_handlers() -> None:
 
@@ -626,15 +549,12 @@ def describe_extracting_blocks() -> None:
                 file: {}
         ''')))
 
-        assert len(result.block) == 2
-        assert isinstance(result.block[0], rep.Task)
-        assert result.block[0].action == 'file'
-        assert result.block[0].name == 'test'
-        assert isinstance(result.block[1], rep.Task)
-        assert result.block[1].action == 'file'
-        assert result.block[1].name == 'test2'
-        assert result.rescue == []
-        assert result.always == []
+        assert result == rep.Block(
+            block=[  # type: ignore[arg-type]
+                rep.Task(action='file', name='test', args={}, raw=None),
+                rep.Task(action='file', name='test2', args={}, raw=None),
+            ],
+            raw=None)
         assert all(child.parent is result for child in result.block + result.rescue + result.always)
 
     def extracts_block_of_handlers() -> None:
@@ -646,15 +566,12 @@ def describe_extracting_blocks() -> None:
                 file: {}
         ''')), handlers=True)
 
-        assert len(result.block) == 2
-        assert isinstance(result.block[0], rep.Handler)
-        assert result.block[0].action == 'file'
-        assert result.block[0].name == 'test'
-        assert isinstance(result.block[1], rep.Handler)
-        assert result.block[1].action == 'file'
-        assert result.block[1].name == 'test2'
-        assert result.rescue == []
-        assert result.always == []
+        assert result == rep.Block(
+            block=[  # type: ignore[arg-type]
+                rep.Handler(action='file', name='test', args={}, raw=None),
+                rep.Handler(action='file', name='test2', args={}, raw=None),
+            ],
+            raw=None)
         assert all(child.parent is result for child in result.block + result.rescue + result.always)
 
     def extracts_blocks_with_rescue_and_always() -> None:
@@ -670,18 +587,17 @@ def describe_extracting_blocks() -> None:
                 file: {}
         ''')))
 
-        assert len(result.block) == 1
-        assert isinstance(result.block[0], rep.Task)
-        assert result.block[0].action == 'file'
-        assert result.block[0].name == 'test'
-        assert len(result.rescue) == 1
-        assert isinstance(result.rescue[0], rep.Task)
-        assert result.rescue[0].action == 'file'
-        assert result.rescue[0].name == 'test2'
-        assert len(result.always) == 1
-        assert isinstance(result.always[0], rep.Task)
-        assert result.always[0].action == 'file'
-        assert result.always[0].name == 'test3'
+        assert result == rep.Block(
+            block=[  # type: ignore[arg-type]
+                rep.Task(action='file', name='test', args={}, raw=None),
+            ],
+            rescue=[  # type: ignore[arg-type]
+                rep.Task(action='file', name='test2', args={}, raw=None),
+            ],
+            always=[  # type: ignore[arg-type]
+                rep.Task(action='file', name='test3', args={}, raw=None),
+            ],
+            raw=None)
         assert all(child.parent is result for child in result.block + result.rescue + result.always)
 
     def extracts_nested_blocks() -> None:
@@ -694,17 +610,16 @@ def describe_extracting_blocks() -> None:
                     file: {}
         ''')))
 
-        assert len(result.block) == 2
-        assert isinstance(result.block[0], rep.Task)
-        assert result.block[0].action == 'file'
-        assert result.block[0].name == 'test'
-        assert isinstance(result.block[1], rep.Block)
-        assert isinstance(result.block[1].block[0], rep.Task)
-        assert result.block[1].block[0].action == 'file'
-        assert result.block[1].block[0].name == 'test'
-        assert result.rescue == []
-        assert result.always == []
+        assert result == rep.Block(
+            block=[  # type: ignore[arg-type]
+                rep.Task(action='file', name='test', args={}, raw=None),
+                rep.Block(block=[  # type: ignore[arg-type]
+                    rep.Task(action='file', name='test', args={}, raw=None),
+                ], raw=None),
+            ],
+            raw=None)
         assert all(child.parent is result for child in result.block + result.rescue + result.always)
+        assert isinstance(result.block[1], rep.Block)
         assert all(child.parent is result.block[1] for child in result.block[1].block + result.block[1].rescue + result.block[1].always)
 
     def does_not_eagerly_load_import_tasks() -> None:
@@ -713,12 +628,11 @@ def describe_extracting_blocks() -> None:
               - import_tasks: test
         ''')))
 
-        assert len(result.block) == 1
-        assert isinstance(result.block[0], rep.Task)
-        assert result.block[0].action == 'import_tasks'
-        assert result.block[0].args == { '_raw_params': 'test' }
-        assert result.rescue == []
-        assert result.always == []
+        assert result == rep.Block(
+            block=[  # type: ignore[arg-type]
+                rep.Task(action='import_tasks', args={'_raw_params': 'test'}, raw=None),
+            ],
+            raw=None)
         assert all(child.parent is result for child in result.block + result.rescue + result.always)
 
     def rejects_non_blocks() -> None:
@@ -747,27 +661,31 @@ def describe_extracting_tasks_file() -> None:
 
         result = ext.extract_tasks_file(ext.ProjectPath(tmp_path, 'main.yml'))
 
-        assert result.file_path == Path('main.yml')
+        assert result == rep.TaskFile(
+            file_path=Path('main.yml'),
+            tasks=[  # type: ignore[arg-type]
+                rep.Task(
+                    action='file',
+                    args={'path': 'hello'},
+                    name='hello world',
+                    raw=None),
+                rep.Block(
+                    block=[  # type: ignore[arg-type]
+                        rep.Task(
+                            action='test',
+                            args={},
+                            name='test',
+                            raw=None)
+                    ], raw=None)
+            ])
         assert all(v.parent is result for v in result.tasks)
-        assert isinstance(result.tasks[0], rep.Task)
-        assert result.tasks[0].action == 'file'
-        assert result.tasks[0].name == 'hello world'
-        assert result.tasks[0].args == { 'path': 'hello' }
-        assert isinstance(result.tasks[1], rep.Block)
-        assert len(result.tasks[1].block) == 1
-        assert isinstance(result.tasks[1].block[0], rep.Task)
-        assert result.tasks[1].block[0].action == 'test'
-        assert result.tasks[1].block[0].name == 'test'
-        assert result.tasks[1].block[0].args == {}
-        assert result.tasks[1].rescue == []
-        assert result.tasks[1].always == []
 
     def allows_task_files_to_be_empty(tmp_path: Path) -> None:
         (tmp_path / 'main.yml').write_text('# just a comment')
 
         result = ext.extract_tasks_file(ext.ProjectPath(tmp_path, 'main.yml'))
 
-        assert result.tasks == []
+        assert result == rep.TaskFile(file_path=Path('main.yml'), tasks=[])
 
     @pytest.mark.parametrize('content', [
         'hello: world'  # dict
@@ -789,12 +707,14 @@ def describe_extracting_plays() -> None:
               - import_tasks: test
         ''')))
 
-        assert result.name == 'test play'
-        assert result.hosts == ['servers']
-        assert len(result.tasks) == 1
+        assert result == rep.Play(
+            hosts=['servers'],
+            name='test play',
+            tasks=[
+                rep.Task(action='import_tasks', args={'_raw_params': 'test'}, raw=None),
+            ],
+            raw=None)
         assert all(child.parent is result for child in result.tasks)
-        assert isinstance(result.tasks[0], rep.Task)
-        assert result.tasks[0].action == 'import_tasks'
 
     def extracts_play_with_block() -> None:
         result = ext.extract_play(_parse_yaml(dedent('''
@@ -805,16 +725,17 @@ def describe_extracting_plays() -> None:
                 - import_tasks: test
         ''')))
 
-        assert result.name == 'test play'
-        assert result.hosts == ['servers']
-        assert len(result.tasks) == 1
+        assert result == rep.Play(
+            hosts=['servers'],
+            name='test play',
+            tasks=[
+                rep.Block(
+                    block=[  # type: ignore[arg-type]
+                        rep.Task(action='import_tasks', args={'_raw_params': 'test'}, raw=None),
+                    ], raw=None)
+            ],
+            raw=None)
         assert all(child.parent is result for child in result.tasks)
-        assert isinstance(result.tasks[0], rep.Block)
-        assert len(result.tasks[0].block) == 1
-        assert result.tasks[0].rescue == []
-        assert result.tasks[0].always == []
-        assert isinstance(result.tasks[0].block[0], rep.Task)
-        assert result.tasks[0].block[0].action == 'import_tasks'
 
     def extracts_play_with_vars() -> None:
         result = ext.extract_play(_parse_yaml(dedent('''
@@ -826,13 +747,15 @@ def describe_extracting_plays() -> None:
               testvar: 123
         ''')))
 
-        assert result.name == 'test play'
-        assert result.hosts == ['servers']
-        assert len(result.tasks) == 1
+        assert result == rep.Play(
+            hosts=['servers'],
+            name='test play',
+            tasks=[
+                rep.Task(action='import_tasks', args={'_raw_params': 'test'}, raw=None),
+            ],
+            vars=[rep.Variable('testvar', 123)],
+            raw=None)
         assert all(child.parent is result for child in result.tasks)
-        assert isinstance(result.tasks[0], rep.Task)
-        assert result.tasks[0].action == 'import_tasks'
-        assert result.vars == [rep.Variable('testvar', 123)]
 
     def rejects_invalid_play() -> None:
         with pytest.raises(Exception):
@@ -876,16 +799,9 @@ def describe_extract_playbook() -> None:
                         name='config servers',
                         tasks=[
                             rep.Task(
-                                name='',
                                 action='file',
                                 args={'path': 'test.txt', 'state': 'present'},
-                                when=[],
-                                loop=None,
-                                loop_with=None,
-                                loop_control=None,
-                                register=None,
                                 raw=raw_task,
-                                vars=[],
                             )
                         ],
                         vars=[rep.Variable('x', 111)],
@@ -933,16 +849,9 @@ def describe_extract_playbook() -> None:
                         name='config servers',
                         tasks=[
                             rep.Task(
-                                name='',
                                 action='file',
                                 args={'path': 'test.txt', 'state': 'present'},
-                                when=[],
-                                loop=None,
-                                loop_with=None,
-                                loop_control=None,
-                                register=None,
                                 raw=raw_task,
-                                vars=[],
                             )
                         ],
                         vars=[rep.Variable('x', 111)],
@@ -950,8 +859,6 @@ def describe_extract_playbook() -> None:
                     rep.Play(
                         hosts=['databases'],
                         name='config databases',
-                        tasks=[],
-                        vars=[],
                         raw=raw_play_2),
                 ],
                 raw=raw_pb),
@@ -1009,33 +916,18 @@ def describe_extracting_roles() -> None:
             file_path=Path('tasks/main.yml'),
             tasks=[  # type: ignore[arg-type]
                 rep.Task(
-                    name='',
                     action='file',
                     args={'path': 'hello'},
-                    when=[],
-                    loop=None,
-                    loop_with=None,
-                    loop_control=None,
-                    register=None,
                     raw={'file': {'path': 'hello'}},
-                    vars=[],
                 ),
                 rep.Task(
-                    name='',
                     action='apt',
                     args={'name': 'test'},
-                    when=[],
-                    loop=None,
-                    loop_with=None,
-                    loop_control=None,
-                    register=None,
                     raw={'apt': {'name': 'test'}},
-                    vars=[],
                 )])
         meta_file = rep.MetaFile(
             file_path=Path('meta/main.yml'),
             metablock=rep.MetaBlock(
-                dependencies=[],
                 platforms=[rep.Platform('Debian', 'all')],
                 raw={'dependencies': [], 'galaxy_info': {'name': 'test', 'author': 'test', 'platforms': [{'name': 'Debian', 'versions': ['all']}]}}))
         vars_file = rep.VariableFile(
@@ -1046,19 +938,12 @@ def describe_extracting_roles() -> None:
             variables=[rep.Variable('a', 123)])
         handler_file = rep.TaskFile(
             file_path=Path('handlers/main.yml'),
-            tasks=[
+            tasks=[  # type: ignore[arg-type]
                 rep.Handler(
                     name='restart x',
                     action='service',
                     args={'name': 'test'},
-                    when=[],
-                    loop=None,
-                    loop_with=None,
-                    loop_control=None,
-                    register=None,
                     raw={'name': 'restart x', 'service': {'name': 'test'}},
-                    vars=[],
-                    listen=[],
                 )])
         assert result == rep.StructuralModel(
             root=rep.Role(
@@ -1100,28 +985,14 @@ def describe_extracting_roles() -> None:
             file_path=Path('tasks/main.yml'),
             tasks=[  # type: ignore[arg-type]
                 rep.Task(
-                    name='',
                     action='file',
                     args={'path': 'hello'},
-                    when=[],
-                    loop=None,
-                    loop_with=None,
-                    loop_control=None,
-                    register=None,
                     raw={'file': {'path': 'hello'}},
-                    vars=[],
                 ),
                 rep.Task(
-                    name='',
                     action='apt',
                     args={'name': 'test'},
-                    when=[],
-                    loop=None,
-                    loop_with=None,
-                    loop_control=None,
-                    register=None,
                     raw={'apt': {'name': 'test'}},
-                    vars=[],
                 )])
         defaults_file = rep.VariableFile(
             file_path=Path('defaults/main.yml'),
@@ -1212,43 +1083,22 @@ def describe_extracting_roles() -> None:
             file_path=Path('tasks/main.yml'),
             tasks=[  # type: ignore[arg-type]
                 rep.Task(
-                    name='',
                     action='file',
                     args={'path': 'hello'},
-                    when=[],
-                    loop=None,
-                    loop_with=None,
-                    loop_control=None,
-                    register=None,
                     raw={'file': {'path': 'hello'}},
-                    vars=[],
                 ),
                 rep.Task(
-                    name='',
                     action='import_tasks',
                     args={'_raw_params': 'other.yml'},
-                    when=[],
-                    loop=None,
-                    loop_with=None,
-                    loop_control=None,
-                    register=None,
                     raw={'import_tasks': 'other.yml'},
-                    vars=[],
                 )])
         other_task_file = rep.TaskFile(
             file_path=Path('tasks/other.yml'),
             tasks=[  # type: ignore[arg-type]
                 rep.Task(
-                    name='',
                     action='apt',
                     args={'name': 'test'},
-                    when=[],
-                    loop=None,
-                    loop_with=None,
-                    loop_control=None,
-                    register=None,
                     raw={'apt': {'name': 'test'}},
-                    vars=[],
                 )])
         assert result == rep.StructuralModel(
             root=rep.Role(
