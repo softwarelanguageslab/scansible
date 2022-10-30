@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Type
 
+from itertools import chain
 from pathlib import Path
 from textwrap import dedent
 
@@ -550,12 +551,12 @@ def describe_extracting_blocks() -> None:
         ''')))
 
         assert result == rep.Block(
-            block=[  # type: ignore[arg-type]
+            block=[
                 rep.Task(action='file', name='test', args={}, raw=None),
                 rep.Task(action='file', name='test2', args={}, raw=None),
             ],
             raw=None)
-        assert all(child.parent is result for child in result.block + result.rescue + result.always)
+        assert all(child.parent is result for child in chain(result.block, result.rescue, result.always))
 
     def extracts_block_of_handlers() -> None:
         result = ext.extract_block(_parse_yaml(dedent('''
@@ -567,12 +568,12 @@ def describe_extracting_blocks() -> None:
         ''')), handlers=True)
 
         assert result == rep.Block(
-            block=[  # type: ignore[arg-type]
+            block=[
                 rep.Handler(action='file', name='test', args={}, raw=None),
                 rep.Handler(action='file', name='test2', args={}, raw=None),
             ],
             raw=None)
-        assert all(child.parent is result for child in result.block + result.rescue + result.always)
+        assert all(child.parent is result for child in chain(result.block, result.rescue, result.always))
 
     def extracts_blocks_with_rescue_and_always() -> None:
         result = ext.extract_block(_parse_yaml(dedent('''
@@ -588,17 +589,17 @@ def describe_extracting_blocks() -> None:
         ''')))
 
         assert result == rep.Block(
-            block=[  # type: ignore[arg-type]
+            block=[
                 rep.Task(action='file', name='test', args={}, raw=None),
             ],
-            rescue=[  # type: ignore[arg-type]
+            rescue=[
                 rep.Task(action='file', name='test2', args={}, raw=None),
             ],
-            always=[  # type: ignore[arg-type]
+            always=[
                 rep.Task(action='file', name='test3', args={}, raw=None),
             ],
             raw=None)
-        assert all(child.parent is result for child in result.block + result.rescue + result.always)
+        assert all(child.parent is result for child in chain(result.block, result.rescue, result.always))
 
     def extracts_nested_blocks() -> None:
         result = ext.extract_block(_parse_yaml(dedent('''
@@ -613,14 +614,14 @@ def describe_extracting_blocks() -> None:
         assert result == rep.Block(
             block=[  # type: ignore[arg-type]
                 rep.Task(action='file', name='test', args={}, raw=None),
-                rep.Block(block=[  # type: ignore[arg-type]
+                rep.Block(block=[
                     rep.Task(action='file', name='test', args={}, raw=None),
                 ], raw=None),
             ],
             raw=None)
-        assert all(child.parent is result for child in result.block + result.rescue + result.always)
+        assert all(child.parent is result for child in chain(result.block, result.rescue, result.always))
         assert isinstance(result.block[1], rep.Block)
-        assert all(child.parent is result.block[1] for child in result.block[1].block + result.block[1].rescue + result.block[1].always)
+        assert all(child.parent is result.block[1] for child in chain(result.block[1].block, result.block[1].rescue, result.block[1].always))
 
     def does_not_eagerly_load_import_tasks() -> None:
         result = ext.extract_block(_parse_yaml(dedent('''
@@ -629,11 +630,11 @@ def describe_extracting_blocks() -> None:
         ''')))
 
         assert result == rep.Block(
-            block=[  # type: ignore[arg-type]
+            block=[
                 rep.Task(action='import_tasks', args={'_raw_params': 'test'}, raw=None),
             ],
             raw=None)
-        assert all(child.parent is result for child in result.block + result.rescue + result.always)
+        assert all(child.parent is result for child in chain(result.block, result.rescue, result.always))
 
     def rejects_non_blocks() -> None:
         with pytest.raises(Exception):
@@ -670,7 +671,7 @@ def describe_extracting_tasks_file() -> None:
                     name='hello world',
                     raw=None),
                 rep.Block(
-                    block=[  # type: ignore[arg-type]
+                    block=[
                         rep.Task(
                             action='test',
                             args={},
@@ -730,7 +731,7 @@ def describe_extracting_plays() -> None:
             name='test play',
             tasks=[
                 rep.Block(
-                    block=[  # type: ignore[arg-type]
+                    block=[
                         rep.Task(action='import_tasks', args={'_raw_params': 'test'}, raw=None),
                     ], raw=None)
             ],
@@ -914,7 +915,7 @@ def describe_extracting_roles() -> None:
         assert isinstance(result.root, rep.Role)
         task_file = rep.TaskFile(
             file_path=Path('tasks/main.yml'),
-            tasks=[  # type: ignore[arg-type]
+            tasks=[
                 rep.Task(
                     action='file',
                     args={'path': 'hello'},
@@ -938,7 +939,7 @@ def describe_extracting_roles() -> None:
             variables=[rep.Variable('a', 123)])
         handler_file = rep.TaskFile(
             file_path=Path('handlers/main.yml'),
-            tasks=[  # type: ignore[arg-type]
+            tasks=[
                 rep.Handler(
                     name='restart x',
                     action='service',
@@ -983,7 +984,7 @@ def describe_extracting_roles() -> None:
         assert isinstance(result.root, rep.Role)
         task_file = rep.TaskFile(
             file_path=Path('tasks/main.yml'),
-            tasks=[  # type: ignore[arg-type]
+            tasks=[
                 rep.Task(
                     action='file',
                     args={'path': 'hello'},
@@ -1081,7 +1082,7 @@ def describe_extracting_roles() -> None:
             variables=[rep.Variable('a', 123)])
         task_file = rep.TaskFile(
             file_path=Path('tasks/main.yml'),
-            tasks=[  # type: ignore[arg-type]
+            tasks=[
                 rep.Task(
                     action='file',
                     args={'path': 'hello'},
@@ -1094,7 +1095,7 @@ def describe_extracting_roles() -> None:
                 )])
         other_task_file = rep.TaskFile(
             file_path=Path('tasks/other.yml'),
-            tasks=[  # type: ignore[arg-type]
+            tasks=[
                 rep.Task(
                     action='apt',
                     args={'name': 'test'},

@@ -4,11 +4,10 @@ from __future__ import annotations
 from typing import (
         Any,
         Callable,
-        Dict,
-        List,
         Mapping,
-        Union,
+        Sequence,
         TypeVar,
+        Union,
 )
 
 import datetime
@@ -138,7 +137,7 @@ class Dependency:
     #: The role that is depended upon.
     role: str = default_field()
     #: Optional condition on when to include a dependency.
-    when: list[str] = default_field(factory=list)
+    when: Sequence[str] = default_field(factory=list)
 
 
 @define
@@ -166,9 +165,9 @@ class MetaBlock:
     #: The parent file of this metadata block.
     parent: MetaFile = parent_field()
     #: Platforms supported by the role
-    platforms: list[Platform] = default_field(factory=list)
+    platforms: Sequence[Platform] = default_field(factory=list)
     #: Role dependencies
-    dependencies: list[Dependency] = default_field(factory=list)
+    dependencies: Sequence[Dependency] = default_field(factory=list)
 
 
 @define
@@ -195,7 +194,7 @@ class VariableFile:
     #: The path to the file, relative to the project root.
     file_path: Path = path_field()
     #: The variables contained within the file. The order is irrelevant.
-    variables: list[Variable] = default_field()  # TODO: Use a set
+    variables: Sequence[Variable] = default_field()  # TODO: Use a set
 
 
 @define
@@ -237,11 +236,11 @@ class TaskBase:
     #: Name of the task.
     name: str = default_field(default='')
     #: Condition on the task, or None if no condition.
-    when: list[str | bool] = default_field(factory=list)
+    when: Sequence[str | bool] = default_field(factory=list)
     #: Loop on the task, or None if no loop. Can be a string (an expression),
     #: a list of arbitrary values, or, when the loop comes from `with_dict`, a
     #: dict of arbitrary items.
-    loop: str | list[AnyValue] | dict[Scalar, AnyValue] | None = default_field(default=None)
+    loop: str | Sequence[AnyValue] | Mapping[Scalar, AnyValue] | None = default_field(default=None)
     #: The type of loop used in old looping syntax (`with_*`), e.g.
     #: `with_items` -> `items`.
     loop_with: str | None = default_field(default=None)
@@ -251,7 +250,7 @@ class TaskBase:
     #: the result of this action.
     register: str | None = default_field(default=None)
     #: Variables defined on the task
-    vars: list[Variable] = default_field(factory=list)  # TODO: Should be a set, since order doesn't matter
+    vars: Sequence[Variable] = default_field(factory=list)  # TODO: Should be a set, since order doesn't matter
 
 
 @define(slots=False)
@@ -268,7 +267,7 @@ class Handler(TaskBase):
     """
 
     #: Topics on which the handler listens
-    listen: list[str] = default_field(factory=list)
+    listen: Sequence[str] = default_field(factory=list)
 
 
 @define
@@ -283,17 +282,17 @@ class Block:
     parent: TaskContainer = parent_field()
 
     #: The block's main task list.
-    block: list[Task | Block] | list[Handler | Block] = default_field()
+    block: Sequence[Task | Block] | Sequence[Handler | Block] = default_field()
     #: List of tasks in the block's rescue section, i.e. the tasks that will
     #: execute when an exception occurs.
-    rescue: list[Task | Block] | list[Handler | Block] = default_field(factory=list)
+    rescue: Sequence[Task | Block] | Sequence[Handler | Block] = default_field(factory=list)
     #: List of tasks in the block's always section, like a try-catch's `finally`
     #: handler.
-    always: list[Task | Block] | list[Handler | Block] = default_field(factory=list)
+    always: Sequence[Task | Block] | Sequence[Handler | Block] = default_field(factory=list)
     #: Name of the block
     name: str = default_field(default='')
     #: Set of variables defined on this block.
-    vars: list[Variable] = default_field(factory=list)  # TODO: Should be a set
+    vars: Sequence[Variable] = default_field(factory=list)  # TODO: Should be a set
 
 
 @define
@@ -307,7 +306,7 @@ class TaskFile:
     #: The top-level tasks or blocks contained in the file, in the order of
     #: definition. Can also be a list of handlers (or blocks thereof), but
     #: handlers and tasks cannot be mixed.
-    tasks: list[Block | Task] | list[Block | Handler] = default_field()
+    tasks: Sequence[Block | Task] | Sequence[Block | Handler] = default_field()
 
 
 @define
@@ -371,13 +370,13 @@ class Play:
     #: Raw information present in the play, some which may not explicitly be parsed.
     raw: Any = raw_field()
     #: The play's targetted hosts.
-    hosts: list[str] = default_field()
+    hosts: Sequence[str] = default_field()
     #: The play's name.
     name: str = default_field(default='')
     #: The play's list of blocks.
-    tasks: list[Task | Block] = default_field(factory=list)
+    tasks: Sequence[Task | Block] = default_field(factory=list)
     #: The play-level variables.
-    vars: list[Variable] = default_field(factory=list)  # TODO: Should be a set
+    vars: Sequence[Variable] = default_field(factory=list)  # TODO: Should be a set
 
     # TODO: Handlers, pre- and post-tasks, roles, vars files, vars_prompt, etc?
 
@@ -391,7 +390,7 @@ class Playbook:
     #: Raw information present in the playbook, some which may not explicitly be parsed.
     raw: Any = raw_field()
     #: List of plays defined in this playbook.
-    plays: list[Play] = default_field()
+    plays: Sequence[Play] = default_field()
 
 
 @define
