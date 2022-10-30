@@ -32,14 +32,12 @@ def extract_variable_file(path: ProjectPath) -> rep.VariableFile:
     ds, raw_ds = loaders.load_variable_file(path)
 
     variables = extract_list_of_variables(ds)
-    varfile = rep.VariableFile(file_path=path.relative, variables=variables)
-    for v in variables:
-        v.parent = varfile
+    varfile = rep.VariableFile(file_path=path.relative, variables=variables, raw=raw_ds)
     return varfile
 
 
-def extract_list_of_variables(ds: dict[str, ans.AnsibleValue]) -> list[rep.Variable]:
-    return [rep.Variable(name=k, value=convert_ansible_values(v)) for k, v in ds.items()]
+def extract_list_of_variables(ds: dict[str, ans.AnsibleValue]) -> dict[str, rep.AnyValue]:
+    return {k: convert_ansible_values(v) for k, v in ds.items()}
 
 
 def extract_tasks_file(path: ProjectPath, handlers: bool = False) -> rep.TaskFile:

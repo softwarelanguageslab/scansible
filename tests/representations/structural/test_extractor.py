@@ -157,14 +157,15 @@ def describe_extracting_variables() -> None:
 
         result = ext.extract_variable_file(ext.ProjectPath(tmp_path, 'main.yml'))
 
-        assert result.file_path == Path('main.yml')
-        assert all(v.parent is result for v in result.variables)
-        assert sorted(result.variables, key=lambda v: v.name) == [
-            rep.Variable('test', 'hello world'),
-            rep.Variable('test2', 123),
-            rep.Variable('test3', ['hello', 'world']),
-            rep.Variable('test4', { 'this': 'is', 'a': 'dict' })
-        ]
+        assert result == rep.VariableFile(
+            file_path=Path('main.yml'),
+            variables={
+                'test': 'hello world',
+                'test2': 123,
+                'test3': ['hello', 'world'],
+                'test4': { 'this': 'is', 'a': 'dict' }
+            },
+            raw=None)
 
     def extracts_vault_variables(tmp_path: Path) -> None:
         # ioannis1/pg_config/defaults/main.yml
@@ -176,9 +177,12 @@ def describe_extracting_variables() -> None:
 
         result = ext.extract_variable_file(ext.ProjectPath(tmp_path, 'main.yml'))
 
-        assert result.file_path == Path('main.yml')
-        assert all(v.parent is result for v in result.variables)
-        assert result.variables == [rep.Variable('postgres_passwd', rep.VaultValue(b'$ANSIBLE_VAULT;1.1;AES256\n62396263313762316136336334303463366465303638626438616530343935623766626534366436\n'))]
+        assert result == rep.VariableFile(
+            file_path=Path('main.yml'),
+            variables={
+                'postgres_passwd': rep.VaultValue(b'$ANSIBLE_VAULT;1.1;AES256\n62396263313762316136336334303463366465303638626438616530343935623766626534366436\n'),
+            },
+            raw=None)
 
     def allows_variable_values_to_be_none(tmp_path: Path) -> None:
         (tmp_path / 'main.yml').write_text(dedent('''
@@ -187,7 +191,10 @@ def describe_extracting_variables() -> None:
 
         result = ext.extract_variable_file(ext.ProjectPath(tmp_path, 'main.yml'))
 
-        assert result.variables == [rep.Variable('test', None)]
+        assert result == rep.VariableFile(
+            file_path=Path('main.yml'),
+            variables={ 'test': None },
+            raw=None)
 
     def allows_variable_files_to_be_empty(tmp_path: Path) -> None:
         (tmp_path / 'main.yml').write_text(dedent('''
@@ -196,7 +203,10 @@ def describe_extracting_variables() -> None:
 
         result = ext.extract_variable_file(ext.ProjectPath(tmp_path, 'main.yml'))
 
-        assert result.variables == []
+        assert result == rep.VariableFile(
+            file_path=Path('main.yml'),
+            variables={},
+            raw=None)
 
     @pytest.mark.parametrize('content', [
         '- hello\n- world'  # list
@@ -260,7 +270,7 @@ def a_task_extractor() -> None:
                 'path': '{{ file_path }}',
             },
             name='Ensure file exists',
-            vars=[rep.Variable('file_path', 'test.txt')],
+            vars={'file_path': 'test.txt'},
             raw=None)
 
     def extracts_task_with_loop(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
@@ -754,7 +764,7 @@ def describe_extracting_plays() -> None:
             tasks=[
                 rep.Task(action='import_tasks', args={'_raw_params': 'test'}, raw=None),
             ],
-            vars=[rep.Variable('testvar', 123)],
+            vars={'testvar': 123},
             raw=None)
         assert all(child.parent is result for child in result.tasks)
 
@@ -805,7 +815,7 @@ def describe_extract_playbook() -> None:
                                 raw=raw_task,
                             )
                         ],
-                        vars=[rep.Variable('x', 111)],
+                        vars={'x': 111},
                         raw=raw_play),
                 ],
                 raw=raw_pb),
@@ -855,7 +865,7 @@ def describe_extract_playbook() -> None:
                                 raw=raw_task,
                             )
                         ],
-                        vars=[rep.Variable('x', 111)],
+                        vars={'x': 111},
                         raw=raw_play_1),
                     rep.Play(
                         hosts=['databases'],
@@ -933,10 +943,12 @@ def describe_extracting_roles() -> None:
                 raw={'dependencies': [], 'galaxy_info': {'name': 'test', 'author': 'test', 'platforms': [{'name': 'Debian', 'versions': ['all']}]}}))
         vars_file = rep.VariableFile(
             file_path=Path('vars/main.yml'),
-            variables=[rep.Variable('b', 456)])
+            variables={'b': 456},
+            raw=None)
         defaults_file = rep.VariableFile(
             file_path=Path('defaults/main.yml'),
-            variables=[rep.Variable('a', 123)])
+            variables={'a': 123},
+            raw=None)
         handler_file = rep.TaskFile(
             file_path=Path('handlers/main.yml'),
             tasks=[
@@ -997,7 +1009,8 @@ def describe_extracting_roles() -> None:
                 )])
         defaults_file = rep.VariableFile(
             file_path=Path('defaults/main.yml'),
-            variables=[rep.Variable('a', 123)])
+            variables={'a': 123},
+            raw=None)
         assert result == rep.StructuralModel(
             root=rep.Role(
                 meta_file=None,
@@ -1036,7 +1049,8 @@ def describe_extracting_roles() -> None:
         assert isinstance(result.root, rep.Role)
         defaults_file = rep.VariableFile(
             file_path=Path('defaults/main.yml'),
-            variables=[rep.Variable('a', 123)])
+            variables={'a': 123},
+            raw=None)
         assert result == rep.StructuralModel(
             root=rep.Role(
                 meta_file=None,
@@ -1079,7 +1093,8 @@ def describe_extracting_roles() -> None:
         assert isinstance(result.root, rep.Role)
         defaults_file = rep.VariableFile(
             file_path=Path('defaults/main.yml'),
-            variables=[rep.Variable('a', 123)])
+            variables={'a': 123},
+            raw=None)
         task_file = rep.TaskFile(
             file_path=Path('tasks/main.yml'),
             tasks=[

@@ -21,7 +21,6 @@ from ansible.parsing.yaml.objects import AnsibleSequence, AnsibleMapping, Ansibl
 
 
 # Type aliases
-VariableContainer = Union['VariableFile', 'Task', 'Block', 'Play']
 TaskContainer = Union['Block', 'Play', 'TaskFile']
 Scalar = Union[bool, int, float, str, 'VaultValue', datetime.date, datetime.datetime, None]
 # These should be recursive types, but mypy doesn't support them so they'd be
@@ -171,30 +170,17 @@ class MetaBlock:
 
 
 @define
-class Variable:
-    """
-    Represents a variable.
-    """
-
-    #: Variable name.
-    name: str = default_field()
-    #: Variable value.
-    value: AnyValue = default_field()
-    #: Parent wherein the variable is defined. Either a file containing variables
-    #: (in defaults/ or vars/), a task, a block, or a play.
-    parent: VariableContainer = parent_field()
-
-
-@define
 class VariableFile:
     """
     Represents a file containing variables.
     """
 
+    #: Raw content of the variable file.
+    raw: Any = raw_field()
     #: The path to the file, relative to the project root.
     file_path: Path = path_field()
     #: The variables contained within the file. The order is irrelevant.
-    variables: Sequence[Variable] = default_field()  # TODO: Use a set
+    variables: Mapping[str, AnyValue] = default_field()
 
 
 @define
@@ -250,7 +236,7 @@ class TaskBase:
     #: the result of this action.
     register: str | None = default_field(default=None)
     #: Variables defined on the task
-    vars: Sequence[Variable] = default_field(factory=list)  # TODO: Should be a set, since order doesn't matter
+    vars: Mapping[str, AnyValue] = default_field(factory=dict)
 
 
 @define(slots=False)
@@ -292,7 +278,7 @@ class Block:
     #: Name of the block
     name: str | None = default_field(default='')
     #: Set of variables defined on this block.
-    vars: Sequence[Variable] = default_field(factory=list)  # TODO: Should be a set
+    vars: Mapping[str, AnyValue] = default_field(factory=dict)
 
 
 @define
@@ -376,7 +362,7 @@ class Play:
     #: The play's list of blocks.
     tasks: Sequence[Task | Block] = default_field(factory=list)
     #: The play-level variables.
-    vars: Sequence[Variable] = default_field(factory=list)  # TODO: Should be a set
+    vars: Mapping[str, AnyValue] = default_field(factory=dict)
 
     # TODO: Handlers, pre- and post-tasks, roles, vars files, vars_prompt, etc?
 
