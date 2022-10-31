@@ -468,6 +468,74 @@ def describe_load_task() -> None:
         assert result[0].when == []
         assert result[1]['when'] is None
 
+    def describe_transforming_old_become() -> None:
+
+        @pytest.mark.parametrize('method', ['su', 'sudo'])
+        def transforms_old_become(method: str) -> None:
+            ds = {
+                'file': {},
+                f'{method}': 'yes',
+                f'{method}_user': 'me',
+                f'{method}_exe': 'test',
+                f'{method}_flags': '--flag',
+                f'{method}_pass': 'sekrit',
+            }
+            result = loaders.load_task(ds, as_handler=False)  # type: ignore[call-overload]
+
+            assert result[0].action == 'file'
+            assert result[0].become is True
+            assert result[0].become_user == 'me'
+            assert result[0].become_exe == 'test'
+            assert result[0].become_flags == '--flag'
+            assert result[0].vars == {'ansible_become_password': 'sekrit'}
+            assert result[1] == ds
+
+        @pytest.mark.parametrize('method', ['su', 'sudo'])
+        def transforms_old_become_with_multiple_vars(method: str) -> None:
+            ds = {
+                'file': {},
+                f'{method}': 'yes',
+                f'{method}_user': 'me',
+                f'{method}_exe': 'test',
+                f'{method}_flags': '--flag',
+                f'{method}_pass': 'sekrit',
+                'vars': {
+                    'other': 'hello',
+                }
+            }
+            result = loaders.load_task(ds, as_handler=False)  # type: ignore[call-overload]
+
+            assert result[0].action == 'file'
+            assert result[0].become is True
+            assert result[0].become_user == 'me'
+            assert result[0].become_exe == 'test'
+            assert result[0].become_flags == '--flag'
+            assert result[0].vars == {'other': 'hello', 'ansible_become_password': 'sekrit'}
+            assert result[1] == ds
+
+        @pytest.mark.parametrize('combo', [('su', 'sudo'), ('sudo', 'become'), ('su', 'become')])
+        def rejects_duplicate_become_method(combo: tuple[str, str]) -> None:
+            with pytest.raises(LoadError, match='Invalid mix of directives'):
+                loaders.load_task({  # type: ignore[call-overload]
+                    'file': {},
+                    combo[0]: 'yes',
+                    combo[1]: 'yes',
+                }, as_handler=False)
+
+
+    def transforms_become() -> None:
+        # devops-cmp/ansible-nodejs/tasks/main.yml @ ce6141fb61f1573b705db7006683af59ea792978
+        result = loaders.load_task({  # type: ignore[call-overload]
+            'get_url': {
+                'url': '...',
+                'dest': '...',
+            },
+            'when': None,
+        }, as_handler=False)
+
+        assert result[0].when == []
+        assert result[1]['when'] is None
+
 def describe_load_block() -> None:
     def loads_correct_block() -> None:
         result = loaders.load_block({

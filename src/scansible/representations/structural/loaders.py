@@ -215,6 +215,51 @@ def _transform_task_static_include(ds: dict[str, ans.AnsibleValue]) -> None:
         else:
             ds['include_tasks'] = include_args
 
+def _transform_old_become(ds: dict[str, ans.AnsibleValue]) -> None:
+    # Current Ansible version refuses to parse tasks that use sudo/su and their
+    # derivatives (*_user, *_exe, *_flags, *_pass). Transform them like legacy
+    # Ansible versions used to do.
+    # https://github.com/ansible/ansible/commit/e40832df847bc7dcc94f41c491618de665c0b9e5
+
+    # Same validation as legacy Ansible versions
+    has_become = 'become' in ds or 'become_user' in ds
+    has_sudo = 'sudo' in ds or 'sudo_user' in ds
+    has_su = 'su' in ds or 'su_user' in ds
+
+    if not (has_sudo or has_su):
+        # Nothing to transform.
+        return
+
+    print('no early return')
+    # At most one become method may be present.
+    if sum(1 for has_method in (has_become, has_sudo, has_su) if has_method) > 1:
+        raise LoadError('task', 'Invalid mix of directives: sudo/su/become', extra_msg=repr(ds))
+
+    sudo_kws = ('sudo', 'sudo_user', 'sudo_exe', 'sudo_flags', 'sudo_pass')
+    su_kws = ('su', 'su_user', 'su_exe', 'su_flags', 'su_pass')
+    main_kw, user_kw, exe_kw, flags_kw, pass_kw = sudo_kws if has_sudo else su_kws
+
+    ds['become_method'] = 'sudo' if has_sudo else 'su'  # type: ignore[assignment]
+
+    if main_kw in ds:
+        ds['become'] = ds[main_kw]
+        del ds[main_kw]
+    if user_kw in ds:
+        ds['become_user'] = ds[user_kw]
+        del ds[user_kw]
+    if exe_kw in ds:
+        ds['become_exe'] = ds[exe_kw]
+        del ds[exe_kw]
+    if flags_kw in ds:
+        ds['become_flags'] = ds[flags_kw]
+        del ds[flags_kw]
+    if pass_kw in ds:
+        # There's no `become_pass` alternative, so define the variable instead.
+        variables: dict[str, ans.AnsibleValue] = ds.get('vars', {})  # type: ignore[assignment]
+        variables['ansible_become_password'] = ds[pass_kw]
+        ds['vars'] = variables  # type: ignore[assignment]
+        del ds[pass_kw]
+
 
 def _task_is_include_import_tasks(action: str) -> bool:
     return action in ans.C._ACTION_ALL_INCLUDE_IMPORT_TASKS
@@ -234,6 +279,10 @@ def load_task(original_ds: dict[str, ans.AnsibleValue], as_handler: Literal[True
 def load_task(original_ds: dict[str, ans.AnsibleValue], as_handler: Literal[False]) -> tuple[ans.Task, Any]: ...
 def load_task(original_ds: dict[str, ans.AnsibleValue], as_handler: bool) -> tuple[ans.Task | ans.Handler, Any]:
     ds = deepcopy(original_ds)
+
+    # Need to do this before mod_args parsing, since mod_args parsing can crash
+    # because of the presence of old keywords.
+    _transform_old_become(ds)
 
     with _patch_modargs_parser():
         action = _get_task_action(ds)
@@ -294,6 +343,8 @@ _PatchedBlock.__name__ = 'Block'
 def load_block(original_ds: dict[str, ans.AnsibleValue]) -> tuple[_PatchedBlock, Any]:
     ds = deepcopy(original_ds)
 
+    _transform_old_become(ds)
+
     if not _PatchedBlock.is_block(ds):
         raise LoadError('block', 'Not a block', extra_msg=f'Expected block to contain "block" keyword, but it does not.\n\n{ds!r}')
 
@@ -326,6 +377,8 @@ _PatchedPlay.__name__ = 'Play'
 def load_play(original_ds: dict[str, ans.AnsibleValue]) -> tuple[_PatchedPlay, Any]:
     ds = deepcopy(original_ds)
 
+    _transform_old_become(ds)
+
     raw_play = _PatchedPlay()
     raw_play.load_data(ds)
     validate_ansible_object(raw_play)
@@ -357,6 +410,9 @@ _PatchedRoleInclude.__name__ = 'RoleInclude'
 
 def load_role_dependency(original_ds: str | dict[str, ans.AnsibleValue], allow_new_style: bool = False) -> tuple[_PatchedRoleInclude, dict[str, str] | None, Any]:
     ds = deepcopy(original_ds)
+
+    if isinstance(ds, dict):
+        _transform_old_become(ds)
 
     new_dep: str | dict[str, ans.AnsibleValue]
     if isinstance(ds, dict) and not ('name' in ds or 'role' in ds) and allow_new_style:
