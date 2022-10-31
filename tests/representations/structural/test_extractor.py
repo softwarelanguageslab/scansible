@@ -56,7 +56,7 @@ def describe_extracting_metadata_file() -> None:
 
         result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
 
-        assert result.metablock.dependencies == [rep.Dependency(role='testrole')]
+        assert result.metablock.dependencies == [rep.RoleRequirement(role='testrole', raw=None)]
 
     @pytest.mark.parametrize('key', ['name', 'role'])
     def extracts_simple_dict_dependencies(tmp_path: Path, key: str) -> None:
@@ -67,7 +67,7 @@ def describe_extracting_metadata_file() -> None:
 
         result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
 
-        assert result.metablock.dependencies == [rep.Dependency(role='testrole')]
+        assert result.metablock.dependencies == [rep.RoleRequirement(role='testrole', raw=None)]
 
     def extracts_dependencies_with_condition(tmp_path: Path) -> None:
         (tmp_path / 'main.yml').write_text(dedent('''
@@ -78,7 +78,7 @@ def describe_extracting_metadata_file() -> None:
 
         result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
 
-        assert result.metablock.dependencies == [rep.Dependency(role='testrole', when=["{{ ansible_os_family == 'Debian' }}"])]
+        assert result.metablock.dependencies == [rep.RoleRequirement(role='testrole', when=["{{ ansible_os_family == 'Debian' }}"], raw=None)]
 
     def extracts_dependencies_with_multiple_conditions(tmp_path: Path) -> None:
         (tmp_path / 'main.yml').write_text(dedent('''
@@ -91,9 +91,10 @@ def describe_extracting_metadata_file() -> None:
 
         result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
 
-        assert result.metablock.dependencies == [rep.Dependency(
+        assert result.metablock.dependencies == [rep.RoleRequirement(
             role='testrole',
-            when=["{{ ansible_os_family == 'Debian' }}", '{{ 1 + 1 == 2 }}'])]
+            when=["{{ ansible_os_family == 'Debian' }}", '{{ 1 + 1 == 2 }}'],
+            raw=None)]
 
     def rejects_empty_metadata(tmp_path: Path) -> None:
         (tmp_path / 'main.yml').write_text('')

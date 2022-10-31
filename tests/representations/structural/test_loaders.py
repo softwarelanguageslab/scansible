@@ -261,55 +261,6 @@ def describe_load_role_metadata() -> None:
             assert result[0]['dependencies'] == []
             assert 'dependencies' not in result[1]
 
-        def normalises_dependency_without_condition(load_meta: LoadMetaType) -> None:
-            result: tuple[Any, Any] = load_meta('''
-                galaxy_info:
-                  name: test
-                  author: test
-                dependencies:
-                  - name: test
-            ''')
-
-            assert result[0]['dependencies'] == [{'name': 'test', 'when': []}]
-            assert 'when' not in result[1]['dependencies'][0]
-
-        def normalises_dependency_with_single_condition(load_meta: LoadMetaType) -> None:
-            result: tuple[Any, Any] = load_meta('''
-                galaxy_info:
-                  name: test
-                  author: test
-                dependencies:
-                  - name: test
-                    when: x is True
-            ''')
-
-            assert result[0]['dependencies'] == [{'name': 'test', 'when': ['x is True']}]
-            assert isinstance(result[1]['dependencies'][0]['when'], str)
-
-        def normalises_bare_string_dependency(load_meta: LoadMetaType) -> None:
-            result: tuple[Any, Any] = load_meta('''
-                galaxy_info:
-                  name: test
-                  author: test
-                dependencies:
-                  - test
-            ''')
-
-            assert result[0]['dependencies'] == [{'name': 'test', 'when': []}]
-            assert isinstance(result[1]['dependencies'][0], str)
-
-        def normalises_dependency_with_role_instead_of_name(load_meta: LoadMetaType) -> None:
-            result: tuple[Any, Any] = load_meta('''
-                galaxy_info:
-                  name: test
-                  author: test
-                dependencies:
-                  - role: test
-            ''')
-
-            assert result[0]['dependencies'] == [{'name': 'test', 'when': []}]
-            assert result[1]['dependencies'][0] == { 'role': 'test' }
-
         def raises_on_wrong_dependencies_type(load_meta: LoadMetaType) -> None:
             with pytest.raises(LoadError, match='Expected role dependencies to be list'):
                 load_meta('''
@@ -321,90 +272,6 @@ def describe_load_role_metadata() -> None:
 
                     dependencies:
                         test: x
-                ''')
-
-        def raises_on_wrong_dependency_type(load_meta: LoadMetaType) -> None:
-            with pytest.raises(LoadError, match=r'Expected role dependency to be str \| dict'):
-                load_meta('''
-                    galaxy_info:
-                        platforms:
-                            - name: Debian
-                              versions:
-                                - any
-
-                    dependencies:
-                        -
-                          - hello
-                          - world
-                ''')
-
-        def raises_on_missing_dependency_name(load_meta: LoadMetaType) -> None:
-            with pytest.raises(LoadError, match='Missing dependency name'):
-                load_meta('''
-                    galaxy_info:
-                        platforms:
-                            - name: Debian
-                              versions:
-                                - any
-
-                    dependencies:
-                        - when: yes
-                ''')
-
-        def raises_on_wrong_dependency_name(load_meta: LoadMetaType) -> None:
-            with pytest.raises(LoadError, match=r'Expected dependency name to be str'):
-                load_meta('''
-                    galaxy_info:
-                        platforms:
-                            - name: Debian
-                              versions:
-                                - any
-
-                    dependencies:
-                        - name: 123
-                ''')
-
-        def raises_on_multiple_dependency_names(load_meta: LoadMetaType) -> None:
-            with pytest.raises(LoadError, match='"name" and "role" are mutually exclusive'):
-                load_meta('''
-                    galaxy_info:
-                        platforms:
-                            - name: Debian
-                              versions:
-                                - any
-
-                    dependencies:
-                        - name: test
-                          role: test
-                ''')
-
-        def raises_on_wrong_dependency_when(load_meta: LoadMetaType) -> None:
-            with pytest.raises(LoadError, match=r'Expected dependency condition to be str \| list\[str\]'):
-                load_meta('''
-                    galaxy_info:
-                        platforms:
-                            - name: Debian
-                              versions:
-                                - any
-
-                    dependencies:
-                        - name: test
-                          when:
-                            x: 123
-                ''')
-
-        def raises_on_superfluous_depedency_properties(load_meta: LoadMetaType) -> None:
-            with pytest.raises(LoadError, match='Superfluous properties in dependency'):
-                load_meta('''
-                    galaxy_info:
-                        platforms:
-                            - name: Debian
-                              versions:
-                                - all
-
-                    dependencies:
-                        - name: test
-                          test: test
                 ''')
 
 
@@ -661,3 +528,83 @@ def describe_load_playbook() -> None:
                 hosts: x
                 name: test
             ''')
+
+
+def describe_load_role_dependency() -> None:
+
+    def normalises_dependency_without_condition() -> None:
+        result: tuple[ans.role.RoleInclude, dict[str, str] | None, Any] = loaders.load_role_dependency({
+            'role': 'test'  # type: ignore[dict-item]
+        })
+
+        assert result[0].role == 'test'
+        assert result[0].when == []
+        assert result[1] is None
+        assert result[2] == {'role': 'test'}
+
+    def normalises_dependency_with_single_condition() -> None:
+        result: tuple[ans.role.RoleInclude, dict[str, str] | None, Any] = loaders.load_role_dependency({
+            'role': 'test',  # type: ignore[dict-item]
+            'when': 'x is True',  # type: ignore[dict-item]
+        })
+
+        assert result[0].role == 'test'
+        assert result[0].when == ['x is True']
+        assert result[1] is None
+
+    def normalises_bare_string_dependency() -> None:
+        result: tuple[ans.role.RoleInclude, dict[str, str] | None, Any] = loaders.load_role_dependency('test')
+
+        assert result[0].role == 'test'
+        assert result[0].when == []
+        assert result[1] is None
+        assert result[2] == 'test'
+
+    def normalises_dependency_with_name_instead_of_role() -> None:
+        result: tuple[ans.role.RoleInclude, dict[str, str] | None, Any] = loaders.load_role_dependency({
+            'name': 'test'  # type: ignore[dict-item]
+        })
+
+        assert result[0].role == 'test'
+        assert result[0].when == []
+        assert result[1] is None
+        assert result[2] == {'name': 'test'}
+
+    def normalises_int_role_name_to_str() -> None:
+        result: tuple[ans.role.RoleInclude, dict[str, str] | None, Any] = loaders.load_role_dependency(123)  # type: ignore[arg-type]
+
+        assert result[0].role == '123'
+        assert result[1] is None
+        assert result[2] == 123
+
+    def raises_on_wrong_dependency_type() -> None:
+        with pytest.raises(LoadError, match=r'Expected role dependency to be str \| dict'):
+            loaders.load_role_dependency(['hello', 'world'])  # type: ignore[arg-type]
+
+    def raises_on_missing_dependency_name() -> None:
+        with pytest.raises(ans.AnsibleError, match='role definitions must contain a role name'):
+            loaders.load_role_dependency({ 'when': 'yes' })  # type: ignore[dict-item]
+
+    def raises_on_invalid_role_name_type() -> None:
+        with pytest.raises(ans.AnsibleError, match='role definitions must contain a role name'):
+            loaders.load_role_dependency({ 'role': ['abc'] })  # type: ignore[dict-item]
+
+    def considers_superfluous_non_directive_dependency_properties_to_be_parameters() -> None:
+        result: tuple[ans.role.RoleInclude, dict[str, str] | None, Any] = loaders.load_role_dependency({
+            'role': 'test',  # type: ignore[dict-item]
+            'param_x': 123,
+            'become': 'yes'  # type: ignore[dict-item]
+        })
+
+        assert result[0].role == 'test'
+        assert result[0].become == True
+        assert result[0]._role_params == {'param_x': 123}
+
+    def loads_new_style_role_requirements() -> None:
+        result: tuple[ans.role.RoleInclude, dict[str, str] | None, Any] = loaders.load_role_dependency({
+            'src': 'https://github.com/bennojoy/nginx',  # type: ignore[dict-item]
+            'version': 'main',  # type: ignore[dict-item]
+        }, allow_new_style=True)
+
+        assert result[0].role == 'nginx'
+        assert result[1] == {'name': 'nginx', 'src': 'https://github.com/bennojoy/nginx', 'version': 'main', 'scm': 'git'}

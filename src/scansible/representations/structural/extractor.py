@@ -17,15 +17,26 @@ def extract_role_metadata_file(path: ProjectPath) -> rep.MetaFile:
     ds, raw_ds = loaders.load_role_metadata(path)
 
     ds_platforms: list[dict[str, Any]] = ds['galaxy_info']['platforms']  # type: ignore
-    ds_dependencies: list[dict[str, Any]] = ds['dependencies']  # type: ignore
+    ds_dependencies: list[str | dict[str, ans.AnsibleValue]] = ds['dependencies']  # type: ignore
 
     platforms = [rep.Platform(p['name'], v) for p in ds_platforms for v in p['versions']]
-    dependencies = [rep.Dependency(role=dep['name'], when=dep['when']) for dep in ds_dependencies]
+    dependencies = [_extract_role_dependency(dep, allow_new_style=True) for dep in ds_dependencies]
 
     metablock = rep.MetaBlock(platforms=platforms, dependencies=dependencies, raw=raw_ds)
     metafile = rep.MetaFile(metablock=metablock, file_path=path.relative)
     metablock.parent = metafile
     return metafile
+
+
+def _extract_role_dependency(ds: str | dict[str, ans.AnsibleValue], allow_new_style: bool = False) -> rep.RoleRequirement:
+    ri, src_info, raw_ds = loaders.load_role_dependency(ds, allow_new_style=allow_new_style)
+    return rep.RoleRequirement(
+        role=ri.role,
+        params=convert_ansible_values(ri._role_params),
+        when=ri.when,
+        source_info=None if src_info is None else rep.RoleSourceInfo(**src_info),
+        raw=raw_ds,
+    )
 
 
 def extract_variable_file(path: ProjectPath) -> rep.VariableFile:

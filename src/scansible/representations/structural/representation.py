@@ -27,7 +27,7 @@ TaskContainer = Union['Block', 'Play', 'TaskFile']
 Scalar = Union[bool, int, float, str, 'VaultValue', datetime.date, datetime.datetime, None]
 # These should be recursive types, but mypy doesn't support them so they'd be
 # Any anyway, and it also doesn't work with our type validation.
-AnyValue = Union[Scalar, list[Any], dict[Scalar, Any]]
+AnyValue = Union[Scalar, Sequence[Any], Mapping[Scalar, Any]]
 
 def _convert_union_type(type_: Any) -> object:
     if isinstance(type_, types.UnionType):
@@ -138,18 +138,6 @@ class Platform:
     version: str = required_field()
 
 
-@frozen
-class Dependency:
-    """
-    Represents a role dependency.
-    """
-
-    #: The role that is depended upon.
-    role: str = required_field()
-    #: Optional condition on when to include a dependency.
-    when: Sequence[str] = default_field(factory=list)
-
-
 @define
 class MetaFile:
     """
@@ -177,7 +165,7 @@ class MetaBlock:
     #: Platforms supported by the role
     platforms: Sequence[Platform] = default_field(factory=list)
     #: Role dependencies
-    dependencies: Sequence[Dependency] = default_field(factory=list)
+    dependencies: Sequence['RoleRequirement'] = default_field(factory=list)
 
 
 @define
@@ -379,6 +367,52 @@ class Block(DirectivesBase):
     collections: Sequence[str] = default_field(factory=list)
 
 
+@frozen
+class RoleSourceInfo:
+    """
+    Represents source info for a role requirement.
+    """
+
+    #: Name of the role.
+    name: str | None
+    #: Source URL.
+    src: str | None
+    #: Source control management system (git, hg, ...).
+    scm: str | None
+    #: Role version.
+    version: str | None
+
+
+@define(slots=False)
+class RoleRequirement(DirectivesBase):
+    """
+    Represents a role inclusion dependency in a play's `roles` directive or
+    a role's `dependencies` (old-style only).
+    """
+
+    #: The role that is depended upon.
+    role: str = required_field()
+
+    #: The role include parameters.
+    params: Mapping[str, AnyValue] = default_field(factory=dict)
+
+    #: Delegate execution to another host.
+    delegate_to: str | None = default_field(default=None)
+    #: Apply facts to delegated host.
+    delegate_facts: str | bool | None = default_field(default=None)
+
+    #: Tags on the role inclusion.
+    tags: Sequence[str | int] = default_field(factory=list)
+    #: List of collections to search for modules.
+    collections: Sequence[str] = default_field(factory=list)
+    #: Optional condition on when to include a dependency.
+    when: Sequence[str | bool] = default_field(factory=list)
+
+    #: Source info for role. Possibly available for role requirements coming
+    #: from a role's meta/main.yml metadata file, but never for plays.
+    source_info: RoleSourceInfo | None = default_field(default=None)
+
+
 @define
 class TaskFile:
     """
@@ -497,8 +531,7 @@ class Play(DirectivesBase):
     vars_prompt: Sequence[VarsPrompt] = default_field(factory=list)
 
     #: List of roles to be imported into play.
-    # TODO: Better representation
-    roles: Sequence[Any] = default_field(factory=list)
+    roles: Sequence[RoleRequirement] = default_field(factory=list)
 
     #: Handlers for the play.
     handlers: Sequence[Handler | Block] = default_field(factory=list)

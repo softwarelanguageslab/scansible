@@ -95,8 +95,6 @@ def _validate_meta_galaxy_info(ds: dict[str, ans.AnsibleValue]) -> None:
     if not isinstance(galaxy_info, dict):
         raise LoadTypeError('role metadata galaxy_info', dict, galaxy_info)
 
-_EXPECTED_PLATFORM_KEYS = {'name', 'versions'}
-
 def _load_meta_platforms(ds: dict[str, ans.AnsibleValue]) -> None:
     assert isinstance(ds['galaxy_info'], dict)
     platforms = ds['galaxy_info'].get('platforms')
@@ -122,7 +120,7 @@ def _load_meta_platforms(ds: dict[str, ans.AnsibleValue]) -> None:
         # ["any", "all"] is equivalent to ["all"]. Also, Ansible Galaxy doesn't
         # verify whether versions is actually a list, so if it's the string
         # "small", it'd still be considered ["all"].
-        if 'all' in versions:
+        if isinstance(versions, (list, str, dict)) and 'all' in versions:
             versions = ['all']
 
         if not name:
@@ -149,41 +147,6 @@ def _load_meta_dependencies(ds: dict[str, ans.AnsibleValue]) -> None:
 
     if not isinstance(dependencies, list):
         raise LoadTypeError('role dependencies', list, dependencies)
-
-    new_deps = ans.AnsibleSequence()
-    for dep in dependencies:
-        if isinstance(dep, str):
-            new_deps.append(ans.AnsibleMapping({ 'name': dep, 'when': ans.AnsibleSequence() }))
-        elif isinstance(dep, dict):
-            other_keys = dep.keys() - {'name', 'role', 'when'}
-            if other_keys:
-                raise LoadError('role metadata dependency', 'Superfluous properties in dependency', extra_msg=f'Found superfluous properties in {dep!r}: {", ".join(other_keys)}')
-
-            if 'name' not in dep and 'role' not in dep:
-                raise LoadError('role metadata dependency', 'Missing dependency name', extra_msg=f'"name" or "role" are required in dependencies')
-            if 'name' in dep and (('name' in dep) == ('role' in dep)):
-                raise LoadError('role metadata dependency', '"name" and "role" are mutually exclusive', extra_msg=f'Found both "role" and "name" in {dep!r}')
-            elif 'role' in dep:
-                dep['name'] = dep['role']
-                del dep['role']
-
-            if not isinstance(dep['name'], str):
-                raise LoadTypeError('dependency name', str, dep['name'])
-
-            when: ans.AnsibleBaseYAMLObject | None = dep.get('when')
-            if when is None:
-                dep['when'] = ans.AnsibleSequence()
-            elif isinstance(when, str):
-                dep['when'] = ans.AnsibleSequence([when])
-            elif not isinstance(when, list) or not all(isinstance(cond, str) for cond in when):
-                raise LoadTypeError('dependency condition', str | list[str], when)
-
-            new_deps.append(dep)
-
-        else:
-            raise LoadTypeError('role dependency', str | dict, dep)
-
-    ds['dependencies'] = new_deps
 
 
 def load_variable_file(path: ProjectPath) -> tuple[dict[str, ans.AnsibleValue], Any]:
@@ -380,3 +343,47 @@ def load_playbook(path: ProjectPath) -> tuple[list[dict[str, ans.AnsibleValue]],
         raise LoadTypeError('playbook', list, ds, path.relative)
 
     return ds, original_ds
+
+
+class _PatchedRoleInclude(ans.role.RoleInclude):
+
+    # Override the _load_role_path method so that it doesn't resolve the path.
+    def _load_role_path(self, role_name: str) -> tuple[str, str]:
+        return role_name, ''
+
+
+_PatchedRoleInclude.__name__ = 'RoleInclude'
+
+
+def load_role_dependency(original_ds: str | dict[str, ans.AnsibleValue], allow_new_style: bool = False) -> tuple[_PatchedRoleInclude, dict[str, str] | None, Any]:
+    ds = deepcopy(original_ds)
+
+    new_dep: str | dict[str, ans.AnsibleValue]
+    if isinstance(ds, dict) and not ('name' in ds or 'role' in ds) and allow_new_style:
+        # new-style role dependency, needs to be parsed specially and converted
+        # to old style for later loading.
+        parsed_def = ans.role.RoleRequirement.role_yaml_parse(ds)  # type: ignore[arg-type]
+        if 'name' in parsed_def:
+            ds['name'] = parsed_def['name']  # type: ignore[assignment]
+    else:
+        parsed_def = None
+
+    return _load_old_style_role_dependency(ds), parsed_def, original_ds
+
+
+def _load_old_style_role_dependency(original_ds: str | dict[str, ans.AnsibleValue]) -> _PatchedRoleInclude:
+    ds = deepcopy(original_ds)
+
+    # Validation from original RoleInclude, can't use the method because it
+    # constructs a RoleInclude, which attempts to resolve the role path.
+    if not isinstance(ds, (str, dict, ans.AnsibleBaseYAMLObject, int)):
+        raise LoadTypeError('role dependency', str | dict | ans.AnsibleBaseYAMLObject, ds)
+
+    if isinstance(ds, str) and ',' in ds:
+        raise LoadError('role dependency', 'Invalid old-style role requirement', extra_msg=repr(ds))
+
+    ri = _PatchedRoleInclude()
+    ri.load_data(ds)
+    validate_ansible_object(ri)
+
+    return ri

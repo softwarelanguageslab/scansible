@@ -24,3 +24,9 @@ from ansible.errors import AnsibleError, AnsibleParserError
 if TYPE_CHECKING:
     # This alias doesn't exist outside of the stub files
     from ansible.playbook.base import Value as AnsibleValue
+
+
+# Fake class as stand-in for module.
+class role:
+    from ansible.playbook.role.include import RoleInclude
+    from ansible.playbook.role.requirement import RoleRequirement
