@@ -361,6 +361,8 @@ class Block(DirectivesBase):
     #: Apply facts to delegated host.
     delegate_facts: str | bool | None = default_field(default=None)
 
+    #: Condition on the block, or None if no condition.
+    when: Sequence[str | bool] = default_field(factory=list)
     #: Tags on the block.
     tags: Sequence[str | int] = default_field(factory=list)
     #: List of collections to search for modules.
@@ -398,8 +400,8 @@ class RoleRequirement(DirectivesBase):
 
     #: Delegate execution to another host.
     delegate_to: str | None = default_field(default=None)
-    #: Apply facts to delegated host.
-    delegate_facts: str | bool | None = default_field(default=None)
+    #: Apply facts to delegated host. Contrary to tasks, the default here is False.
+    delegate_facts: str | bool | None = default_field(default=False)
 
     #: Tags on the role inclusion.
     tags: Sequence[str | int] = default_field(factory=list)
@@ -550,6 +552,11 @@ class Play(DirectivesBase):
     strategy: str | None = default_field(default=ans.C.DEFAULT_STRATEGY)
     #: How hosts should be sorted in execution order.
     order: str | None = default_field(default=None)
+
+    #: Tags on the play.
+    tags: Sequence[str | int] = default_field(factory=list)
+    #: List of collections to search for modules.
+    collections: Sequence[str] = default_field(factory=list)
 
 
 @define

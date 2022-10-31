@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Type
 
+from functools import partial
 from itertools import chain
 from pathlib import Path
 from textwrap import dedent
@@ -58,16 +59,25 @@ def describe_extracting_metadata_file() -> None:
 
         assert result.metablock.dependencies == [rep.RoleRequirement(role='testrole', raw=None)]
 
-    @pytest.mark.parametrize('key', ['name', 'role'])
-    def extracts_simple_dict_dependencies(tmp_path: Path, key: str) -> None:
+    def extracts_simple_dict_dependencies_with_role_key(tmp_path: Path) -> None:
         (tmp_path / 'main.yml').write_text(dedent(f'''
             dependencies:
-                - {key}: testrole
+                - role: testrole
         '''))
 
         result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
 
         assert result.metablock.dependencies == [rep.RoleRequirement(role='testrole', raw=None)]
+
+    def extracts_simple_dict_dependencies_with_name_key(tmp_path: Path) -> None:
+        (tmp_path / 'main.yml').write_text(dedent(f'''
+            dependencies:
+                - name: testrole
+        '''))
+
+        result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
+
+        assert result.metablock.dependencies == [rep.RoleRequirement(name='testrole', role='testrole', raw=None)]
 
     def extracts_dependencies_with_condition(tmp_path: Path) -> None:
         (tmp_path / 'main.yml').write_text(dedent('''
@@ -446,6 +456,21 @@ def a_task_extractor() -> None:
             },
             raw=None)
 
+    def extracts_include_role_task(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
+        result = extractor(_parse_yaml(dedent('''
+            include_role:
+                name: testrole
+                public: true
+        ''')))
+
+        assert result == task_representation(
+            action='include_role',
+            args={
+                'name': 'testrole',
+                'public': True,
+            },
+            raw=None)
+
     def rejects_tasks_with_invalid_attribute_values(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
         with pytest.raises(Exception):
             extractor(_parse_yaml(dedent('''
@@ -486,7 +511,7 @@ def describe_extracting_tasks() -> None:
 
     @pytest.fixture()
     def extractor() -> Callable[[dict[str, ans.AnsibleValue]], rep.Task]:
-        return ext.extract_task
+        return partial(ext.extract_task, as_handler=False)  # type: ignore[return-value]
 
     @pytest.fixture()
     def task_representation() -> Type[rep.Task]:
@@ -498,7 +523,7 @@ def describe_extracting_handlers() -> None:
 
     @pytest.fixture()
     def extractor() -> Callable[[dict[str, ans.AnsibleValue]], rep.Handler]:
-        return ext.extract_handler
+        return partial(ext.extract_task, as_handler=True)  # type: ignore[return-value]
 
     @pytest.fixture()
     def task_representation() -> Type[rep.Handler]:
@@ -506,12 +531,12 @@ def describe_extracting_handlers() -> None:
 
 
     def extracts_handler_with_listen() -> None:
-        result = ext.extract_handler(_parse_yaml(dedent('''
+        result = ext.extract_task(_parse_yaml(dedent('''
             name: Ensure file exists
             file:
                 path: '{{ file_path }}'
             listen: a topic
-        ''')))
+        ''')), as_handler=True)
 
         assert result == rep.Handler(
             action='file',
@@ -521,14 +546,14 @@ def describe_extracting_handlers() -> None:
             raw=None)
 
     def extracts_handler_with_list_of_listens() -> None:
-        result = ext.extract_handler(_parse_yaml(dedent('''
+        result = ext.extract_task(_parse_yaml(dedent('''
             name: Ensure file exists
             file:
                 path: '{{ file_path }}'
             listen:
               - a topic
               - another topic
-        ''')))
+        ''')), as_handler=True)
 
         assert result == rep.Handler(
             action='file',

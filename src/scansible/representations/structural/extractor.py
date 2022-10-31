@@ -5,10 +5,29 @@ from typing import Any, Callable, Literal, TypeVar, overload, TYPE_CHECKING
 
 from contextlib import redirect_stderr, redirect_stdout
 from functools import partial
+from itertools import chain
 from pathlib import Path
 
 from . import representation as rep, ansible_types as ans, loaders
 from .helpers import ProjectPath, parse_file, validate_ansible_object, capture_output, find_all_files, find_file, FatalError, prevent_undesired_operations, convert_ansible_values
+
+
+def _ansible_to_dict(obj: ans.FieldAttributeBase) -> dict[str, Any]:
+    """Convert an Ansible object to a dictionary of its attributes.
+
+    Used so that we can initialise the representation objects without having to
+    manually specify each directive, while also being able to transform certain
+    directive values.
+    """
+
+    attr_names = obj._attributes.keys()
+    # For `include_role` actions, we can't use the field attributes since they
+    # include action arguments, which we don't store specially. We'll instead
+    # take them from its superclass.
+    if isinstance(obj, ans.IncludeRole):
+        attr_names = ans.TaskInclude._attributes.keys()
+
+    return {attr_name: getattr(obj, attr_name) for attr_name in attr_names}
 
 
 def extract_role_metadata_file(path: ProjectPath) -> rep.MetaFile:
@@ -30,10 +49,12 @@ def extract_role_metadata_file(path: ProjectPath) -> rep.MetaFile:
 
 def _extract_role_dependency(ds: str | dict[str, ans.AnsibleValue], allow_new_style: bool = False) -> rep.RoleRequirement:
     ri, src_info, raw_ds = loaders.load_role_dependency(ds, allow_new_style=allow_new_style)
+
+    attrs = _ansible_to_dict(ri)
+
     return rep.RoleRequirement(
-        role=ri.role,
+        **attrs,
         params=convert_ansible_values(ri._role_params),
-        when=ri.when,
         source_info=None if src_info is None else rep.RoleSourceInfo(**src_info),
         raw=raw_ds,
     )
@@ -81,26 +102,22 @@ def extract_task_or_block(ds: dict[str, ans.AnsibleValue], handlers: Literal[Tru
     if ans.Block.is_block(ds):
         return extract_block(ds, handlers)
 
-    return extract_handler(ds) if handlers else extract_task(ds)
+    return extract_task(ds, handlers)
 
 
 def extract_block(ds: dict[str, ans.AnsibleValue], handlers: Literal[True, False] = False) -> rep.Block:
     raw_block, raw_ds = loaders.load_block(ds)
 
-    children_block = extract_list_of_tasks_or_blocks(raw_block.block, handlers=handlers)
-    children_rescue = extract_list_of_tasks_or_blocks(raw_block.rescue, handlers=handlers)
-    children_always = extract_list_of_tasks_or_blocks(raw_block.always, handlers=handlers)
+    attrs = _ansible_to_dict(raw_block)
 
-    block = rep.Block(
-            name=raw_block.name,
-            block=children_block,
-            rescue=children_rescue,
-            always=children_always,
-            vars=extract_list_of_variables(raw_block.vars),
-            raw=raw_ds
-    )
+    attrs['block'] = extract_list_of_tasks_or_blocks(raw_block.block, handlers=handlers)
+    attrs['rescue'] = extract_list_of_tasks_or_blocks(raw_block.rescue, handlers=handlers)
+    attrs['always'] = extract_list_of_tasks_or_blocks(raw_block.always, handlers=handlers)
+    attrs['vars'] = extract_list_of_variables(raw_block.vars)
 
-    for child in children_block + children_rescue + children_always:
+    block = rep.Block(**attrs, raw=raw_ds)
+
+    for child in chain(block.block, block.rescue, block.always):
         child.parent = block
 
     return block
@@ -111,60 +128,34 @@ def _extract_loop_control(lc: ans.LoopControl | None) -> rep.LoopControl | None:
         return None
 
     validate_ansible_object(lc)
-    return rep.LoopControl(
-        loop_var=lc.loop_var,
-        index_var=lc.index_var,
-        label=lc.label,
-        pause=lc.pause,
-        extended=lc.extended,
-    )
+    return rep.LoopControl(**_ansible_to_dict(lc))
 
 
-def extract_task(ds: dict[str, ans.AnsibleValue]) -> rep.Task:
-    raw_task, raw_ds = loaders.load_task(ds, False)
+def extract_task(ds: dict[str, ans.AnsibleValue], as_handler: Literal[True, False]) -> rep.Task | rep.Handler:
+    raw_task, raw_ds = loaders.load_task(ds, as_handler)
 
-    return rep.Task(
-        name=raw_task.name,
-        action=raw_task.action,
-        args=convert_ansible_values(raw_task.args),
-        when=raw_task.when,
-        loop=raw_task.loop,
-        loop_with=raw_task.loop_with,
-        loop_control=_extract_loop_control(raw_task.loop_control),
-        vars=extract_list_of_variables(raw_task.vars),
-        register=raw_task.register,
-        raw=raw_ds,
-    )
+    attrs = _ansible_to_dict(raw_task)
+    attrs['args'] = convert_ansible_values(raw_task.args)
+    attrs['loop_control'] = _extract_loop_control(raw_task.loop_control)
+    attrs['vars'] = extract_list_of_variables(raw_task.vars)
 
+    rep_cls = rep.Handler if as_handler else rep.Task
 
-def extract_handler(ds: dict[str, ans.AnsibleValue]) -> rep.Handler:
-    raw_handler, raw_ds = loaders.load_task(ds, True)
-
-    return rep.Handler(
-        name=raw_handler.name,
-        action=raw_handler.action,
-        args=convert_ansible_values(raw_handler.args),
-        when=raw_handler.when,
-        loop=raw_handler.loop,
-        loop_with=raw_handler.loop_with,
-        loop_control=_extract_loop_control(raw_handler.loop_control),
-        vars=extract_list_of_variables(raw_handler.vars),
-        listen=raw_handler.listen,
-        register=raw_handler.register,
-        raw=raw_ds,
-    )
+    return rep_cls(**attrs, raw=raw_ds)  # type: ignore[no-any-return]
 
 
 def extract_play(ds: dict[str, ans.AnsibleValue]) -> rep.Play:
     raw_play, raw_ds = loaders.load_play(ds)
 
-    play = rep.Play(
-        name=raw_play.name,
-        hosts=raw_play.hosts,
-        tasks=extract_list_of_tasks_or_blocks(raw_play.tasks, handlers=False),
-        vars=extract_list_of_variables(raw_play.vars),
-        raw=raw_ds
-    )
+    attrs = _ansible_to_dict(raw_play)
+    attrs['tasks'] = extract_list_of_tasks_or_blocks(raw_play.tasks, handlers=False)
+    attrs['handlers'] = extract_list_of_tasks_or_blocks(raw_play.handlers, handlers=True)
+    attrs['pre_tasks'] = extract_list_of_tasks_or_blocks(raw_play.pre_tasks, handlers=False)
+    attrs['post_tasks'] = extract_list_of_tasks_or_blocks(raw_play.post_tasks, handlers=False)
+    attrs['roles'] = [_extract_role_dependency(dep, allow_new_style=False) for dep in raw_play.roles]
+    attrs['vars'] = extract_list_of_variables(raw_play.vars)
+
+    play = rep.Play(**attrs, raw=raw_ds)
     for child in play.tasks:
         child.parent = play
     return play

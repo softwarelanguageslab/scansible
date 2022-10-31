@@ -357,7 +357,11 @@ def load_block(original_ds: dict[str, ans.AnsibleValue]) -> tuple[_PatchedBlock,
 
 class _PatchedPlay(ans.Play):
 
-    tasks: list[dict[str, ans.AnsibleValue]]
+    tasks: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
+    handlers: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
+    pre_tasks: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
+    post_tasks: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
+    roles: list[str | dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
 
     def __init__(self, *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
