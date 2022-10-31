@@ -96,8 +96,11 @@ def validate_ansible_object(obj: ans.FieldAttributeBase) -> None:
 
         # We need to ensure we don't retrieve the validated value if the
         # original value is an expression. Ansible usually eagerly evaluates
-        # those, we don't.
-        if templar.is_template(value):
+        # those, we don't. We only care when it's a string, to prevent Ansible
+        # from attempting to e.g. convert an expression into a boolean. If it's
+        # a list containing expressions and Ansible wants to convert it to a
+        # boolean, there's something wrong anyway.
+        if isinstance(value, str) and templar.is_template(value):
             continue
 
         # templar argument is only used when attribute.isa is a class, which we

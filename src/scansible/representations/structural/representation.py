@@ -229,7 +229,7 @@ class DirectivesBase:
     module_defaults: list[Mapping[str, Mapping[str, AnyValue]]] | None = default_field(default=None)
 
     #: Dictionary converted into environment variables.
-    environment: Mapping[str, str] | str | None = default_field(default=None)
+    environment: Sequence[Mapping[str, str] | str] | None = default_field(default=None)
     #: To disable logging of action.
     no_log: bool | str | None = default_field(default=None)
     #: Run on a single host only.
