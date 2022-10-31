@@ -80,8 +80,8 @@ def load_role_metadata(path: ProjectPath) -> tuple[dict[str, ans.AnsibleValue], 
         raise LoadTypeError('role metadata', dict, ds, path.relative)
 
     _validate_meta_galaxy_info(ds)
-    _validate_meta_platforms(ds)
-    _validate_meta_dependencies(ds)
+    _load_meta_platforms(ds)
+    _load_meta_dependencies(ds)
 
     return ds, original_ds
 
@@ -97,34 +97,51 @@ def _validate_meta_galaxy_info(ds: dict[str, ans.AnsibleValue]) -> None:
 
 _EXPECTED_PLATFORM_KEYS = {'name', 'versions'}
 
-def _validate_meta_platforms(ds: dict[str, ans.AnsibleValue]) -> None:
+def _load_meta_platforms(ds: dict[str, ans.AnsibleValue]) -> None:
     assert isinstance(ds['galaxy_info'], dict)
     platforms = ds['galaxy_info'].get('platforms')
     if platforms is None:
         ds['galaxy_info']['platforms'] = ans.AnsibleSequence()
         return
 
+    # Validation based on Ansible Galaxy loader
+    # https://github.com/ansible/galaxy/blob/1fe0bd986aaeb4c45157d4e463b7049cad76a25e/galaxy/importer/loaders/role.py#L188
+    # https://github.com/ansible/galaxy/blob/1fe0bd986aaeb4c45157d4e463b7049cad76a25e/galaxy/importer/loaders/role.py#L464
     if not isinstance(platforms, (tuple, list)):
         raise LoadTypeError('role metadata galaxy_info.platforms', list, platforms)
 
+    validated_platforms = ans.AnsibleSequence()
     for platform in platforms:
         if not isinstance(platform, dict):
-            raise LoadTypeError('role metadata platform', dict, platform)
+            print(f'Ignoring malformed platform {platform!r}: expected to be dict, got {_type_to_str(type(platform))}')
+            continue
 
-        for key in _EXPECTED_PLATFORM_KEYS:
-            if key not in platform:
-                raise LoadError('role metadata platform', f'Missing property "{key}"')
-        other_keys = platform.keys() - _EXPECTED_PLATFORM_KEYS
-        if other_keys:
-            raise LoadError('role metadata platforms', 'Superfluous properties in platform', extra_msg=f'Found superfluous properties in {platform!r}: {", ".join(other_keys)}')
+        name = platform.get('name')
+        versions = platform.get('versions', ['all'])
+        # https://github.com/ansible/galaxy/blob/1fe0bd986aaeb4c45157d4e463b7049cad76a25e/galaxy/importer/loaders/role.py#L471
+        # ["any", "all"] is equivalent to ["all"]. Also, Ansible Galaxy doesn't
+        # verify whether versions is actually a list, so if it's the string
+        # "small", it'd still be considered ["all"].
+        if 'all' in versions:
+            versions = ['all']
 
-        if not isinstance(platform['name'], str):
-            raise LoadTypeError('platform name', str, platform['name'])
-        if not isinstance(platform['versions'], list) or not all(isinstance(version, (str, int, float)) for version in platform['versions']):
-            raise LoadTypeError('platform versions', list[str | int | float], platform['versions'])
+        if not name:
+            print(f'Ignoring malformed platform {platform!r}: missing "name" key')
+            continue
+
+        if not isinstance(versions, list):
+            print(f'Ignoring malformed platform {platform!r}: "versions" expected to be list, got {_type_to_str(type(versions))}')
+            continue
+
+        validated_platforms.append(ans.AnsibleMapping({
+            'name': str(name),
+            'versions': [str(v) for v in versions]
+        }))
+
+    ds['galaxy_info']['platforms'] = validated_platforms
 
 
-def _validate_meta_dependencies(ds: dict[str, ans.AnsibleValue]) -> None:
+def _load_meta_dependencies(ds: dict[str, ans.AnsibleValue]) -> None:
     dependencies = ds.get('dependencies')
     if dependencies is None:
         ds['dependencies'] = ans.AnsibleSequence()

@@ -43,8 +43,8 @@ def describe_extracting_metadata_file() -> None:
             rep.MetaBlock(
                 platforms=[
                     rep.Platform(name='Debian', version='any'),
-                    rep.Platform(name='Fedora', version=7),
-                    rep.Platform(name='Fedora', version=8),
+                    rep.Platform(name='Fedora', version='7'),
+                    rep.Platform(name='Fedora', version='8'),
                 ],
                 raw=None))
 
@@ -130,15 +130,16 @@ def describe_extracting_metadata_file() -> None:
         with pytest.raises(Exception):
             ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
 
-    def rejects_invalid_platform_entry(tmp_path: Path) -> None:
+    def transforms_weird_platform_entry(tmp_path: Path) -> None:
         (tmp_path / 'main.yml').write_text(dedent('''
             galaxy_info:
                 platforms:
-                  - name: [hello]
+                  - [hello]
         '''))
 
-        with pytest.raises(Exception):
-            ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
+        result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
+
+        assert result.metablock.platforms == []
 
 
 def describe_extracting_variables() -> None:

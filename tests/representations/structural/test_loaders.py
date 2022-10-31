@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any, Callable, TYPE_CHECKING
 
 from pathlib import Path
 
 import pytest
+
+if TYPE_CHECKING:
+    from _pytest.capture import CaptureFixture
 
 from scansible.representations.structural import loaders, ansible_types as ans, helpers as h
 from scansible.representations.structural.loaders import LoadError
@@ -74,10 +77,10 @@ def describe_load_role_metadata() -> None:
                 'author': 'test',
                 'platforms': [{
                     'name': 'Debian',
-                    'versions': ['any', 'all']
+                    'versions': ['all']
                 }, {
                     'name': 'Fedora',
-                    'versions': [9]
+                    'versions': ['9']
                 }],
             },
             'dependencies': [{
@@ -131,83 +134,120 @@ def describe_load_role_metadata() -> None:
                     dependencies: []
                 ''')
 
-        def raises_on_wrong_platform_type(load_meta: LoadMetaType) -> None:
-            with pytest.raises(LoadError, match='Expected role metadata platform to be dict'):
-                load_meta('''
-                    galaxy_info:
-                        platforms:
-                            - Debian
+        def ignores_wrong_platform_type(load_meta: LoadMetaType, capsys: CaptureFixture) -> None:
+            result: tuple[Any, Any] = load_meta('''
+                galaxy_info:
+                    platforms:
+                        - Debian
 
-                    dependencies: []
-                ''')
+                dependencies: []
+            ''')
 
-        def raises_on_missing_platform_name(load_meta: LoadMetaType) -> None:
-            with pytest.raises(LoadError, match='Missing property "name"'):
-                load_meta('''
-                    galaxy_info:
-                        platforms:
-                            - versions: [1, 2]
+            assert result[0]['galaxy_info']['platforms'] == []
+            captured = capsys.readouterr()
+            assert 'Ignoring malformed platform' in captured.out
 
-                    dependencies: []
-                ''')
+        def ignores_missing_platform_name(load_meta: LoadMetaType, capsys: CaptureFixture) -> None:
+            result: tuple[Any, Any] = load_meta('''
+                galaxy_info:
+                    platforms:
+                        - versions: [1, 2]
 
-        def raises_on_missing_platform_versions(load_meta: LoadMetaType) -> None:
-            with pytest.raises(LoadError, match='Missing property "versions"'):
-                load_meta('''
-                    galaxy_info:
-                        platforms:
-                            - name: Debian
+                dependencies: []
+            ''')
 
-                    dependencies: []
-                ''')
+            assert result[0]['galaxy_info']['platforms'] == []
+            captured = capsys.readouterr()
+            assert 'Ignoring malformed platform' in captured.out
 
-        def raises_on_superfluous_platform_properties(load_meta: LoadMetaType) -> None:
-            with pytest.raises(LoadError, match='Superfluous properties in platform'):
-                load_meta('''
-                    galaxy_info:
-                        platforms:
-                            - name: Debian
-                              versions:
-                                - all
-                              test: test
+        def inserts_default_platform_versions(load_meta: LoadMetaType) -> None:
+            result: tuple[Any, Any] = load_meta('''
+                galaxy_info:
+                    platforms:
+                        - name: Debian
 
-                    dependencies: []
-                ''')
+                dependencies: []
+            ''')
 
-        def raises_on_wrong_platform_name_type(load_meta: LoadMetaType) -> None:
-            with pytest.raises(LoadError, match='Expected platform name to be str'):
-                load_meta('''
-                    galaxy_info:
-                        platforms:
-                            - name: 1
-                              versions: [1, 2]
+            assert result[0]['galaxy_info']['platforms'] == [{ 'name': 'Debian', 'versions': ['all'] }]
 
-                    dependencies: []
-                ''')
+        def ignores_superfluous_platform_properties(load_meta: LoadMetaType) -> None:
+            result: tuple[Any, Any] = load_meta('''
+                galaxy_info:
+                    platforms:
+                        - name: Debian
+                          versions:
+                            - all
+                          test: test
 
-        def raises_on_wrong_platform_versions_type(load_meta: LoadMetaType) -> None:
-            with pytest.raises(LoadError, match=r'Expected platform versions to be list\[str \| int \| float\]'):
-                load_meta('''
-                    galaxy_info:
-                        platforms:
-                            - name: Debian
-                              versions: all
+                dependencies: []
+            ''')
 
-                    dependencies: []
-                ''')
+            assert result[0]['galaxy_info']['platforms'] == [{ 'name': 'Debian', 'versions': ['all'] }]
 
-        def raises_on_wrong_platform_version_type(load_meta: LoadMetaType) -> None:
-            with pytest.raises(LoadError, match=r'Expected platform versions to be list\[str \| int \| float\]'):
-                load_meta('''
-                    galaxy_info:
-                        platforms:
-                            - name: Debian
-                              versions:
-                                - x: yes
-                                  y: no
+        def stringifies_wrong_platform_name_type(load_meta: LoadMetaType) -> None:
+            result: tuple[Any, Any] = load_meta('''
+                galaxy_info:
+                    platforms:
+                        - name: 1
+                          versions: ['v1', 'v2']
 
-                    dependencies: []
-                ''')
+                dependencies: []
+            ''')
+
+            assert result[0]['galaxy_info']['platforms'] == [{ 'name': '1', 'versions': ['v1', 'v2'] }]
+
+        def stringifies_non_string_platform_versions(load_meta: LoadMetaType) -> None:
+            result: tuple[Any, Any] = load_meta('''
+                galaxy_info:
+                    platforms:
+                        - name: Fedora
+                          versions: [6, 7.1]
+
+                dependencies: []
+            ''')
+
+            assert result[0]['galaxy_info']['platforms'] == [{ 'name': 'Fedora', 'versions': ['6', '7.1'] }]
+
+        def does_likely_undesired_things_for_wrong_platform_versions_type(load_meta: LoadMetaType) -> None:
+            result: tuple[Any, Any] = load_meta('''
+                galaxy_info:
+                    platforms:
+                        - name: Debian
+                          versions: all
+
+                dependencies: []
+            ''')
+
+            assert result[0]['galaxy_info']['platforms'] == [{ 'name': 'Debian', 'versions': ['all'] }]
+
+        def reduces_versions_to_all_if_present(load_meta: LoadMetaType) -> None:
+            result: tuple[Any, Any] = load_meta('''
+                galaxy_info:
+                    platforms:
+                        - name: Debian
+                          versions:
+                            - any
+                            - all
+
+                dependencies: []
+            ''')
+
+            assert result[0]['galaxy_info']['platforms'] == [{ 'name': 'Debian', 'versions': ['all'] }]
+
+        def ignores_wrong_versions_type(load_meta: LoadMetaType, capsys: CaptureFixture) -> None:
+            result: tuple[Any, Any] = load_meta('''
+                galaxy_info:
+                    platforms:
+                        - name: Debian
+                          versions: xenial
+
+                dependencies: []
+            ''')
+
+            assert result[0]['galaxy_info']['platforms'] == []
+            captured = capsys.readouterr()
+            assert 'Ignoring malformed platform' in captured.out
 
     def describe_loading_dependencies() -> None:
         def normalises_missing_dependencies_property(load_meta: LoadMetaType) -> None:
