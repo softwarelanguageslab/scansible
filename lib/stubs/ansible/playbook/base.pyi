@@ -4,7 +4,7 @@ from ansible.vars.manager import VariableManager
 from ansible.parsing.dataloader import DataLoader
 from ansible.parsing.yaml.objects import AnsibleSequence, AnsibleMapping, AnsibleUnicode
 
-Scalar = Union[AnsibleUnicode, int, bool, float]
+Scalar = Union[AnsibleUnicode, int, bool, float, None]
 Value = Union[Scalar, AnsibleSequence, AnsibleMapping]
 
 SelfType = TypeVar('SelfType', bound=Base)

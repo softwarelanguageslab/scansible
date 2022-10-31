@@ -134,8 +134,8 @@ def _load_meta_platforms(ds: dict[str, ans.AnsibleValue]) -> None:
             continue
 
         validated_platforms.append(ans.AnsibleMapping({
-            'name': str(name),
-            'versions': [str(v) for v in versions]
+            'name': str(name),  # type: ignore[dict-item]
+            'versions': [str(v) for v in versions]  # type: ignore[dict-item]
         }))
 
     ds['galaxy_info']['platforms'] = validated_platforms
@@ -289,7 +289,7 @@ def load_task(original_ds: dict[str, ans.AnsibleValue], as_handler: bool) -> tup
         # This can happen and Ansible doesn't do anything about it, it just
         # ignores the when. Remove the directive so that defaults take over.
         if 'when' in ds and ds['when'] is None:
-            del ds['when']  # type: ignore[unreachable]
+            del ds['when']
 
         # Use the correct Ansible representation so that more validation is done.
         ansible_cls: Type[ans.Task]
