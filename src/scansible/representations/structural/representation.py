@@ -8,6 +8,7 @@ from typing import (
         Sequence,
         TypeVar,
         Union,
+        cast,
 )
 
 import datetime
@@ -15,6 +16,7 @@ import types
 from pathlib import Path
 
 import attrs
+import rich.repr
 from attrs import define, frozen, field
 from attrs_strict import AttributeTypeError, type_validator as old_type_validator
 from ansible.parsing.yaml.objects import AnsibleSequence, AnsibleMapping, AnsibleUnicode
@@ -73,12 +75,13 @@ def default_field(default: Any = attrs.NOTHING, factory: Any = None) -> Any:
         raise TypeError('Either a default value or a factory needs to be specified')
     return field(validator=type_validator(), default=default, factory=factory)
 
+def raise_if_missing() -> None:
+    raise ValueError('Missing required field')
+
 def required_field() -> Any:
     # necessary because otherwise we can't do inheritance with defaults in super
     # and required params in sub.
-    def illegal() -> None:
-        raise ValueError('Missing required field')
-    return default_field(factory=illegal)
+    return default_field(factory=raise_if_missing)
 
 def parent_field() -> Any:
     return field(init=False, repr=False, eq=False, validator=type_validator())
@@ -104,6 +107,22 @@ def validate_absolute_path(inst: Any, attr: attrs.Attribute[Path], value: Path) 
         raise ValueError(f'Expected {attr.name} to be an absolute path, got relative path {value} instead')
 
 
+def generate_rich_repr(obj: Any) -> rich.repr.Result:
+    for attr in cast(tuple[attrs.Attribute, ...], obj.__attrs_attrs__):  # type: ignore[type-arg]
+        name = attr.name
+        default = attr.default
+        value = getattr(obj, name)
+
+        if not attr.repr:
+            continue
+
+        if default is attrs.NOTHING or (isinstance(default, attrs.Factory) and default.factory is raise_if_missing):  # type: ignore[arg-type, union-attr]
+            yield name, value
+        else:
+            default_value = default.factory() if isinstance(default, attrs.Factory) else default  # type: ignore[arg-type, union-attr]
+            yield name, value, default_value
+
+
 @frozen
 class VaultValue:
     """
@@ -112,6 +131,8 @@ class VaultValue:
 
     #: The encrypted data.
     data: bytes
+
+    __rich_repr__ = generate_rich_repr
 
 
 @frozen
@@ -125,6 +146,8 @@ class BrokenTask:
     #: The reason for failure.
     reason: str = required_field()
 
+    __rich_repr__ = generate_rich_repr
+
 
 @frozen
 class BrokenFile:
@@ -136,6 +159,8 @@ class BrokenFile:
     path: Path = path_field()
     #: The reason why the file is broken.
     reason: str = required_field()
+
+    __rich_repr__ = generate_rich_repr
 
 
 @frozen
@@ -149,6 +174,8 @@ class Platform:
     #: Platform version.
     version: str = required_field()
 
+    __rich_repr__ = generate_rich_repr
+
 
 @define
 class MetaFile:
@@ -160,6 +187,8 @@ class MetaFile:
     file_path: Path = path_field()
     #: The metadata block contained in the file.
     metablock: MetaBlock = required_field()
+
+    __rich_repr__ = generate_rich_repr
 
 
 @define
@@ -179,6 +208,8 @@ class MetaBlock:
     #: Role dependencies
     dependencies: Sequence['RoleRequirement'] = default_field(factory=list)
 
+    __rich_repr__ = generate_rich_repr
+
 
 @define
 class VariableFile:
@@ -192,6 +223,8 @@ class VariableFile:
     file_path: Path = path_field()
     #: The variables contained within the file. The order is irrelevant.
     variables: Mapping[str, AnyValue] = required_field()
+
+    __rich_repr__ = generate_rich_repr
 
 
 @define
@@ -213,6 +246,8 @@ class LoopControl:
     #: Whether to include more information in the loop items.
     #: See https://docs.ansible.com/ansible/latest/user_guide/playbooks_loops.html#extended-loop-variables
     extended: str | bool | None = default_field(default=None)
+
+    __rich_repr__ = generate_rich_repr
 
 
 @define(slots=False)
@@ -275,6 +310,7 @@ class DirectivesBase:
     #: Path to privilege escalation executable.
     become_exe: str | None = default_field(default=None)
 
+    __rich_repr__ = generate_rich_repr
 
 
 @define(slots=False)
@@ -330,6 +366,8 @@ class TaskBase(DirectivesBase):
     #: List of collections to search for modules.
     collections: Sequence[str] = default_field(factory=list)
 
+    __rich_repr__ = generate_rich_repr
+
 
 @define(slots=False)
 class Task(TaskBase):
@@ -346,6 +384,8 @@ class Handler(TaskBase):
 
     #: Topics on which the handler listens
     listen: Sequence[str] = default_field(factory=list)
+
+    __rich_repr__ = generate_rich_repr
 
 
 @define
@@ -380,6 +420,8 @@ class Block(DirectivesBase):
     #: List of collections to search for modules.
     collections: Sequence[str] = default_field(factory=list)
 
+    __rich_repr__ = generate_rich_repr
+
 
 @frozen
 class RoleSourceInfo:
@@ -395,6 +437,8 @@ class RoleSourceInfo:
     scm: str | None
     #: Role version.
     version: str | None
+
+    __rich_repr__ = generate_rich_repr
 
 
 @define(slots=False)
@@ -426,6 +470,8 @@ class RoleRequirement(DirectivesBase):
     #: from a role's meta/main.yml metadata file, but never for plays.
     source_info: RoleSourceInfo | None = default_field(default=None)
 
+    __rich_repr__ = generate_rich_repr
+
 
 @define
 class TaskFile:
@@ -439,6 +485,8 @@ class TaskFile:
     #: definition. Can also be a list of handlers (or blocks thereof), but
     #: handlers and tasks cannot be mixed.
     tasks: Sequence[Block | Task] | Sequence[Block | Handler] = required_field()
+
+    __rich_repr__ = generate_rich_repr
 
 
 @define
@@ -467,13 +515,13 @@ class Role:
     broken_tasks: list[BrokenTask] = required_field()
 
     #: The defaults/main file.
-    main_defaults_file: VariableFile | None = field(init=False, validator=type_validator())
+    main_defaults_file: VariableFile | None = field(init=False, validator=type_validator(), repr=False)
     #: The vars/main file.
-    main_vars_file: VariableFile | None = field(init=False, validator=type_validator())
+    main_vars_file: VariableFile | None = field(init=False, validator=type_validator(), repr=False)
     #: The tasks/main file.
-    main_tasks_file: TaskFile | None = field(init=False, validator=type_validator())
+    main_tasks_file: TaskFile | None = field(init=False, validator=type_validator(), repr=False)
     #: The handlers/main file.
-    main_handlers_file: TaskFile | None = field(init=False, validator=type_validator())
+    main_handlers_file: TaskFile | None = field(init=False, validator=type_validator(), repr=False)
 
     def __attrs_post_init__(self) -> None:
 
@@ -491,6 +539,8 @@ class Role:
         self.main_vars_file = find_file(self.role_var_files, 'main')
         self.main_tasks_file = find_file(self.task_files, 'main')
         self.main_handlers_file = find_file(self.handler_files, 'main')
+
+    __rich_repr__ = generate_rich_repr
 
 
 @define
@@ -515,6 +565,8 @@ class VarsPrompt:
     salt: str | None = default_field(default=None)
     #: Whether the user input is unsafe and should not be templated.
     unsafe: str | bool | None = default_field(default=None)
+
+    __rich_repr__ = generate_rich_repr
 
 
 @define
@@ -572,6 +624,8 @@ class Play(DirectivesBase):
     #: List of collections to search for modules.
     collections: Sequence[str] = default_field(factory=list)
 
+    __rich_repr__ = generate_rich_repr
+
 
 @define
 class Playbook:
@@ -585,6 +639,8 @@ class Playbook:
     plays: Sequence[Play] = required_field()
     #: Playbook's list of broken tasks.
     broken_tasks: list[BrokenTask] = required_field()
+
+    __rich_repr__ = generate_rich_repr
 
 
 @define
@@ -614,6 +670,8 @@ class StructuralModel:
         self.is_playbook = isinstance(self.root, Playbook)
         assert self.is_role != self.is_playbook, 'is_role and is_playbook should be mutually exclusive, and one should be set.'
 
+    __rich_repr__ = generate_rich_repr
+
 
 @define
 class MultiStructuralModel:
@@ -625,3 +683,5 @@ class MultiStructuralModel:
     id: str = required_field()
     #: Map of versions to structural models.
     structural_models: dict[str, StructuralModel] = required_field()
+
+    __rich_repr__ = generate_rich_repr
