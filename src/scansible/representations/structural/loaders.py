@@ -217,20 +217,26 @@ def _get_task_action(ds: dict[str, ans.AnsibleValue]) -> str:
     return action
 
 
-def _transform_task_static_include(ds: dict[str, ans.AnsibleValue]) -> None:
+def _transform_task_static_include(ds: dict[str, ans.AnsibleValue], action: str) -> None:
     # Current Ansible version crashes when the old static key is used.
     # Transform it to modern syntax, either into `import_tasks` if it's a
     # static include, or `include_tasks` if it isn't.
     if 'static' in ds:
         is_static = ans.convert_bool(ds['static'])
 
-        include_args = ds['include']
-        del ds['include']
         del ds['static']
-        if is_static:
-            ds['import_tasks'] = include_args
-        else:
-            ds['include_tasks'] = include_args
+        if _task_is_include(action):
+            include_args = ds['include']
+            del ds['include']
+            if is_static:
+                ds['import_tasks'] = include_args
+            else:
+                ds['include_tasks'] = include_args
+        elif _task_is_include_tasks(action) and is_static:
+            raise LoadError('task', 'include_tasks with static: yes', extra_msg=repr(ds))
+        elif _task_is_import_tasks(action) and not is_static:
+            raise LoadError('task', 'import_tasks with static: no', extra_msg=repr(ds))
+
 
 def _transform_old_become(ds: dict[str, ans.AnsibleValue]) -> None:
     # Current Ansible version refuses to parse tasks that use sudo/su and their
@@ -302,6 +308,12 @@ def _task_is_include_import_tasks(action: str) -> bool:
 def _task_is_include(action: str) -> bool:
     return action in ans.C._ACTION_INCLUDE
 
+def _task_is_include_tasks(action: str) -> bool:
+    return action in ans.C._ACTION_INCLUDE_TASKS
+
+def _task_is_import_tasks(action: str) -> bool:
+    return action in ans.C._ACTION_IMPORT_TASKS
+
 def _task_is_import_playbook(action: str) -> bool:
     return action in ans.C._ACTION_IMPORT_PLAYBOOK
 
@@ -329,10 +341,10 @@ def load_task(original_ds: dict[str, ans.AnsibleValue], as_handler: bool) -> tup
             # import_playbook is illegal here.
             raise LoadError('task', 'import_playbook is only allowed as a top-level playbook task')
 
-        if _task_is_include(action):
+        if _task_is_include_import_tasks(action):
             # Check for include/import tasks and transform them if the static
             # directive is present.
-            _transform_task_static_include(ds)
+            _transform_task_static_include(ds, action)
 
         # This can happen and Ansible doesn't do anything about it, it just
         # ignores the when. Remove the directive so that defaults take over.
