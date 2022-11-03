@@ -468,6 +468,20 @@ def describe_load_task() -> None:
         assert result[0].when == []
         assert result[1]['when'] is None
 
+    def transforms_always_run() -> None:
+        # devops-cmp/ansible-nodejs/tasks/main.yml @ ce6141fb61f1573b705db7006683af59ea792978
+        result = loaders.load_task({  # type: ignore[call-overload]
+            'get_url': {
+                'url': '...',
+                'dest': '...',
+            },
+            'always_run': 'yes',
+        }, as_handler=False)
+
+        assert result[0].check_mode is False
+        assert result[1]['always_run'] == 'yes'
+        assert 'check_mode' not in result[1]
+
     def describe_transforming_old_become() -> None:
 
         @pytest.mark.parametrize('method', ['su', 'sudo'])

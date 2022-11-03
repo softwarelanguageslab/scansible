@@ -278,6 +278,24 @@ def _transform_old_become(ds: dict[str, ans.AnsibleValue]) -> None:
         del ds[pass_kw]
 
 
+def _transform_old_always_run(ds: dict[str, ans.AnsibleValue]) -> None:
+    # `always_run` is an old, now-removed directive which has since been
+    # replaced by the `check_mode: no` directive.
+    if 'always_run' in ds:
+        try:
+            val = ans.convert_bool(ds['always_run'])
+        except Exception as e:
+            print(f'Could not load "always_run" value: {e}')
+            return
+
+        # if `always_run: yes` -> `check_mode: no`.
+        # not sure if `always_run: no` necessarily means `check_mode: yes` or
+        # just "use default behaviour".
+        del ds['always_run']
+        if val:
+            ds['check_mode'] = False
+
+
 def _task_is_include_import_tasks(action: str) -> bool:
     return action in ans.C._ACTION_ALL_INCLUDE_IMPORT_TASKS
 
@@ -300,6 +318,7 @@ def load_task(original_ds: dict[str, ans.AnsibleValue], as_handler: bool) -> tup
     # Need to do this before mod_args parsing, since mod_args parsing can crash
     # because of the presence of old keywords.
     _transform_old_become(ds)
+    _transform_old_always_run(ds)
 
     with _patch_modargs_parser(), _patch_lookup_loader():
         action = _get_task_action(ds)
