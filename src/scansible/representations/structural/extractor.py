@@ -12,6 +12,24 @@ from . import representation as rep, ansible_types as ans, loaders
 from .helpers import ProjectPath, parse_file, validate_ansible_object, capture_output, find_all_files, find_file, FatalError, prevent_undesired_operations, convert_ansible_values
 
 
+class ExtractionContext:
+    """Context during extraction, to store broken files etc."""
+
+    #: Whether extraction should be lenient. If true, the extractor will skip
+    #: tasks or blocks that fail to extract, without skipping the entire file.
+    #: If false, the entire file will be skipped instead.
+    lenient: bool
+    #: List of broken files which could not be parsed/extracted.
+    broken_files: list[rep.BrokenFile]
+    #: List of broken tasks or blocks that could not be parsed/extracted.
+    broken_tasks: list[rep.BrokenTask]
+
+    def __init__(self, lenient: bool) -> None:
+        self.lenient = lenient
+        self.broken_files = []
+        self.broken_tasks = []
+
+
 def _ansible_to_dict(obj: ans.FieldAttributeBase) -> dict[str, Any]:
     """Convert an Ansible object to a dictionary of its attributes.
 
@@ -30,7 +48,7 @@ def _ansible_to_dict(obj: ans.FieldAttributeBase) -> dict[str, Any]:
     return {attr_name: getattr(obj, attr_name) for attr_name in attr_names}
 
 
-def extract_role_metadata_file(path: ProjectPath) -> rep.MetaFile:
+def extract_role_metadata_file(path: ProjectPath, ctx: ExtractionContext) -> rep.MetaFile:
     """Extract the structural representation of a metadata file."""
 
     ds, raw_ds = loaders.load_role_metadata(path)
@@ -39,7 +57,7 @@ def extract_role_metadata_file(path: ProjectPath) -> rep.MetaFile:
     ds_dependencies: list[str | dict[str, ans.AnsibleValue]] = ds['dependencies']  # type: ignore
 
     platforms = [rep.Platform(p['name'], v) for p in ds_platforms for v in p['versions']]
-    dependencies = [_extract_role_dependency(dep, allow_new_style=True) for dep in ds_dependencies]
+    dependencies = [dep for raw_dep in ds_dependencies if (dep := _extract_role_dependency(raw_dep, ctx, allow_new_style=True)) is not None]
 
     metablock = rep.MetaBlock(platforms=platforms, dependencies=dependencies, raw=raw_ds)
     metafile = rep.MetaFile(metablock=metablock, file_path=path.relative)
@@ -47,8 +65,14 @@ def extract_role_metadata_file(path: ProjectPath) -> rep.MetaFile:
     return metafile
 
 
-def _extract_role_dependency(ds: str | dict[str, ans.AnsibleValue], allow_new_style: bool = False) -> rep.RoleRequirement:
-    ri, src_info, raw_ds = loaders.load_role_dependency(ds, allow_new_style=allow_new_style)
+def _extract_role_dependency(ds: str | dict[str, ans.AnsibleValue], ctx: ExtractionContext, allow_new_style: bool = False) -> rep.RoleRequirement | None:
+    try:
+        ri, src_info, raw_ds = loaders.load_role_dependency(ds, allow_new_style=allow_new_style)
+    except (ans.AnsibleError, loaders.LoadError) as e:
+        if not ctx.lenient:
+            raise
+        ctx.broken_tasks.append(rep.BrokenTask(ds, str(e)))
+        return None
 
     attrs = _ansible_to_dict(ri)
 
@@ -72,47 +96,55 @@ def extract_list_of_variables(ds: dict[str, ans.AnsibleValue]) -> dict[str, rep.
     return {k: convert_ansible_values(v) for k, v in ds.items()}
 
 
-def extract_tasks_file(path: ProjectPath, handlers: bool = False) -> rep.TaskFile:
+def extract_tasks_file(path: ProjectPath, ctx: ExtractionContext, handlers: bool = False) -> rep.TaskFile:
     ds, raw_ds = loaders.load_tasks_file(path)
 
-    content = extract_list_of_tasks_or_blocks(ds, handlers)  # type: ignore[call-overload]
+    content = extract_list_of_tasks_or_blocks(ds, ctx, handlers)  # type: ignore[call-overload]
     tf = rep.TaskFile(file_path=path.relative, tasks=content)
     for child in content:
         child.parent = tf
     return tf
 
 @overload
-def extract_list_of_tasks_or_blocks(ds: list[dict[str, ans.AnsibleValue]], handlers: Literal[True]) -> list[rep.Handler | rep.Block]: ...
+def extract_list_of_tasks_or_blocks(ds: list[dict[str, ans.AnsibleValue]], ctx: ExtractionContext, handlers: Literal[True]) -> list[rep.Handler | rep.Block]: ...
 @overload
-def extract_list_of_tasks_or_blocks(ds: list[dict[str, ans.AnsibleValue]], handlers: Literal[False] = ...) -> list[rep.Task | rep.Block]: ...
+def extract_list_of_tasks_or_blocks(ds: list[dict[str, ans.AnsibleValue]], ctx: ExtractionContext, handlers: Literal[False] = ...) -> list[rep.Task | rep.Block]: ...
 
-def extract_list_of_tasks_or_blocks(ds: list[dict[str, ans.AnsibleValue]], handlers: Literal[True, False] = False) -> list[rep.Task | rep.Block] | list[rep.Handler | rep.Block]:
+def extract_list_of_tasks_or_blocks(ds: list[dict[str, ans.AnsibleValue]], ctx: ExtractionContext, handlers: Literal[True, False] = False) -> list[rep.Task | rep.Block] | list[rep.Handler | rep.Block]:
     content = []
     for inner_ds in ds:
-        content.append(extract_task_or_block(inner_ds, handlers))
+        inner_result = extract_task_or_block(inner_ds, ctx, handlers)
+        if inner_result is not None:
+            content.append(inner_result)
     return content  # type: ignore[return-value]
 
 
 @overload
-def extract_task_or_block(ds: dict[str, ans.AnsibleValue], handlers: Literal[False]) -> rep.Task | rep.Block: ...
+def extract_task_or_block(ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext, handlers: Literal[False]) -> rep.Task | rep.Block | None: ...
 @overload
-def extract_task_or_block(ds: dict[str, ans.AnsibleValue], handlers: Literal[True]) -> rep.Handler | rep.Block: ...
+def extract_task_or_block(ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext, handlers: Literal[True]) -> rep.Handler | rep.Block | None: ...
 
-def extract_task_or_block(ds: dict[str, ans.AnsibleValue], handlers: Literal[True, False] = False) -> rep.Handler | rep.Task | rep.Block:
+def extract_task_or_block(ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext, handlers: Literal[True, False] = False) -> rep.Handler | rep.Task | rep.Block | None:
     if ans.Block.is_block(ds):
-        return extract_block(ds, handlers)
+        return extract_block(ds, ctx, handlers)
 
-    return extract_task(ds, handlers)
+    return extract_task(ds, ctx, handlers)
 
 
-def extract_block(ds: dict[str, ans.AnsibleValue], handlers: Literal[True, False] = False) -> rep.Block:
-    raw_block, raw_ds = loaders.load_block(ds)
+def extract_block(ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext, handlers: Literal[True, False] = False) -> rep.Block | None:
+    try:
+        raw_block, raw_ds = loaders.load_block(ds)
+    except (ans.AnsibleError, loaders.LoadError) as e:
+        if not ctx.lenient:
+            raise
+        ctx.broken_tasks.append(rep.BrokenTask(ds, str(e)))
+        return None
 
     attrs = _ansible_to_dict(raw_block)
 
-    attrs['block'] = extract_list_of_tasks_or_blocks(raw_block.block, handlers=handlers)
-    attrs['rescue'] = extract_list_of_tasks_or_blocks(raw_block.rescue, handlers=handlers)
-    attrs['always'] = extract_list_of_tasks_or_blocks(raw_block.always, handlers=handlers)
+    attrs['block'] = extract_list_of_tasks_or_blocks(raw_block.block, ctx, handlers=handlers)
+    attrs['rescue'] = extract_list_of_tasks_or_blocks(raw_block.rescue, ctx, handlers=handlers)
+    attrs['always'] = extract_list_of_tasks_or_blocks(raw_block.always, ctx, handlers=handlers)
     attrs['vars'] = extract_list_of_variables(raw_block.vars)
 
     block = rep.Block(**attrs, raw=raw_ds)
@@ -131,8 +163,14 @@ def _extract_loop_control(lc: ans.LoopControl | None) -> rep.LoopControl | None:
     return rep.LoopControl(**_ansible_to_dict(lc))
 
 
-def extract_task(ds: dict[str, ans.AnsibleValue], as_handler: Literal[True, False]) -> rep.Task | rep.Handler:
-    raw_task, raw_ds = loaders.load_task(ds, as_handler)
+def extract_task(ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext, as_handler: Literal[True, False]) -> rep.Task | rep.Handler | None:
+    try:
+        raw_task, raw_ds = loaders.load_task(ds, as_handler)
+    except (ans.AnsibleError, loaders.LoadError) as e:
+        if not ctx.lenient:
+            raise
+        ctx.broken_tasks.append(rep.BrokenTask(ds, str(e)))
+        return None
 
     attrs = _ansible_to_dict(raw_task)
     attrs['args'] = convert_ansible_values(raw_task.args)
@@ -144,15 +182,15 @@ def extract_task(ds: dict[str, ans.AnsibleValue], as_handler: Literal[True, Fals
     return rep_cls(**attrs, raw=raw_ds)  # type: ignore[no-any-return]
 
 
-def extract_play(ds: dict[str, ans.AnsibleValue]) -> rep.Play:
+def extract_play(ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext) -> rep.Play:
     raw_play, raw_ds = loaders.load_play(ds)
 
     attrs = _ansible_to_dict(raw_play)
-    attrs['tasks'] = extract_list_of_tasks_or_blocks(raw_play.tasks, handlers=False)
-    attrs['handlers'] = extract_list_of_tasks_or_blocks(raw_play.handlers, handlers=True)
-    attrs['pre_tasks'] = extract_list_of_tasks_or_blocks(raw_play.pre_tasks, handlers=False)
-    attrs['post_tasks'] = extract_list_of_tasks_or_blocks(raw_play.post_tasks, handlers=False)
-    attrs['roles'] = [_extract_role_dependency(dep, allow_new_style=False) for dep in raw_play.roles]
+    attrs['tasks'] = extract_list_of_tasks_or_blocks(raw_play.tasks, ctx, handlers=False)
+    attrs['handlers'] = extract_list_of_tasks_or_blocks(raw_play.handlers, ctx, handlers=True)
+    attrs['pre_tasks'] = extract_list_of_tasks_or_blocks(raw_play.pre_tasks, ctx, handlers=False)
+    attrs['post_tasks'] = extract_list_of_tasks_or_blocks(raw_play.post_tasks, ctx, handlers=False)
+    attrs['roles'] = [dep for raw_dep in raw_play.roles if (dep := _extract_role_dependency(raw_dep, ctx, allow_new_style=False)) is not None]
     attrs['vars'] = extract_list_of_variables(raw_play.vars)
 
     play = rep.Play(**attrs, raw=raw_ds)
@@ -161,7 +199,7 @@ def extract_play(ds: dict[str, ans.AnsibleValue]) -> rep.Play:
     return play
 
 
-def extract_playbook(path: Path, id: str, version: str) -> rep.StructuralModel:
+def extract_playbook(path: Path, id: str, version: str, lenient: bool = True) -> rep.StructuralModel:
     """
     Extract a structural model from a playbook.
 
@@ -171,26 +209,30 @@ def extract_playbook(path: Path, id: str, version: str) -> rep.StructuralModel:
     :type       id:       str
     :param      version:  The version of the playbook.
     :type       version:  str
+    :param      lenient:  Whether extraction should be lenient, i.e. ignoring
+                          broken tasks/blocks.
+    :type       lenient:  bool
 
     :returns:   Extracted structural model.
     :rtype:     StructuralModel
     """
 
     pb_path = ProjectPath.from_root(path)
+    ctx = ExtractionContext(lenient)
 
     with capture_output() as output, prevent_undesired_operations():
         ds, raw_ds = loaders.load_playbook(pb_path)
 
         # Parse the plays in the playbook
-        plays = [extract_play(play_ds) for play_ds in ds]
+        plays = [extract_play(play_ds, ctx) for play_ds in ds]
 
-    pb = rep.Playbook(plays=plays, raw=ds)
+    pb = rep.Playbook(plays=plays, raw=ds, broken_tasks=ctx.broken_tasks)
     for play in plays:
         play.parent = pb
     return rep.StructuralModel(root=pb, path=path, id=id, version=version, logs=output.getvalue())
 
 
-def extract_role(path: Path, id: str, version: str, extract_all: bool = False) -> rep.StructuralModel:
+def extract_role(path: Path, id: str, version: str, extract_all: bool = False, lenient: bool = True) -> rep.StructuralModel:
     """
     Extract a structural model from a role.
 
@@ -205,12 +247,16 @@ def extract_role(path: Path, id: str, version: str, extract_all: bool = False) -
                               files can still be extracted using
                               `extract_task_file` or `extract_variable_file`.
     :type       extract_all:  bool
+    :param      lenient:      Whether extracting should be lenient, i.e.
+                              ignoring broken tasks/blocks.
+    :type       lenient:      bool
 
     :returns:   Extracted structural model.
     :rtype:     StructuralModel
     """
 
     role_path = ProjectPath.from_root(path)
+    ctx = ExtractionContext(lenient)
 
     # Extract all constituents
     task_files: dict[str, rep.TaskFile] = {}
@@ -218,28 +264,27 @@ def extract_role(path: Path, id: str, version: str, extract_all: bool = False) -
     vars_files: dict[str, rep.VariableFile] = {}
     defaults_files: dict[str, rep.VariableFile] = {}
     meta_files: dict[str, rep.MetaFile] = {}
-    broken_files: list[rep.BrokenFile] = []
 
     with capture_output() as output, prevent_undesired_operations():
         meta_file_path = find_file(role_path, 'meta/main')
-        _safe_extract(extract_role_metadata_file, meta_file_path, meta_files, broken_files)
+        _safe_extract(partial(extract_role_metadata_file, ctx=ctx), meta_file_path, meta_files, ctx)
         meta_file = next(iter(meta_files.values())) if meta_files else None
 
         if extract_all:
             get_dir = partial(ProjectPath, role_path.absolute)
 
-            _safe_extract_all(partial(extract_tasks_file, handlers=False), get_dir('tasks'), task_files, broken_files)
-            _safe_extract_all(partial(extract_tasks_file, handlers=True), get_dir('handlers'), handler_files, broken_files)
-            _safe_extract_all(extract_variable_file, get_dir('vars'), vars_files, broken_files)
-            _safe_extract_all(extract_variable_file, get_dir('defaults'), defaults_files, broken_files)
+            _safe_extract_all(partial(extract_tasks_file, ctx=ctx, handlers=False), get_dir('tasks'), task_files, ctx)
+            _safe_extract_all(partial(extract_tasks_file, ctx=ctx, handlers=True), get_dir('handlers'), handler_files, ctx)
+            _safe_extract_all(extract_variable_file, get_dir('vars'), vars_files, ctx)
+            _safe_extract_all(extract_variable_file, get_dir('defaults'), defaults_files, ctx)
         else:
             def get_main_path(dirname: str) -> ProjectPath | None:
                 return find_file(role_path.join(dirname), 'main')
 
-            _safe_extract(partial(extract_tasks_file, handlers=False), get_main_path('tasks'), task_files, broken_files)
-            _safe_extract(partial(extract_tasks_file, handlers=True), get_main_path('handlers'), handler_files, broken_files)
-            _safe_extract(extract_variable_file, get_main_path('defaults'), defaults_files, broken_files)
-            _safe_extract(extract_variable_file, get_main_path('vars'), vars_files, broken_files)
+            _safe_extract(partial(extract_tasks_file, ctx=ctx, handlers=False), get_main_path('tasks'), task_files, ctx)
+            _safe_extract(partial(extract_tasks_file, ctx=ctx, handlers=True), get_main_path('handlers'), handler_files, ctx)
+            _safe_extract(extract_variable_file, get_main_path('defaults'), defaults_files, ctx)
+            _safe_extract(extract_variable_file, get_main_path('vars'), vars_files, ctx)
 
     role = rep.Role(
         task_files=task_files,
@@ -247,7 +292,8 @@ def extract_role(path: Path, id: str, version: str, extract_all: bool = False) -
         role_var_files=vars_files,
         default_var_files=defaults_files,
         meta_file=meta_file,
-        broken_files=broken_files,
+        broken_files=ctx.broken_files,
+        broken_tasks=ctx.broken_tasks,
     )
 
     return rep.StructuralModel(
@@ -262,7 +308,7 @@ def extract_role(path: Path, id: str, version: str, extract_all: bool = False) -
 ExtractedFileType = TypeVar('ExtractedFileType')
 
 
-def _safe_extract(extractor: Callable[[ProjectPath], ExtractedFileType], file_path: ProjectPath | None, file_dict: dict[str, ExtractedFileType], broken_files: list[rep.BrokenFile]) -> None:
+def _safe_extract(extractor: Callable[[ProjectPath], ExtractedFileType], file_path: ProjectPath | None, file_dict: dict[str, ExtractedFileType], ctx: ExtractionContext) -> None:
     if file_path is None:
         return
 
@@ -270,12 +316,12 @@ def _safe_extract(extractor: Callable[[ProjectPath], ExtractedFileType], file_pa
         extracted_file = extractor(file_path)
         file_dict['/'.join(file_path.relative.parts[1:])] = extracted_file
     except (ans.AnsibleError, loaders.LoadError) as e:
-        broken_files.append(rep.BrokenFile(path=file_path.relative, reason=str(e)))
+        ctx.broken_files.append(rep.BrokenFile(path=file_path.relative, reason=str(e)))
 
 
-def _safe_extract_all(extractor: Callable[[ProjectPath], ExtractedFileType], dir_path: ProjectPath, file_dict: dict[str, ExtractedFileType], broken_files: list[rep.BrokenFile]) -> None:
+def _safe_extract_all(extractor: Callable[[ProjectPath], ExtractedFileType], dir_path: ProjectPath, file_dict: dict[str, ExtractedFileType], ctx: ExtractionContext) -> None:
     if not dir_path.absolute.is_dir():
         return
 
     for child_path in find_all_files(dir_path):
-        _safe_extract(extractor, child_path, file_dict, broken_files)
+        _safe_extract(extractor, child_path, file_dict, ctx)

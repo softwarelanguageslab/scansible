@@ -36,7 +36,7 @@ def describe_extracting_metadata_file() -> None:
                     - 8
         '''))
 
-        result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
+        result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'), ext.ExtractionContext(False))
 
         assert result.metablock.parent is result
         assert result == rep.MetaFile(
@@ -55,7 +55,7 @@ def describe_extracting_metadata_file() -> None:
                 - testrole
         '''))
 
-        result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
+        result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'), ext.ExtractionContext(False))
 
         assert result.metablock.dependencies == [rep.RoleRequirement(role='testrole', raw=None)]
 
@@ -65,7 +65,7 @@ def describe_extracting_metadata_file() -> None:
                 - role: testrole
         '''))
 
-        result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
+        result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'), ext.ExtractionContext(False))
 
         assert result.metablock.dependencies == [rep.RoleRequirement(role='testrole', raw=None)]
 
@@ -75,7 +75,7 @@ def describe_extracting_metadata_file() -> None:
                 - name: testrole
         '''))
 
-        result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
+        result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'), ext.ExtractionContext(False))
 
         assert result.metablock.dependencies == [rep.RoleRequirement(name='testrole', role='testrole', raw=None)]
 
@@ -86,7 +86,7 @@ def describe_extracting_metadata_file() -> None:
                   when: "{{ ansible_os_family == 'Debian' }}"
         '''))
 
-        result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
+        result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'), ext.ExtractionContext(False))
 
         assert result.metablock.dependencies == [rep.RoleRequirement(role='testrole', when=["{{ ansible_os_family == 'Debian' }}"], raw=None)]
 
@@ -99,7 +99,7 @@ def describe_extracting_metadata_file() -> None:
                     - "{{ 1 + 1 == 2 }}"
         '''))
 
-        result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
+        result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'), ext.ExtractionContext(False))
 
         assert result.metablock.dependencies == [rep.RoleRequirement(
             role='testrole',
@@ -110,7 +110,7 @@ def describe_extracting_metadata_file() -> None:
         (tmp_path / 'main.yml').write_text('')
 
         with pytest.raises(Exception):
-            ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
+            ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'), ext.ExtractionContext(False))
 
 
     @pytest.mark.parametrize('content', [
@@ -121,7 +121,7 @@ def describe_extracting_metadata_file() -> None:
         (tmp_path / 'main.yml').write_text(content)
 
         with pytest.raises(Exception):
-            ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
+            ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'), ext.ExtractionContext(False))
 
 
     def rejects_invalid_galaxy_info(tmp_path: Path) -> None:
@@ -130,7 +130,7 @@ def describe_extracting_metadata_file() -> None:
         '''))
 
         with pytest.raises(Exception):
-            ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
+            ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'), ext.ExtractionContext(False))
 
     def rejects_invalid_platforms_list(tmp_path: Path) -> None:
         (tmp_path / 'main.yml').write_text(dedent('''
@@ -139,7 +139,7 @@ def describe_extracting_metadata_file() -> None:
         '''))
 
         with pytest.raises(Exception):
-            ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
+            ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'), ext.ExtractionContext(False))
 
     def transforms_weird_platform_entry(tmp_path: Path) -> None:
         (tmp_path / 'main.yml').write_text(dedent('''
@@ -148,9 +148,21 @@ def describe_extracting_metadata_file() -> None:
                   - [hello]
         '''))
 
-        result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'))
+        result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'), ext.ExtractionContext(False))
 
         assert result.metablock.platforms == []
+
+    def ignores_malformed_dependency_in_lenient_mode(tmp_path: Path) -> None:
+        (tmp_path / 'main.yml').write_text(dedent('''
+            dependencies:
+                - test: nope
+        '''))
+        ctx = ext.ExtractionContext(True)
+
+        result = ext.extract_role_metadata_file(ext.ProjectPath(tmp_path, 'main.yml'), ctx)
+
+        assert result.metablock.dependencies == []
+        assert ctx.broken_tasks[0].ds == {'test': 'nope'}
 
 
 def describe_extracting_variables() -> None:
@@ -230,7 +242,7 @@ def describe_extracting_variables() -> None:
         with pytest.raises(Exception):
             ext.extract_variable_file(ext.ProjectPath(tmp_path, 'main.yml'))
 
-TaskExtractor = Callable[[dict[str, 'ans.AnsibleValue']], rep.Task]
+TaskExtractor = Callable[[dict[str, 'ans.AnsibleValue'], ext.ExtractionContext], rep.Task | None]
 
 # Shared behaviour for task extractors
 def a_task_extractor() -> None:
@@ -241,7 +253,7 @@ def a_task_extractor() -> None:
             file:
                 path: test.txt
                 state: present
-        ''')))
+        ''')), ext.ExtractionContext(False))
 
         assert result == task_representation(
             action='file',
@@ -256,7 +268,7 @@ def a_task_extractor() -> None:
         result = extractor(_parse_yaml(dedent('''
             name: Ensure file exists
             file: path=test.txt state=present
-        ''')))
+        ''')), ext.ExtractionContext(False))
 
         assert result == task_representation(
             action='file',
@@ -274,7 +286,7 @@ def a_task_extractor() -> None:
                 path: '{{ file_path }}'
             vars:
                 file_path: test.txt
-        ''')))
+        ''')), ext.ExtractionContext(False))
 
         assert result == task_representation(
             action='file',
@@ -290,7 +302,7 @@ def a_task_extractor() -> None:
             name: test
             debug: msg={{ item }}
             loop: [hello, world]
-        ''')))
+        ''')), ext.ExtractionContext(False))
 
         assert result == task_representation(
             action='debug',
@@ -306,7 +318,7 @@ def a_task_extractor() -> None:
             name: test
             debug: msg={{ item }}
             loop: '{{ somelist }}'
-        ''')))
+        ''')), ext.ExtractionContext(False))
 
         assert result == task_representation(
             action='debug',
@@ -324,7 +336,7 @@ def a_task_extractor() -> None:
             loop: [hello, world]
             loop_control:
               loop_var: myvar
-        ''')))
+        ''')), ext.ExtractionContext(False))
 
         assert result == task_representation(
             action='debug',
@@ -341,7 +353,7 @@ def a_task_extractor() -> None:
             name: test
             debug: msg={{ myvar }}
             when: yes
-        ''')))
+        ''')), ext.ExtractionContext(False))
 
         assert result == task_representation(
             action='debug',
@@ -355,7 +367,7 @@ def a_task_extractor() -> None:
     def does_not_eagerly_evaluate_imports(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
         result = extractor(_parse_yaml(dedent('''
             import_tasks: tasks.yml
-        ''')))
+        ''')), ext.ExtractionContext(False))
 
         assert result == task_representation(
             action='import_tasks',
@@ -372,7 +384,7 @@ def a_task_extractor() -> None:
             debug:
                 msg: hello
             register: '{{ expr }}'
-        ''')))
+        ''')), ext.ExtractionContext(False))
 
         assert result == task_representation(
             action='debug',
@@ -388,7 +400,7 @@ def a_task_extractor() -> None:
             name: test
             action_that_doesnt_exist:
                 msg: hello
-        ''')))
+        ''')), ext.ExtractionContext(False))
 
         assert result == task_representation(
             action='action_that_doesnt_exist',
@@ -406,7 +418,7 @@ def a_task_extractor() -> None:
             with_items:
               - hello
               - world
-        ''')))
+        ''')), ext.ExtractionContext(False))
 
         assert result == task_representation(
             action='file',
@@ -421,7 +433,7 @@ def a_task_extractor() -> None:
     def extracts_include_task(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
         result = extractor(_parse_yaml(dedent('''
             include: test.yml
-        ''')))
+        ''')), ext.ExtractionContext(False))
 
         assert result == task_representation(
             action='include',
@@ -434,7 +446,7 @@ def a_task_extractor() -> None:
         result = extractor(_parse_yaml(dedent('''
             include: test.yml
             static: yes
-        ''')))
+        ''')), ext.ExtractionContext(False))
 
         assert result == task_representation(
             action='import_tasks',
@@ -447,7 +459,7 @@ def a_task_extractor() -> None:
         result = extractor(_parse_yaml(dedent('''
             include: test.yml
             static: no
-        ''')))
+        ''')), ext.ExtractionContext(False))
 
         assert result == task_representation(
             action='include_tasks',
@@ -461,7 +473,7 @@ def a_task_extractor() -> None:
             include_role:
                 name: testrole
                 public: true
-        ''')))
+        ''')), ext.ExtractionContext(False))
 
         assert result == task_representation(
             action='include_role',
@@ -478,7 +490,7 @@ def a_task_extractor() -> None:
                 file:
                     path: test.txt
                 vars: 0
-            ''')))
+            ''')), ext.ExtractionContext(False))
 
     def rejects_tasks_with_invalid_postvalidated_attribute_values(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
         with pytest.raises(Exception):
@@ -487,13 +499,13 @@ def a_task_extractor() -> None:
                 file:
                     path: test.txt
                 loop: 0
-            ''')))
+            ''')), ext.ExtractionContext(False))
 
     def rejects_tasks_with_no_action(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
         with pytest.raises(Exception):
             extractor(_parse_yaml(dedent('''
                 name: test
-            ''')))
+            ''')), ext.ExtractionContext(False))
 
     def rejects_tasks_with_multiple_actions(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
         with pytest.raises(Exception):
@@ -503,7 +515,20 @@ def a_task_extractor() -> None:
                     path: test.txt
                 apt:
                     name: test.txt
-            ''')))
+            ''')), ext.ExtractionContext(False))
+
+    def ignores_malformed_task_in_lenient_mode(extractor: TaskExtractor, task_representation: Type[rep.Task]) -> None:
+        ctx = ext.ExtractionContext(True)
+        result = extractor(_parse_yaml(dedent('''
+            name: test
+            file:
+                path: test.txt
+            apt:
+                name: test.txt
+        ''')), ctx)
+
+        assert result is None
+        assert len(ctx.broken_tasks) == 1
 
 
 @behaves_like(a_task_extractor)
@@ -536,7 +561,7 @@ def describe_extracting_handlers() -> None:
             file:
                 path: '{{ file_path }}'
             listen: a topic
-        ''')), as_handler=True)
+        ''')), ext.ExtractionContext(False), as_handler=True)
 
         assert result == rep.Handler(
             action='file',
@@ -553,7 +578,7 @@ def describe_extracting_handlers() -> None:
             listen:
               - a topic
               - another topic
-        ''')), as_handler=True)
+        ''')), ext.ExtractionContext(False), as_handler=True)
 
         assert result == rep.Handler(
             action='file',
@@ -569,7 +594,7 @@ def describe_extracting_list_of_handlers() -> None:
         result = ext.extract_list_of_tasks_or_blocks(_parse_yaml(dedent('''
             - file: {}
             - apt: {}
-        ''')), handlers=True)
+        ''')), ext.ExtractionContext(False), handlers=True)
 
         assert len(result) == 2
         assert isinstance(result[0], rep.Handler)
@@ -585,7 +610,7 @@ def describe_extracting_blocks() -> None:
                 file: {}
               - name: test2
                 file: {}
-        ''')))
+        ''')), ext.ExtractionContext(False))
 
         assert result == rep.Block(
             block=[
@@ -602,7 +627,7 @@ def describe_extracting_blocks() -> None:
                 file: {}
               - name: test2
                 file: {}
-        ''')), handlers=True)
+        ''')), ext.ExtractionContext(False), handlers=True)
 
         assert result == rep.Block(
             block=[
@@ -623,7 +648,7 @@ def describe_extracting_blocks() -> None:
             always:
               - name: test3
                 file: {}
-        ''')))
+        ''')), ext.ExtractionContext(False))
 
         assert result == rep.Block(
             block=[
@@ -646,7 +671,7 @@ def describe_extracting_blocks() -> None:
               - block:
                   - name: test
                     file: {}
-        ''')))
+        ''')), ext.ExtractionContext(False))
 
         assert result == rep.Block(
             block=[  # type: ignore[arg-type]
@@ -664,7 +689,7 @@ def describe_extracting_blocks() -> None:
         result = ext.extract_block(_parse_yaml(dedent('''
             block:
               - import_tasks: test
-        ''')))
+        ''')), ext.ExtractionContext(False))
 
         assert result == rep.Block(
             block=[
@@ -677,14 +702,25 @@ def describe_extracting_blocks() -> None:
         with pytest.raises(Exception):
             ext.extract_block(_parse_yaml(dedent('''
                 import_tasks: test
-            ''')))
+            ''')), ext.ExtractionContext(False))
 
     def rejects_blocks_without_block() -> None:
         with pytest.raises(Exception):
             ext.extract_block(_parse_yaml(dedent('''
                 rescue:
                   - file: {}
-            ''')))
+            ''')), ext.ExtractionContext(False))
+
+    def ignores_malformed_block_in_lenient_mode() -> None:
+        ctx = ext.ExtractionContext(True)
+
+        result = ext.extract_block(_parse_yaml(dedent('''
+            rescue:
+              - file: {}
+        ''')), ctx)
+
+        assert result is None
+        assert len(ctx.broken_tasks) == 1
 
 def describe_extracting_tasks_file() -> None:
     def extracts_standard_task_files(tmp_path: Path) -> None:
@@ -697,7 +733,7 @@ def describe_extracting_tasks_file() -> None:
                   test: {}
         '''))
 
-        result = ext.extract_tasks_file(ext.ProjectPath(tmp_path, 'main.yml'))
+        result = ext.extract_tasks_file(ext.ProjectPath(tmp_path, 'main.yml'), ext.ExtractionContext(False))
 
         assert result == rep.TaskFile(
             file_path=Path('main.yml'),
@@ -721,7 +757,7 @@ def describe_extracting_tasks_file() -> None:
     def allows_task_files_to_be_empty(tmp_path: Path) -> None:
         (tmp_path / 'main.yml').write_text('# just a comment')
 
-        result = ext.extract_tasks_file(ext.ProjectPath(tmp_path, 'main.yml'))
+        result = ext.extract_tasks_file(ext.ProjectPath(tmp_path, 'main.yml'), ext.ExtractionContext(False))
 
         assert result == rep.TaskFile(file_path=Path('main.yml'), tasks=[])
 
@@ -733,7 +769,7 @@ def describe_extracting_tasks_file() -> None:
         (tmp_path / 'main.yml').write_text(content)
 
         with pytest.raises(Exception):
-            ext.extract_tasks_file(ext.ProjectPath(tmp_path, 'main.yml'))
+            ext.extract_tasks_file(ext.ProjectPath(tmp_path, 'main.yml'), ext.ExtractionContext(False))
 
 def describe_extracting_plays() -> None:
 
@@ -743,7 +779,7 @@ def describe_extracting_plays() -> None:
             hosts: servers
             tasks:
               - import_tasks: test
-        ''')))
+        ''')), ext.ExtractionContext(False))
 
         assert result == rep.Play(
             hosts=['servers'],
@@ -761,7 +797,7 @@ def describe_extracting_plays() -> None:
             tasks:
               - block:
                 - import_tasks: test
-        ''')))
+        ''')), ext.ExtractionContext(False))
 
         assert result == rep.Play(
             hosts=['servers'],
@@ -783,7 +819,7 @@ def describe_extracting_plays() -> None:
               - import_tasks: test
             vars:
               testvar: 123
-        ''')))
+        ''')), ext.ExtractionContext(False))
 
         assert result == rep.Play(
             hosts=['servers'],
@@ -802,7 +838,7 @@ def describe_extracting_plays() -> None:
                 name: test play
                 tasks:
                   - import_tasks: hello
-            ''')))
+            ''')), ext.ExtractionContext(False))
 
 def describe_extract_playbook() -> None:
 
@@ -845,7 +881,8 @@ def describe_extract_playbook() -> None:
                         vars={'x': 111},
                         raw=raw_play),
                 ],
-                raw=raw_pb),
+                raw=raw_pb,
+                broken_tasks=[]),
             path=tmp_path / 'pb.yml',
             id='test',
             version='test2',
@@ -899,7 +936,8 @@ def describe_extract_playbook() -> None:
                         name='config databases',
                         raw=raw_play_2),
                 ],
-                raw=raw_pb),
+                raw=raw_pb,
+                broken_tasks=[]),
             path=tmp_path / 'pb.yml',
             id='test',
             version='test2',
@@ -992,7 +1030,8 @@ def describe_extracting_roles() -> None:
                 default_var_files={'main.yml': defaults_file},
                 role_var_files={'main.yml': vars_file},
                 handler_files={'main.yml': handler_file},
-                broken_files=[]),
+                broken_files=[],
+                broken_tasks=[]),
             path=tmp_path,
             id='test',
             version='test2',
@@ -1045,7 +1084,8 @@ def describe_extracting_roles() -> None:
                 default_var_files={'main.yml': defaults_file},
                 role_var_files={},
                 handler_files={},
-                broken_files=[]),
+                broken_files=[],
+                broken_tasks=[]),
             path=tmp_path,
             id='test',
             version='test2',
@@ -1085,7 +1125,8 @@ def describe_extracting_roles() -> None:
                 default_var_files={'main.yml': defaults_file},
                 role_var_files={},
                 handler_files={},
-                broken_files=[rep.BrokenFile(Path('tasks/main.yml'), "Failed to load task file at tasks/main.yml: Wrong type encountered\n\nExpected task file to be list, got AnsibleMapping instead.\nActual value:\n{'file': {'path': 'hello'}, 'apt': {'name': 'test'}}")]),
+                broken_files=[rep.BrokenFile(Path('tasks/main.yml'), "Failed to load task file at tasks/main.yml: Wrong type encountered\n\nExpected task file to be list, got AnsibleMapping instead.\nActual value:\n{'file': {'path': 'hello'}, 'apt': {'name': 'test'}}")],
+                broken_tasks=[]),
             path=tmp_path,
             id='test',
             version='test2',
@@ -1150,7 +1191,8 @@ def describe_extracting_roles() -> None:
                 default_var_files={'main.yml': defaults_file},
                 role_var_files={},
                 handler_files={},
-                broken_files=[]),
+                broken_files=[],
+                broken_tasks=[]),
             path=tmp_path,
             id='test',
             version='test2',

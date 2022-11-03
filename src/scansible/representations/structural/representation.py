@@ -115,9 +115,21 @@ class VaultValue:
 
 
 @frozen
+class BrokenTask:
+    """
+    Represents a task/block that could not be extracted.
+    """
+
+    #: The raw datastructure that failed to extract.
+    ds: Any = required_field()
+    #: The reason for failure.
+    reason: str = required_field()
+
+
+@frozen
 class BrokenFile:
     """
-    Represents a file that could not be parsed.
+    Represents a file that could not be parsed or extracted.
     """
 
     #: The path to the file.
@@ -451,6 +463,8 @@ class Role:
     handler_files: dict[str, TaskFile] = required_field()
     #: Role's list of broken files.
     broken_files: list[BrokenFile] = required_field()
+    #: Role's list of broken tasks.
+    broken_tasks: list[BrokenTask] = required_field()
 
     #: The defaults/main file.
     main_defaults_file: VariableFile | None = field(init=False, validator=type_validator())
@@ -569,6 +583,8 @@ class Playbook:
     raw: Any = raw_field()
     #: List of plays defined in this playbook.
     plays: Sequence[Play] = required_field()
+    #: Playbook's list of broken tasks.
+    broken_tasks: list[BrokenTask] = required_field()
 
 
 @define
