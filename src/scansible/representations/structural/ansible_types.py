@@ -12,6 +12,7 @@ from ansible.playbook.role_include import IncludeRole
 from ansible.playbook.task import Task
 from ansible.playbook.task_include import TaskInclude
 
+from ansible.plugins.loader import PluginLoader
 from ansible.parsing.yaml.objects import AnsibleSequence, AnsibleMapping, AnsibleBaseYAMLObject, AnsibleVaultEncryptedUnicode
 from ansible.module_utils.parsing.convert_bool import boolean as convert_bool
 from ansible.template import Templar

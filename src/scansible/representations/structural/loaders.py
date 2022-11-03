@@ -194,6 +194,23 @@ def _patch_modargs_parser() -> Generator[None, None, None]:
         ans.ModuleArgsParser.parse = old_mod_args_parse  # type: ignore[assignment]
 
 
+@contextmanager
+def _patch_lookup_loader() -> Generator[None, None, None]:
+    # Patch the lookup_loader so that it always reports a lookup plugin as existing.
+    # Ansible does early resolution of `with_*` lookups, and since we may not
+    # have all collections installed and we're not registering custom lookup
+    # plugins, it'll complain when those are used in `with_*` directives.
+    old_loader_has_plugin = ans.PluginLoader.has_plugin
+    ans.PluginLoader.has_plugin = lambda *args, **kwargs: True  # type: ignore[assignment]
+    ans.PluginLoader.__contains__ = lambda *args, **kwargs: True  # type: ignore[assignment]
+
+    try:
+        yield
+    finally:
+        ans.PluginLoader.has_plugin = old_loader_has_plugin  # type: ignore[assignment]
+        ans.PluginLoader.__contains__ = old_loader_has_plugin  # type: ignore[assignment]
+
+
 def _get_task_action(ds: dict[str, ans.AnsibleValue]) -> str:
     args_parser = ans.ModuleArgsParser(ds)
     (action, _, _) = args_parser.parse()
@@ -284,7 +301,7 @@ def load_task(original_ds: dict[str, ans.AnsibleValue], as_handler: bool) -> tup
     # because of the presence of old keywords.
     _transform_old_become(ds)
 
-    with _patch_modargs_parser():
+    with _patch_modargs_parser(), _patch_lookup_loader():
         action = _get_task_action(ds)
         is_include_tasks = _task_is_include_import_tasks(action)
 
