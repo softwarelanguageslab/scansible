@@ -107,8 +107,8 @@ def validate_absolute_path(inst: Any, attr: attrs.Attribute[Path], value: Path) 
         raise ValueError(f'Expected {attr.name} to be an absolute path, got relative path {value} instead')
 
 
-def generate_rich_repr(obj: Any) -> rich.repr.Result:
-    for attr in cast(tuple[attrs.Attribute, ...], obj.__attrs_attrs__):  # type: ignore[type-arg]
+def generate_rich_repr(obj: StructuralBase) -> rich.repr.Result:
+    for attr in cast(tuple[attrs.Attribute, ...], obj.__attrs_attrs__):  # type: ignore[attr-defined, type-arg]
         name = attr.name
         default = attr.default
         value = getattr(obj, name)
@@ -123,8 +123,12 @@ def generate_rich_repr(obj: Any) -> rich.repr.Result:
             yield name, value, default_value
 
 
+class StructuralBase:
+    __rich_repr__ = generate_rich_repr
+
+
 @frozen
-class VaultValue:
+class VaultValue(StructuralBase):
     """
     Represents an Ansible encrypted vault value.
     """
@@ -132,11 +136,9 @@ class VaultValue:
     #: The encrypted data.
     data: bytes
 
-    __rich_repr__ = generate_rich_repr
-
 
 @frozen
-class BrokenTask:
+class BrokenTask(StructuralBase):
     """
     Represents a task/block that could not be extracted.
     """
@@ -146,11 +148,9 @@ class BrokenTask:
     #: The reason for failure.
     reason: str = required_field()
 
-    __rich_repr__ = generate_rich_repr
-
 
 @frozen
-class BrokenFile:
+class BrokenFile(StructuralBase):
     """
     Represents a file that could not be parsed or extracted.
     """
@@ -160,11 +160,9 @@ class BrokenFile:
     #: The reason why the file is broken.
     reason: str = required_field()
 
-    __rich_repr__ = generate_rich_repr
-
 
 @frozen
-class Platform:
+class Platform(StructuralBase):
     """
     Represents a platform supported by a role.
     """
@@ -174,11 +172,9 @@ class Platform:
     #: Platform version.
     version: str = required_field()
 
-    __rich_repr__ = generate_rich_repr
-
 
 @define
-class MetaFile:
+class MetaFile(StructuralBase):
     """
     Represents a file containing role metadata.
     """
@@ -188,11 +184,9 @@ class MetaFile:
     #: The metadata block contained in the file.
     metablock: MetaBlock = required_field()
 
-    __rich_repr__ = generate_rich_repr
-
 
 @define
-class MetaBlock:
+class MetaBlock(StructuralBase):
     """
     Represents a role metadata block.
     """
@@ -208,11 +202,9 @@ class MetaBlock:
     #: Role dependencies
     dependencies: Sequence['RoleRequirement'] = default_field(factory=list)
 
-    __rich_repr__ = generate_rich_repr
-
 
 @define
-class VariableFile:
+class VariableFile(StructuralBase):
     """
     Represents a file containing variables.
     """
@@ -224,11 +216,9 @@ class VariableFile:
     #: The variables contained within the file. The order is irrelevant.
     variables: Mapping[str, AnyValue] = required_field()
 
-    __rich_repr__ = generate_rich_repr
-
 
 @define
-class LoopControl:
+class LoopControl(StructuralBase):
     """
     Represents the loop control directive value.
     """
@@ -247,11 +237,9 @@ class LoopControl:
     #: See https://docs.ansible.com/ansible/latest/user_guide/playbooks_loops.html#extended-loop-variables
     extended: str | bool | None = default_field(default=None)
 
-    __rich_repr__ = generate_rich_repr
-
 
 @define(slots=False)
-class DirectivesBase:
+class DirectivesBase(StructuralBase):
     """
     Represents the common Ansible directives.
     """
@@ -310,8 +298,6 @@ class DirectivesBase:
     #: Path to privilege escalation executable.
     become_exe: str | None = default_field(default=None)
 
-    __rich_repr__ = generate_rich_repr
-
 
 @define(slots=False)
 class TaskBase(DirectivesBase):
@@ -366,8 +352,6 @@ class TaskBase(DirectivesBase):
     #: List of collections to search for modules.
     collections: Sequence[str] = default_field(factory=list)
 
-    __rich_repr__ = generate_rich_repr
-
 
 @define(slots=False)
 class Task(TaskBase):
@@ -384,8 +368,6 @@ class Handler(TaskBase):
 
     #: Topics on which the handler listens
     listen: Sequence[str] = default_field(factory=list)
-
-    __rich_repr__ = generate_rich_repr
 
 
 @define
@@ -420,11 +402,9 @@ class Block(DirectivesBase):
     #: List of collections to search for modules.
     collections: Sequence[str] = default_field(factory=list)
 
-    __rich_repr__ = generate_rich_repr
-
 
 @frozen
-class RoleSourceInfo:
+class RoleSourceInfo(StructuralBase):
     """
     Represents source info for a role requirement.
     """
@@ -437,8 +417,6 @@ class RoleSourceInfo:
     scm: str | None
     #: Role version.
     version: str | None
-
-    __rich_repr__ = generate_rich_repr
 
 
 @define(slots=False)
@@ -470,11 +448,9 @@ class RoleRequirement(DirectivesBase):
     #: from a role's meta/main.yml metadata file, but never for plays.
     source_info: RoleSourceInfo | None = default_field(default=None)
 
-    __rich_repr__ = generate_rich_repr
-
 
 @define
-class TaskFile:
+class TaskFile(StructuralBase):
     """
     Represents a file containing tasks and blocks.
     """
@@ -486,11 +462,9 @@ class TaskFile:
     #: handlers and tasks cannot be mixed.
     tasks: Sequence[Block | Task] | Sequence[Block | Handler] = required_field()
 
-    __rich_repr__ = generate_rich_repr
-
 
 @define
-class Role:
+class Role(StructuralBase):
     """
     Represents an Ansible role.
     """
@@ -540,11 +514,9 @@ class Role:
         self.main_tasks_file = find_file(self.task_files, 'main')
         self.main_handlers_file = find_file(self.handler_files, 'main')
 
-    __rich_repr__ = generate_rich_repr
-
 
 @define
-class VarsPrompt:
+class VarsPrompt(StructuralBase):
     """Represents a vars_prompt entry."""
 
     #: Name of the variable.
@@ -565,8 +537,6 @@ class VarsPrompt:
     salt: str | None = default_field(default=None)
     #: Whether the user input is unsafe and should not be templated.
     unsafe: str | bool | None = default_field(default=None)
-
-    __rich_repr__ = generate_rich_repr
 
 
 @define
@@ -624,11 +594,9 @@ class Play(DirectivesBase):
     #: List of collections to search for modules.
     collections: Sequence[str] = default_field(factory=list)
 
-    __rich_repr__ = generate_rich_repr
-
 
 @define
-class Playbook:
+class Playbook(StructuralBase):
     """
     Represents an Ansible playbook.
     """
@@ -640,11 +608,9 @@ class Playbook:
     #: Playbook's list of broken tasks.
     broken_tasks: list[BrokenTask] = required_field()
 
-    __rich_repr__ = generate_rich_repr
-
 
 @define
-class StructuralModel:
+class StructuralModel(StructuralBase):
     """
     Represents a structural model of a single role or playbook version.
     """
@@ -670,11 +636,9 @@ class StructuralModel:
         self.is_playbook = isinstance(self.root, Playbook)
         assert self.is_role != self.is_playbook, 'is_role and is_playbook should be mutually exclusive, and one should be set.'
 
-    __rich_repr__ = generate_rich_repr
-
 
 @define
-class MultiStructuralModel:
+class MultiStructuralModel(StructuralBase):
     """
     Represents the structural model of multiple versions of a role or playbook.
     """
@@ -683,5 +647,3 @@ class MultiStructuralModel:
     id: str = required_field()
     #: Map of versions to structural models.
     structural_models: dict[str, StructuralModel] = required_field()
-
-    __rich_repr__ = generate_rich_repr
