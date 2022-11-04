@@ -4,7 +4,10 @@ from __future__ import annotations
 from typing import (
         Any,
         Callable,
+        Generic,
+        Iterable,
         Mapping,
+        Protocol,
         Sequence,
         TypeVar,
         Union,
@@ -12,7 +15,11 @@ from typing import (
 )
 
 import datetime
+import re
 import types
+from abc import abstractmethod
+from functools import reduce
+from itertools import chain
 from pathlib import Path
 
 import attrs
@@ -107,24 +114,80 @@ def validate_absolute_path(inst: Any, attr: attrs.Attribute[Path], value: Path) 
         raise ValueError(f'Expected {attr.name} to be an absolute path, got relative path {value} instead')
 
 
-def generate_rich_repr(obj: StructuralBase) -> rich.repr.Result:
-    for attr in cast(tuple[attrs.Attribute, ...], obj.__attrs_attrs__):  # type: ignore[attr-defined, type-arg]
-        name = attr.name
-        default = attr.default
-        value = getattr(obj, name)
+VisitorReturnType = TypeVar('VisitorReturnType', covariant=True)
 
-        if not attr.repr:
-            continue
 
-        if default is attrs.NOTHING or (isinstance(default, attrs.Factory) and default.factory is raise_if_missing):  # type: ignore[arg-type, union-attr]
-            yield name, value
-        else:
-            default_value = default.factory() if isinstance(default, attrs.Factory) else default  # type: ignore[arg-type, union-attr]
-            yield name, value, default_value
+class StructuralVisitor(Protocol[VisitorReturnType]):
+    @abstractmethod
+    def visit_block(self, v: Block) -> VisitorReturnType: ...
+    @abstractmethod
+    def visit_broken_file(self, v: BrokenFile) -> VisitorReturnType: ...
+    @abstractmethod
+    def visit_broken_task(self, v: BrokenTask) -> VisitorReturnType: ...
+    @abstractmethod
+    def visit_handler(self, v: Handler) -> VisitorReturnType: ...
+    @abstractmethod
+    def visit_loop_control(self, v: LoopControl) -> VisitorReturnType: ...
+    @abstractmethod
+    def visit_meta_block(self, v: MetaBlock) -> VisitorReturnType: ...
+    @abstractmethod
+    def visit_meta_file(self, v: MetaFile) -> VisitorReturnType: ...
+    @abstractmethod
+    def visit_multi_structural_model(self, v: MultiStructuralModel) -> VisitorReturnType: ...
+    @abstractmethod
+    def visit_platform(self, v: Platform) -> VisitorReturnType: ...
+    @abstractmethod
+    def visit_play(self, v: Play) -> VisitorReturnType: ...
+    @abstractmethod
+    def visit_playbook(self, v: Playbook) -> VisitorReturnType: ...
+    @abstractmethod
+    def visit_role(self, v: Role) -> VisitorReturnType: ...
+    @abstractmethod
+    def visit_role_requirement(self, v: RoleRequirement) -> VisitorReturnType: ...
+    @abstractmethod
+    def visit_role_source_info(self, v: RoleSourceInfo) -> VisitorReturnType: ...
+    @abstractmethod
+    def visit_structural_model(self, v: StructuralModel) -> VisitorReturnType: ...
+    @abstractmethod
+    def visit_task(self, v: Task) -> VisitorReturnType: ...
+    @abstractmethod
+    def visit_task_file(self, v: TaskFile) -> VisitorReturnType: ...
+    @abstractmethod
+    def visit_variable_file(self, v: VariableFile) -> VisitorReturnType: ...
+    @abstractmethod
+    def visit_vars_prompt(self, v: VarsPrompt) -> VisitorReturnType: ...
 
 
 class StructuralBase:
-    __rich_repr__ = generate_rich_repr
+
+    def accept(self, visitor: StructuralVisitor[VisitorReturnType]) -> VisitorReturnType:
+        cls_name_snake_case = re.sub(r'(?<!^)(?=[A-Z])', '_', self.__class__.__name__).lower()
+        method_name = f'visit_{cls_name_snake_case}'
+        return getattr(visitor, method_name)(self)  # type: ignore[no-any-return]
+
+    def _yield_non_default_representable_attributes(self) -> Iterable[tuple[str, Any]]:
+        for attr in self.__attrs_attrs__:  # type: ignore[attr-defined]
+            if not attr.repr:
+                continue
+
+            name = attr.name
+            default = attr.default
+            value = getattr(self, name)
+            is_not_default = (
+                # If there's no default specified...
+                default is attrs.NOTHING
+                or (isinstance(default, attrs.Factory) and (  # type: ignore[arg-type]
+                    # or if it's a factory but it raises if no value is specified
+                    default.factory is raise_if_missing
+                    # or if it's a factory and the factory value is different from the actual value
+                    or default.factory() != value))
+                # or if it's a value and it's different from the actual value.
+                or (not isinstance(default, attrs.Factory) and value != default))  # type: ignore[arg-type]
+
+            if is_not_default:
+                yield name, value
+
+    __rich_repr__ = _yield_non_default_representable_attributes
 
 
 @frozen
@@ -135,6 +198,9 @@ class VaultValue(StructuralBase):
 
     #: The encrypted data.
     data: bytes
+
+    def __str__(self) -> str:
+        return self.data.decode()
 
 
 @frozen

@@ -9,3 +9,5 @@ FORMATTERS = FORMATTERS
 RENDERERS = RENDERERS
 ExecutableNotFound = ExecutableNotFound
 RequiredArgumentError = RequiredArgumentError
+
+def nohtml(s: str) -> str: ...
