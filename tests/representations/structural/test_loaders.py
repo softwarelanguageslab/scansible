@@ -134,7 +134,7 @@ def describe_load_role_metadata() -> None:
                     dependencies: []
                 ''')
 
-        def ignores_wrong_platform_type(load_meta: LoadMetaType, capsys: CaptureFixture) -> None:
+        def ignores_wrong_platform_type(load_meta: LoadMetaType, capsys: CaptureFixture[str]) -> None:
             result: tuple[Any, Any] = load_meta('''
                 galaxy_info:
                     platforms:
@@ -147,7 +147,7 @@ def describe_load_role_metadata() -> None:
             captured = capsys.readouterr()
             assert 'Ignoring malformed platform' in captured.out
 
-        def ignores_missing_platform_name(load_meta: LoadMetaType, capsys: CaptureFixture) -> None:
+        def ignores_missing_platform_name(load_meta: LoadMetaType, capsys: CaptureFixture[str]) -> None:
             result: tuple[Any, Any] = load_meta('''
                 galaxy_info:
                     platforms:
@@ -235,7 +235,7 @@ def describe_load_role_metadata() -> None:
 
             assert result[0]['galaxy_info']['platforms'] == [{ 'name': 'Debian', 'versions': ['all'] }]
 
-        def ignores_wrong_versions_type(load_meta: LoadMetaType, capsys: CaptureFixture) -> None:
+        def ignores_wrong_versions_type(load_meta: LoadMetaType, capsys: CaptureFixture[str]) -> None:
             result: tuple[Any, Any] = load_meta('''
                 galaxy_info:
                     platforms:
