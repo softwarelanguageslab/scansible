@@ -9,19 +9,17 @@ from enum import Enum
 
 from loguru import logger
 
-from scansible.models.edges import DEF, DEFINED_IF, USE
-from scansible.models.graph import Graph
-from scansible.models.nodes import DataNode, Expression, IntermediateValue, Literal, Variable
+from .. import representation as rep
 
 if TYPE_CHECKING:
     from .context import ExtractionContext
 
-from scansible.extractor.templates import TemplateExpressionAST, LookupTargetLiteral
+from .templates import TemplateExpressionAST, LookupTargetLiteral
 
 class TemplateRecord(NamedTuple):
     """State of a template expression."""
-    data_node: DataNode
-    expr_node: Expression
+    data_node: rep.DataNode
+    expr_node: rep.Expression
     used_variables: list[tuple[str, int, int]]
     is_literal: bool
 
@@ -37,8 +35,9 @@ class VariableDefinitionRecord(NamedTuple):
     """Binding of a variable at any given time."""
     name: str
     revision: int
-    template_expr: Union[str, Sentinel]
-    location: str
+    template_expr: str | Sentinel
+    name_location: rep.NodeLocation
+    init_location: rep.NodeLocation
 
     def __repr__(self) -> str:
         return f'VariableDefinitionRecord(name={self.name!r}, revision={self.revision}, expr={self.template_expr!r})'
@@ -60,9 +59,11 @@ class VariableValueRecord:
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}(var_def={self.var_def!r}, val_revision={self.val_revision})'
 
+
 class ConstantVariableValueRecord(VariableValueRecord):
     def copy(self) -> ConstantVariableValueRecord:
         return ConstantVariableValueRecord(self.var_def, self.val_revision)
+
 
 class ChangeableVariableValueRecord(VariableValueRecord):
     def __init__(self, var_def: VariableDefinitionRecord, val_revision: int, template_record: TemplateRecord) -> None:
@@ -304,7 +305,7 @@ class Scope:
     def __repr__(self) -> str:
         return f'Scope(level={self.level.name}, is_cached={self.is_cached})'
 
-    def get_variable_definition(self, name: str) -> Optional[VariableDefinitionRecord]:
+    def get_variable_definition(self, name: str) -> VariableDefinitionRecord | None:
         return self._var_def_store.get(name)
 
     def set_variable_definition(self, name: str, rec: VariableDefinitionRecord) -> None:
@@ -314,7 +315,7 @@ class Scope:
         return (name in self._var_def_store
                 and self._var_def_store[name].revision == revision)
 
-    def get_variable_value(self, name: str) -> Optional[VariableValueRecord]:
+    def get_variable_value(self, name: str) -> VariableValueRecord | None:
         return self._var_val_store.get(name)
 
     def set_variable_value(self, name: str, rec: VariableValueRecord) -> None:
@@ -333,7 +334,7 @@ class Scope:
     def get_all_defined_variables(self) -> dict[str, int]:
         return {vr.name: vr.revision for vr in self._var_def_store.values()}
 
-    def get_expression(self, expr: str) -> Optional[TemplateRecord]:
+    def get_expression(self, expr: str) -> TemplateRecord | None:
         return self._expr_store.get(expr)
 
     def set_expression(self, expr: str, rec: TemplateRecord) -> None:
@@ -671,7 +672,7 @@ class VarContext:
         self.context = context
         self._next_revnos: dict[str, int] = defaultdict(lambda: 0)
         self._next_valnos: dict[tuple[str, int], int] = {}
-        self._valno_to_var: dict[tuple[str, int, int], tuple[Variable, bool]] = {}
+        self._valno_to_var: dict[tuple[str, int, int], tuple[rep.Variable, bool]] = {}
 
     @contextmanager
     def enter_scope(self, level: ScopeLevel) -> Generator[None, None, None]:
@@ -685,19 +686,19 @@ class VarContext:
         yield
         self._scopes.exit_scope()
 
-    def evaluate_template(self, expr: str, is_conditional: bool, is_top_level: bool = True) -> TemplateRecord:
+    def evaluate_template(self, expr: str, location: rep.NodeLocation, is_conditional: bool, is_top_level: bool = True) -> TemplateRecord:
         """Parse a template, add required nodes to the graph, and return the record."""
         logger.debug(f'Evaluating expression {expr!r}')
         ast = TemplateExpressionAST.parse(expr, is_conditional, self._scopes.get_variable_mapping())
 
         if ast is None or ast.is_literal():
             logger.debug(f'{expr!r} is a literal or broken expression')
-            ln = Literal(node_id=self.context.next_id(), value=expr, type='str')
+            ln = rep.Literal(value=expr, type='str', location=location)
             self.context.graph.add_node(ln)
             # Create this node purely to adhere to TemplateRecord typings so we
             # don't have to accept None as a possibility. It's never added to
             # the graph and the template record is never cached either.
-            en = Expression(node_id=self.context.next_id(), expr=expr, non_idempotent_components_str='')
+            en = rep.Expression(expr=expr, non_idempotent_components=())
             return TemplateRecord(ln, en, [], True)
 
         used_values = self._resolve_expression_values(ast, is_top_level)
@@ -706,17 +707,17 @@ class VarContext:
         existing_tr_pair = self._scopes.get_expression(expr, used_values)
         if existing_tr_pair is None:
             logger.debug(f'Expression {expr!r} was (re-)evaluated, creating new expression result')
-            return self._create_new_expression_result(expr, used_values, non_idempotent_components)
+            return self._create_new_expression_result(expr, location, used_values, non_idempotent_components)
 
         existing_tr, existing_tr_scope = existing_tr_pair
         logger.debug(f'Expression {expr!r} was already evaluated with the same input values, reusing previous result {existing_tr!r} from {existing_tr_scope!r}')
 
         if non_idempotent_components:
             logger.debug(f'Determined that expression {expr!r} may not be idempotent, creating new expression result')
-            iv = IntermediateValue(node_id=self.context.next_id(), identifier=self.context.next_iv_id())
+            iv = rep.IntermediateValue(identifier=self.context.next_iv_id())
             logger.debug(f'Using IV {iv!r}')
             self.context.graph.add_node(iv)
-            self.context.graph.add_edge(existing_tr.expr_node, iv, DEF)
+            self.context.graph.add_edge(existing_tr.expr_node, iv, rep.DEF)
             return existing_tr._replace(data_node=iv)
 
         return existing_tr_pair[0]
@@ -758,20 +759,20 @@ class VarContext:
 
         return vr
 
-    def _create_new_expression_result(self, expr: str, used_values: list[VariableValueRecord], non_idempotent_components: list[str]) -> TemplateRecord:
-        en = Expression(node_id=self.context.next_id(), expr=expr, non_idempotent_components_str='\n'.join(non_idempotent_components))
-        iv = IntermediateValue(node_id=self.context.next_id(), identifier=self.context.next_iv_id())
+    def _create_new_expression_result(self, expr: str, location: rep.NodeLocation, used_values: list[VariableValueRecord], non_idempotent_components: list[str]) -> TemplateRecord:
+        en = rep.Expression(expr=expr, non_idempotent_components=tuple(non_idempotent_components), location=location)
+        iv = rep.IntermediateValue(identifier=self.context.next_iv_id())
         logger.debug(f'Using IV {iv!r}')
         self.context.graph.add_node(en)
         self.context.graph.add_node(iv)
-        self.context.graph.add_edge(en, iv, DEF)
+        self.context.graph.add_edge(en, iv, rep.DEF)
 
-        def get_var_node_for_val_record(val_record: VariableValueRecord) -> Variable:
+        def get_var_node_for_val_record(val_record: VariableValueRecord) -> rep.Variable:
             return self._valno_to_var[(val_record.name, val_record.revision, val_record.val_revision)][0]
 
         for used_value in used_values:
             var_node = get_var_node_for_val_record(used_value)
-            self.context.graph.add_edge(var_node, en, USE)
+            self.context.graph.add_edge(var_node, en, rep.USE)
 
         used_value_ids = [
             (vval.name, vval.revision, vval.val_revision)
@@ -780,18 +781,18 @@ class VarContext:
         self._scopes.set_expression(expr, tr)
         return tr
 
-    def add_literal(self, value: Any) -> Literal:
+    def add_literal(self, value: Any, location: rep.NodeLocation) -> rep.Literal:
         type_ = value.__class__.__name__
         if isinstance(value, (dict, list)):
             self.context.graph.errors.append('I am not able to handle composite literals yet')
-            lit = Literal(node_id=self.context.next_id(), type=type_, value='')
+            lit = rep.Literal(type=type_, value='', location=location)
         else:
-            lit = Literal(node_id=self.context.next_id(), type=type_, value=value)
+            lit = rep.Literal(type=type_, value=value, location=location)
 
         self.context.graph.add_node(lit)
         return lit
 
-    def register_variable(self, name: str, level: ScopeLevel, location: str, *, expr: Any = SENTINEL) -> Variable:
+    def register_variable(self, name: str, level: ScopeLevel, name_location: rep.NodeLocation, init_location: rep.NodeLocation, *, expr: Any = SENTINEL) -> rep.Variable:
         """Declare a variable, initialized with the given expression.
 
         Expression may be empty if not available.
@@ -806,7 +807,7 @@ class VarContext:
         self._next_valnos[(name, var_rev)] = 0
 
         logger.debug(f'Selected revision {var_rev} for {name}')
-        var_node = Variable(node_id=self.context.next_id(), name=name, version=var_rev, value_version=0, scope_level=level.value, location=location)
+        var_node = rep.Variable(name=name, version=var_rev, value_version=0, scope_level=level.value, location=name_location)
         self.context.graph.add_node(var_node)
 
         # Store auxiliary information about which other variables are available at the
@@ -820,10 +821,10 @@ class VarContext:
             template_expr = SENTINEL
         else:
             template_expr = SENTINEL
-            lit_node = self.add_literal(expr)
-            self.context.graph.add_edge(lit_node, var_node, DEF)
+            lit_node = self.add_literal(expr, init_location)
+            self.context.graph.add_edge(lit_node, var_node, rep.DEF)
 
-        def_record = VariableDefinitionRecord(name, var_rev, template_expr, location)
+        def_record = VariableDefinitionRecord(name, var_rev, template_expr, name_location, init_location)
         self._scopes.set_variable_definition(name, def_record, level)
 
         # Assume the value is used by the caller is constant if they don't provide an expression.
@@ -843,18 +844,17 @@ class VarContext:
                 scope.level is level and scope.get_variable_definition(name) is not None
                 for scope in self._scopes._precedence_chain)
 
-    def _create_new_variable_node(self, vval: VariableValueRecord, scope: Scope) -> Variable:
+    def _create_new_variable_node(self, vval: VariableValueRecord, scope: Scope) -> rep.Variable:
         assert vval.val_revision >= 1, f'Internal Error: Unacceptable value version provided'
         var_node_idx = (vval.name, vval.revision, vval.val_revision)
         old_var_node, _ = self._valno_to_var[(vval.name, vval.revision, 0)]
 
-        new_var_node = Variable(
-                node_id=self.context.next_id(),
+        new_var_node = rep.Variable(
                 name=vval.name,
                 version=vval.revision,
                 value_version=vval.val_revision,
                 scope_level=scope.level.value,
-                location=vval.var_def.location)
+                location=vval.var_def.name_location)
         self.context.graph.add_node(new_var_node)
 
         self._valno_to_var[var_node_idx] = (new_var_node, True)
@@ -866,7 +866,7 @@ class VarContext:
         # manipulated by the caller.
         for predecessor in self.context.graph.predecessors(old_var_node):
             edge_type = self.context.graph[predecessor][old_var_node][0]['type']
-            if edge_type is not DEFINED_IF:
+            if edge_type is not rep.DEFINED_IF:
                 continue
             self.context.graph.add_edge(predecessor, new_var_node, edge_type)
 
@@ -886,7 +886,7 @@ class VarContext:
         if vdef_pair is None:
             assert self._scopes.get_variable_value(name) is None, f'Internal Error: Variable {name!r} has no definition but does have value'
             logger.debug(f'Variable {name} has not yet been defined, registering new value at lowest precedence level')
-            self.register_variable(name, ScopeLevel.CLI_VALUES, location='external file')
+            self.register_variable(name, ScopeLevel.CLI_VALUES, rep.NodeLocation.fake(), rep.NodeLocation.fake())
             vval_pair = self._scopes.get_variable_value(name)
             assert vval_pair is not None and isinstance(vval_pair[0], ConstantVariableValueRecord), f'Internal Error: Expected registered variable for {name!r} to be constant'
             return vval_pair[0]
@@ -906,7 +906,7 @@ class VarContext:
         # Evaluate the expression, perhaps re-evaluating if necessary. If the
         # expression was already evaluated previously and still has the same
         # value, this will just return the previous record.
-        template_record: TemplateRecord = self.evaluate_template(expr, False, False)
+        template_record: TemplateRecord = self.evaluate_template(expr, vdef.init_location, False, False)
 
         # Try to find a pre-existing value record for this template record. If
         # it exists, we've already evaluated this variable before and we can
@@ -927,7 +927,7 @@ class VarContext:
         value_record = ChangeableVariableValueRecord(vdef, value_revision, template_record)
         self._scopes.set_variable_value(name, value_record, ScopeLevel.OF_TEMPLATE)
 
-        var_node: Variable | None = None
+        var_node: rep.Variable | None = None
         var_node_idx = (name, vdef.revision, value_revision)
         if var_node_idx in self._valno_to_var:
             var_node, in_use = self._valno_to_var[var_node_idx]
@@ -945,5 +945,5 @@ class VarContext:
             var_node = self._create_new_variable_node(value_record, vdef_scope)
 
         # Link the edge
-        self.context.graph.add_edge(template_record.data_node, var_node, DEF)
+        self.context.graph.add_edge(template_record.data_node, var_node, rep.DEF)
         return value_record

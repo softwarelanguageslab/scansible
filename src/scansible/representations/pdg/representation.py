@@ -24,26 +24,51 @@ class NodeLocation:
     file: str = field(validator=type_validator())
     line: int = field(validator=type_validator())
     column: int = field(validator=type_validator())
+    includer_location: NodeLocation | None = field(validator=type_validator(), default=None)
+
+    @classmethod
+    def fake(cls, includer_location: NodeLocation | None = None) -> NodeLocation:
+        # TODO: Remove this and use real locations
+        return cls(file='fake.yml', line=-1, column=-1, includer_location=includer_location)
+
+    def __str__(self) -> str:
+        base = f'{self.file}:{self.line}:{self.column}'
+        if self.includer_location:
+            base += f'\n\tvia {self.includer_location}'
+
+        return base
 
 
-@define(slots=False, hash=True)
+def _frozen_node_id(inst: Node, attr: attrs.Attribute[int], new_value: int) -> int:
+    if getattr(inst, attr.name) >= 0:
+        raise attrs.exceptions.FrozenAttributeError()
+    return new_value
+
+
+@define(slots=False, hash=False)
 class Node:
     """Base nodes."""
-    node_id: int = field(validator=type_validator(), eq=False, default=-1, kw_only=True)
+    node_id: int = field(validator=type_validator(), default=-1, init=False, on_setattr=_frozen_node_id)
     location: NodeLocation | None = field(validator=type_validator(), default=None, kw_only=True, on_setattr=setters.frozen)
 
+    def __hash__(self) -> int:
+        if self.node_id is None or self.node_id < 0:
+            raise ValueError(f'attempting to hash a partially initialised {self.__class__.__name__}')
 
-@define(slots=False, hash=True)
+        return hash(tuple(getattr(self, attr.name) for attr in self.__attrs_attrs__))  # type: ignore[attr-defined]
+
+
+@define(slots=False, hash=False)
 class ControlNode(Node):
     ...
 
 
-@define(slots=False, hash=True)
+@define(slots=False, hash=False)
 class DataNode(Node):
     ...
 
 
-@define(slots=False, hash=True)
+@define(slots=False, hash=False)
 class Task(ControlNode):
     """Node representing a task."""
     action: str = field(validator=[type_validator(), non_empty_validator], on_setattr=setters.frozen)
@@ -58,7 +83,7 @@ class Conditional(ControlNode):
     """Node representing a condition."""
 
 
-@define(slots=False, hash=True)
+@define(slots=False, hash=False)
 class Variable(DataNode):
     """Node representing variables."""
     name: str = field(validator=[type_validator(), non_empty_validator], on_setattr=setters.frozen)
@@ -67,20 +92,21 @@ class Variable(DataNode):
     scope_level: int = field(validator=type_validator(), on_setattr=setters.frozen)
 
 
-@define(slots=False, hash=True)
+@define(slots=False, hash=False)
 class IntermediateValue(DataNode):
     """Node representing intermediate values."""
     identifier: int = field(validator=type_validator(), on_setattr=setters.frozen)
 
 
-@define(slots=False, hash=True)
+@define(slots=False, hash=False)
 class Literal(DataNode):
     """Node representing a literal."""
-    type: ValidTypeStr = field(validator=type_validator(), on_setattr=setters.frozen)
+    # TODO: Improve validation, use ValidTypeStr again!
+    type: str = field(validator=type_validator(), on_setattr=setters.frozen)
     value: Any = field(validator=type_validator(), on_setattr=setters.frozen)
 
 
-@define(slots=False, hash=True)
+@define(slots=False, hash=False)
 class Expression(DataNode):
     """Node representing a template expression."""
     expr: str = field(validator=[type_validator(), non_empty_validator], on_setattr=setters.frozen)
@@ -213,7 +239,8 @@ class Graph(BaseGraph):
         if not isinstance(node, Node):
             raise TypeError('Can only add Nodes to the graph')
 
-        node.node_id = self._get_next_node_id()
+        if node.node_id < 0:
+            node.node_id = self._get_next_node_id()
         super().add_node(node)
 
     def add_nodes_from(self, nodes: Iterable[Node]) -> None:  # type: ignore[override]
@@ -232,3 +259,10 @@ class Graph(BaseGraph):
                 return edge_idx
 
         return super().add_edge(n1, n2, type=type)
+
+
+__all__ = [
+    'Graph',
+    'Node', 'ControlNode', 'DataNode', 'Loop', 'Conditional', 'Task', 'Variable', 'Expression', 'IntermediateValue', 'Literal',
+    'Edge', 'DEF', 'DEFINED_IF', 'USE', 'ORDER', 'ORDER_TRANS', 'ORDER_BACK', 'Keyword',
+]

@@ -127,27 +127,37 @@ class StructuralBase:
         method_name = f'visit_{cls_name_snake_case}'
         return getattr(visitor, method_name)(self)  # type: ignore[no-any-return]
 
+    @classmethod
+    def is_default(cls, attr_name: str, attr_value: Any) -> bool:  # type: ignore[misc]
+        attr = next(a for a in cls.__attrs_attrs__ if a.name == attr_name)  # type: ignore[attr-defined]
+        default = attr.default
+        return not (
+            # If there's no default specified...
+            default is attrs.NOTHING
+            or (default is not None and isinstance(default, attrs.Factory) and (  # type: ignore[arg-type]
+                # or if it's a factory but it raises if no value is specified
+                default.factory is raise_if_missing
+                # or if it's a factory and the factory value is different from the actual value
+                or default.factory() != attr_value))
+            # or if it's a value and it's different from the actual value.
+            or (not isinstance(default, attrs.Factory) and attr_value != default))  # type: ignore[arg-type]
+
     def _yield_non_default_representable_attributes(self) -> Iterable[tuple[str, Any]]:
         for attr in self.__attrs_attrs__:  # type: ignore[attr-defined]
             if not attr.repr:
                 continue
 
             name = attr.name
-            default = attr.default
             value = getattr(self, name)
-            is_not_default = (
-                # If there's no default specified...
-                default is attrs.NOTHING
-                or (isinstance(default, attrs.Factory) and (  # type: ignore[arg-type]
-                    # or if it's a factory but it raises if no value is specified
-                    default.factory is raise_if_missing
-                    # or if it's a factory and the factory value is different from the actual value
-                    or default.factory() != value))
-                # or if it's a value and it's different from the actual value.
-                or (not isinstance(default, attrs.Factory) and value != default))  # type: ignore[arg-type]
 
-            if is_not_default:
+            if self.is_default(name, value):
                 yield name, value
+
+    def _get_non_default_attributes(self) -> list[tuple[str, Any]]:
+        return [
+            (name, value)
+            for attr in self.__attrs_attrs__  # type: ignore[attr-defined]
+            if not self.is_default((name := attr.name), (value := getattr(self, name)))]
 
     __rich_repr__ = _yield_non_default_representable_attributes
 
@@ -635,6 +645,8 @@ class Playbook(StructuralBase):
     plays: Sequence[Play] = required_field()
     #: Playbook's list of broken tasks.
     broken_tasks: list[BrokenTask] = required_field()
+    #: Playbook's list of broken files. Currently always empty.
+    broken_files: list[BrokenFile] = default_field(factory=list)
 
 
 @define

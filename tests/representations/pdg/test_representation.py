@@ -23,8 +23,15 @@ def a_node() -> None:
 
         assert node is not None
 
-    def should_be_hashable(factory: NodeFactory) -> None:
+    def should_not_be_hashable_before_node_id_is_set(factory: NodeFactory) -> None:
         node = factory(rep.NodeLocation('test.yml', 0, 0))
+
+        with pytest.raises(Exception):
+            hash(node)
+
+    def should_be_hashable_after_node_id_is_set(factory: NodeFactory) -> None:
+        node = factory(rep.NodeLocation('test.yml', 0, 0))
+        node.node_id = 0
 
         assert hash(node) is not None
 
@@ -333,6 +340,10 @@ def describe_order_edge() -> None:
     e = rep.Expression(expr='{{ test }}')
     l = rep.Literal(type='str', value='test')
 
+    for idx, n in enumerate((t1, t2, v, e, l)):
+        n.node_id = idx
+    print(t1)
+
     @pytest.fixture(params=[(t1, t2)])
     def valid_source_and_target(request: FixtureRequest) -> tuple[rep.Node, rep.Node]:
         return request.param  # type: ignore[no-any-return]
@@ -354,7 +365,10 @@ def describe_use_edge() -> None:
     t = rep.Task(action='file')
     v = rep.Variable(name='test', version=1, value_version=1, scope_level=1)
     e = rep.Expression(expr='{{ test }}')
-    l = rep.Literal(type='str', value='test', node_id=4)
+    l = rep.Literal(type='str', value='test')
+
+    for idx, n in enumerate((t, v, e, l)):
+        n.node_id = idx
 
     @pytest.fixture(params=[(v, e)])
     def valid_source_and_target(request: FixtureRequest) -> tuple[rep.Node, rep.Node]:
@@ -379,6 +393,9 @@ def describe_def_edge() -> None:
     e = rep.Expression(expr='{{ test }}')
     l = rep.Literal(type='str', value='test')
 
+    for idx, n in enumerate((t, v, e, l)):
+        n.node_id = idx
+
     valid = set(product([e, l, t, v], [v]))
     @pytest.fixture(params=valid)
     def valid_source_and_target(request: FixtureRequest) -> tuple[rep.Node, rep.Node]:
@@ -402,6 +419,9 @@ def describe_kw_edge() -> None:
     v = rep.Variable(name='test', version=1, value_version=1, scope_level=1)
     e = rep.Expression(expr='{{ test }}')
     l = rep.Literal(type='str', value='test')
+
+    for idx, n in enumerate((t, v, e, l)):
+        n.node_id = idx
 
     valid = set(product([e, l, v], [t]))
     @pytest.fixture(params=valid)
