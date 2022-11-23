@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import abc
 
+from ansible import constants as ansible_constants
 from loguru import logger
 
 from scansible.representations.structural import Task, TaskFile
@@ -85,11 +86,11 @@ class TaskExtractor(abc.ABC):
 
 def task_extractor_factory(context: ExtractionContext, task: Task) -> TaskExtractor:
     action = task.action
-    if action == 'set_fact':
+    if action in ansible_constants._ACTION_SET_FACT:
         return SetFactTaskExtractor(context, task)
-    if action == 'include_vars':
+    if action in ansible_constants._ACTION_INCLUDE_VARS:
         return IncludeVarsTaskExtractor(context, task)
-    if action in ('import_tasks', 'include_tasks'):
+    if action in ansible_constants._ACTION_ALL_INCLUDE_IMPORT_TASKS:
         return IncludeTaskExtractor(context, task)
 
     return GenericTaskExtractor(context, task)
