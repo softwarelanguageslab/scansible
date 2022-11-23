@@ -2,7 +2,7 @@ from typing import NamedTuple
 
 import pytest
 
-from scansible.extractor.templates import TemplateExpressionAST, LookupTarget, LookupTargetLiteral, LookupTargetVariable
+from scansible.representations.pdg.extractor.templates import TemplateExpressionAST, LookupTarget, LookupTargetLiteral, LookupTargetVariable
 
 
 class Case(NamedTuple):
@@ -91,29 +91,35 @@ def describe_template_parser() -> None:
     def should_parse_expressions(case: Case) -> None:
         ast = TemplateExpressionAST.parse(
                 case.expr, case.is_conditional, case.variable_mappings)
+        assert ast is not None
         assert ast.ast_root is not None
 
     def should_find_variables(case: Case) -> None:
         ast = TemplateExpressionAST.parse(
                 case.expr, case.is_conditional, case.variable_mappings)
+        assert ast is not None
         assert ast.referenced_variables == case.variables
 
     def should_find_filters(case: Case) -> None:
         ast = TemplateExpressionAST.parse(
                 case.expr, case.is_conditional, case.variable_mappings)
+        assert ast is not None
         assert ast.used_filters == case.filters
 
     def should_find_tests(case: Case) -> None:
         ast = TemplateExpressionAST.parse(
                 case.expr, case.is_conditional, case.variable_mappings)
+        assert ast is not None
         assert ast.used_tests == case.tests
 
     def should_find_now_usage(case: Case) -> None:
         ast = TemplateExpressionAST.parse(
                 case.expr, case.is_conditional, case.variable_mappings)
+        assert ast is not None
         assert ast.uses_now == case.uses_now
 
     def should_find_lookups(case: Case) -> None:
         ast = TemplateExpressionAST.parse(
                 case.expr, case.is_conditional, case.variable_mappings)
+        assert ast is not None
         assert ast.used_lookups == case.lookup_targets
