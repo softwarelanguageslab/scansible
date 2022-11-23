@@ -7,9 +7,7 @@ import pytest
 
 from pydantic import BaseModel
 
-from scansible.models.edges import Edge
-from scansible.models.graph import Graph
-from scansible.models.nodes import Node, IntermediateValue
+from scansible.representations.pdg import Edge, Graph, Node, IntermediateValue
 
 
 def _get_in_out_neighbours(g: Graph, n: Node) -> set[Node]:
