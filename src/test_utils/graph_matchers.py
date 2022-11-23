@@ -1,11 +1,9 @@
 """Graph matcher assertion helpers."""
-from typing import Any, Optional
+from typing import Any
 
 import operator
 
-import pytest
-
-from pydantic import BaseModel
+import attrs
 
 from scansible.representations.pdg import Edge, Graph, Node, IntermediateValue
 
@@ -15,24 +13,25 @@ def _get_in_out_neighbours(g: Graph, n: Node) -> set[Node]:
 
 
 def _match_node(n1: Node, n2: Node) -> bool:
+    def to_dict(n: Node) -> dict[str, Any]:
+        return {k: v for k, v in attrs.asdict(n).items() if k != 'node_id'}
+
     return (type(n1) == type(n2)
-            and all(getattr(n1, attr) == getattr(n2, attr)
-                    for attr in n1.__fields__
-                    if attr != 'node_id' and not isinstance(n1, IntermediateValue)))
+        and (not isinstance(n1, IntermediateValue) and to_dict(n1) == to_dict(n2)))
 
 
 def get_graph_kws(g: Graph, ignore: set[str]) -> dict[str, Any]:
     return {k: v for k, v in g.graph.items() if k not in ignore}
 
 
-def assert_graphs_match(g1: Graph, g2: Graph, ignore_graph_kws: Optional[set[str]] = None) -> None:
+def assert_graphs_match(g1: Graph, g2: Graph, ignore_graph_kws: set[str] | None = None) -> None:
     __tracebackhide__ = True
 
     if ignore_graph_kws is None:
         ignore_graph_kws = set()
 
     if get_graph_kws(g1, ignore_graph_kws) != get_graph_kws(g2, ignore_graph_kws):
-        pytest.fail(f'Mismatching graph attributes: Expected {g2.graph}, got {g1.graph}')
+        raise AssertionError(f'Mismatching graph attributes: Expected {g2.graph}, got {g1.graph}')
 
     # Compare nodes
     nodes1 = set(g1)
@@ -48,11 +47,11 @@ def assert_graphs_match(g1: Graph, g2: Graph, ignore_graph_kws: Optional[set[str
                 correspondences[n1] = n2
                 break
         else:
-            pytest.fail(f'Unexpected node {n1!r} in first graph')
+            raise AssertionError(f'Unexpected node {n1!r} in first graph')
 
     for n2 in nodes2:
         if not isinstance(n2, IntermediateValue):
-            pytest.fail(f'Missing node {n2!r} in first graph')
+            raise AssertionError(f'Missing node {n2!r} in first graph')
 
     # Construct correspondences between intermediate values
     for n1 in nodes1:
@@ -62,10 +61,10 @@ def assert_graphs_match(g1: Graph, g2: Graph, ignore_graph_kws: Optional[set[str
         connected_nodes = _get_in_out_neighbours(g1, n1)
 
         if not connected_nodes:
-            pytest.fail('Disconnected intermediate value in first graph. Cannot handle that')
+            raise AssertionError('Disconnected intermediate value in first graph. Cannot handle that')
 
         if any(isinstance(cn, IntermediateValue) for cn in connected_nodes):
-            pytest.fail(f'Chain of intermediate values with {n1!r} in first graph. Cannot handle those.')
+            raise AssertionError(f'Chain of intermediate values with {n1!r} in first graph. Cannot handle those.')
 
         conn_in_g2 = {correspondences[cn] for cn in connected_nodes}
         assert len(conn_in_g2) == len(connected_nodes)
@@ -77,16 +76,16 @@ def assert_graphs_match(g1: Graph, g2: Graph, ignore_graph_kws: Optional[set[str
                 continue
             if _get_in_out_neighbours(g2, cand) == conn_in_g2 and cand in nodes2:
                 if found:
-                    pytest.fail('Multiple intermediate values between same nodes. Cannot handle that.')
+                    raise AssertionError('Multiple intermediate values between same nodes. Cannot handle that.')
                 found = True
                 correspondences[n1] = cand
                 nodes2.remove(cand)
                 break
         else:
-            pytest.fail(f'Unexpected intermediate value {n1!r} of first graph (connected to {connected_nodes}')
+            raise AssertionError(f'Unexpected intermediate value {n1!r} of first graph (connected to {connected_nodes}')
 
     for n2 in nodes2:
-        pytest.fail(f'Missing intermediate value {n2!r} in first graph')
+        raise AssertionError(f'Missing intermediate value {n2!r} in first graph')
 
     # Compare edges
     edges1 = set(g1.edges())
@@ -95,17 +94,17 @@ def assert_graphs_match(g1: Graph, g2: Graph, ignore_graph_kws: Optional[set[str
         e2 = (correspondences[e1[0]], correspondences[e1[1]])
 
         if e2 not in edges2:
-            pytest.fail(f'Unexpected edge {e1[0]!r} -> {e1[1]!r} in first graph')
+            raise AssertionError(f'Unexpected edge {e1[0]!r} -> {e1[1]!r} in first graph')
 
         edges2.remove(e2)
 
         d1 = g1[e1[0]][e1[1]]
         d2 = g2[e2[0]][e2[1]]
-        if (isinstance(d1, BaseModel) and d1 != d2) or (type(d1) != type(d2)):
-            pytest.fail(f'Mismatch in edge data for {e2[0]!r} -> {e2[1]!r}: Expected {d2}, got {d1}')
+        if d1 != d2:
+            raise AssertionError(f'Mismatch in edge data for {e2[0]!r} -> {e2[1]!r}: Expected {d2}, got {d1}')
 
     for e2 in edges2:
-        pytest.fail(f'Missing edge {e2[0]!r} -> {e2[1]!r} in first graph')
+        raise AssertionError(f'Missing edge {e2[0]!r} -> {e2[1]!r} in first graph')
 
 
 NodeSpecs = dict[str, Node]
