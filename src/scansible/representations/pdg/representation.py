@@ -264,4 +264,5 @@ __all__ = [
     'Graph',
     'Node', 'ControlNode', 'DataNode', 'Loop', 'Conditional', 'Task', 'Variable', 'Expression', 'IntermediateValue', 'Literal',
     'Edge', 'DEF', 'DEFINED_IF', 'USE', 'ORDER', 'ORDER_TRANS', 'ORDER_BACK', 'Keyword',
+    'NodeLocation',
 ]

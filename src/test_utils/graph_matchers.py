@@ -1,5 +1,5 @@
 """Graph matcher assertion helpers."""
-from typing import Any
+from typing import Any, Iterable
 
 import operator
 
@@ -14,7 +14,7 @@ def _get_in_out_neighbours(g: Graph, n: Node) -> set[Node]:
 
 def _match_node(n1: Node, n2: Node) -> bool:
     def to_dict(n: Node) -> dict[str, Any]:
-        return {k: v for k, v in attrs.asdict(n).items() if k != 'node_id'}
+        return {k: v for k, v in attrs.asdict(n).items() if k not in ('node_id', 'location')}
 
     return (type(n1) == type(n2)
         and (not isinstance(n1, IntermediateValue) and to_dict(n1) == to_dict(n2)))
@@ -108,7 +108,7 @@ def assert_graphs_match(g1: Graph, g2: Graph, ignore_graph_kws: set[str] | None 
 
 
 NodeSpecs = dict[str, Node]
-EdgeSpecs = list[tuple[str, str, Edge]]
+EdgeSpecs = Iterable[tuple[str, str, Edge]]
 
 def create_graph(nodes: NodeSpecs, edges: EdgeSpecs, role_name: str = 'test_role', role_version: str = 'test_version') -> Graph:
     g = Graph(role_name=role_name, role_version=role_version)
