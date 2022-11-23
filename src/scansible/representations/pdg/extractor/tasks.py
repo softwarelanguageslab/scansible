@@ -67,16 +67,8 @@ class TaskExtractor(abc.ABC):
         if isinstance(value, str):
             tr = self.context.vars.evaluate_template(value, rep.NodeLocation.fake(), is_conditional)
             return tr.data_node
-
-        type_ = value.__class__.__name__
-        if isinstance(value, (dict, list)):
-            self.context.graph.errors.append('I am not able to handle composite literals yet')
-            lit = rep.Literal(type=type_, value='')  # type: ignore[arg-type]
         else:
-            lit = rep.Literal(type=type_, value=value)  # type: ignore[arg-type]
-
-        self.context.graph.add_node(lit)
-        return lit
+            return self.context.vars.add_literal(value, rep.NodeLocation.fake())
 
     def warn_remaining_kws(self, action: str = '') -> None:
         for other_kw, _ in self.task._get_non_default_attributes():

@@ -9,6 +9,8 @@ from enum import Enum
 
 from loguru import logger
 
+from scansible.representations import structural as struct
+
 from .. import representation as rep
 
 if TYPE_CHECKING:
@@ -785,7 +787,9 @@ class VarContext:
         type_ = value.__class__.__name__
         if isinstance(value, (dict, list)):
             self.context.graph.errors.append('I am not able to handle composite literals yet')
-            lit = rep.Literal(type=type_, value='', location=location)
+            lit = rep.Literal(type=type_, value=str(value), location=location)
+        elif isinstance(value, struct.VaultValue):
+            lit = rep.Literal(type=type_, value=str(value), location=location)
         else:
             lit = rep.Literal(type=type_, value=value, location=location)
 

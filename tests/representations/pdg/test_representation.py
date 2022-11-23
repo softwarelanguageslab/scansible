@@ -1,4 +1,4 @@
-from typing import Any, Protocol
+from typing import Any, Protocol, Literal
 
 from itertools import chain, product
 
@@ -110,8 +110,8 @@ def describe_literal() -> None:
         return lambda loc: rep.Literal(type='bool', value=True, location=loc)
 
     @pytest.mark.parametrize('type', ['bool', 'str', 'list'])
-    def should_have_type(type: str) -> None:
-        lit = rep.Literal(type=type, value=None)  # type: ignore[arg-type]
+    def should_have_type(type: Literal['bool', 'str', 'list']) -> None:
+        lit = rep.Literal(type=type, value=None)
 
         assert lit.type == type
 

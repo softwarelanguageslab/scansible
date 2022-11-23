@@ -10,7 +10,7 @@ from networkx.classes import MultiDiGraph
 from .._utils import type_validator
 
 
-ValidTypeStr = LiteralT['str', 'bool', 'int', 'float', 'dict', 'list', 'NoneType']
+ValidTypeStr = LiteralT['str', 'bool', 'int', 'float', 'dict', 'list', 'NoneType', 'VaultValue', 'date', 'datetime']
 
 
 def non_empty_validator(inst: object, attr: attrs.Attribute[str], value: str) -> None:
@@ -101,8 +101,7 @@ class IntermediateValue(DataNode):
 @define(slots=False, hash=False)
 class Literal(DataNode):
     """Node representing a literal."""
-    # TODO: Improve validation, use ValidTypeStr again!
-    type: str = field(validator=type_validator(), on_setattr=setters.frozen)
+    type: ValidTypeStr = field(validator=type_validator(), on_setattr=setters.frozen)
     value: Any = field(validator=type_validator(), on_setattr=setters.frozen)
 
 
