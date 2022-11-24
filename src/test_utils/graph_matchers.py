@@ -12,9 +12,10 @@ def _get_in_out_neighbours(g: Graph, n: Node) -> set[Node]:
     return set(g.predecessors(n)) | set(g.successors(n))
 
 
-def _match_node(n1: Node, n2: Node) -> bool:
+def _match_node(n1: Node, n2: Node, match_locations: bool) -> bool:
+    ignored_kws = ('node_id', ) if match_locations else ('node_id', 'location')
     def to_dict(n: Node) -> dict[str, Any]:
-        return {k: v for k, v in attrs.asdict(n).items() if k not in ('node_id', 'location')}
+        return {k: v for k, v in attrs.asdict(n).items() if k not in ignored_kws}
 
     return (type(n1) == type(n2)
         and (not isinstance(n1, IntermediateValue) and to_dict(n1) == to_dict(n2)))
@@ -24,7 +25,7 @@ def get_graph_kws(g: Graph, ignore: set[str]) -> dict[str, Any]:
     return {k: v for k, v in g.graph.items() if k not in ignore}
 
 
-def assert_graphs_match(g1: Graph, g2: Graph, ignore_graph_kws: set[str] | None = None) -> None:
+def assert_graphs_match(g1: Graph, g2: Graph, *, ignore_graph_kws: set[str] | None = None, match_locations: bool = False) -> None:
     __tracebackhide__ = True
 
     if ignore_graph_kws is None:
@@ -42,7 +43,7 @@ def assert_graphs_match(g1: Graph, g2: Graph, ignore_graph_kws: set[str] | None 
             continue
 
         for n2 in sorted(nodes2, key=operator.attrgetter('node_id')):
-            if _match_node(n1, n2):
+            if _match_node(n1, n2, match_locations):
                 nodes2.remove(n2)
                 correspondences[n1] = n2
                 break

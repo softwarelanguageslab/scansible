@@ -105,12 +105,18 @@ class Literal(DataNode):
     value: Any = field(validator=type_validator(), on_setattr=setters.frozen)
 
 
+def _convert_to_tuple(obj: tuple[str, ...] | list[str]) -> tuple[str, ...]:
+    if isinstance(obj, tuple):
+        return obj
+    return tuple(obj)
+
+
 @define(slots=False, hash=False)
 class Expression(DataNode):
     """Node representing a template expression."""
     expr: str = field(validator=[type_validator(), non_empty_validator], on_setattr=setters.frozen)
 
-    non_idempotent_components: tuple[str, ...] = field(validator=type_validator(), factory=tuple, on_setattr=setters.frozen)
+    non_idempotent_components: tuple[str, ...] = field(validator=type_validator(), factory=tuple, converter=_convert_to_tuple, on_setattr=setters.frozen)
 
     @property
     def idempotent(self) -> bool:
