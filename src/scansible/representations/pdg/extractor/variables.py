@@ -10,10 +10,9 @@ from .context import ExtractionContext, ExtractionResult
 
 class VariablesExtractor:
 
-    def __init__(self, context: ExtractionContext, variables: Mapping[str, object], parent_location: rep.NodeLocation | None) -> None:
+    def __init__(self, context: ExtractionContext, variables: Mapping[str, object]) -> None:
         self.context = context
         self.variables = variables
-        self.parent_location = parent_location
 
     def extract_variables(self, scope_level: ScopeLevel) -> ExtractionResult:
         added_vars: list[rep.Variable] = []
@@ -27,4 +26,4 @@ class VariablesExtractor:
     def extract_variable(self, var_name: str, var_init: object, scope_level: ScopeLevel) -> rep.Variable:
         if not isinstance(var_init, (str, bool, int, float)):
             self.context.graph.errors.append('I am not able to properly handle non-atomic values yet')
-        return self.context.vars.register_variable(var_name, scope_level, expr=var_init, name_location=rep.NodeLocation.fake(self.parent_location), init_location=rep.NodeLocation.fake(self.parent_location))
+        return self.context.vars.register_variable(var_name, scope_level, expr=var_init)

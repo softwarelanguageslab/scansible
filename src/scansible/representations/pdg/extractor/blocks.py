@@ -16,7 +16,7 @@ class BlockExtractor:
     def __init__(self, context: ExtractionContext, block: Block) -> None:
         self.context = context
         self.block = block
-        self.location = rep.NodeLocation.fake()
+        self.location = context.get_location(block)
 
     def extract_block(self, predecessors: list[rep.ControlNode]) -> TaskExtractionResult:
         with self.context.vars.enter_scope(ScopeLevel.BLOCK_VARS):
@@ -29,7 +29,7 @@ class BlockExtractor:
             # shadow variables registered in an outer block. However, it's
             # confirmed to be a bug, so we'll handle it as if it were
             # implemented correctly.
-            self.context.vars.register_variable(var_name, expr=var_value, level=ScopeLevel.BLOCK_VARS, name_location=self.location, init_location=self.location)
+            self.context.vars.register_variable(var_name, expr=var_value, level=ScopeLevel.BLOCK_VARS)
 
         # A block without a list of tasks should be impossible
         block_result = self._extract_children(self.block.block, predecessors)

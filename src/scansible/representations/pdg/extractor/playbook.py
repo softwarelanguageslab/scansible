@@ -19,6 +19,6 @@ class PlaybookExtractor:
     def extract(self) -> None:
         for play in self.playbook.plays:
             with self.context.vars.enter_scope(ScopeLevel.PLAY_VARS):
-                VariablesExtractor(self.context, play.vars, rep.NodeLocation.fake()).extract_variables(ScopeLevel.PLAY_VARS)
+                VariablesExtractor(self.context, play.vars).extract_variables(ScopeLevel.PLAY_VARS)
                 TaskListExtractor(self.context, play.tasks).extract_tasks([])
 

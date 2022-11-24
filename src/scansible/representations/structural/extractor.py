@@ -179,7 +179,7 @@ def extract_task(ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext, as_han
 
     rep_cls = rep.Handler if as_handler else rep.Task
 
-    return rep_cls(**attrs, raw=raw_ds)  # type: ignore[no-any-return]
+    return rep_cls(**attrs, raw=raw_ds, location=raw_ds.ansible_pos)  # type: ignore[no-any-return]
 
 
 def extract_play(ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext) -> rep.Play:
@@ -193,7 +193,7 @@ def extract_play(ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext) -> rep
     attrs['roles'] = [dep for raw_dep in raw_play.roles if (dep := _extract_role_dependency(raw_dep, ctx, allow_new_style=False)) is not None]
     attrs['vars'] = extract_list_of_variables(raw_play.vars)
 
-    play = rep.Play(**attrs, raw=raw_ds)
+    play = rep.Play(**attrs, raw=raw_ds, location=raw_ds.ansible_pos)
     for child in play.tasks:
         child.parent = play
     return play

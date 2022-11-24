@@ -200,9 +200,13 @@ def prevent_undesired_operations() -> Generator[None, None, None]:
 
 def convert_ansible_values(obj: Any) -> Any:
     if isinstance(obj, ans.AnsibleVaultEncryptedUnicode):
-        return rep.VaultValue(data=obj._ciphertext)
+        return rep.VaultValue(data=obj._ciphertext, location=obj.ansible_pos)
     if isinstance(obj, list):
-        return [convert_ansible_values(el) for el in obj]
+        seq = ans.AnsibleSequence([convert_ansible_values(el) for el in obj])
+        seq.ansible_pos = getattr(obj, 'ansible_pos', ('unknown file', -1, -1))
+        return seq
     if isinstance(obj, dict):
-        return {k: convert_ansible_values(v) for k, v in obj.items()}
+        dct = ans.AnsibleMapping({k: convert_ansible_values(v) for k, v in obj.items()})
+        dct.ansible_pos = getattr(obj, 'ansible_pos', ('unknown file', -1, -1))
+        return dct
     return obj

@@ -22,9 +22,11 @@ class IncludeContext:
     _playbook_base_path: ProjectPath | None
     _role_base_path: ProjectPath | None
     _last_included_file_path: ProjectPath | None
+    last_include_location: rep.NodeLocation | None
 
     def __init__(self, model: struct_rep.StructuralModel, *, lenient: bool) -> None:
         self._lenient = lenient
+        self.last_include_location = None
 
         if isinstance(model.root, struct_rep.Playbook):
             self._playbook_base_path = ProjectPath.from_root(model.path.parent)
@@ -37,22 +39,25 @@ class IncludeContext:
                 self._last_included_file_path = self._role_base_path.join(model.root.main_tasks_file.file_path)
 
     @contextmanager
-    def _enter_tasks_file(self, file_path: ProjectPath) -> Generator[None, None, None]:
+    def _enter_file(self, file_path: ProjectPath, includer_location: rep.NodeLocation) -> Generator[None, None, None]:
         old_lifp = self._last_included_file_path
+        old_includer = self.last_include_location
         self._last_included_file_path = file_path
+        self.last_include_location = includer_location
         try:
             yield
         finally:
             self._last_included_file_path = old_lifp
+            self.last_include_location = old_includer
 
     @contextmanager
-    def _enter_role(self, role: struct_rep.Role, role_base_path: ProjectPath) -> Generator[None, None, None]:
+    def _enter_role(self, role: struct_rep.Role, role_base_path: ProjectPath, includer_location: rep.NodeLocation) -> Generator[None, None, None]:
         old_rbp = self._role_base_path
         self._role_base_path = role_base_path
         try:
             # TODO: this is ugly. we can probably use an ExitStack here.
             if role.main_tasks_file is not None:
-                with self._enter_tasks_file(role_base_path.join(role.main_tasks_file.file_path)):
+                with self._enter_file(role_base_path.join(role.main_tasks_file.file_path), includer_location):
                     yield
             else:
                 yield
@@ -60,7 +65,7 @@ class IncludeContext:
             self._role_base_path = old_rbp
 
     @contextmanager
-    def load_and_enter_task_file(self, path: str) -> Generator[struct_rep.TaskFile | None, None, None]:
+    def load_and_enter_task_file(self, path: str, includer_location: rep.NodeLocation) -> Generator[struct_rep.TaskFile | None, None, None]:
         real_path = self._find_file(path, 'tasks')
         if not real_path:
             yield None
@@ -77,11 +82,11 @@ class IncludeContext:
         for bt in struct_ctx.broken_tasks:
             logger.error(bt.reason)
 
-        with self._enter_tasks_file(real_path):
+        with self._enter_file(real_path, includer_location):
             yield task_file
 
     @contextmanager
-    def load_and_enter_role(self, role_name: str) -> Generator[struct_rep.Role | None, None, None]:
+    def load_and_enter_role(self, role_name: str, includer_location: rep.NodeLocation) -> Generator[struct_rep.Role | None, None, None]:
         assert False, 'Not implemented yet'
         real_path: struct_rep.extractor.ProjectPath | None = None  # TODO!
         if not real_path:
@@ -102,19 +107,24 @@ class IncludeContext:
         for bf in role.broken_files:
             logger.error(f'Could not extract {bf.path}: {bf.reason}')
 
-        with self._enter_role(role, real_path):
+        with self._enter_role(role, real_path, includer_location):
             yield role
 
-    def load_var_file(self, path: str) -> struct_rep.VariableFile | None:
+    @contextmanager
+    def load_and_enter_var_file(self, path: str, includer_location: rep.NodeLocation) -> Generator[struct_rep.VariableFile | None, None, None]:
         real_path = self._find_file(path, 'vars')
         if not real_path:
             return None
 
         try:
-            return struct_rep.extractor.extract_variable_file(real_path)
+            var_file = struct_rep.extractor.extract_variable_file(real_path)
         except Exception as e:
             logger.error(e)
-            return None
+            yield None
+            return
+
+        with self._enter_file(real_path, includer_location):
+            yield var_file
 
     def _find_file(self, short_path: str, base_dir: str) -> struct_rep.extractor.ProjectPath | None:
         # Ansible's file resolution order:
@@ -221,6 +231,16 @@ class ExtractionContext:
     def next_iv_id(self) -> int:
         self._next_iv_id += 1
         return self._next_iv_id - 1
+
+    def get_location(self, ds: object) -> rep.NodeLocation:
+        if hasattr(ds, 'ansible_pos'):
+            file, line, column = ds.ansible_pos  # type: ignore[attr-defined]
+        elif hasattr(ds, 'location'):
+            file, line, column = ds.location  # type: ignore[attr-defined]
+        else:
+            file, line, column = 'unknown file', -1, -1
+
+        return rep.NodeLocation(file, line, column, self.include_ctx.last_include_location)
 
 
 @define

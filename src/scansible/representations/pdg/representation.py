@@ -19,17 +19,12 @@ def non_empty_validator(inst: object, attr: attrs.Attribute[str], value: str) ->
         raise ValueError(f'Expected {attr.name} to be non-empty string, got empty string')
 
 
-@frozen
+@frozen(str=False)
 class NodeLocation:
     file: str = field(validator=type_validator())
     line: int = field(validator=type_validator())
     column: int = field(validator=type_validator())
     includer_location: NodeLocation | None = field(validator=type_validator(), default=None)
-
-    @classmethod
-    def fake(cls, includer_location: NodeLocation | None = None) -> NodeLocation:
-        # TODO: Remove this and use real locations
-        return cls(file='fake.yml', line=-1, column=-1, includer_location=includer_location)
 
     def __str__(self) -> str:
         base = f'{self.file}:{self.line}:{self.column}'

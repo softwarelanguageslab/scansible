@@ -38,8 +38,6 @@ class VariableDefinitionRecord(NamedTuple):
     name: str
     revision: int
     template_expr: str | Sentinel
-    name_location: rep.NodeLocation
-    init_location: rep.NodeLocation
 
     def __repr__(self) -> str:
         return f'VariableDefinitionRecord(name={self.name!r}, revision={self.revision}, expr={self.template_expr!r})'
@@ -688,9 +686,10 @@ class VarContext:
         yield
         self._scopes.exit_scope()
 
-    def evaluate_template(self, expr: str, location: rep.NodeLocation, is_conditional: bool, is_top_level: bool = True) -> TemplateRecord:
+    def evaluate_template(self, expr: str, is_conditional: bool, is_top_level: bool = True) -> TemplateRecord:
         """Parse a template, add required nodes to the graph, and return the record."""
         logger.debug(f'Evaluating expression {expr!r}')
+        location = self.context.get_location(expr)
         ast = TemplateExpressionAST.parse(expr, is_conditional, self._scopes.get_variable_mapping())
 
         if ast is None or ast.is_literal():
@@ -783,7 +782,8 @@ class VarContext:
         self._scopes.set_expression(expr, tr)
         return tr
 
-    def add_literal(self, value: Any, location: rep.NodeLocation) -> rep.Literal:
+    def add_literal(self, value: Any) -> rep.Literal:
+        location = self.context.get_location(value)
         type_ = value.__class__.__name__
         type_ = {'AnsibleUnicode': 'str', 'AnsibleSequence': 'list', 'AnsibleMapping': 'dict'}.get(type_, type_)
         if isinstance(value, (dict, list)):
@@ -797,7 +797,7 @@ class VarContext:
         self.context.graph.add_node(lit)
         return lit
 
-    def register_variable(self, name: str, level: ScopeLevel, name_location: rep.NodeLocation, init_location: rep.NodeLocation, *, expr: Any = SENTINEL) -> rep.Variable:
+    def register_variable(self, name: str, level: ScopeLevel, *, expr: Any = SENTINEL) -> rep.Variable:
         """Declare a variable, initialized with the given expression.
 
         Expression may be empty if not available.
@@ -812,7 +812,7 @@ class VarContext:
         self._next_valnos[(name, var_rev)] = 0
 
         logger.debug(f'Selected revision {var_rev} for {name}')
-        var_node = rep.Variable(name=name, version=var_rev, value_version=0, scope_level=level.value, location=name_location)
+        var_node = rep.Variable(name=name, version=var_rev, value_version=0, scope_level=level.value, location=self.context.get_location(name))
         self.context.graph.add_node(var_node)
 
         # Store auxiliary information about which other variables are available at the
@@ -826,10 +826,10 @@ class VarContext:
             template_expr = SENTINEL
         else:
             template_expr = SENTINEL
-            lit_node = self.add_literal(expr, init_location)
+            lit_node = self.add_literal(expr)
             self.context.graph.add_edge(lit_node, var_node, rep.DEF)
 
-        def_record = VariableDefinitionRecord(name, var_rev, template_expr, name_location, init_location)
+        def_record = VariableDefinitionRecord(name, var_rev, template_expr)
         self._scopes.set_variable_definition(name, def_record, level)
 
         # Assume the value is used by the caller is constant if they don't provide an expression.
@@ -859,7 +859,7 @@ class VarContext:
                 version=vval.revision,
                 value_version=vval.val_revision,
                 scope_level=scope.level.value,
-                location=vval.var_def.name_location)
+                location=self.context.get_location(vval.name))
         self.context.graph.add_node(new_var_node)
 
         self._valno_to_var[var_node_idx] = (new_var_node, True)
@@ -891,7 +891,7 @@ class VarContext:
         if vdef_pair is None:
             assert self._scopes.get_variable_value(name) is None, f'Internal Error: Variable {name!r} has no definition but does have value'
             logger.debug(f'Variable {name} has not yet been defined, registering new value at lowest precedence level')
-            self.register_variable(name, ScopeLevel.CLI_VALUES, rep.NodeLocation.fake(), rep.NodeLocation.fake())
+            self.register_variable(name, ScopeLevel.CLI_VALUES)
             vval_pair = self._scopes.get_variable_value(name)
             assert vval_pair is not None and isinstance(vval_pair[0], ConstantVariableValueRecord), f'Internal Error: Expected registered variable for {name!r} to be constant'
             return vval_pair[0]
@@ -911,7 +911,7 @@ class VarContext:
         # Evaluate the expression, perhaps re-evaluating if necessary. If the
         # expression was already evaluated previously and still has the same
         # value, this will just return the previous record.
-        template_record: TemplateRecord = self.evaluate_template(expr, vdef.init_location, False, False)
+        template_record: TemplateRecord = self.evaluate_template(expr, False, False)
 
         # Try to find a pre-existing value record for this template record. If
         # it exists, we've already evaluated this variable before and we can

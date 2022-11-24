@@ -37,6 +37,7 @@ Scalar = Union[bool, int, float, str, 'VaultValue', datetime.date, datetime.date
 # These should be recursive types, but mypy doesn't support them so they'd be
 # Any anyway, and it also doesn't work with our type validation.
 AnyValue = Union[Scalar, Sequence[Any], Mapping[Scalar, Any]]
+Position = tuple[str, int, int]
 
 
 def default_field(default: Any = attrs.NOTHING, factory: Any = None) -> Any:
@@ -57,6 +58,9 @@ def parent_field() -> Any:
 
 def raw_field() -> Any:
     return field(repr=False, eq=False)
+
+def position_field() -> Any:
+    return field(repr=False, eq=False, default=('unknown file', -1, -1))
 
 def path_field() -> Any:
     return field(validator=validate_relative_path)
@@ -162,7 +166,7 @@ class StructuralBase:
     __rich_repr__ = _yield_non_default_representable_attributes
 
 
-@frozen
+@frozen(str=False)
 class VaultValue(StructuralBase):
     """
     Represents an Ansible encrypted vault value.
@@ -170,6 +174,8 @@ class VaultValue(StructuralBase):
 
     #: The encrypted data.
     data: bytes
+    #: Position of the value.
+    location: Position = position_field()
 
     def __str__(self) -> str:
         return self.data.decode()
@@ -209,6 +215,8 @@ class Platform(StructuralBase):
     name: str = required_field()
     #: Platform version.
     version: str = required_field()
+    #: Position of the value.
+    location: Position = position_field()
 
 
 @define
@@ -232,6 +240,8 @@ class MetaBlock(StructuralBase):
     #: Raw information present in the metadata block, some which may not
     #: explicitly be parsed.
     raw: Any = raw_field()
+    #: Position of the value.
+    location: Position = position_field()
 
     #: The parent file of this metadata block.
     parent: MetaFile = parent_field()
@@ -261,6 +271,8 @@ class LoopControl(StructuralBase):
     Represents the loop control directive value.
     """
 
+    #: Position of the value.
+    location: Position = position_field()
     #: The loop variable name. `item` by default.
     loop_var: str = default_field(default='item')
     #: The index variable name.
@@ -284,6 +296,8 @@ class DirectivesBase(StructuralBase):
 
     #: Raw information present in the entity.
     raw: Any = raw_field()
+    #: Position of the value.
+    location: Position = position_field()
 
     #: Name of the task.
     name: str | None = default_field(default='')
@@ -464,6 +478,8 @@ class RoleRequirement(DirectivesBase):
     a role's `dependencies` (old-style only).
     """
 
+    #: Position of the value.
+    location: Position = position_field()
     #: The role that is depended upon.
     role: str = required_field()
 
@@ -557,6 +573,8 @@ class Role(StructuralBase):
 class VarsPrompt(StructuralBase):
     """Represents a vars_prompt entry."""
 
+    #: Position of the value.
+    location: Position = position_field()
     #: Name of the variable.
     name: str = required_field()
     #: Prompt to show.
@@ -583,6 +601,8 @@ class Play(DirectivesBase):
     Represents an Ansible play contained within a playbook.
     """
 
+    #: Position of the value.
+    location: Position = position_field()
     #: The playbook in which this play is contained.
     parent: Playbook = parent_field()
     #: The play's targetted hosts.

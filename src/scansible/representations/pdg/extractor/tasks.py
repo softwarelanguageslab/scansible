@@ -22,7 +22,7 @@ class TaskExtractor(abc.ABC):
     def __init__(self, context: ExtractionContext, task: Task) -> None:
         self.context = context
         self.task = task
-        self.location = rep.NodeLocation.fake()
+        self.location = context.get_location(task)
 
     def extract_task(self, predecessors: list[rep.ControlNode]) -> TaskExtractionResult:
         raise NotImplementedError('To be implemented by subclass')
@@ -65,10 +65,10 @@ class TaskExtractor(abc.ABC):
     # TODO: This doesn't really belong here...
     def extract_value(self, value: object, is_conditional: bool = False) -> rep.DataNode:
         if isinstance(value, str):
-            tr = self.context.vars.evaluate_template(value, rep.NodeLocation.fake(), is_conditional)
+            tr = self.context.vars.evaluate_template(value, is_conditional)
             return tr.data_node
         else:
-            return self.context.vars.add_literal(value, rep.NodeLocation.fake())
+            return self.context.vars.add_literal(value)
 
     def warn_remaining_kws(self, action: str = '') -> None:
         for other_kw, _ in self.task._get_non_default_attributes():
@@ -97,7 +97,7 @@ class GenericTaskExtractor(TaskExtractor):
         logger.debug(f'Extracting task with name {self.task.name!r} from {self.location}')
         with self.context.vars.enter_cached_scope(ScopeLevel.TASK_VARS):
             for var_name, var_value in self.task.vars.items():
-                self.context.vars.register_variable(var_name, expr=var_value, level=ScopeLevel.TASK_VARS, name_location=self.location, init_location=self.location)
+                self.context.vars.register_variable(var_name, expr=var_value, level=ScopeLevel.TASK_VARS)
 
             if self.task.loop:
                 result = self._extract_looping_task(predecessors)
@@ -135,7 +135,7 @@ class GenericTaskExtractor(TaskExtractor):
 
         # For some reason, loop vars have the same precedence as include params.
         with self.context.vars.enter_scope(ScopeLevel.INCLUDE_PARAMS):
-            loop_target_var = self.context.vars.register_variable(loop_var_name, ScopeLevel.INCLUDE_PARAMS, name_location=self.location, init_location=self.location)
+            loop_target_var = self.context.vars.register_variable(loop_var_name, ScopeLevel.INCLUDE_PARAMS)
             self.context.graph.add_edge(loop_source_var, loop_target_var, rep.DEF_LOOP_ITEM)
 
             tn, cn = self._extract_bare_task([loop_node])
@@ -195,7 +195,7 @@ class GenericTaskExtractor(TaskExtractor):
     def _define_registered_var(self, definers: list[rep.ControlNode]) -> rep.Variable | None:
         if (registered_var_name := self.task.register):
             assert isinstance(registered_var_name, str)
-            vn = self.context.vars.register_variable(registered_var_name, ScopeLevel.SET_FACTS_REGISTERED, name_location=self.location, init_location=self.location)
+            vn = self.context.vars.register_variable(registered_var_name, ScopeLevel.SET_FACTS_REGISTERED)
             self.context.graph.add_node(vn)
             # There could be multiple defining control nodes, e.g. the loop node and the task node.
             for definer in definers:
@@ -222,7 +222,7 @@ class SetFactTaskExtractor(TaskExtractor):
             added_vars: list[rep.Variable] = []
             cond_val = self.extract_conditional_value()
             for var_name, value_node in name_to_value.items():
-                var_node = self.context.vars.register_variable(var_name, ScopeLevel.SET_FACTS_REGISTERED, name_location=self.location, init_location=self.location)
+                var_node = self.context.vars.register_variable(var_name, ScopeLevel.SET_FACTS_REGISTERED)
                 added_vars.append(var_node)
                 self.context.graph.add_node(var_node)
                 self.context.graph.add_edge(value_node, var_node, rep.DEF)
@@ -239,7 +239,7 @@ class SetFactTaskExtractor(TaskExtractor):
 
         loop_source_var, loop_var_name = source_and_name
         with self.context.vars.enter_scope(ScopeLevel.INCLUDE_PARAMS):
-            loop_target_var = self.context.vars.register_variable(loop_var_name, ScopeLevel.INCLUDE_PARAMS, name_location=self.location, init_location=self.location)
+            loop_target_var = self.context.vars.register_variable(loop_var_name, ScopeLevel.INCLUDE_PARAMS)
             self.context.graph.add_edge(loop_source_var, loop_target_var, rep.DEF_LOOP_ITEM)
 
             return self._extract_bare_task(predecessors)
@@ -269,17 +269,16 @@ class IncludeVarsTaskExtractor(TaskExtractor):
             self.context.graph.errors.append(f'Cannot handle dynamic file name on {self.task.action} yet!')
             return abort_result
 
-        varfile = self.context.include_ctx.load_var_file(incl_name)
+        with self.context.include_ctx.load_and_enter_var_file(incl_name, self.location) as varfile:
+            if not varfile:
+                self.context.graph.errors.append(f'Var file not found: {incl_name}')
+                return abort_result
 
-        if not varfile:
-            self.context.graph.errors.append(f'Var file not found: {incl_name}')
-            return abort_result
-
-        cond_node = self.extract_conditional_value()
-        inner_result = VariablesExtractor(self.context, varfile.variables, self.location).extract_variables(ScopeLevel.INCLUDE_VARS)
-        if cond_node is not None:
-            for added_var in inner_result.added_variable_nodes:
-                self.context.graph.add_edge(cond_node, added_var, rep.DEFINED_IF)
+            cond_node = self.extract_conditional_value()
+            inner_result = VariablesExtractor(self.context, varfile.variables).extract_variables(ScopeLevel.INCLUDE_VARS)
+            if cond_node is not None:
+                for added_var in inner_result.added_variable_nodes:
+                    self.context.graph.add_edge(cond_node, added_var, rep.DEFINED_IF)
 
         self.warn_remaining_kws()
         return TaskExtractionResult(added_control_nodes=[], added_variable_nodes=inner_result.added_variable_nodes, next_predecessors=predecessors)
@@ -292,7 +291,7 @@ class IncludeTaskExtractor(TaskExtractor):
     def extract_task(self, predecessors: list[rep.ControlNode]) -> TaskExtractionResult:
         with self.context.vars.enter_scope(ScopeLevel.INCLUDE_PARAMS):
             for var_name, var_value in self.task.vars.items():
-                self.context.vars.register_variable(var_name, expr=var_value, level=ScopeLevel.INCLUDE_PARAMS, name_location=self.location, init_location=self.location)
+                self.context.vars.register_variable(var_name, expr=var_value, level=ScopeLevel.INCLUDE_PARAMS)
 
             abort_result = TaskExtractionResult(added_control_nodes=[], added_variable_nodes=[], next_predecessors=predecessors)
 
@@ -316,7 +315,7 @@ class IncludeTaskExtractor(TaskExtractor):
                 logger.debug(args)
 
             logger.debug(incl_name)
-            with self.context.include_ctx.load_and_enter_task_file(incl_name) as task_file:
+            with self.context.include_ctx.load_and_enter_task_file(incl_name, self.location) as task_file:
                 if not task_file:
                     self.context.graph.errors.append(f'Task file not found: {incl_name}')
                     return abort_result

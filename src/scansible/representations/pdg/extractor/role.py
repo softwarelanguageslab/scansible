@@ -25,11 +25,11 @@ class RoleExtractor:
         next_predecessors = predecessors
         with self.context.vars.enter_scope(ScopeLevel.ROLE_DEFAULTS), self.context.vars.enter_scope(ScopeLevel.ROLE_VARS):
             if (df := self.role.main_defaults_file) is not None:
-                df_result = VariablesExtractor(self.context, df.variables, rep.NodeLocation.fake()).extract_variables(ScopeLevel.ROLE_DEFAULTS)
+                df_result = VariablesExtractor(self.context, df.variables).extract_variables(ScopeLevel.ROLE_DEFAULTS)
                 added_variable_nodes.extend(df_result.added_variable_nodes)
 
             if (vf := self.role.main_vars_file) is not None:
-                vf_result = VariablesExtractor(self.context, vf.variables, rep.NodeLocation.fake()).extract_variables(ScopeLevel.ROLE_VARS)
+                vf_result = VariablesExtractor(self.context, vf.variables).extract_variables(ScopeLevel.ROLE_VARS)
                 added_variable_nodes.extend(vf_result.added_variable_nodes)
 
             # Extract handlers first, as they're needed to link to tasks
