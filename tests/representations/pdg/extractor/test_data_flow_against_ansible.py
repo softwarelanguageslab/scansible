@@ -26,7 +26,7 @@ from scansible.representations.pdg.extractor import extract_pdg
 from scansible.representations.pdg.extractor.var_context import ScopeLevel
 from scansible.representations.pdg.extractor.templates import TemplateExpressionAST
 from scansible.representations.pdg import representation as rep
-from scansible.io.neo4j import dump_graph
+from scansible.representations.pdg.io.neo4j import dump_graph
 
 
 _considered_scopes = [

@@ -5,7 +5,7 @@ import json
 
 import attrs
 
-from ..representations.pdg import Graph, Node, Edge, representation as rep
+from .. import Graph, Node, Edge, representation as rep
 
 
 def _get_shared_node_attrs(g: Graph) -> dict[str, str]:
@@ -13,11 +13,10 @@ def _get_shared_node_attrs(g: Graph) -> dict[str, str]:
 
 
 def dump_value(v: Any) -> str:
-    if isinstance(v, str):
-        return json.dumps(v)
-    if v is None:
-        return 'null'
-    return dump_value(str(v))
+    if isinstance(v, (tuple, list, dict)):
+        # Need to wrap [] and {} into quotes.
+        return dump_value(json.dumps(v))
+    return json.dumps(v)
 
 def _create_attr_content(attrs: dict[str, Any]) -> str:
     return ', '.join(
