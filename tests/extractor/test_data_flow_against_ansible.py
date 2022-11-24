@@ -22,12 +22,10 @@ except ImportError:
     from yaml import Dumper  # type: ignore[misc]
 from hypothesis import assume, given, example, Phase, settings, strategies as st
 
-from scansible.extractor import extract_structural_graph
-from scansible.extractor.var_context import ScopeLevel
-from scansible.extractor.templates import TemplateExpressionAST
-from scansible.io.structural_models import parse_role
-from scansible.models.graph import Graph
-from scansible.models import nodes, edges
+from scansible.representations.pdg.extractor import extract_pdg
+from scansible.representations.pdg.extractor.var_context import ScopeLevel
+from scansible.representations.pdg.extractor.templates import TemplateExpressionAST
+from scansible.representations.pdg import representation as rep
 from scansible.io.neo4j import dump_graph
 
 
@@ -391,7 +389,7 @@ class CodeGen:
 
 
 @st.composite
-def ansible_playbooks(draw: st.DrawFn) -> list[PlaybookFile]:  # type: ignore[misc]
+def ansible_playbooks(draw: st.DrawFn) -> list[PlaybookFile]:
     init_scopes = draw(st.lists(_ansible_init_scopes))
     scopes = draw(st.lists(_ansible_scopes))
     assume(bool(init_scopes + scopes))
@@ -409,7 +407,7 @@ def ansible_playbooks(draw: st.DrawFn) -> list[PlaybookFile]:  # type: ignore[mi
 
 
 @given(ansible_playbooks())
-@settings(deadline=None, max_examples=500)
+@settings(deadline=None, max_examples=100)
 def test_inferred_dataflow_matches_actual(playbooks: list[PlaybookFile]) -> None:  # type: ignore[misc]
     with _setup_env(playbooks) as playbook_dir:
         try:
@@ -424,6 +422,7 @@ def test_inferred_dataflow_matches_actual(playbooks: list[PlaybookFile]) -> None
 
             assert inferred_dataflow == actual_dataflow
         except:
+            print(playbooks)
             print(dump_graph(graph))
             raise
 
@@ -448,33 +447,32 @@ def _setup_env(playbooks: list[PlaybookFile]) -> Iterator[Path]:
         yield Path(tmpdir)
 
 
-def _parse_graph(playbook_dir: Path) -> Graph:
-    srm = parse_role(playbook_dir)
-    return extract_structural_graph(srm)
+def _parse_graph(playbook_dir: Path) -> rep.Graph:
+    return extract_pdg(playbook_dir.resolve(), 'test', 'test').graph
 
 
-def _infer_dataflow(graph: Graph) -> Dataflow:
+def _infer_dataflow(graph: rep.Graph) -> Dataflow:
     printers = _yield_debug_tasks(graph)
     # TODO: We should check the order of printing as well.
     return sorted([_get_expected_output(printer, graph) for printer in printers])
 
 
-def _yield_debug_tasks(graph: Graph) -> Iterable[nodes.Task]:
+def _yield_debug_tasks(graph: rep.Graph) -> Iterable[rep.Task]:
     for node in graph:
-        if not isinstance(node, nodes.Task):
+        if not isinstance(node, rep.Task):
             continue
         if node.action == 'debug':
             yield node
 
 
-def _get_expected_output(printer: nodes.Task, graph: Graph) -> str:
+def _get_expected_output(printer: rep.Task, graph: rep.Graph) -> str:
     expr = _get_printed_expr(printer, graph)
     if printer.name and printer.name.endswith('is defined?'):
-        use_node = list(_find_predecessors(graph, expr, edges.USE))[0]
+        use_node = list(_find_predecessors(graph, expr, rep.USE))[0]
         # Defined, get the value
-        if isinstance(use_node, nodes.IntermediateValue):
+        if isinstance(use_node, rep.IntermediateValue):
             return _resolve_iv_to_value(graph, use_node)
-        if isinstance(use_node, nodes.Variable):
+        if isinstance(use_node, rep.Variable):
             val = _resolve_var_to_value(graph, use_node)
             if val is None:
                 # Not defined any longer, prints "false"
@@ -484,60 +482,62 @@ def _get_expected_output(printer: nodes.Task, graph: Graph) -> str:
     return _resolve_expr_to_value(graph, expr)
 
 
-def _get_printed_expr(printer: nodes.Task, graph: Graph) -> nodes.Expression:
-    message_iv = list(_find_predecessors(graph, printer, edges.Keyword(keyword='args.msg')))
+def _get_printed_expr(printer: rep.Task, graph: rep.Graph) -> rep.Expression:
+    message_iv = list(_find_predecessors(graph, printer, rep.Keyword(keyword='args.msg')))
     assert message_iv, 'No expression?!'
     assert len(message_iv) == 1, 'Multiple expressions?!'
 
     # IV should've been produced by an expression
-    expr = next(_find_predecessors(graph, message_iv[0], edges.DEF))
-    assert isinstance(expr, nodes.Expression), 'Wrong node type?!'
+    expr = next(_find_predecessors(graph, message_iv[0], rep.DEF))
+    assert isinstance(expr, rep.Expression), 'Wrong node type?!'
     return expr
 
 
-def _find_predecessors(g: Graph, n: nodes.Node, edata: edges.Edge) -> Iterator[nodes.Node]:
+def _find_predecessors(g: rep.Graph, n: rep.Node, edata: rep.Edge) -> Iterator[rep.Node]:
     for e in g.edges():
         if not e[1] == n:
             continue
-        if g[e[0]][n].get(0)['type'] == edata:
+        if g[e[0]][n].get(0)['type'] == edata:  # type: ignore[index]
             yield e[0]
 
 
-def _resolve_expr_to_value(g: Graph, expr: nodes.Expression) -> str:
+def _resolve_expr_to_value(g: rep.Graph, expr: rep.Expression) -> str:
     # Should only use one data node
-    used_data = next(_find_predecessors(g, expr, edges.USE))
-    if isinstance(used_data, nodes.Literal):
+    used_data = next(_find_predecessors(g, expr, rep.USE))
+    if isinstance(used_data, rep.Literal):
         data = used_data.value
-    elif isinstance(used_data, nodes.IntermediateValue):
+    elif isinstance(used_data, rep.IntermediateValue):
         data = _resolve_iv_to_value(g, used_data)
-    elif isinstance(used_data, nodes.Variable):
+    elif isinstance(used_data, rep.Variable):
         data = _resolve_var_to_value(g, used_data)
         assert data is not None
     else:
         raise ValueError(f'invalid USE node: {type(used_data)} {used_data}')
 
     templ = jinja2.Template(expr.expr)
-    var_names = TemplateExpressionAST.parse(expr.expr).referenced_variables
+    templ_ast = TemplateExpressionAST.parse(expr.expr)
+    assert templ_ast is not None
+    var_names = templ_ast.referenced_variables
     var_name = next(iter(var_names))
     return templ.render(**{var_name: data})
 
 
-def _resolve_iv_to_value(g: Graph, iv: nodes.IntermediateValue) -> str:
-    def_node = next(_find_predecessors(g, iv, edges.DEF))
-    assert isinstance(def_node, nodes.Expression), f'unexpected DEF node: {def_node}'
+def _resolve_iv_to_value(g: rep.Graph, iv: rep.IntermediateValue) -> str:
+    def_node = next(_find_predecessors(g, iv, rep.DEF))
+    assert isinstance(def_node, rep.Expression), f'unexpected DEF node: {def_node}'
     return _resolve_expr_to_value(g, def_node)
 
 
-def _resolve_var_to_value(g: Graph, v: nodes.Variable) -> str | None:
-    def_nodes = list(_find_predecessors(g, v, edges.DEF))
+def _resolve_var_to_value(g: rep.Graph, v: rep.Variable) -> str | None:
+    def_nodes = list(_find_predecessors(g, v, rep.DEF))
     if not def_nodes:
         return None
     assert len(def_nodes) == 1, 'Multiple defs should not happen here!'
     def_node = def_nodes[0]
-    assert isinstance(def_node, (nodes.IntermediateValue, nodes.Literal)), f'unexpected DEF node: {def_node}'
-    if isinstance(def_node, nodes.IntermediateValue):
+    assert isinstance(def_node, (rep.IntermediateValue, rep.Literal)), f'unexpected DEF node: {def_node}'
+    if isinstance(def_node, rep.IntermediateValue):
         return _resolve_iv_to_value(g, def_node)
-    return def_node.value
+    return str(def_node.value)
 
 
 def _observe_dataflow(playbook_dir: Path) -> Dataflow:

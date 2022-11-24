@@ -473,7 +473,7 @@ class ScopeContext:
                 continue
 
             logger.debug(f'Found possible value for {name!r}: {possible_vval!r}')
-            if revision > 0 and possible_vval.revision != revision:
+            if revision >= 0 and possible_vval.revision != revision:
                 logger.debug('Ignoring: Wrong definition version')
                 continue
 

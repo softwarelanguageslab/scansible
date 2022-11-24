@@ -553,6 +553,31 @@ def describe_scoping() -> None:
             ('te', 'tei', DEF),
         ]))
 
+    def should_respect_precedence(create_context: ContextCreator) -> None:
+        ctx, g = create_context()
+
+        vn = ctx.register_variable('b', ScopeLevel.SET_FACTS_REGISTERED, fake_node_location(), fake_node_location())
+        ln = Literal(type='int', value=1)
+        g.add_node(ln)
+        g.add_edge(ln, vn, DEF)
+        with ctx.enter_scope(ScopeLevel.TASK_VARS):
+            ctx.register_variable('b', ScopeLevel.TASK_VARS, fake_node_location(), fake_node_location(), expr='2')
+            ctx.evaluate_template('{{ b }}', fake_node_location(), False)
+
+        assert_graphs_match(g, create_graph({
+            '1': Literal(type='int', value=1),
+            '2': Literal(type='str', value='2'),
+            'bsf': Variable(name='b', version=0, value_version=0, scope_level=ScopeLevel.SET_FACTS_REGISTERED.value),
+            'bt': Variable(name='b', version=1, value_version=0, scope_level=ScopeLevel.TASK_VARS.value),
+            'be': Expression(expr='{{ b }}'),
+            'beiv': IntermediateValue(identifier=0),
+        }, {
+            ('1', 'bsf', DEF),
+            ('2', 'bt', DEF),
+            ('bsf', 'be', USE),
+            ('be', 'beiv', DEF),
+        }))
+
     def should_respect_precedence_register_element(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
