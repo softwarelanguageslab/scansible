@@ -379,7 +379,7 @@ class CodeGen:
         files = []
         for fp, content in self._files.items():
             if fp.parent.name != 'tasks' and content:
-                content = content[0]
+                content = content[0]  # type: ignore[assignment]
             if not content:
                 continue
             files.append((fp, yaml.dump(content, Dumper=Dumper)))
@@ -406,6 +406,7 @@ def ansible_playbooks(draw: st.DrawFn) -> list[PlaybookFile]:
     return code_gen.files
 
 
+@pytest.mark.slow
 @given(ansible_playbooks())
 @settings(deadline=None, max_examples=100)
 def test_inferred_dataflow_matches_actual(playbooks: list[PlaybookFile]) -> None:  # type: ignore[misc]
