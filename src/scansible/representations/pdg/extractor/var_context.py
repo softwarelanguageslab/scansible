@@ -785,6 +785,7 @@ class VarContext:
 
     def add_literal(self, value: Any, location: rep.NodeLocation) -> rep.Literal:
         type_ = value.__class__.__name__
+        type_ = {'AnsibleUnicode': 'str', 'AnsibleSequence': 'list', 'AnsibleMapping': 'dict'}.get(type_, type_)
         if isinstance(value, (dict, list)):
             self.context.graph.errors.append('I am not able to handle composite literals yet')
             lit = rep.Literal(type=type_, value=str(value), location=location)
