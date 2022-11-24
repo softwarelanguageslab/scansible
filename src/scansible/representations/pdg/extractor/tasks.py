@@ -123,7 +123,7 @@ class GenericTaskExtractor(TaskExtractor):
                 added_control_nodes=added)
 
     def _extract_looping_task(self, predecessors: list[rep.ControlNode]) -> TaskExtractionResult:
-        loop_node = rep.Loop(location=self.location)
+        loop_node = rep.Loop(location=self.context.get_location(self.task.loop) or self.location)
         source_and_name = self.extract_looping_value_and_name()
         assert source_and_name is not None, 'Internal error'
 
@@ -170,7 +170,7 @@ class GenericTaskExtractor(TaskExtractor):
         if (condition_val_node := self.extract_conditional_value()) is not None:
             # Add a conditional node, which uses the expression IV, and is
             # succeeded by the task itself.
-            cn = rep.Conditional(location=self.location)
+            cn = rep.Conditional(location=self.context.get_location(self.task.when) or self.location)
             self.context.graph.add_node(cn)
             self.context.graph.add_edge(condition_val_node, cn, rep.USE)
             self.context.graph.add_edge(cn, tn, rep.ORDER)
@@ -330,7 +330,7 @@ class IncludeTaskExtractor(TaskExtractor):
                 if cond_val_node is not None:
                     # Add a conditional node, which uses the expression IV, and is
                     # succeeded by the task itself.
-                    cn: rep.ControlNode = rep.Conditional(location=self.location)
+                    cn: rep.ControlNode = rep.Conditional(location=self.context.get_location(self.task.when) or self.location)
                     self.context.graph.add_node(cn)
                     self.context.graph.add_edge(cond_val_node, cn, rep.USE)
                     for pred in predecessors:
@@ -344,6 +344,76 @@ class IncludeTaskExtractor(TaskExtractor):
                 # blocks, which in turn imports this module.
                 from .task_lists import TaskListExtractor
                 inner_result = TaskListExtractor(self.context, task_file.tasks).extract_tasks(include_predecessors)  # type: ignore[arg-type]
+
+            if cond_val_node is None:
+                return inner_result
+
+            # Need to link up condition to defined variables, and add condition
+            # to next predecessors as the include may be skipped.
+            for added_var in inner_result.added_variable_nodes:
+                self.context.graph.add_edge(cond_val_node, added_var, rep.DEFINED_IF)
+            return TaskExtractionResult(
+                added_control_nodes=[cn] + inner_result.added_control_nodes,
+                added_variable_nodes=inner_result.added_variable_nodes,
+                next_predecessors=[cn] + inner_result.next_predecessors)
+
+
+class IncludeRoleExtractor(TaskExtractor):
+    @classmethod
+    def SUPPORTED_TASK_ATTRIBUTES(cls) -> frozenset[str]:  # type: ignore[override]
+        return frozenset({'name', 'action', 'args', 'when'})
+
+    def extract_task(self, predecessors: list[rep.ControlNode]) -> TaskExtractionResult:
+        with self.context.vars.enter_scope(ScopeLevel.INCLUDE_PARAMS):
+            for var_name, var_value in self.task.vars.items():
+                self.context.vars.register_variable(var_name, expr=var_value, level=ScopeLevel.INCLUDE_PARAMS)
+
+            abort_result = TaskExtractionResult(added_control_nodes=[], added_variable_nodes=[], next_predecessors=predecessors)
+
+            args = dict(self.task.args)
+            incl_name = args.pop('_raw_params', '')
+            if not incl_name or not isinstance(incl_name, str):
+                self.context.graph.errors.append(f'Unknown included file name!')
+                return abort_result
+
+            if '{{' in incl_name:
+                # TODO: When we do handle expressions here, we should make sure
+                # to check whether these expressions can or cannot use the include
+                # parameters. If they cannot, we should extract the included
+                # name before registering the variables.
+                self.context.graph.errors.append(f'Cannot handle dynamic file name on {self.task.action} yet!')
+                return abort_result
+
+            if args:
+                # Still arguments left?
+                self.context.graph.errors.append('Superfluous arguments on include/import task!')
+                logger.debug(args)
+
+            logger.debug(incl_name)
+            with self.context.include_ctx.load_and_enter_role(incl_name, self.location) as incl_role:
+                if not incl_role:
+                    self.context.graph.errors.append(f'Task file not found: {incl_name}')
+                    return abort_result
+
+                cond_val_node = self.extract_conditional_value()
+
+                if cond_val_node is not None:
+                    # Add a conditional node, which uses the expression IV, and is
+                    # succeeded by the task itself.
+                    cn: rep.ControlNode = rep.Conditional(location=self.context.get_location(self.task.when) or self.location)
+                    self.context.graph.add_node(cn)
+                    self.context.graph.add_edge(cond_val_node, cn, rep.USE)
+                    for pred in predecessors:
+                        self.context.graph.add_edge(pred, cn, rep.ORDER)
+                    include_predecessors = [cn]
+                else:
+                    include_predecessors = predecessors
+                self.warn_remaining_kws()
+
+                # Delayed import to prevent circular imports. task_files imports
+                # blocks, which in turn imports this module.
+                from .role import RoleExtractor
+                inner_result = RoleExtractor(self.context, incl_role).extract_role(include_predecessors)
 
             if cond_val_node is None:
                 return inner_result

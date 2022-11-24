@@ -449,7 +449,7 @@ def _setup_env(playbooks: list[PlaybookFile]) -> Iterator[Path]:
 
 
 def _parse_graph(playbook_dir: Path) -> rep.Graph:
-    return extract_pdg(playbook_dir.resolve(), 'test', 'test').graph
+    return extract_pdg(playbook_dir.resolve(), 'test', 'test', Path()).graph
 
 
 def _infer_dataflow(graph: rep.Graph) -> Dataflow:

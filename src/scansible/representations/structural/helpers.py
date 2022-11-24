@@ -39,6 +39,9 @@ class ProjectPath:
         else:
             self.relative = file_path
 
+    def __str__(self) -> str:
+        return str(self.absolute)
+
     @classmethod
     def from_root(cls, root_path: Path) -> ProjectPath:
         """

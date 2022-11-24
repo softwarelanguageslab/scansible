@@ -13,7 +13,7 @@ ContextCreator = Callable[[], tuple[VarContext, Graph]]
 
 @pytest.fixture()
 def create_context(g: Graph, mocker: MockerFixture) -> ContextCreator:
-    return lambda: (ExtractionContext(g, mocker.Mock(**{'root.main_tasks_file.file_path': 'test'}), lenient=True).vars, g)
+    return lambda: (ExtractionContext(g, mocker.Mock(**{'root.main_tasks_file.file_path': 'test'}), mocker.Mock(), lenient=True).vars, g)
 
 def describe_unmodified() -> None:
 

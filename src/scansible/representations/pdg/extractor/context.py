@@ -24,8 +24,9 @@ class IncludeContext:
     _last_included_file_path: ProjectPath | None
     last_include_location: rep.NodeLocation | None
 
-    def __init__(self, model: struct_rep.StructuralModel, *, lenient: bool) -> None:
+    def __init__(self, model: struct_rep.StructuralModel, role_search_path: Path, *, lenient: bool) -> None:
         self._lenient = lenient
+        self._role_search_path = role_search_path
         self.last_include_location = None
 
         if isinstance(model.root, struct_rep.Playbook):
@@ -87,8 +88,7 @@ class IncludeContext:
 
     @contextmanager
     def load_and_enter_role(self, role_name: str, includer_location: rep.NodeLocation) -> Generator[struct_rep.Role | None, None, None]:
-        assert False, 'Not implemented yet'
-        real_path: struct_rep.extractor.ProjectPath | None = None  # TODO!
+        real_path = self._find_role(role_name)
         if not real_path:
             yield None
             return
@@ -175,6 +175,17 @@ class IncludeContext:
 
         return None
 
+    def _find_role(self, role_name: str) -> struct_rep.extractor.ProjectPath | None:
+        # TODO: Use Ansible's standard resolution process.
+        search_path = self._role_search_path / role_name
+        if not search_path.is_dir():
+            logger.error(f'{role_name!r} does not exist in role search path')
+            return None
+
+        # TODO: We shouldn't make a new root directory here, but it may be a
+        # symlink.
+        return ProjectPath.from_root(search_path.resolve())
+
     def _is_in_project(self, path: Path) -> bool:
         # normalize path: resolve .. to parent and . to self, etc.
         path = Path(normpath(path))
@@ -220,11 +231,11 @@ class ExtractionContext:
     visibility_information: VisibilityInformation
     _next_iv_id: int
 
-    def __init__(self, graph: rep.Graph, model: struct_rep.StructuralModel, *, lenient: bool) -> None:
+    def __init__(self, graph: rep.Graph, model: struct_rep.StructuralModel, role_search_path: Path, *, lenient: bool) -> None:
         self.vars = VarContext(self)
         self.graph = graph
         self.model_root = model.root
-        self.include_ctx = IncludeContext(model, lenient=lenient)
+        self.include_ctx = IncludeContext(model, role_search_path, lenient=lenient)
         self.visibility_information = VisibilityInformation()
         self._next_iv_id = 0
 
