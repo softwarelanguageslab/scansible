@@ -5,7 +5,7 @@ from loguru import logger
 from scansible.representations.structural import Playbook
 
 from .. import representation as rep
-from .context import ExtractionContext, TaskExtractionResult
+from .context import ExtractionContext
 from .task_lists import TaskListExtractor
 from .variables import VariablesExtractor
 from .var_context import ScopeLevel

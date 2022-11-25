@@ -6,7 +6,8 @@ from scansible.representations.structural import VariableFile
 
 from .. import representation as rep
 from .var_context import ScopeLevel
-from .context import ExtractionContext, ExtractionResult
+from .context import ExtractionContext
+from .result import ExtractionResult
 
 class VariablesExtractor:
 
@@ -18,10 +19,7 @@ class VariablesExtractor:
         added_vars: list[rep.Variable] = []
         for var_name, var_init in self.variables.items():
             added_vars.append(self.extract_variable(var_name, var_init, scope_level))
-        return ExtractionResult(
-            added_control_nodes=[],
-            added_variable_nodes=added_vars
-        )
+        return ExtractionResult([], added_vars, [])
 
     def extract_variable(self, var_name: str, var_init: object, scope_level: ScopeLevel) -> rep.Variable:
         if not isinstance(var_init, (str, bool, int, float)):

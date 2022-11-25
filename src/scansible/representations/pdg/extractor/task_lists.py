@@ -8,7 +8,8 @@ from .. import representation as rep
 from .blocks import BlockExtractor
 from .tasks import task_extractor_factory
 from .var_context import ScopeLevel
-from .context import ExtractionContext, TaskExtractionResult
+from .context import ExtractionContext
+from .result import ExtractionResult
 
 class TaskListExtractor:
 
@@ -16,20 +17,15 @@ class TaskListExtractor:
         self.context = context
         self.tasks = tasks
 
-    def extract_tasks(self, predecessors: list[rep.ControlNode]) -> TaskExtractionResult:
-        all_added_nodes = []
-        all_added_var_nodes = []
+    def extract_tasks(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
+        result = ExtractionResult.empty(predecessors)
+
         for child in self.tasks:
             if isinstance(child, Block):
-                intermediate_result = BlockExtractor(self.context, child).extract_block(predecessors)
+                child_result = BlockExtractor(self.context, child).extract_block(result.next_predecessors)
             else:
-                intermediate_result = task_extractor_factory(self.context, child).extract_task(predecessors)
+                child_result = task_extractor_factory(self.context, child).extract_task(result.next_predecessors)
 
-            all_added_var_nodes.extend(intermediate_result.added_variable_nodes)
-            all_added_nodes.extend(intermediate_result.added_control_nodes)
-            predecessors = intermediate_result.next_predecessors
+            result = result.chain(child_result)
 
-        return TaskExtractionResult(
-                added_control_nodes=all_added_nodes,
-                added_variable_nodes=all_added_var_nodes,
-                next_predecessors=predecessors)
+        return result

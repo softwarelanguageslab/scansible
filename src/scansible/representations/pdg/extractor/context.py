@@ -252,14 +252,3 @@ class ExtractionContext:
             file, line, column = 'unknown file', -1, -1
 
         return rep.NodeLocation(file, line, column, self.include_ctx.last_include_location)
-
-
-@define
-class ExtractionResult:
-    added_control_nodes: list[rep.ControlNode]
-    added_variable_nodes: list[rep.Variable]
-
-
-@define
-class TaskExtractionResult(ExtractionResult):
-    next_predecessors: list[rep.ControlNode]
