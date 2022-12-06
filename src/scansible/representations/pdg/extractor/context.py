@@ -176,15 +176,39 @@ class IncludeContext:
         return None
 
     def _find_role(self, role_name: str) -> struct_rep.extractor.ProjectPath | None:
-        # TODO: Use Ansible's standard resolution process.
-        search_path = self._role_search_path / role_name
-        if not search_path.is_dir():
-            logger.error(f'{role_name!r} does not exist in role search path')
-            return None
+        # Ansible's role resolution order:
+        # - collections (skipped)
+        # - <playbook dir>/roles/{name}
+        # - <default role dir>/{name}
+        # - <current role's parent dir>/{name}
+        # - <playbook dir>/{name}
 
-        # TODO: We shouldn't make a new root directory here, but it may be a
-        # symlink.
-        return ProjectPath.from_root(search_path.resolve())
+        base_search_dirs = []
+        if self._playbook_base_path is not None:
+            base_search_dirs.append(self._playbook_base_path.join('roles').absolute)
+
+        base_search_dirs.append(self._role_search_path)
+
+        if self._role_base_path is not None:
+            base_search_dirs.append(self._role_base_path.absolute)
+
+        if self._playbook_base_path is not None:
+            base_search_dirs.append(self._playbook_base_path.absolute)
+
+        for search_path in base_search_dirs:
+            logger.debug(f'Checking whether role {role_name} exists in {search_path}')
+            candidate_path = Path(normpath(search_path / role_name))
+            if not candidate_path.is_relative_to(search_path):
+                logger.warning(f'Blocked attempted path traversal on {candidate_path}')
+                continue
+            candidate_path = candidate_path.resolve()
+
+            if candidate_path.is_dir():
+                logger.debug(f'Found role: {candidate_path}')
+                # TODO: Are we sure we want to create a new root path here?
+                return ProjectPath.from_root(candidate_path)
+
+        return None
 
     def _is_in_project(self, path: Path) -> bool:
         # normalize path: resolve .. to parent and . to self, etc.
