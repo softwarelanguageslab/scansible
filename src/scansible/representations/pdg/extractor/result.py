@@ -70,9 +70,9 @@ class ExtractionResult:
     def chain(self, other: ExtractionResult) -> ExtractionResult:
         """Chain two results, discarding `self`'s next predecessors in favour of `other`'s.
 
-        Throws error if other's next predecessors are empty.
+        Throws error if other's next predecessors are empty while the current's next predecessors are not.
         """
-        if not other.next_predecessors:
+        if not other.next_predecessors and self.next_predecessors:
             raise ValueError('Next predecessors would be overwritten by empty list, you probably want to merge instead of chain.')
         return self._extend(
             added_control_nodes=other.added_control_nodes,

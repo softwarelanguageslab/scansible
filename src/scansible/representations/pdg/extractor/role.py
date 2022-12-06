@@ -12,6 +12,7 @@ from .result import ExtractionResult
 from .task_lists import TaskListExtractor
 from .variables import VariablesExtractor
 from .var_context import ScopeLevel
+from .role_dependencies import extract_role_dependency
 
 class RoleExtractor:
 
@@ -28,7 +29,7 @@ class RoleExtractor:
         # TODO: Do role variables of the current role get loaded before or after the dependencies?
         if self.role.meta_file:
             for dep in self.role.meta_file.metablock.dependencies:
-                result = result.chain(self._extract_role_dependency(dep, result.next_predecessors))
+                result = result.chain(extract_role_dependency(self.context, dep, result.next_predecessors))
 
         with self.context.vars.enter_scope(ScopeLevel.ROLE_DEFAULTS), self.context.vars.enter_scope(ScopeLevel.ROLE_VARS):
             if (df := self.role.main_defaults_file) is not None:
@@ -58,17 +59,3 @@ class RoleExtractor:
                 logger.warning('No main task file')
 
         return result
-
-    def _extract_role_dependency(self, dep: RoleRequirement, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
-        with self.context.vars.enter_scope(ScopeLevel.INCLUDE_PARAMS):
-            for var_name, var_init in dep.params.items():
-                result = self.context.vars.register_variable(var_name, ScopeLevel.INCLUDE_PARAMS, expr=var_init)
-
-            # TODO: Conditionals
-            with self.context.include_ctx.load_and_enter_role(dep.role, self.context.get_location(dep.role)) as incl_role:
-                if not incl_role:
-                    self.context.graph.errors.append(f'Could not resolve {dep.role!r} to role')
-                    return ExtractionResult.empty(predecessors)
-                return RoleExtractor(self.context, incl_role).extract_role(predecessors)
-
-

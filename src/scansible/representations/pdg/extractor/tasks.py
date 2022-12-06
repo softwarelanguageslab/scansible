@@ -86,6 +86,8 @@ def task_extractor_factory(context: ExtractionContext, task: Task) -> TaskExtrac
         return IncludeVarsTaskExtractor(context, task)
     if action in ansible_constants._ACTION_ALL_INCLUDE_IMPORT_TASKS:
         return IncludeTaskExtractor(context, task)
+    if action in ansible_constants._ACTION_ALL_PROPER_INCLUDE_IMPORT_ROLES:
+        return IncludeRoleExtractor(context, task)
 
     return GenericTaskExtractor(context, task)
 
