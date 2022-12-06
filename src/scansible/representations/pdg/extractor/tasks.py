@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from ansible import constants as ansible_constants
 from loguru import logger
 
-from scansible.representations.structural import Task, TaskFile
+from scansible.representations.structural import TaskBase, TaskFile
 
 from .. import representation as rep
 from .context import ExtractionContext
@@ -21,7 +21,7 @@ class TaskExtractor(abc.ABC):
     @abc.abstractclassmethod
     def SUPPORTED_TASK_ATTRIBUTES(cls) -> frozenset[str]: ...
 
-    def __init__(self, context: ExtractionContext, task: Task) -> None:
+    def __init__(self, context: ExtractionContext, task: TaskBase) -> None:
         self.context = context
         self.task = task
         self.location = context.get_location(task)
@@ -78,7 +78,7 @@ class TaskExtractor(abc.ABC):
                 self.context.graph.errors.append(f'Cannot handle {other_kw} on {action or self.task.action} yet!')
 
 
-def task_extractor_factory(context: ExtractionContext, task: Task) -> TaskExtractor:
+def task_extractor_factory(context: ExtractionContext, task: TaskBase) -> TaskExtractor:
     action = task.action
     if action in ansible_constants._ACTION_SET_FACT:
         return SetFactTaskExtractor(context, task)

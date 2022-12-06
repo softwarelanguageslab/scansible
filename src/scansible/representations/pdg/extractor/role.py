@@ -10,6 +10,7 @@ from .. import representation as rep
 from .context import ExtractionContext
 from .result import ExtractionResult
 from .task_lists import TaskListExtractor
+from .handler_lists import HandlerListExtractor
 from .variables import VariablesExtractor
 from .var_context import ScopeLevel
 from .role_dependencies import extract_role_dependency
@@ -57,5 +58,12 @@ class RoleExtractor:
                 result = result.chain(tf_result)
             else:
                 logger.warning('No main task file')
+
+            if self.role.main_handlers_file is not None:
+                with self.context.include_ctx.enter_role_handlers(self.role.main_handlers_file.file_path):
+                    result = result.chain(HandlerListExtractor(
+                        self.context,
+                        self.role.main_handlers_file.tasks  # type: ignore[arg-type]
+                    ).extract_handlers(result.next_predecessors))
 
         return result

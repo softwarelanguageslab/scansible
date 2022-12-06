@@ -111,6 +111,13 @@ class IncludeContext:
             yield role
 
     @contextmanager
+    def enter_role_handlers(self, handler_path: Path) -> Generator[None, None, None]:
+        assert self._role_base_path is not None, 'Should not attempt to enter role handlers without having entered role'
+        assert self.last_include_location is not None
+        with self._enter_file(self._role_base_path.join(handler_path), self.last_include_location):
+            yield
+
+    @contextmanager
     def load_and_enter_var_file(self, path: str, includer_location: rep.NodeLocation) -> Generator[struct_rep.VariableFile | None, None, None]:
         real_path = self._find_file(path, 'vars')
         if not real_path:
