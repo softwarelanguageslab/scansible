@@ -19,27 +19,27 @@ class SetFactTaskExtractor(TaskExtractor):
             return self._extract_bare_task(predecessors)
 
     def _extract_bare_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
-        result = ExtractionResult.empty(predecessors)
+        # Don't link these conditions to any predecessors, these conditions aren't
+        # really part of the control flow.
+        condition_nodes = self.extract_condition([]).added_control_nodes
 
-        with self.context.vars.enter_cached_scope(ScopeLevel.TASK_VARS):
-            # Evaluate all values before defining the variables. Ansible does
-            # the same. We need to do this as one variable may be defined in
-            # terms of another variable that's `set_fact`ed
-            name_to_value = {var_name: self.extract_value(var_value) for var_name, var_value in self.task.args.items()}
-            cond_val = self.extract_conditional_value()
-            added_vars = []
+        # Evaluate all values before defining the variables. Ansible does
+        # the same. We need to do this as one variable may be defined in
+        # terms of another variable that's `set_fact`ed
+        name_to_value = {var_name: self.extract_value(var_value) for var_name, var_value in self.task.args.items()}
+        added_vars = []
 
-            for var_name, value_node in name_to_value.items():
-                var_node = self.context.vars.register_variable(var_name, ScopeLevel.SET_FACTS_REGISTERED)
-                added_vars.append(var_node)
+        for var_name, value_node in name_to_value.items():
+            var_node = self.context.vars.register_variable(var_name, ScopeLevel.SET_FACTS_REGISTERED)
+            added_vars.append(var_node)
 
-                self.context.graph.add_node(var_node)
-                self.context.graph.add_edge(value_node, var_node, rep.DEF)
-                if cond_val is not None:
-                    self.context.graph.add_edge(cond_val, var_node, rep.DEFINED_IF)
+            self.context.graph.add_node(var_node)
+            self.context.graph.add_edge(value_node, var_node, rep.DEF)
+            for condition_node in condition_nodes:
+                self.context.graph.add_edge(condition_node, var_node, rep.DEFINED_IF)
 
         self.warn_remaining_kws()
-        return result.add_variable_nodes(added_vars)
+        return ExtractionResult([], added_vars, predecessors)
 
     def _extract_looping_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
         self.context.graph.errors.append('loops on set_fact are not fully supported yet')

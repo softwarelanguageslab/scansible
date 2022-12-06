@@ -30,18 +30,7 @@ class GenericTaskExtractor(TaskExtractor):
         if self.task.loop_control:
             self.context.graph.errors.append('Found loop_control without loop')
 
-        tn, cn = self._extract_bare_task(predecessors)
-        registered_var = self._define_registered_var([tn])
-        added: list[rep.ControlNode] = [tn]
-        # Condition could be false, so the task could be skipped and the
-        # condition itself could also be a predecessor.
-        if cn is not None:
-            added.append(cn)
-
-        return ExtractionResult(
-            next_predecessors=added,
-            added_variable_nodes=[] if registered_var is None else [registered_var],
-            added_control_nodes=added)
+        return self._extract_bare_task(predecessors)
 
     def _extract_looping_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
         loop_node = rep.Loop(location=self.context.get_location(self.task.loop) or self.location)
@@ -59,43 +48,30 @@ class GenericTaskExtractor(TaskExtractor):
             loop_target_var = self.context.vars.register_variable(loop_var_name, ScopeLevel.INCLUDE_PARAMS)
             self.context.graph.add_edge(loop_source_var, loop_target_var, rep.DEF_LOOP_ITEM)
 
-            tn, cn = self._extract_bare_task([loop_node])
-            # Back edge to represent looping. Forward edge already added by the
-            # called method.
-            self.context.graph.add_edge(tn, loop_node, rep.ORDER_BACK)
-            # If there was a conditional node added by the task, its "else" branch
-            # needs to link back to the loop. If a loop step is skipped, the next
-            # task will be the next step in the loop.
-            if cn is not None:
-                self.context.graph.add_edge(cn, loop_node, rep.ORDER_BACK)
+            inner_result = self._extract_bare_task([loop_node])
+            # Add back edges to represent looping. The forward edges are already
+            # added by the bare task extractor. Any of the sink nodes need to
+            # link back to the loop for the potential next iteration.
+            for pred in inner_result.next_predecessors:
+                self.context.graph.add_edge(pred, loop_node, rep.ORDER_BACK)
 
-        # It could be that the source list is empty, in which case the task will
-        # be skipped and there will be a direct edge from the loop to the next
-        # task. If it isn't skipped, it'll always have to go back to the loop
-        # too
-        result = ExtractionResult([loop_node, tn], [], [loop_node])
-        # Any registered variable is defined both by the loop and the individual tasks
-        if (registered_var := self._define_registered_var([loop_node, tn])) is not None:
-            result = result.add_variable_nodes(registered_var)
-        if cn is not None:
-            result = result.add_control_nodes(cn)
+        # Sink node of a looping task is always the loop itself.
+        # If the source list is empty, the task and its conditions will be skipped
+        # entirely, so the loop would be followed by the next control node.
+        # If it isn't empty, it'll always need to go back to the loop too.
+        return inner_result.chain(ExtractionResult([loop_node], [], [loop_node]))
 
-        return result
-
-    def _extract_bare_task(self, predecessors: Sequence[rep.ControlNode]) -> tuple[rep.Task, rep.Conditional | None]:
+    def _extract_bare_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
         tn = rep.Task(name=self.task.name, action=self.task.action, location=self.location)
-        cn: rep.Conditional | None = None
-        first_node: rep.ControlNode = tn
         self.context.graph.add_node(tn)
 
-        if (condition_val_node := self.extract_conditional_value()) is not None:
-            # Add a conditional node, which uses the expression IV, and is
-            # succeeded by the task itself.
-            cn = rep.Conditional(location=self.context.get_location(self.task.when) or self.location)
-            self.context.graph.add_node(cn)
-            self.context.graph.add_edge(condition_val_node, cn, rep.USE)
-            self.context.graph.add_edge(cn, tn, rep.ORDER)
-            first_node = cn
+        # If there's a condition: preds -> first condition -> ... last condition -> task
+        # Otherwise: preds -> task -> rest
+        condition_result = self.extract_condition(predecessors)
+        first_node = condition_result.added_control_nodes[0] if condition_result.added_control_nodes else tn
+
+        for condition_node in condition_result.next_predecessors:
+            self.context.graph.add_edge(condition_node, tn, rep.ORDER)
 
         for pred in predecessors:
             self.context.graph.add_edge(pred, first_node, rep.ORDER)
@@ -105,21 +81,23 @@ class GenericTaskExtractor(TaskExtractor):
             arg_node = self.extract_value(arg_value)
             self.context.graph.add_edge(arg_node, tn, rep.Keyword(keyword=f'args.{arg_name}'))
 
+        registered_vars = self._define_registered_var(tn)
+
         misc_kws = {'check_mode',}
         for misc_kw in misc_kws:
             if not self.task.is_default(misc_kw, (kw_val := getattr(self.task, misc_kw))):
                 val_node = self.extract_value(kw_val)
                 self.context.graph.add_edge(val_node, tn, rep.Keyword(keyword=misc_kw))
 
-        return tn, cn
+        # Next predecessors are either any of the condition nodes, or the task node if all conditions passed.
+        control_nodes = [tn] + [cn for cn in condition_result.added_control_nodes]
+        return ExtractionResult(control_nodes, registered_vars, control_nodes)
 
-    def _define_registered_var(self, definers: list[rep.ControlNode]) -> rep.Variable | None:
-        if (registered_var_name := self.task.register):
-            assert isinstance(registered_var_name, str)
-            vn = self.context.vars.register_variable(registered_var_name, ScopeLevel.SET_FACTS_REGISTERED)
-            self.context.graph.add_node(vn)
-            # There could be multiple defining control nodes, e.g. the loop node and the task node.
-            for definer in definers:
-                self.context.graph.add_edge(definer, vn, rep.DEF)
-            return vn
-        return None
+    def _define_registered_var(self, task: rep.Task) -> Sequence[rep.Variable]:
+        if not self.task.register:
+            return []
+
+        vn = self.context.vars.register_variable(self.task.register, ScopeLevel.SET_FACTS_REGISTERED)
+        self.context.graph.add_node(vn)
+        self.context.graph.add_edge(task, vn, rep.DEF)
+        return [vn]

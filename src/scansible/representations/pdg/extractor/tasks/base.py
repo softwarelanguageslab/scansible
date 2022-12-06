@@ -11,6 +11,8 @@ from scansible.representations.structural import TaskBase
 from ... import representation as rep
 from ..context import ExtractionContext
 from ..result import ExtractionResult
+from ..var_context import ScopeLevel
+from ..variables import VariablesExtractor
 
 class TaskExtractor(abc.ABC):
 
@@ -27,18 +29,21 @@ class TaskExtractor(abc.ABC):
     def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
         raise NotImplementedError('To be implemented by subclass')
 
-    def extract_conditional_value(self) -> rep.DataNode | None:
-        if not self.task.when:
-            return None
+    def extract_condition(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
+        result = ExtractionResult.empty(predecessors)
 
-        if not isinstance(self.task.when, list):
-            self.context.graph.errors.append(f'Cannot handle {type(self.task.when)} conditionals!')
-        elif len(self.task.when) > 1:
-            self.context.graph.errors.append(f'Cannot handle multiple conditions yet!')
-        else:
-            return self.extract_value(self.task.when[0], is_conditional=True)
+        for condition in self.task.when:
+            # Create an IV for each condition and link it to the conditional node.
+            condition_value_node = self.extract_value(condition, is_conditional=True)
+            condition_node = rep.Conditional(location=self.context.get_location(condition) or self.location)
+            self.context.graph.add_node(condition_node)
+            self.context.graph.add_edge(condition_value_node, condition_node, rep.USE)
+            # Link previous predecessors to this condition node
+            for pred in result.next_predecessors:
+                self.context.graph.add_edge(pred, condition_node, rep.ORDER)
+            result = result.add_control_nodes(condition_node).replace_next_predecessors(condition_node)
 
-        return None
+        return result
 
     def extract_looping_value_and_name(self) -> tuple[rep.DataNode, str] | None:
         loop_expr = self.task.loop

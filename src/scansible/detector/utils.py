@@ -53,6 +53,7 @@ def get_def_expression(graph: Graph, node: Variable | IntermediateValue) -> Expr
     return def_exprs[0]
 
 def get_def_conditions(graph: Graph, v: Variable) -> list[Expression]:
+    # TODO: The structure of DefinedIf was changed and this must be adapted too.
     cond_ivs = get_node_predecessors(graph, v, node_type=Node, edge_type=DefinedIf)
     cond_exprs: list[Expression] = []
     for civ in cond_ivs:

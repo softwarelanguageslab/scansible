@@ -40,31 +40,29 @@ class IncludeRoleExtractor(TaskExtractor):
                     self.context.graph.errors.append(f'Task file not found: {incl_name}')
                     return abort_result
 
-                cond_val_node = self.extract_conditional_value()
-
-                if cond_val_node is not None:
-                    # Add a conditional node, which uses the expression IV, and is
-                    # succeeded by the task itself.
-                    cn: rep.ControlNode = rep.Conditional(location=self.context.get_location(self.task.when) or self.location)
-                    self.context.graph.add_node(cn)
-                    self.context.graph.add_edge(cond_val_node, cn, rep.USE)
-                    for pred in predecessors:
-                        self.context.graph.add_edge(pred, cn, rep.ORDER)
-                    predecessors = [cn]
+                # If there's a condition on this task, the predecessors for the
+                # task itself become the conditionals.
+                condition_result: ExtractionResult | None = None
+                if self.task.when:
+                    condition_result = self.extract_condition(predecessors)
+                    predecessors = condition_result.next_predecessors
 
                 self.warn_remaining_kws()
 
                 # Delayed import to prevent circular imports. task_files imports
                 # blocks, which in turn imports this module.
                 from ..role import RoleExtractor
-                result = RoleExtractor(self.context, incl_role).extract_role(predecessors)
+                role_result = RoleExtractor(self.context, incl_role).extract_role(predecessors)
 
-            if cond_val_node is not None:
-                # Need to link up condition to defined variables, and add condition
-                # to next predecessors as the include may be skipped.
-                for added_var in result.added_variable_nodes:
-                    self.context.graph.add_edge(cond_val_node, added_var, rep.DEFINED_IF)
+            if condition_result is None:
+                return role_result
 
-                return result.add_control_nodes(cn).add_next_predecessors(cn)
-
-            return result
+            # If there was a condition, make sure to link up any global variables
+            # defined in the role to indicate that they're conditionally
+            # defined. We also need to add _ALL_ condition nodes as potential
+            # next predecessors, not just the last one, since subsequent conditions
+            # may be skipped.
+            for condition_node in condition_result.added_control_nodes:
+                for added_var in role_result.added_variable_nodes:
+                    self.context.graph.add_edge(condition_node, added_var, rep.DEFINED_IF)
+            return role_result.add_control_nodes(condition_result.added_control_nodes).add_next_predecessors(condition_result.added_control_nodes)

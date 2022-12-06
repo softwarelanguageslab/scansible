@@ -39,11 +39,12 @@ class IncludeVarsTaskExtractor(TaskExtractor):
                 self.context.graph.errors.append(f'Var file not found: {incl_name}')
                 return result
 
-            cond_node = self.extract_conditional_value()
+            # Don't include these condition nodes into the CFG, see SetFactExtractor.
+            condition_nodes = self.extract_condition([]).added_control_nodes
             inner_result = VariablesExtractor(self.context, varfile.variables).extract_variables(ScopeLevel.INCLUDE_VARS)
-            if cond_node is not None:
+            for condition_node in condition_nodes:
                 for added_var in inner_result.added_variable_nodes:
-                    self.context.graph.add_edge(cond_node, added_var, rep.DEFINED_IF)
+                    self.context.graph.add_edge(condition_node, added_var, rep.DEFINED_IF)
 
         self.warn_remaining_kws()
         return result.merge(inner_result)

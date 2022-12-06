@@ -189,8 +189,8 @@ class DefinedIf(DataFlowEdge):
     def raise_if_disallowed(cls, source: Node, target: Node) -> None:
         if not isinstance(target, Variable):
             raise TypeError('DefinedIf edges can only target variables')
-        if not isinstance(source, (IntermediateValue, Literal)):
-            raise TypeError('DefinedIf edges must originate from IVs or literals')
+        if not isinstance(source, Conditional):
+            raise TypeError('DefinedIf edges must originate from conditionals')
 
 
 class DefLoopItem(DataFlowEdge):
