@@ -41,10 +41,6 @@ class RoleExtractor:
                 vf_result = VariablesExtractor(self.context, vf.variables).extract_variables(ScopeLevel.ROLE_VARS)
                 result = result.merge(vf_result)
 
-            # Extract handlers first, as they're needed to link to tasks
-            if self.role.main_handlers_file is not None:
-                self.context.graph.errors.append('I cannot handle handlers yet!')
-
             if self.role.main_tasks_file is not None:
                 # No need to enter the included file here, it should have already
                 # happened. 1) This is a root role, in which case it's already
@@ -59,6 +55,7 @@ class RoleExtractor:
             else:
                 logger.warning('No main task file')
 
+            # TODO: These should somehow be linked to tasks.
             if self.role.main_handlers_file is not None:
                 with self.context.include_ctx.enter_role_handlers(self.role.main_handlers_file.file_path):
                     result = result.chain(HandlerListExtractor(
