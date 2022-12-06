@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from typing import Literal
+
 import abc
-from collections.abc import Sequence
+from collections.abc import Generator, Sequence
+from contextlib import contextmanager
 
 from scansible.representations.structural import TaskBase
 
@@ -11,14 +14,16 @@ from ..result import ExtractionResult
 
 class TaskExtractor(abc.ABC):
 
-    @abc.abstractclassmethod
-    def SUPPORTED_TASK_ATTRIBUTES(cls) -> frozenset[str]: ...
+    @classmethod
+    def SUPPORTED_TASK_ATTRIBUTES(cls) -> frozenset[str]:
+        return frozenset({'name', 'action', 'args', 'when', 'vars'})
 
     def __init__(self, context: ExtractionContext, task: TaskBase) -> None:
         self.context = context
         self.task = task
         self.location = context.get_location(task)
 
+    @abc.abstractmethod
     def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
         raise NotImplementedError('To be implemented by subclass')
 
@@ -64,6 +69,13 @@ class TaskExtractor(abc.ABC):
             return tr.data_node
         else:
             return self.context.vars.add_literal(value)
+
+    @contextmanager
+    def setup_task_vars_scope(self, scope_level: Literal[ScopeLevel.TASK_VARS, ScopeLevel.INCLUDE_PARAMS]) -> Generator[None, None, None]:
+        # TODO: Revisit this when we re-introduce caching, sometimes the scope may be cached.
+        with self.context.vars.enter_scope(scope_level):
+            VariablesExtractor(self.context, self.task.vars).extract_variables(scope_level)
+            yield
 
     def warn_remaining_kws(self, action: str = '') -> None:
         for other_kw, _ in self.task._get_non_default_attributes():

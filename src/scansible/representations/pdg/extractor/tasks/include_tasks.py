@@ -11,15 +11,9 @@ from .base import TaskExtractor
 
 
 class IncludeTaskExtractor(TaskExtractor):
-    @classmethod
-    def SUPPORTED_TASK_ATTRIBUTES(cls) -> frozenset[str]:  # type: ignore[override]
-        return frozenset({'name', 'action', 'args', 'when'})
 
     def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
-        with self.context.vars.enter_scope(ScopeLevel.INCLUDE_PARAMS):
-            for var_name, var_value in self.task.vars.items():
-                self.context.vars.register_variable(var_name, expr=var_value, level=ScopeLevel.INCLUDE_PARAMS)
-
+        with self.setup_task_vars_scope(ScopeLevel.INCLUDE_PARAMS):
             abort_result = ExtractionResult.empty(predecessors)
 
             args = dict(self.task.args)

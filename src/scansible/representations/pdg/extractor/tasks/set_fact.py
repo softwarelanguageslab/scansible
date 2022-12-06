@@ -9,13 +9,14 @@ from .base import TaskExtractor
 
 class SetFactTaskExtractor(TaskExtractor):
     @classmethod
-    def SUPPORTED_TASK_ATTRIBUTES(cls) -> frozenset[str]:  # type: ignore[override]
-        return frozenset({'name', 'action', 'args', 'when', 'loop', 'loop_control'})
+    def SUPPORTED_TASK_ATTRIBUTES(cls) -> frozenset[str]:
+        return super().SUPPORTED_TASK_ATTRIBUTES().union({'loop', 'loop_control'})
 
     def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
-        if self.task.loop:
-            return self._extract_looping_task(predecessors)
-        return self._extract_bare_task(predecessors)
+        with self.setup_task_vars_scope(ScopeLevel.TASK_VARS):
+            if self.task.loop:
+                return self._extract_looping_task(predecessors)
+            return self._extract_bare_task(predecessors)
 
     def _extract_bare_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
         result = ExtractionResult.empty(predecessors)

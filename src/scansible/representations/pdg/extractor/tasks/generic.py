@@ -12,15 +12,12 @@ from .base import TaskExtractor
 class GenericTaskExtractor(TaskExtractor):
 
     @classmethod
-    def SUPPORTED_TASK_ATTRIBUTES(cls) -> frozenset[str]:  # type: ignore[override]
-        return frozenset({'name', 'action', 'args', 'vars', 'when', 'loop', 'loop_control', 'check_mode', 'register'})
+    def SUPPORTED_TASK_ATTRIBUTES(cls) -> frozenset[str]:
+        return super().SUPPORTED_TASK_ATTRIBUTES().union({'vars', 'loop', 'loop_control', 'check_mode', 'register'})
 
     def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
         logger.debug(f'Extracting task with name {self.task.name!r} from {self.location}')
-        with self.context.vars.enter_cached_scope(ScopeLevel.TASK_VARS):
-            for var_name, var_value in self.task.vars.items():
-                self.context.vars.register_variable(var_name, expr=var_value, level=ScopeLevel.TASK_VARS)
-
+        with self.setup_task_vars_scope(ScopeLevel.TASK_VARS):
             if self.task.loop:
                 result = self._extract_looping_task(predecessors)
             else:

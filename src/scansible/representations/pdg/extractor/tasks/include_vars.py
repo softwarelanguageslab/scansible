@@ -9,11 +9,12 @@ from ..variables import VariablesExtractor
 from .base import TaskExtractor
 
 class IncludeVarsTaskExtractor(TaskExtractor):
-    @classmethod
-    def SUPPORTED_TASK_ATTRIBUTES(cls) -> frozenset[str]:  # type: ignore[override]
-        return frozenset({'name', 'action', 'args', 'when'})
 
     def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
+        with self.setup_task_vars_scope(ScopeLevel.TASK_VARS):
+            return self._do_extract(predecessors)
+
+    def _do_extract(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
         args = dict(self.task.args)
         result = ExtractionResult.empty(predecessors)
 
