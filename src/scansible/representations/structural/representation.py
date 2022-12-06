@@ -632,9 +632,9 @@ class Play(DirectivesBase):
     #: Handlers for the play.
     handlers: Sequence[Handler | Block] = default_field(factory=list)
     #: Tasks to be run before the roles in `roles`.
-    pre_tasks: Sequence[Handler | Block] = default_field(factory=list)
+    pre_tasks: Sequence[Task | Block] = default_field(factory=list)
     #: Tasks to be run after the main tasks.
-    post_tasks: Sequence[Handler | Block] = default_field(factory=list)
+    post_tasks: Sequence[Task | Block] = default_field(factory=list)
 
     #: Force handler notification.
     force_handlers: bool | str | None = default_field(default=None)
