@@ -23,10 +23,29 @@ class PlaybookExtractor:
 
     def extract(self) -> None:
         # TODO: Inventory vars, group vars, etc. Can we determine these?
+        # For playbooks, they can be in group_vars and host_vars relative to the playbook root dir.
+        # The "all" file (possibly with .yaml/.yml/.json, but not necessarily) contains variables
+        # for all hosts, whereas the other files are for specific hosts.
+
         for play in self.playbook.plays:
-            with self.context.vars.enter_scope(ScopeLevel.PLAY_VARS):
+            with self.context.vars.enter_scope(ScopeLevel.PLAY_VARS), self.context.vars.enter_scope(ScopeLevel.PLAY_VARS_PROMPT), self.context.vars.enter_scope(ScopeLevel.PLAY_VARS_FILES):
+                # Extract variables first. Order doesn't really matter.
+
+                # - Play variables
                 VariablesExtractor(self.context, play.vars).extract_variables(ScopeLevel.PLAY_VARS)
-                # TODO: vars_files, vars_prompt
+
+                # - Play vars_prompt
+                # HACK: These prompts don't always use the default, but we're acting as if it's always the default that's used. TODO: Better representation!
+                VariablesExtractor(self.context, {prompt.name: prompt.default for prompt in play.vars_prompt}).extract_variables(ScopeLevel.PLAY_VARS_PROMPT)
+
+                # - Play vars_files
+                # TODO: Not clear whether this follows Ansible's search mechanism.
+                for vars_file in play.vars_files:
+                    with self.context.include_ctx.load_and_enter_var_file(vars_file, self.context.get_location(vars_file)) as file_content:
+                        if file_content is None:
+                            self.context.graph.errors.append(f'Could not load play vars_file {vars_file!r}')
+                            continue
+                        VariablesExtractor(self.context, file_content.variables).extract_variables(ScopeLevel.PLAY_VARS_FILES)
 
 
                 # Follow Ansible's execution order:
