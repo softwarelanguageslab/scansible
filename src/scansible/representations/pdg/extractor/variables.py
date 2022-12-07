@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import Mapping
+from collections.abc import Mapping
+
+from loguru import logger
 
 from scansible.representations.structural import VariableFile
 
@@ -23,5 +25,5 @@ class VariablesExtractor:
 
     def extract_variable(self, var_name: str, var_init: object, scope_level: ScopeLevel) -> rep.Variable:
         if not isinstance(var_init, (str, bool, int, float)):
-            self.context.graph.errors.append('I am not able to properly handle non-atomic values yet')
+            logger.warning('I am not able to properly handle non-atomic values yet')
         return self.context.vars.register_variable(var_name, scope_level, expr=var_init)

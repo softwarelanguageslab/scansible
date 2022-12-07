@@ -20,25 +20,26 @@ class IncludeVarsTaskExtractor(TaskExtractor):
 
         incl_name = args.pop('_raw_params', '')
         if not incl_name or not isinstance(incl_name, str):
-            self.context.graph.errors.append(f'Unknown included file name!')
+            self.logger.error(f'Unknown included file name!')
             return result
 
         if args:
-            self.context.graph.errors.append(f'Additional arguments on included vars action')
+            self.logger.warning(f'Additional arguments on included vars action')
 
         if '{{' in incl_name:
             # TODO: When we do handle expressions here, we should make sure
             # to check whether these expressions can or cannot use the include
             # parameters. If they cannot, we should extract the included
             # name before registering the variables.
-            self.context.graph.errors.append(f'Cannot handle dynamic file name on {self.task.action} yet!')
+            self.logger.warning(f'Cannot handle dynamic file name on {self.task.action} yet!')
             return result
 
         with self.context.include_ctx.load_and_enter_var_file(incl_name, self.location) as varfile:
             if not varfile:
-                self.context.graph.errors.append(f'Var file not found: {incl_name}')
+                self.logger.error(f'Var file not found: {incl_name}')
                 return result
 
+            self.logger.info(f'Following include of {varfile.file_path}')
             # Don't include these condition nodes into the CFG, see SetFactExtractor.
             condition_nodes = self.extract_condition([]).added_control_nodes
             inner_result = VariablesExtractor(self.context, varfile.variables).extract_variables(ScopeLevel.INCLUDE_VARS)

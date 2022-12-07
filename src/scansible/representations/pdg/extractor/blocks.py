@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Sequence
 
+from loguru import logger
+
 from scansible.representations.structural import Block, Task, Handler
 
 from .. import representation as rep
@@ -18,6 +20,7 @@ class BlockExtractor:
         self.context = context
         self.block = block
         self.location = context.get_location(block)
+        self.logger = logger.bind(location=block.location)
 
     def extract_block(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
         with self.context.vars.enter_scope(ScopeLevel.BLOCK_VARS):
@@ -60,8 +63,8 @@ class BlockExtractor:
             result = result.chain(self._extract_children(self.block.always, result.next_predecessors))  # type: ignore[arg-type]
 
         for kw, _ in self.block._get_non_default_attributes():
-            if kw not in self.SUPPORTED_BLOCK_ATTRIBUTES and kw != 'raw':
-                self.context.graph.errors.append(f'Unsupported block keyword {kw}!')
+            if kw not in self.SUPPORTED_BLOCK_ATTRIBUTES and kw not in ('location', 'raw', 'parent'):
+                self.logger.warning(f'Unsupported block keyword {kw!r}!')
 
         return result
 

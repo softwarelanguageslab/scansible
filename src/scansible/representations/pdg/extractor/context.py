@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Generic, Generator, Literal, Mapping, Sequence, TypeVar, overload, cast
 
 import json
+import textwrap
+from collections import defaultdict
 from contextlib import contextmanager
 from os.path import normpath
 from pathlib import Path, PurePosixPath
@@ -260,6 +262,7 @@ class ExtractionContext:
     # Auxiliary information about variable visibility. We don't store this in
     # the graph itself but in a companion file.
     visibility_information: VisibilityInformation
+    errors: list[tuple[str, tuple[str, int, int] | None]]
     _next_iv_id: int
 
     def __init__(self, graph: rep.Graph, model: struct_rep.StructuralModel, role_search_path: Path, *, lenient: bool) -> None:
@@ -269,6 +272,7 @@ class ExtractionContext:
         self.include_ctx = IncludeContext(model, role_search_path, lenient=lenient)
         self.visibility_information = VisibilityInformation()
         self._next_iv_id = 0
+        self.errors = []
 
     def next_iv_id(self) -> int:
         self._next_iv_id += 1
@@ -283,3 +287,23 @@ class ExtractionContext:
             file, line, column = 'unknown file', -1, -1
 
         return rep.NodeLocation(file, line, column, self.include_ctx.last_include_location)
+
+    def record_extraction_error(self, reason: str, location: tuple[str, int, int] | None) -> None:
+        self.errors.append((reason, location))
+
+    def summarise_extraction_errors(self) -> str:
+        reason_to_location = defaultdict(list)
+        for reason, location in self.errors:
+            reason_to_location[reason.strip()].append(location)
+
+        parts = []
+        for reason, locations in sorted(reason_to_location.items()):
+            num_unknown = len([loc for loc in locations if loc is None])
+            loc_strs = sorted(set(':'.join(map(str, loc)) for loc in locations if loc is not None))
+            if num_unknown:
+                prefix = 'and ' if loc_strs else ''
+                loc_strs.append(f'{prefix}{num_unknown} unknown location(s)')
+            locs = textwrap.indent('\n'.join(loc_strs), ' ' * 4)
+            parts.append(f'{reason}\n{locs}')
+
+        return '\n\n'.join(parts)

@@ -43,8 +43,9 @@ class PlaybookExtractor:
                 for vars_file in play.vars_files:
                     with self.context.include_ctx.load_and_enter_var_file(vars_file, self.context.get_location(vars_file)) as file_content:
                         if file_content is None:
-                            self.context.graph.errors.append(f'Could not load play vars_file {vars_file!r}')
+                            logger.bind(location=play.location).error(f'Could not load play vars_file {vars_file!r}')
                             continue
+
                         VariablesExtractor(self.context, file_content.variables).extract_variables(ScopeLevel.PLAY_VARS_FILES)
 
 

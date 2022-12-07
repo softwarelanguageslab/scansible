@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from loguru import logger
-
 from ... import representation as rep
 from ..result import ExtractionResult
 from ..var_context import ScopeLevel
@@ -16,7 +14,7 @@ class GenericTaskExtractor(TaskExtractor):
         return super().SUPPORTED_TASK_ATTRIBUTES().union({'vars', 'loop', 'loop_control', 'check_mode', 'register'})
 
     def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
-        logger.debug(f'Extracting task with name {self.task.name!r} from {self.location}')
+        self.logger.debug(f'Extracting task with name {self.task.name!r}')
         with self.setup_task_vars_scope(ScopeLevel.TASK_VARS):
             if self.task.loop:
                 result = self._extract_looping_task(predecessors)
@@ -28,7 +26,7 @@ class GenericTaskExtractor(TaskExtractor):
 
     def _extract_single_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
         if self.task.loop_control:
-            self.context.graph.errors.append('Found loop_control without loop')
+            self.logger.warning('Found loop_control without loop')
 
         return self._extract_bare_task(predecessors)
 

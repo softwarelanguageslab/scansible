@@ -6,6 +6,8 @@ import abc
 from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 
+from loguru import logger
+
 from scansible.representations.structural import TaskBase
 
 from ... import representation as rep
@@ -24,6 +26,7 @@ class TaskExtractor(abc.ABC):
         self.context = context
         self.task = task
         self.location = context.get_location(task)
+        self.logger = logger.bind(location=task.location)
 
     @abc.abstractmethod
     def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
@@ -53,7 +56,7 @@ class TaskExtractor(abc.ABC):
         loop_source_var = self.extract_value(loop_expr)
 
         if self.task.loop_with:
-            self.context.graph.errors.append(f'I cannot handle looping style {self.task.loop_with!r} yet!')
+            self.logger.warning(f'I cannot handle looping style {self.task.loop_with!r} yet!')
 
         if self.task.loop_control:
             loop_var_name = self.task.loop_control.loop_var or 'item'
@@ -61,7 +64,7 @@ class TaskExtractor(abc.ABC):
             for loop_control_k, _ in self.task.loop_control._get_non_default_attributes():
                 if loop_control_k == 'loop_var':
                     continue
-                self.context.graph.errors.append(f'I cannot handle loop_control option {loop_control_k} yet!')
+                self.logger.warning(f'I cannot handle loop_control option {loop_control_k} yet!')
         else:
             loop_var_name = 'item'
 
@@ -84,5 +87,5 @@ class TaskExtractor(abc.ABC):
 
     def warn_remaining_kws(self, action: str = '') -> None:
         for other_kw, _ in self.task._get_non_default_attributes():
-            if not other_kw in self.SUPPORTED_TASK_ATTRIBUTES() and other_kw != 'raw':
-                self.context.graph.errors.append(f'Cannot handle {other_kw} on {action or self.task.action} yet!')
+            if not other_kw in self.SUPPORTED_TASK_ATTRIBUTES() and other_kw not in ('raw', 'location', 'parent'):
+                self.logger.warning(f'Cannot handle {other_kw} on {action or self.task.action} yet!')

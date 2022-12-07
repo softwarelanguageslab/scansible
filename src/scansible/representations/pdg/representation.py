@@ -220,7 +220,6 @@ class Graph(BaseGraph):
 
     def __init__(self, role_name: str, role_version: str) -> None:
         super().__init__(role_name=role_name, role_version=role_version)
-        self.errors: list[str] = []
         self._last_node_id = -1
 
     def _get_next_node_id(self) -> int:

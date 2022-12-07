@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 from typing import Sequence
 
 from pathlib import Path
 
+import loguru
 from loguru import logger
 
 from scansible.representations import structural as struct
@@ -59,21 +62,36 @@ class StructuralGraphExtractor:
         for logstr in model.logs:
             logger.debug(logstr)
 
-        graph.errors.extend(bt.reason for bt in model.root.broken_tasks)
-        graph.errors.extend(f'{bf.path}: {bf.reason}' for bf in model.root.broken_files)
+        for bt in model.root.broken_tasks:
+            logger.error(bt.reason)
+        for bf in model.root.broken_files:
+            logger.bind(location=bf.path).error(bf.reason)
 
         self.context = ExtractionContext(graph, model, role_search_path, lenient=lenient)
 
     def extract(self) -> ExtractionContext:
+        # Set up capturing warning and error messages so they can be added to
+        # the context.
+        log_handle = logger.add(self._capture_log_message, level='WARNING', format='{level} - {message}')
+
         if self.model.is_playbook:
             self._extract_playbook()
         else:
             self._extract_role()
 
+        logger.remove(log_handle)
+
         # logger.info('Finished extraction, now adding transitive edges')
         # self.add_transitive_edges()
 
         return self.context
+
+    def _capture_log_message(self, message: loguru.Message) -> None:
+        location = message.record.get('extra', {}).get('location')
+        if location is not None and location[0] == 'unknown file':
+            location = None
+        reason = str(message)
+        self.context.record_extraction_error(reason, location)
 
     def _extract_role(self) -> None:
         RoleExtractor(

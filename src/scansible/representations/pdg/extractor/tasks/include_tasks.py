@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from loguru import logger
-
 from ... import representation as rep
 from ..result import ExtractionResult
 from ..var_context import ScopeLevel
@@ -19,7 +17,7 @@ class IncludeTaskExtractor(TaskExtractor):
             args = dict(self.task.args)
             incl_name = args.pop('_raw_params', '')
             if not incl_name or not isinstance(incl_name, str):
-                self.context.graph.errors.append(f'Unknown included file name!')
+                self.logger.error(f'Unknown included file name!')
                 return abort_result
 
             if '{{' in incl_name:
@@ -27,31 +25,32 @@ class IncludeTaskExtractor(TaskExtractor):
                 # to check whether these expressions can or cannot use the include
                 # parameters. If they cannot, we should extract the included
                 # name before registering the variables.
-                self.context.graph.errors.append(f'Cannot handle dynamic file name on {self.task.action} yet!')
+                self.logger.warning(f'Cannot handle dynamic file name on {self.task.action} yet!')
                 return abort_result
 
             if args:
                 # Still arguments left?
-                self.context.graph.errors.append('Superfluous arguments on include/import task!')
-                logger.debug(args)
+                self.logger.warning('Superfluous arguments on include/import task!')
+                self.logger.debug(args)
 
-            logger.debug(incl_name)
+            self.logger.debug(incl_name)
             with self.context.include_ctx.load_and_enter_task_file(incl_name, self.location) as task_file:
                 if not task_file:
-                    self.context.graph.errors.append(f'Task file not found: {incl_name}')
+                    self.logger.error(f'Task file not found: {incl_name}')
                     return abort_result
 
                 # If there's a condition on this task, the predecessors for the
                 # task itself become the conditionals.
                 condition_result: ExtractionResult | None = None
                 if self.task.action == 'import_tasks' and self.task.when:
-                    self.context.graph.errors.append('Not sure how to handle conditional on static import')
+                    self.logger.warning('Not sure how to handle conditional on static import')
                 elif self.task.when:
                     condition_result = self.extract_condition(predecessors)
                     predecessors = condition_result.next_predecessors
 
                 self.warn_remaining_kws()
 
+                self.logger.info(f'Following include of {task_file.file_path}')
                 # Delayed import to prevent circular imports. task_files imports
                 # blocks, which in turn imports this module.
                 from ..task_lists import TaskListExtractor
