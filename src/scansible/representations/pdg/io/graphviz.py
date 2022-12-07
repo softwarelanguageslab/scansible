@@ -27,18 +27,18 @@ def get_node_label(n: rep.Node) -> str:
         return n.expr
 
     if isinstance(n, rep.Literal):
-        return str(n.value)
+        return f'{n.type}:{n.value}'
 
     if isinstance(n, rep.IntermediateValue):
         return f'${n.identifier}'
 
     if isinstance(n, rep.Variable):
-        return n.name
+        return f'{n.name}@{n.version},{n.value_version}'
 
     if isinstance(n, rep.Task):
         return n.action
 
-    return ''
+    return n.__class__.__name__
 
 def dump_node(n: rep.Node, g: rep.Graph, dot: gv.Digraph) -> None:
     node_id = str(n.node_id)
@@ -55,6 +55,8 @@ def dump_edge(e: rep.Edge, source: rep.Node, target: rep.Node, dot: gv.Digraph) 
     source_id = str(source.node_id)
     target_id = str(target.node_id)
     edge_label = e.__class__.__name__.upper()
+    if isinstance(e, rep.Keyword):
+        edge_label = e.keyword
 
     dot.edge(source_id, target_id, label=edge_label)
 
