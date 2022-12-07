@@ -787,7 +787,7 @@ class VarContext:
         type_ = value.__class__.__name__
         type_ = {'AnsibleUnicode': 'str', 'AnsibleSequence': 'list', 'AnsibleMapping': 'dict'}.get(type_, type_)
         if isinstance(value, (dict, list)):
-            logger.error('I am not able to handle composite literals yet')
+            logger.warning('I am not able to handle composite literals yet')
             lit = rep.Literal(type=type_, value=str(value), location=location)
         elif isinstance(value, struct.VaultValue):
             lit = rep.Literal(type=type_, value=str(value), location=location)

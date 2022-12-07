@@ -15,7 +15,7 @@ from .role import RoleExtractor
 from .playbook import PlaybookExtractor
 from .context import ExtractionContext
 
-def extract_pdg(path: Path, project_id: str, project_rev: str, role_search_path: Path, *, as_pb: bool | None = None, lenient: bool = True) -> ExtractionContext:
+def extract_pdg(path: Path, project_id: str, project_rev: str, role_search_paths: Sequence[Path], *, as_pb: bool | None = None, lenient: bool = True) -> ExtractionContext:
     """
     Extract a PDG for a project at a given path.
 
@@ -43,7 +43,7 @@ def extract_pdg(path: Path, project_id: str, project_rev: str, role_search_path:
     else:
         model = struct.extract_role(path, project_id, project_rev, lenient=lenient, extract_all=False)
 
-    return StructuralGraphExtractor(model, role_search_path, lenient).extract()
+    return StructuralGraphExtractor(model, role_search_paths, lenient).extract()
 
 
 def _project_is_role(path: Path) -> bool:
@@ -56,7 +56,7 @@ def _project_is_role(path: Path) -> bool:
 
 class StructuralGraphExtractor:
 
-    def __init__(self, model: struct.StructuralModel, role_search_path: Path, lenient: bool) -> None:
+    def __init__(self, model: struct.StructuralModel, role_search_paths: Sequence[Path], lenient: bool) -> None:
         self.model = model
         graph = rep.Graph(model.id, model.version)
         for logstr in model.logs:
@@ -67,7 +67,7 @@ class StructuralGraphExtractor:
         for bf in model.root.broken_files:
             logger.bind(location=bf.path).error(bf.reason)
 
-        self.context = ExtractionContext(graph, model, role_search_path, lenient=lenient)
+        self.context = ExtractionContext(graph, model, role_search_paths, lenient=lenient)
 
     def extract(self) -> ExtractionContext:
         # Set up capturing warning and error messages so they can be added to

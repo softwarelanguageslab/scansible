@@ -26,9 +26,9 @@ class IncludeContext:
     _last_included_file_path: ProjectPath | None
     last_include_location: rep.NodeLocation | None
 
-    def __init__(self, model: struct_rep.StructuralModel, role_search_path: Path, *, lenient: bool) -> None:
+    def __init__(self, model: struct_rep.StructuralModel, role_search_paths: Sequence[Path], *, lenient: bool) -> None:
         self._lenient = lenient
-        self._role_search_path = role_search_path
+        self._role_search_paths = role_search_paths
         self.last_include_location = None
 
         if isinstance(model.root, struct_rep.Playbook):
@@ -196,7 +196,7 @@ class IncludeContext:
         if self._playbook_base_path is not None:
             base_search_dirs.append(self._playbook_base_path.join('roles').absolute)
 
-        base_search_dirs.append(self._role_search_path)
+        base_search_dirs.extend(self._role_search_paths)
 
         if self._role_base_path is not None:
             base_search_dirs.append(self._role_base_path.absolute)
@@ -265,11 +265,11 @@ class ExtractionContext:
     errors: list[tuple[str, tuple[str, int, int] | None]]
     _next_iv_id: int
 
-    def __init__(self, graph: rep.Graph, model: struct_rep.StructuralModel, role_search_path: Path, *, lenient: bool) -> None:
+    def __init__(self, graph: rep.Graph, model: struct_rep.StructuralModel, role_search_paths: Sequence[Path], *, lenient: bool) -> None:
         self.vars = VarContext(self)
         self.graph = graph
         self.model_root = model.root
-        self.include_ctx = IncludeContext(model, role_search_path, lenient=lenient)
+        self.include_ctx = IncludeContext(model, role_search_paths, lenient=lenient)
         self.visibility_information = VisibilityInformation()
         self._next_iv_id = 0
         self.errors = []
