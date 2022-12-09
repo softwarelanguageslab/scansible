@@ -699,7 +699,7 @@ class VarContext:
             # Create this node purely to adhere to TemplateRecord typings so we
             # don't have to accept None as a possibility. It's never added to
             # the graph and the template record is never cached either.
-            en = rep.Expression(expr=expr, non_idempotent_components=())
+            en = rep.Expression(expr=expr or '<empty string>', non_idempotent_components=())
             return TemplateRecord(ln, en, [], True)
 
         used_values = self._resolve_expression_values(ast, is_top_level)

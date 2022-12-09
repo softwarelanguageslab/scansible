@@ -11,7 +11,7 @@ class GenericTaskExtractor(TaskExtractor):
 
     @classmethod
     def SUPPORTED_TASK_ATTRIBUTES(cls) -> frozenset[str]:
-        return super().SUPPORTED_TASK_ATTRIBUTES().union({'vars', 'loop', 'loop_control', 'check_mode', 'register'})
+        return super().SUPPORTED_TASK_ATTRIBUTES().union({'vars', 'loop', 'loop_control', 'check_mode', 'register', 'become', 'become_user', 'become_method'})
 
     def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
         self.logger.debug(f'Extracting task with name {self.task.name!r}')
@@ -81,7 +81,7 @@ class GenericTaskExtractor(TaskExtractor):
 
         registered_vars = self._define_registered_var(tn)
 
-        misc_kws = {'check_mode',}
+        misc_kws = {'check_mode', 'become', 'become_user', 'become_method'}
         for misc_kw in misc_kws:
             if not self.task.is_default(misc_kw, (kw_val := getattr(self.task, misc_kw))):
                 val_node = self.extract_value(kw_val)

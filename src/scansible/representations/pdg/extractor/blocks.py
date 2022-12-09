@@ -14,7 +14,7 @@ from .var_context import ScopeLevel
 
 class BlockExtractor:
 
-    SUPPORTED_BLOCK_ATTRIBUTES = frozenset(('name', 'block', 'rescue', 'always', 'vars'))
+    SUPPORTED_BLOCK_ATTRIBUTES = frozenset(('name', 'block', 'rescue', 'always', 'vars', 'become', 'become_user', 'become_method'))
 
     def __init__(self, context: ExtractionContext, block: Block) -> None:
         self.context = context
@@ -62,6 +62,26 @@ class BlockExtractor:
             # will always be the last task of the always block, so use `chain`.
             result = result.chain(self._extract_children(self.block.always, result.next_predecessors))  # type: ignore[arg-type]
 
+        for misc_kw in ('become', 'become_user', 'become_method'):
+            kw_val = getattr(self, misc_kw)
+            if self.block.is_default(misc_kw, kw_val):
+                continue
+
+            prev_value: rep.DataNode | None = None
+
+            for ctrl_node in result.added_control_nodes:
+                in_edges = self.context.graph.in_edges(ctrl_node, data='type')
+                has_overridden_kw = any(in_edge.keyword == misc_kw for _, _, in_edge in in_edges if isinstance(in_edge, rep.Keyword))
+                if has_overridden_kw:
+                    continue
+
+                value = prev_value or self.extract_value(kw_val)
+                if isinstance(value, rep.Literal):
+                    prev_value = value
+
+                self.context.graph.add_edge(value, ctrl_node, rep.Keyword(misc_kw))
+
+
         for kw, _ in self.block._get_non_default_attributes():
             if kw not in self.SUPPORTED_BLOCK_ATTRIBUTES and kw not in ('location', 'raw', 'parent'):
                 self.logger.warning(f'Unsupported block keyword {kw!r}!')
@@ -71,3 +91,11 @@ class BlockExtractor:
     def _extract_children(self, child_list: Sequence[Task | Block], predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
         from .task_lists import TaskListExtractor
         return TaskListExtractor(self.context, child_list).extract_tasks(predecessors)
+
+    # TODO: Duplicated from tasks.
+    def extract_value(self, value: object, is_conditional: bool = False) -> rep.DataNode:
+        if isinstance(value, str):
+            tr = self.context.vars.evaluate_template(value, is_conditional)
+            return tr.data_node
+        else:
+            return self.context.vars.add_literal(value)
