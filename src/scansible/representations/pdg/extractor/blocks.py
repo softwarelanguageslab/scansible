@@ -63,7 +63,7 @@ class BlockExtractor:
             result = result.chain(self._extract_children(self.block.always, result.next_predecessors))  # type: ignore[arg-type]
 
         for misc_kw in ('become', 'become_user', 'become_method'):
-            kw_val = getattr(self, misc_kw)
+            kw_val = getattr(self.block, misc_kw)
             if self.block.is_default(misc_kw, kw_val):
                 continue
 
