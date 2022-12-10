@@ -17,7 +17,7 @@ class UnrestrictedIPAddressRule(Rule):
         return f'''
             MATCH chain = (source:{source_type}) -[:DEF|USE|DEFLOOPITEM*0..]->()-[:KEYWORD*0..1]->(sink)
             WHERE source.{value_prop} CONTAINS '0.0.0.0'
-                AND sink:Task OR (sink:Variable AND NOT (sink)-[:USE|KEYWORD]->())
+                AND (sink:Task OR (sink:Variable AND NOT (sink)-[:USE|KEYWORD]->()))
             RETURN
                 source.location as source_location,
                 sink.location as sink_location,
