@@ -110,13 +110,13 @@ def describe_hardcoded_secret_rule() -> None:
               vars:
                 secret_password: sekrit
               tasks:
-                - debug: msg=test
+                - debug: msg={{ secret_password }}
         ''', pb_path)
         with temp_import_pb(db_instance, pb_path):
             results = rules.HardcodedSecretRule().run(db_instance)
 
         assert results == [
-            RuleResult('HardcodedSecret', f'{pb_path}:4:34', f'{pb_path}:4:17', 0)
+            RuleResult('HardcodedSecret', f'{pb_path}:4:34', f'{pb_path}:4:17', 1)
         ]
 
     def matches_indirect_variable_name(db_instance: Neo4jDatabase, tmp_path: Path) -> None:
@@ -133,7 +133,7 @@ def describe_hardcoded_secret_rule() -> None:
             results = rules.HardcodedSecretRule().run(db_instance)
 
         assert results == [
-            RuleResult('HardcodedSecret', f'{pb_path}:4:24', f'{pb_path}:5:17', 1)
+            RuleResult('HardcodedSecret', f'{pb_path}:4:24', f'{pb_path}:5:17', 2)
         ]
 
     def does_not_match_update_password_flag_as_literal(db_instance: Neo4jDatabase, tmp_path: Path) -> None:
@@ -258,13 +258,13 @@ def describe_empty_password_rule() -> None:
               vars:
                 secret_password: ''
               tasks:
-                - debug: msg=test
+                - debug: msg={{ secret_password }}
         ''', pb_path)
         with temp_import_pb(db_instance, pb_path):
             results = rules.EmptyPasswordRule().run(db_instance)
 
         assert results == [
-            RuleResult('EmptyPassword', f'{pb_path}:4:34', f'{pb_path}:4:17', 0)
+            RuleResult('EmptyPassword', f'{pb_path}:4:34', f'{pb_path}:4:17', 1)
         ]
 
     def matches_indirect_variable_name(db_instance: Neo4jDatabase, tmp_path: Path) -> None:
@@ -281,7 +281,7 @@ def describe_empty_password_rule() -> None:
             results = rules.EmptyPasswordRule().run(db_instance)
 
         assert results == [
-            RuleResult('EmptyPassword', f'{pb_path}:4:24', f'{pb_path}:5:17', 1)
+            RuleResult('EmptyPassword', f'{pb_path}:4:24', f'{pb_path}:5:17', 2)
         ]
 
 def describe_admin_by_default_rule() -> None:

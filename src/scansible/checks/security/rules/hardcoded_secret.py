@@ -20,7 +20,7 @@ class HardcodedSecretRule(Rule):
         return f'''
             {self._construct_query("[arg:KEYWORD]->(sink:Task)", "arg.keyword")}
             UNION
-            {self._construct_query("[:DEF|DEFLOOPITEM]->(sink:Variable)", "sink.name")}
+            {self._construct_query("[:DEF|DEFLOOPITEM]->(sink:Variable)-[:DEF|DEFLOOPITEM|USE*0..]->()-[:KEYWORD]->(:Task)", "sink.name")}
         '''
 
     def _construct_query(self, chain_tail: str, key_getter: str) -> str:
