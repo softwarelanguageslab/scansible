@@ -290,15 +290,14 @@ def describe_admin_by_default_rule() -> None:
         write_pb('''
             - hosts: localhost
               tasks:
-                - file:
-                    path: test.txt
-                    owner: root
+                - debug: msg=test
+                  become_user: admin
         ''', pb_path)
         with temp_import_pb(db_instance, pb_path):
             results = rules.AdminByDefaultRule().run(db_instance)
 
         assert results == [
-            RuleResult('AdminByDefault', f'{pb_path}:6:28', f'{pb_path}:4:19', 0)
+            RuleResult('AdminByDefault', f'{pb_path}:5:32', f'{pb_path}:4:19', 0)
         ]
 
     def matches_variable_on_task(db_instance: Neo4jDatabase, tmp_path: Path) -> None:
@@ -306,17 +305,16 @@ def describe_admin_by_default_rule() -> None:
         write_pb('''
             - hosts: localhost
               vars:
-                file_owner: root
+                user_name: admin
               tasks:
-                - file:
-                    path: test.txt
-                    owner: '{{ file_owner }}'
+                - debug: msg=test
+                  become_user: '{{ user_name }}'
         ''', pb_path)
         with temp_import_pb(db_instance, pb_path):
             results = rules.AdminByDefaultRule().run(db_instance)
 
         assert results == [
-            RuleResult('AdminByDefault', f'{pb_path}:4:29', f'{pb_path}:6:19', 1)
+            RuleResult('AdminByDefault', f'{pb_path}:4:28', f'{pb_path}:6:19', 1)
         ]
 
 def describe_http_without_tls_or_ssl_rule() -> None:
