@@ -26,7 +26,13 @@ class SetFactTaskExtractor(TaskExtractor):
         # Evaluate all values before defining the variables. Ansible does
         # the same. We need to do this as one variable may be defined in
         # terms of another variable that's `set_fact`ed
-        name_to_value = {var_name: self.extract_value(var_value) for var_name, var_value in self.task.args.items()}
+        name_to_value = {}
+        for var_name, var_value in self.task.args.items():
+            try:
+                name_to_value[var_name] = self.extract_value(var_value)
+            except RecursiveDefinitionError as e:
+                self.logger.error(e)
+                continue
         added_vars = []
 
         for var_name, value_node in name_to_value.items():

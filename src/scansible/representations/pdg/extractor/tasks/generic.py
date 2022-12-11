@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 from ... import representation as rep
 from ..result import ExtractionResult
-from ..var_context import ScopeLevel
+from ..var_context import ScopeLevel, RecursiveDefinitionError
 from .base import TaskExtractor
 
 class GenericTaskExtractor(TaskExtractor):
@@ -76,7 +76,11 @@ class GenericTaskExtractor(TaskExtractor):
 
         # Link data flow
         for arg_name, arg_value in self.task.args.items():
-            arg_node = self.extract_value(arg_value)
+            try:
+                arg_node = self.extract_value(arg_value)
+            except RecursiveDefinitionError as e:
+                self.logger.error(e)
+                continue
             self.context.graph.add_edge(arg_node, tn, rep.Keyword(keyword=f'args.{arg_name}'))
 
         registered_vars = self._define_registered_var(tn)
@@ -84,7 +88,11 @@ class GenericTaskExtractor(TaskExtractor):
         misc_kws = {'check_mode', 'become', 'become_user', 'become_method'}
         for misc_kw in misc_kws:
             if not self.task.is_default(misc_kw, (kw_val := getattr(self.task, misc_kw))):
-                val_node = self.extract_value(kw_val)
+                try:
+                    val_node = self.extract_value(kw_val)
+                except RecursiveDefinitionError as e:
+                    self.logger.error(e)
+                    continue
                 self.context.graph.add_edge(val_node, tn, rep.Keyword(keyword=misc_kw))
 
         # Next predecessors are either any of the condition nodes, or the task node if all conditions passed.

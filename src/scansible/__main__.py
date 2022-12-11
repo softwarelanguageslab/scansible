@@ -54,6 +54,7 @@ def build_pdg(
 
     from .representations.pdg import extract_pdg, dump_graph
     ctx = extract_pdg(project_path, name, version, role_search_paths, as_pb=as_pb, lenient=not strict)
+    logger.info(f'Extracted PDG of {len(ctx.graph)} nodes and {len(ctx.graph.edges)} edges')
     output.write(dump_graph(output_format, ctx.graph))
 
     if aux_file is not None:

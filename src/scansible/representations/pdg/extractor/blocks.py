@@ -10,7 +10,7 @@ from .. import representation as rep
 from .context import ExtractionContext
 from .result import ExtractionResult
 from .tasks import task_extractor_factory
-from .var_context import ScopeLevel
+from .var_context import ScopeLevel, RecursiveDefinitionError
 
 class BlockExtractor:
 
@@ -78,7 +78,12 @@ class BlockExtractor:
                 if has_overridden_kw:
                     continue
 
-                value = prev_value or self.extract_value(kw_val)
+                try:
+                    value = prev_value or self.extract_value(kw_val)
+                except RecursiveDefinitionError as e:
+                    self.logger.error(e)
+                    continue
+
                 if isinstance(value, rep.Literal):
                     prev_value = value
 

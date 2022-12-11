@@ -13,7 +13,7 @@ from scansible.representations.structural import TaskBase
 from ... import representation as rep
 from ..context import ExtractionContext
 from ..result import ExtractionResult
-from ..var_context import ScopeLevel
+from ..var_context import ScopeLevel, RecursiveDefinitionError
 from ..variables import VariablesExtractor
 
 class TaskExtractor(abc.ABC):
@@ -37,7 +37,11 @@ class TaskExtractor(abc.ABC):
 
         for condition in self.task.when:
             # Create an IV for each condition and link it to the conditional node.
-            condition_value_node = self.extract_value(condition, is_conditional=True)
+            try:
+                condition_value_node = self.extract_value(condition, is_conditional=True)
+            except RecursiveDefinitionError as e:
+                self.logger.error(e)
+                continue
             condition_node = rep.Conditional(location=self.context.get_location(condition) or self.location)
             self.context.graph.add_node(condition_node)
             self.context.graph.add_edge(condition_value_node, condition_node, rep.USE)
@@ -53,7 +57,14 @@ class TaskExtractor(abc.ABC):
         if not loop_expr:
             return None
 
-        loop_source_var = self.extract_value(loop_expr)
+        try:
+            loop_source_var = self.extract_value(loop_expr)
+        except RecursiveDefinitionError as e:
+            self.logger.error(e)
+            if self.context.include_ctx._lenient:
+                return None
+            else:
+                raise
 
         if self.task.loop_with:
             self.logger.warning(f'I cannot handle looping style {self.task.loop_with!r} yet!')

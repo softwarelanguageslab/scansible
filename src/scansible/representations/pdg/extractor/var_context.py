@@ -287,6 +287,8 @@ def get_nonidempotent_components(ast: TemplateExpressionAST) -> list[str]:
 
     return comps
 
+class RecursiveDefinitionError(Exception):
+    pass
 
 class Scope:
     def __init__(self, level: ScopeLevel, is_cached: bool = False) -> None:
@@ -751,7 +753,7 @@ class VarContext:
         try:
             vr = self._get_variable_value_record(var_name)
         except RecursionError:
-            raise RecursionError(f'Recursive definition detected for {var_name!r}') from None
+            raise RecursiveDefinitionError(f'Self-referential definition detected for {var_name!r}') from None
 
         # Store the variable in the cache for potential later reuse, if we need to
         if should_use_cache:
