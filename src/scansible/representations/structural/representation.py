@@ -639,7 +639,7 @@ class Play(DirectivesBase):
     #: Force handler notification.
     force_handlers: bool | str | None = default_field(default=None)
     #: Maximum percentage of hosts that are allowed to fail before aborting play.
-    max_fail_percentage: int | str | None = default_field(default=None)
+    max_fail_percentage: int | str | float | None = default_field(default=None)
     #: Define how Ansible batches execution on hosts.
     serial: Sequence[str | int] = default_field(factory=list)
     #: Execution strategy related to parallel host execution.
