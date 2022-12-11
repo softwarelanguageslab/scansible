@@ -44,6 +44,7 @@ class IncludeContext:
         self._role_stack = []
         self._include_stack = []
 
+        _last_included_file_path = None
         if isinstance(model.root, struct_rep.Playbook):
             self._playbook_base_path = ProjectPath.from_root(model.path.parent)
             _last_included_file_path = self._playbook_base_path.join(model.path.name)
