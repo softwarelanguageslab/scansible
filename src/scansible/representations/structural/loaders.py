@@ -430,6 +430,9 @@ def load_play(original_ds: dict[str, ans.AnsibleValue]) -> tuple[_PatchedPlay, A
 
     _transform_old_become(ds)
 
+    # remove the "accelerate" key if present. It was removed in 2.4
+    ds.pop('accelerate', None)
+
     raw_play = _PatchedPlay()
     raw_play.load_data(ds)
     validate_ansible_object(raw_play)
