@@ -14,7 +14,7 @@ from attrs import define
 from loguru import logger
 
 from scansible.representations import structural as struct_rep
-from scansible.representations.structural.helpers import ProjectPath
+from scansible.representations.structural.helpers import ProjectPath, capture_output, prevent_undesired_operations
 
 from .. import representation as rep
 from .var_context import VarContext
@@ -91,14 +91,17 @@ class IncludeContext:
             yield None
             return
 
-        if any(prev_path.absolute == real_path.absolute for prev_path, _ in self._include_stack):
+        if any(prev_path is not None and prev_path.absolute == real_path.absolute for prev_path, _ in self._include_stack):
             logger.warning(f'Refusing to enter {real_path}: Recursive include')
             yield None
             return
 
         struct_ctx = struct_rep.extractor.ExtractionContext(lenient=self._lenient)
         try:
-            task_file = struct_rep.extractor.extract_tasks_file(real_path, struct_ctx)
+            with capture_output() as output, prevent_undesired_operations():
+                task_file = struct_rep.extractor.extract_tasks_file(real_path, struct_ctx)
+            if (logged_output := output.getvalue()):
+                logger.warning(logged_output)
         except Exception as e:
             logger.error(e)
             yield None
@@ -153,7 +156,10 @@ class IncludeContext:
             return
 
         try:
-            var_file = struct_rep.extractor.extract_variable_file(real_path)
+            with capture_output() as output, prevent_undesired_operations():
+                var_file = struct_rep.extractor.extract_variable_file(real_path)
+            if (logged_output := output.getvalue()):
+                logger.warning(logged_output)
         except Exception as e:
             logger.error(e)
             yield None
