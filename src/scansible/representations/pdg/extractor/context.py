@@ -130,7 +130,8 @@ class IncludeContext:
     def load_and_enter_var_file(self, path: str, includer_location: rep.NodeLocation) -> Generator[struct_rep.VariableFile | None, None, None]:
         real_path = self._find_file(path, 'vars')
         if not real_path:
-            return None
+            yield None
+            return
 
         try:
             var_file = struct_rep.extractor.extract_variable_file(real_path)
