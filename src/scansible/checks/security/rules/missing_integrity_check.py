@@ -9,6 +9,7 @@ class MissingIntegrityCheckRule(Rule):
     DOWNLOAD_PREFIXES = ('http:', 'https:', 'ftp:', 'www\\\\.')
     CHECKSUM_TOKENS = ('checksum', 'cksum')
     CHECK_INTEGRITY_FLAGS = ('gpg_?check', 'check_?sha')
+    DISABLE_CHECK_INTEGRITY_FLAGS = ('disable_?gpg_?check', )
 
 
     @classmethod
@@ -23,6 +24,10 @@ class MissingIntegrityCheckRule(Rule):
     def check_flags_regexp(cls) -> str:
         return f'.*({"|".join(cls.CHECK_INTEGRITY_FLAGS)}).*'
 
+    @classmethod
+    def disable_check_flags_regexp(cls) -> str:
+        return f'.*({"|".join(cls.DISABLE_CHECK_INTEGRITY_FLAGS)}).*'
+
     @property
     def query(self) -> str:
         return f'''
@@ -31,9 +36,15 @@ class MissingIntegrityCheckRule(Rule):
             {self._create_query("Expression", "expr")}
             UNION
             MATCH chain = (source:Literal) -[:DEF|USE|DEFLOOPITEM*0..]->()-[check_key:KEYWORD]->(sink:Task)
-            WHERE check_key.keyword =~ '{self.check_flags_regexp()}'
-                AND ((source.type = 'str' AND source.value = 'no')
-                    OR (source.type = 'bool' AND NOT source.value))
+            WHERE (
+                check_key.keyword =~ '{self.check_flags_regexp()}'
+                    AND ((source.type = 'str' AND source.value = 'no')
+                        OR (source.type = 'bool' AND NOT source.value))
+                OR
+                check_key.keyword =~ '{self.disable_check_flags_regexp()}'
+                    AND ((source.type = 'str' AND source.value = 'yes')
+                        OR (source.type = 'bool' AND source.value))
+                )
             RETURN
                 sink.location as source_location,
                 sink.location as sink_location,
@@ -49,7 +60,7 @@ class MissingIntegrityCheckRule(Rule):
                     WHERE check_key.keyword =~ '{self.checksum_regexp()}'
                 }}
             RETURN
-                source.location as source_location,
+                sink.location as source_location,
                 sink.location as sink_location,
                 size([x in nodes(chain) where x:Expression]) as indirection_level
         '''

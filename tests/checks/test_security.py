@@ -489,7 +489,7 @@ def describe_missing_integrity_check_rule() -> None:
             results = rules.MissingIntegrityCheckRule().run(db_instance)
 
         assert results == [
-            RuleResult('MissingIntegrityCheck', f'{pb_path}:5:26', f'{pb_path}:4:19', 0)
+            RuleResult('MissingIntegrityCheck', f'{pb_path}:4:19', f'{pb_path}:4:19', 0)
         ]
 
     def matches_variable_on_task(db_instance: Neo4jDatabase, tmp_path: Path) -> None:
@@ -506,7 +506,7 @@ def describe_missing_integrity_check_rule() -> None:
             results = rules.MissingIntegrityCheckRule().run(db_instance)
 
         assert results == [
-            RuleResult('MissingIntegrityCheck', f'{pb_path}:4:27', f'{pb_path}:6:19', 1)
+            RuleResult('MissingIntegrityCheck', f'{pb_path}:6:19', f'{pb_path}:6:19', 1)
         ]
 
     def matches_expression_creating_url(db_instance: Neo4jDatabase, tmp_path: Path) -> None:
@@ -523,7 +523,7 @@ def describe_missing_integrity_check_rule() -> None:
             results = rules.MissingIntegrityCheckRule().run(db_instance)
 
         assert results == [
-            RuleResult('MissingIntegrityCheck', f'{pb_path}:7:26', f'{pb_path}:6:19', 1)
+            RuleResult('MissingIntegrityCheck', f'{pb_path}:6:19', f'{pb_path}:6:19', 1)
         ]
 
     def matches_disabled_gpgcheck(db_instance: Neo4jDatabase, tmp_path: Path) -> None:
@@ -534,6 +534,22 @@ def describe_missing_integrity_check_rule() -> None:
                 - apt:
                     name: test
                     gpgcheck: no
+        ''', pb_path)
+        with temp_import_pb(db_instance, pb_path):
+            results = rules.MissingIntegrityCheckRule().run(db_instance)
+
+        assert results == [
+            RuleResult('MissingIntegrityCheck', f'{pb_path}:4:19', f'{pb_path}:4:19', 0)
+        ]
+
+    def matches_inverted_disabled_gpgcheck(db_instance: Neo4jDatabase, tmp_path: Path) -> None:
+        pb_path = tmp_path / 'pb.yml'
+        write_pb('''
+            - hosts: localhost
+              tasks:
+                - yum:
+                    name: test
+                    disable_gpg_check: yes
         ''', pb_path)
         with temp_import_pb(db_instance, pb_path):
             results = rules.MissingIntegrityCheckRule().run(db_instance)
