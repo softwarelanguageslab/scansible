@@ -527,7 +527,7 @@ dev = ["black (>=19.3b0)", "pytest (>=4.6.2)"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "0f2d3b2c809ce8253941dca447ab8ba170a96f797fc73de392a3f6a92019c3bb"
+content-hash = "8fb2ec6a63cf8355bd6c7fe2170cf378245d8cca56a930d50523ca6f1984ec45"
 
 [metadata.files]
 ansible-core = [
