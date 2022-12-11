@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 from ... import representation as rep
 from ..result import ExtractionResult
-from ..var_context import ScopeLevel
+from ..var_context import ScopeLevel, RecursiveDefinitionError
 from .base import TaskExtractor
 
 class SetFactTaskExtractor(TaskExtractor):
