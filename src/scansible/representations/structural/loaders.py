@@ -447,6 +447,13 @@ def load_playbook(path: ProjectPath) -> tuple[list[dict[str, ans.AnsibleValue]],
     if not isinstance(ds, list):
         raise LoadTypeError('playbook', list, ds, path.relative)
 
+    # Transform old include action into import_playbook
+    for child in ds:
+        if not isinstance(child, dict):
+            raise LoadTypeError('playbook entry', dict, ds, path.relative)
+        if 'include' in child:
+            child['import_playbook'] = child.pop('include')
+
     return ds, original_ds
 
 
