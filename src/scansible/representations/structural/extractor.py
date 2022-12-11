@@ -199,6 +199,14 @@ def extract_play(ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext) -> rep
     return play
 
 
+def extract_playbook_child(ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext) -> rep.Play | None:
+    if any(directive in ans.C._ACTION_IMPORT_PLAYBOOK for directive in ds):
+        # Ignore import_playbook for now. The imported playbook can be checked as a separate entrypoint.
+        return None
+    else:
+        return extract_play(ds, ctx)
+
+
 def extract_playbook(path: Path, id: str, version: str, lenient: bool = True) -> rep.StructuralModel:
     """
     Extract a structural model from a playbook.
@@ -224,7 +232,7 @@ def extract_playbook(path: Path, id: str, version: str, lenient: bool = True) ->
         ds, raw_ds = loaders.load_playbook(pb_path)
 
         # Parse the plays in the playbook
-        plays = [extract_play(play_ds, ctx) for play_ds in ds]
+        plays = [play for play_ds in ds if (play := extract_playbook_child(play_ds, ctx)) is not None]
 
     pb = rep.Playbook(plays=plays, raw=ds, broken_tasks=ctx.broken_tasks)
     for play in plays:
