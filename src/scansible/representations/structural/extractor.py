@@ -194,7 +194,7 @@ def extract_play(ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext) -> rep
     attrs['vars'] = extract_list_of_variables(raw_play.vars)
 
     play = rep.Play(**attrs, raw=raw_ds, location=raw_ds.ansible_pos)
-    for child in play.tasks:
+    for child in chain(play.tasks, play.handlers, play.pre_tasks, play.post_tasks):
         child.parent = play
     return play
 
