@@ -5,7 +5,8 @@ from .base import Rule
 
 class HTTPWithoutSSLTLSRule(Rule):
 
-    HTTP_REGEXP = 'http://(?!localhost|127\\\\.0\\\\.0\\\\.1).*'
+    HTTP_REGEXP = 'http://.*'
+    LOCALHOST_REGEXP = '(http://)?(localhost|127\\\\.0\\\\.0\\\\.1).*'
 
     @property
     def query(self) -> str:
@@ -19,6 +20,10 @@ class HTTPWithoutSSLTLSRule(Rule):
         return f'''
             MATCH chain = (source:{source_type}) -[:DEF|USE|DEFLOOPITEM*0..]->()-[:KEYWORD*0..1]->(sink)
             WHERE source.{value_prop} =~ '{self.HTTP_REGEXP}'
+                AND (NOT source.{value_prop} =~ '{self.LOCALHOST_REGEXP}' AND NOT EXISTS {{
+                    MATCH (localhost_source:Literal) -[:DEF|USE|DEFLOOPITEM*0..]->(source)
+                    WHERE localhost_source.value =~ '{self.LOCALHOST_REGEXP}'
+                }})
                 AND (sink:Task OR (sink:Variable AND NOT (sink)-[:USE|KEYWORD]->()))
             RETURN
                 source.location as source_location,

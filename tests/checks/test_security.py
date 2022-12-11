@@ -445,6 +445,23 @@ def describe_http_without_tls_or_ssl_rule() -> None:
 
         assert not results
 
+    def does_not_match_localhost_with_indirection(db_instance: Neo4jDatabase, tmp_path: Path) -> None:
+        pb_path = tmp_path / 'pb.yml'
+        write_pb('''
+            - hosts: localhost
+              vars:
+                server: 'localhost'
+                url: 'http://{{ server }}/test'
+              tasks:
+                - get_url:
+                    url: '{{ url }}'
+        ''', pb_path)
+        with temp_import_pb(db_instance, pb_path):
+            print(rules.HTTPWithoutSSLTLSRule().query)
+            results = rules.HTTPWithoutSSLTLSRule().run(db_instance)
+
+        assert not results
+
     def does_not_match_https(db_instance: Neo4jDatabase, tmp_path: Path) -> None:
         pb_path = tmp_path / 'pb.yml'
         write_pb('''
