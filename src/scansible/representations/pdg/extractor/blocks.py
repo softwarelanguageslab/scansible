@@ -70,6 +70,9 @@ class BlockExtractor:
             prev_value: rep.DataNode | None = None
 
             for ctrl_node in result.added_control_nodes:
+                if not isinstance(ctrl_node, rep.Task):
+                    continue
+
                 in_edges = self.context.graph.in_edges(ctrl_node, data='type')
                 has_overridden_kw = any(in_edge.keyword == misc_kw for _, _, in_edge in in_edges if isinstance(in_edge, rep.Keyword))
                 if has_overridden_kw:
