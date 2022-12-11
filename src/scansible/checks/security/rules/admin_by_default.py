@@ -5,7 +5,7 @@ from .base import Rule
 
 class AdminByDefaultRule(Rule):
 
-    USER_ROLE_TOKENS = ('user.*', 'role', 'uname', 'login.*', 'root', 'admin')
+    USER_ROLE_TOKENS = ('user', 'role', 'uname', 'login', 'root', 'admin')
     ADMIN_NAMES = ('admin', 'root')
 
     @classmethod
