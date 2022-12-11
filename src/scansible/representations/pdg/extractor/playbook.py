@@ -40,13 +40,21 @@ class PlaybookExtractor:
 
                 # - Play vars_files
                 # TODO: Not clear whether this follows Ansible's search mechanism.
-                for vars_file in play.vars_files:
-                    with self.context.include_ctx.load_and_enter_var_file(vars_file, self.context.get_location(vars_file)) as file_content:
-                        if file_content is None:
-                            logger.bind(location=play.location).error(f'Could not load play vars_file {vars_file!r}')
-                            continue
+                for vars_file_list in play.vars_files:
+                    # vars_files entries can themselves be lists, works as the first_found lookup.
+                    if isinstance(vars_file_list, str):
+                        vars_file_list = [vars_file_list]
 
-                        VariablesExtractor(self.context, file_content.variables).extract_variables(ScopeLevel.PLAY_VARS_FILES)
+                    for vars_file in vars_file_list:
+                        # TODO: There should be some form of conditional definition in here.
+                        with self.context.include_ctx.load_and_enter_var_file(vars_file, self.context.get_location(vars_file)) as file_content:
+                            if file_content is None:
+                                continue
+
+                            VariablesExtractor(self.context, file_content.variables).extract_variables(ScopeLevel.PLAY_VARS_FILES)
+                            break
+                    else:
+                        logger.bind(location=play.location).error(f'Could not load play vars_file {vars_file!r}')
 
 
                 # Follow Ansible's execution order:

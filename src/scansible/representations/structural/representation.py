@@ -621,7 +621,7 @@ class Play(DirectivesBase):
     fact_path: str | None = default_field(default=None)
 
     #: List of files with variables to include into play.
-    vars_files: Sequence[str] = default_field(factory=list)
+    vars_files: Sequence[str | Sequence[str]] = default_field(factory=list)
     #: List of variables to prompt user for. List of mappings, `name` key
     #: contains variable name.
     vars_prompt: Sequence[VarsPrompt] = default_field(factory=list)
