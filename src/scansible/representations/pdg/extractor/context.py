@@ -22,26 +22,40 @@ from .var_context import VarContext
 class IncludeContext:
 
     _playbook_base_path: ProjectPath | None
-    _role_base_path: ProjectPath | None
-    _last_included_file_path: ProjectPath | None
-    last_include_location: rep.NodeLocation | None
+
+    _include_stack: list[tuple[ProjectPath | None, rep.NodeLocation | None]]
+    _role_stack: list[ProjectPath]
+
+    @property
+    def _role_base_path(self) -> ProjectPath | None:
+        return self._role_stack[-1] if self._role_stack else None
+
+    @property
+    def _last_included_file_path(self) -> ProjectPath | None:
+        return self._include_stack[-1][0]
+
+    @property
+    def last_include_location(self) -> rep.NodeLocation | None:
+        return self._include_stack[-1][1]
 
     def __init__(self, model: struct_rep.StructuralModel, role_search_paths: Sequence[Path], *, lenient: bool) -> None:
         self._lenient = lenient
         self._role_search_paths = role_search_paths
-        self.last_include_location = None
+        self._role_stack = []
+        self._include_stack = []
 
         if isinstance(model.root, struct_rep.Playbook):
             self._playbook_base_path = ProjectPath.from_root(model.path.parent)
-            self._role_base_path = None
-            self._last_included_file_path = self._playbook_base_path.join(model.path.name)
+            _last_included_file_path = self._playbook_base_path.join(model.path.name)
         else:
             self._playbook_base_path = None
-            self._role_base_path = ProjectPath.from_root(model.path)
+            role_base_path = ProjectPath.from_root(model.path)
+            self._role_stack.append(role_base_path)
             if model.root.main_tasks_file is not None:
-                self._last_included_file_path = self._role_base_path.join(model.root.main_tasks_file.file_path)
+                _last_included_file_path = role_base_path.join(model.root.main_tasks_file.file_path)
 
         self._all_included_files: set[Path] = set()
+        self._include_stack.append((_last_included_file_path, None))
         if self._last_included_file_path is not None:
             self._all_included_files.add(self._last_included_file_path.absolute)
 
@@ -50,21 +64,15 @@ class IncludeContext:
         if includer_location is None:
             assert self.last_include_location is None
 
-        old_lifp = self._last_included_file_path
-        old_includer = self.last_include_location
-        self._last_included_file_path = file_path
-        self.last_include_location = includer_location
-        self._all_included_files.add(file_path.absolute)
+        self._include_stack.append((file_path, includer_location))
         try:
             yield
         finally:
-            self._last_included_file_path = old_lifp
-            self.last_include_location = old_includer
+            self._include_stack.pop()
 
     @contextmanager
     def _enter_role(self, role: struct_rep.Role, role_base_path: ProjectPath, includer_location: rep.NodeLocation) -> Generator[None, None, None]:
-        old_rbp = self._role_base_path
-        self._role_base_path = role_base_path
+        self._role_stack.append(role_base_path)
         try:
             # TODO: this is ugly. we can probably use an ExitStack here.
             if role.main_tasks_file is not None:
@@ -73,12 +81,17 @@ class IncludeContext:
             else:
                 yield
         finally:
-            self._role_base_path = old_rbp
+            self._role_stack.pop()
 
     @contextmanager
     def load_and_enter_task_file(self, path: str, includer_location: rep.NodeLocation) -> Generator[struct_rep.TaskFile | None, None, None]:
         real_path = self._find_file(path, 'tasks')
         if not real_path:
+            yield None
+            return
+
+        if any(prev_path.absolute == real_path.absolute for prev_path, _ in self._include_stack):
+            logger.warning(f'Refusing to enter {real_path}: Recursive include')
             yield None
             return
 
@@ -100,6 +113,11 @@ class IncludeContext:
     def load_and_enter_role(self, role_name: str, includer_location: rep.NodeLocation) -> Generator[struct_rep.Role | None, None, None]:
         real_path = self._find_role(role_name)
         if not real_path:
+            yield None
+            return
+
+        if any(prev_path.absolute == real_path.absolute for prev_path in self._role_stack):
+            logger.warning(f'Refusing to enter {real_path}: Recursive include')
             yield None
             return
 
