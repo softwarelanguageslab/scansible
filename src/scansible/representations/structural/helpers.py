@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Generator, Callable, Any, NoReturn
 
 import io
+import os.path
 from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
 
@@ -35,7 +36,7 @@ class ProjectPath:
             file_path = Path(file_path)
 
         if file_path.is_absolute():
-            self.relative = file_path.relative_to(root_path)
+            self.relative = Path(os.path.relpath(file_path, root_path))
         else:
             self.relative = file_path
 
