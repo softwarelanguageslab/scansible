@@ -326,6 +326,10 @@ def load_task(original_ds: dict[str, ans.AnsibleValue], as_handler: Literal[Fals
 def load_task(original_ds: dict[str, ans.AnsibleValue], as_handler: bool) -> tuple[ans.Task | ans.Handler, Any]:
     ds = deepcopy(original_ds)
 
+    # Apparently an empty Task is allowed by Ansible.
+    if ds is None:
+        ds = {}  # type: ignore[unreachable]
+
     # Need to do this before mod_args parsing, since mod_args parsing can crash
     # because of the presence of old keywords.
     _transform_old_become(ds)
