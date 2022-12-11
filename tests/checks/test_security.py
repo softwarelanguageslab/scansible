@@ -227,6 +227,23 @@ def describe_empty_password_rule() -> None:
             RuleResult('EmptyPassword', f'{pb_path}:7:31', f'{pb_path}:4:19', 0)
         ]
 
+    def matches_null_literal_on_task(db_instance: Neo4jDatabase, tmp_path: Path) -> None:
+        pb_path = tmp_path / 'pb.yml'
+        write_pb('''
+            - hosts: localhost
+              tasks:
+                - name: test
+                  user:
+                    name: me
+                    password:
+        ''', pb_path)
+        with temp_import_pb(db_instance, pb_path):
+            results = rules.EmptyPasswordRule().run(db_instance)
+
+        assert results == [
+            RuleResult('EmptyPassword', 'unknown file:-1:-1', f'{pb_path}:4:19', 0)
+        ]
+
     def matches_variable_on_task(db_instance: Neo4jDatabase, tmp_path: Path) -> None:
         pb_path = tmp_path / 'pb.yml'
         write_pb('''

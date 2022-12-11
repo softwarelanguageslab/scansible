@@ -23,8 +23,8 @@ class EmptyPasswordRule(Rule):
         return f'''
             MATCH chain = (source:Literal)-[:DEF|USE|DEFLOOPITEM*0..]->()-{chain_tail}
             WHERE {key_getter} =~ '{self.password_regexp()}'
-                AND source.value = ''
-                AND source.type = 'str'
+                AND ((source.type = 'str' AND source.value = '' or source.value = 'omit')
+                    OR source.type = 'NoneType')
             RETURN DISTINCT
                 source.location as source_location,
                 sink.location as sink_location,
