@@ -192,6 +192,7 @@ def extract_play(ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext) -> rep
     attrs['post_tasks'] = extract_list_of_tasks_or_blocks(raw_play.post_tasks, ctx, handlers=False)
     attrs['roles'] = [dep for raw_dep in raw_play.roles if (dep := _extract_role_dependency(raw_dep, ctx, allow_new_style=False)) is not None]
     attrs['vars'] = extract_list_of_variables(raw_play.vars)
+    attrs['vars_prompt'] = [rep.VarsPrompt(**vp) for vp in raw_play.vars_prompt]  # type: ignore[arg-type, misc]
 
     play = rep.Play(**attrs, raw=raw_ds, location=raw_ds.ansible_pos)
     for child in chain(play.tasks, play.handlers, play.pre_tasks, play.post_tasks):

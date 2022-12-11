@@ -1,8 +1,9 @@
-from typing import Sequence
+from typing import Sequence, Mapping
 
-from ansible.playbook.base import Base
+from ansible.playbook.base import Base, Value
 from ansible.playbook.collectionsearch import CollectionSearch
 from ansible.playbook.taggable import Taggable
+from ansible.parsing.yaml.objects import AnsibleUnicode
 
 from .block import Block
 from .task import Task
@@ -20,3 +21,5 @@ class Play(Base, Taggable, CollectionSearch):
     tasks: Sequence[Block | Task] = ...
 
     roles: Sequence[Role] = ...
+
+    vars_prompt: Sequence[Mapping[AnsibleUnicode, Value]]
