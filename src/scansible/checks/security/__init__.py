@@ -8,9 +8,14 @@ from .rules import get_all_rules, RuleResult
 def run_all_checks(pdg: Graph, db_url: str, db_user: str, db_pass: str) -> list[tuple[str, str]]:
     rules = get_all_rules()
     results = []
+    pdg_import_query = neo4j_dump(pdg)
+
+    if not pdg_import_query.strip():
+        return []
+
     with Neo4jDatabase(db_url, db_user, db_pass) as db:
         try:
-            db.run(neo4j_dump(pdg))
+            db.run(pdg_import_query)
             for rule in rules:
                 raw_results = rule.run(db)
                 results.extend(_convert_results(raw_results))
