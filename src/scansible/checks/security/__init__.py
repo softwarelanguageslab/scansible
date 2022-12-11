@@ -30,6 +30,6 @@ def _convert_results(results: list[RuleResult]) -> list[tuple[str, str]]:
     for name, source_loc, sink_loc, _ in results:
         if source_loc == 'unknown file:-1:-1':
             source_loc = sink_loc
-        new_results.append((name, sink_loc))
+        new_results.append((name, source_loc))
 
     return new_results
