@@ -61,7 +61,11 @@ def parse_conditional(
         return ast, set()
 
     assert len(ast.body) == 1
-    assert isinstance(ast.body[0], nodes.Output)
+
+    if not isinstance(ast.body[0], nodes.Output):
+        # Definitely an expression, and likely one we cannot handle properly.
+        logger.warning(f'Weird conditional ({ast.body[0].__class__.__name__}) found: {expr!r}')
+        return ast, set()
 
     if (len(ast.body[0].nodes) == 1
             and isinstance(ast.body[0].nodes[0], nodes.TemplateData)):
