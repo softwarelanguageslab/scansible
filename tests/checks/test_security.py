@@ -194,6 +194,21 @@ def describe_hardcoded_secret_rule() -> None:
 
         assert not results
 
+    def does_not_match_task_key_in_whitelist(db_instance: Neo4jDatabase, tmp_path: Path) -> None:
+        pb_path = tmp_path / 'pb.yml'
+        write_pb('''
+            - hosts: localhost
+              tasks:
+                - user:
+                    name: me
+                    password: '{{ some_password_likely_in_inventory }}'
+                    update_password: 'on_create'
+        ''', pb_path)
+        with temp_import_pb(db_instance, pb_path):
+            results = rules.HardcodedSecretRule().run(db_instance)
+
+        assert not results
+
 def describe_empty_password_rule() -> None:
     def matches_literal_on_task(db_instance: Neo4jDatabase, tmp_path: Path) -> None:
         pb_path = tmp_path / 'pb.yml'
