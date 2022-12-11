@@ -233,7 +233,18 @@ def extract_playbook(path: Path, id: str, version: str, lenient: bool = True) ->
         ds, raw_ds = loaders.load_playbook(pb_path)
 
         # Parse the plays in the playbook
-        plays = [play for play_ds in ds if (play := extract_playbook_child(play_ds, ctx)) is not None]
+        plays = []
+        for play_ds in ds:
+            try:
+                play = extract_playbook_child(play_ds, ctx)
+            except (ans.AnsibleError, loaders.LoadError) as e:
+                if not ctx.lenient:
+                    raise
+                ctx.broken_tasks.append(rep.BrokenTask(play_ds, str(e)))
+                continue
+
+            if play is not None:
+                plays.append(play)
 
     pb = rep.Playbook(plays=plays, raw=ds, broken_tasks=ctx.broken_tasks)
     for play in plays:
