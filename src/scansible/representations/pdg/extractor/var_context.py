@@ -787,7 +787,7 @@ class VarContext:
     def add_literal(self, value: Any) -> rep.Literal:
         location = self.context.get_location(value)
         type_ = value.__class__.__name__
-        type_ = {'AnsibleUnicode': 'str', 'AnsibleSequence': 'list', 'AnsibleMapping': 'dict'}.get(type_, type_)
+        type_ = {'AnsibleUnicode': 'str', 'AnsibleSequence': 'list', 'AnsibleMapping': 'dict', 'AnsibleUnsafeText': 'str'}.get(type_, type_)
         if isinstance(value, (dict, list)):
             logger.warning('I am not able to handle composite literals yet')
             lit = rep.Literal(type=type_, value=str(value), location=location)
