@@ -41,12 +41,20 @@ class IncludeContext:
             if model.root.main_tasks_file is not None:
                 self._last_included_file_path = self._role_base_path.join(model.root.main_tasks_file.file_path)
 
+        self._all_included_files: set[Path] = set()
+        if self._last_included_file_path is not None:
+            self._all_included_files.add(self._last_included_file_path.absolute)
+
     @contextmanager
-    def _enter_file(self, file_path: ProjectPath, includer_location: rep.NodeLocation) -> Generator[None, None, None]:
+    def _enter_file(self, file_path: ProjectPath, includer_location: rep.NodeLocation | None) -> Generator[None, None, None]:
+        if includer_location is None:
+            assert self.last_include_location is None
+
         old_lifp = self._last_included_file_path
         old_includer = self.last_include_location
         self._last_included_file_path = file_path
         self.last_include_location = includer_location
+        self._all_included_files.add(file_path.absolute)
         try:
             yield
         finally:
@@ -113,10 +121,9 @@ class IncludeContext:
             yield role
 
     @contextmanager
-    def enter_role_handlers(self, handler_path: Path) -> Generator[None, None, None]:
-        assert self._role_base_path is not None, 'Should not attempt to enter role handlers without having entered role'
-        assert self.last_include_location is not None
-        with self._enter_file(self._role_base_path.join(handler_path), self.last_include_location):
+    def enter_role_file(self, role_file_path: Path) -> Generator[None, None, None]:
+        assert self._role_base_path is not None, 'Should not attempt to enter role file without having entered role'
+        with self._enter_file(self._role_base_path.join(role_file_path), self.last_include_location):
             yield
 
     @contextmanager
@@ -307,3 +314,7 @@ class ExtractionContext:
             parts.append(f'{reason}\n{locs}')
 
         return '\n\n'.join(parts)
+
+    @property
+    def file_set(self) -> frozenset[Path]:
+        return frozenset(self.include_ctx._all_included_files)

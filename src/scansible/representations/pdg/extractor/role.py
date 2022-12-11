@@ -28,18 +28,21 @@ class RoleExtractor:
         result = ExtractionResult.empty(predecessors)
 
         # TODO: Do role variables of the current role get loaded before or after the dependencies?
-        if self.role.meta_file:
-            for dep in self.role.meta_file.metablock.dependencies:
-                result = result.chain(extract_role_dependency(self.context, dep, result.next_predecessors))
+        if (mf := self.role.meta_file) is not None:
+            with self.context.include_ctx.enter_role_file(mf.file_path):
+                for dep in mf.metablock.dependencies:
+                    result = result.chain(extract_role_dependency(self.context, dep, result.next_predecessors))
 
         with self.context.vars.enter_scope(ScopeLevel.ROLE_DEFAULTS), self.context.vars.enter_scope(ScopeLevel.ROLE_VARS):
             if (df := self.role.main_defaults_file) is not None:
-                df_result = VariablesExtractor(self.context, df.variables).extract_variables(ScopeLevel.ROLE_DEFAULTS)
-                result = result.merge(df_result)
+                with self.context.include_ctx.enter_role_file(df.file_path):
+                    df_result = VariablesExtractor(self.context, df.variables).extract_variables(ScopeLevel.ROLE_DEFAULTS)
+                    result = result.merge(df_result)
 
             if (vf := self.role.main_vars_file) is not None:
-                vf_result = VariablesExtractor(self.context, vf.variables).extract_variables(ScopeLevel.ROLE_VARS)
-                result = result.merge(vf_result)
+                with self.context.include_ctx.enter_role_file(vf.file_path):
+                    vf_result = VariablesExtractor(self.context, vf.variables).extract_variables(ScopeLevel.ROLE_VARS)
+                    result = result.merge(vf_result)
 
             if self.role.main_tasks_file is not None:
                 # No need to enter the included file here, it should have already
@@ -56,11 +59,11 @@ class RoleExtractor:
                 logger.warning('No main task file')
 
             # TODO: These should somehow be linked to tasks.
-            if self.role.main_handlers_file is not None:
-                with self.context.include_ctx.enter_role_handlers(self.role.main_handlers_file.file_path):
+            if (hf := self.role.main_handlers_file) is not None:
+                with self.context.include_ctx.enter_role_file(hf.file_path):
                     result = result.chain(HandlerListExtractor(
                         self.context,
-                        self.role.main_handlers_file.tasks  # type: ignore[arg-type]
+                        hf.tasks  # type: ignore[arg-type]
                     ).extract_handlers(result.next_predecessors))
 
         return result
