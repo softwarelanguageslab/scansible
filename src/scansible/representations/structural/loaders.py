@@ -253,7 +253,6 @@ def _transform_old_become(ds: dict[str, ans.AnsibleValue]) -> None:
         # Nothing to transform.
         return
 
-    print('no early return')
     # At most one become method may be present.
     if sum(1 for has_method in (has_become, has_sudo, has_su) if has_method) > 1:
         raise LoadError('task', 'Invalid mix of directives: sudo/su/become', extra_msg=repr(ds))
