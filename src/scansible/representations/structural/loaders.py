@@ -222,7 +222,7 @@ def _transform_task_static_include(ds: dict[str, ans.AnsibleValue], action: str)
     # Transform it to modern syntax, either into `import_tasks` if it's a
     # static include, or `include_tasks` if it isn't.
     if 'static' in ds:
-        is_static = ans.convert_bool(ds['static'])
+        is_static = ds['static'] is not None and ans.convert_bool(ds['static'])
 
         del ds['static']
         if _task_is_include(action):
