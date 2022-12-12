@@ -68,17 +68,11 @@ def build_pdg(
 @click.option('-t', '--type', 'project_type', type=click.Choice(['playbook', 'role']), help='Type of the provided project (default: autodetect)')
 @click.option('--role-search-path', type=click.Path(file_okay=False, path_type=Path), envvar='ROLE_SEARCH_PATH', multiple=True, help='Additional search paths to find role dependencies. Can be specified as environment variable "ROLE_SEARCH_PATH" (multiple paths can be separated with ":"). Provided directories are prepended to Ansible defaults.')
 @click.option('--strict/--lenient', default=False, help='Whether extraction and building should be strict. This aborts processing files if a single task in that file is malformed. (default: lenient)')
-@click.option('--db-uri', required=True, envvar='DB_URI', help='Neo4j database URI. Can be specified as environment variable "DB_URI"')
-@click.option('--db-username', required=True, envvar='DB_USER', help='Neo4j database username. Can be specified as environment variable "DB_USER"')
-@click.option('--db-password', required=True, envvar='DB_PASS', help='Neo4j database password. Can be specified as environment variable "DB_PASS"')
 def check(
         project_path: Path,
         role_search_path: Sequence[Path],
         project_type: str | None,
         strict: bool,
-        db_uri: str,
-        db_username: str,
-        db_password: str,
     ) -> None:
     """Check the project residing at PROJECT_PATH for smells."""
     name = project_path.name
@@ -91,7 +85,7 @@ def check(
 
     from .checks import run_all_checks, TerminalReporter
     reporter = TerminalReporter()
-    results = run_all_checks(pdg, db_uri, db_username, db_password)
+    results = run_all_checks(pdg)
     reporter.report_results(results)
 
 

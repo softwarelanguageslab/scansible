@@ -58,6 +58,7 @@ def describe_project_path() -> None:
             assert pp2.root == rpp.root
             assert pp2.relative == Path('meta/main.yml')
 
+        @pytest.mark.xfail(reason='not implemented any longer')
         def should_reject_child_with_different_parent() -> None:
             with pytest.raises(Exception):
                 rpp = h.ProjectPath.from_root(Path('meta').absolute())

@@ -30,7 +30,7 @@ def dump_node(n: Node, g: Graph) -> str:
 
     attr_content = _create_attr_content(node_attrs)
 
-    return f'CREATE (n{node_id}:{node_label} {{ {attr_content} }})'
+    return f'(n{node_id}:{node_label} {{ {attr_content} }})'
 
 
 def dump_edge(e: Edge, source: Node, target: Node) -> str:
@@ -47,7 +47,7 @@ def dump_edge(e: Edge, source: Node, target: Node) -> str:
     else:
         edge_spec = f':{edge_label}'
 
-    return f'CREATE (n{source_id})-[{edge_spec}]->(n{target_id})'
+    return f'(n{source_id})-[{edge_spec}]->(n{target_id})'
 
 
 def dump_graph(g: Graph) -> str:
@@ -56,8 +56,8 @@ def dump_graph(g: Graph) -> str:
             dump_edge(e['type'], src, target)
             for (src, target, e) in g.edges(data=True)]
 
-    query = '\n'.join([s for s in node_strs + edge_strs if s])
+    query = ', \n'.join([s for s in node_strs + edge_strs if s])
     if not query:
         return ''
 
-    return query + ';'
+    return 'CREATE ' + query

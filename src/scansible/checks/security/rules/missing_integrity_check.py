@@ -6,71 +6,54 @@ from .base import Rule
 class MissingIntegrityCheckRule(Rule):
 
     SOURCE_EXTS = ('dmg', 'rpm', 'tgz', 'zip', 'tar', 'tbz', 'iso', 'rar', 'gzip', 'deb', 'sh', 'run', 'bin', 'gz', 'bzip2', 'bz', 'xz')
-    DOWNLOAD_PREFIXES = ('http:', 'https:', 'ftp:', 'www\\\\.')
+    DOWNLOAD_PREFIXES = ('http:', 'https:', 'ftp:', 'www.')
     CHECKSUM_TOKENS = ('checksum', 'cksum')
-    CHECK_INTEGRITY_FLAGS = ('gpg_?check', 'check_?sha')
-    DISABLE_CHECK_INTEGRITY_FLAGS = ('disable_?gpg_?check', )
+    CHECK_INTEGRITY_FLAGS = ('gpg_check', 'gpgcheck', 'check_sha', 'checksha')
+    DISABLE_CHECK_INTEGRITY_FLAGS = ('disable_gpg_check', 'disablegpgcheck', 'disable_gpgcheck')
 
 
-    @classmethod
-    def download_regexp(cls) -> str:
-        return f'({"|".join(cls.DOWNLOAD_PREFIXES)}).*\\\\.({"|".join(cls.SOURCE_EXTS)})$'
+    def create_download_test(self, value_getter: str, type_getter: str = '') -> str:
+        download_query = f'(({self._create_string_startswith_test(self.DOWNLOAD_PREFIXES, value_getter)}) AND ({self._create_string_endswith_test(self.SOURCE_EXTS, value_getter)}))'
+        if not type_getter:
+            return download_query
+        return f'({type_getter} = "str" AND {download_query})'
 
-    @classmethod
-    def checksum_regexp(cls) -> str:
-        return f'.*({"|".join(cls.CHECKSUM_TOKENS)}).*'
+    def create_checksum_test(self, value_getter: str) -> str:
+        return self._create_string_contains_test(self.CHECKSUM_TOKENS, value_getter)
 
-    @classmethod
-    def check_flags_regexp(cls) -> str:
-        return f'.*({"|".join(cls.CHECK_INTEGRITY_FLAGS)}).*'
+    def create_check_integrity_flags_test(self, value_getter: str) -> str:
+        return self._create_string_contains_test(self.CHECK_INTEGRITY_FLAGS, value_getter)
 
-    @classmethod
-    def disable_check_flags_regexp(cls) -> str:
-        return f'.*({"|".join(cls.DISABLE_CHECK_INTEGRITY_FLAGS)}).*'
+    def create_disable_check_integrity_flags_test(self, value_getter: str) -> str:
+        return self._create_string_contains_test(self.DISABLE_CHECK_INTEGRITY_FLAGS, value_getter)
 
     @property
     def query(self) -> str:
         # Repeated similar queries for the flags are due to some Neo4j weirdness.
         return f'''
-            {self._create_query("Literal", "value")}
+            {self._create_query("Literal", "value", "type")}
             UNION
             {self._create_query("Expression", "expr")}
             UNION
-            MATCH chain = (source:Literal {{ type: 'str' }}) -[:DEF|USE|DEFLOOPITEM*0..]->()-[check_key:KEYWORD]->(sink:Task)
+            MATCH chain = (source:Literal) -[:DEF|USE|DEFLOOPITEM*0..]->()-[check_key:KEYWORD]->(sink:Task)
             WHERE
-                (check_key.keyword =~ '{self.check_flags_regexp()}'
-                    AND (source.value = 'no' OR source.value = 'false'))
+                ({self.create_check_integrity_flags_test("check_key.keyword")} AND {self._create_literal_bool_false_test("source")})
                 OR
-                (check_key.keyword =~ '{self.disable_check_flags_regexp()}'
-                    AND (source.value = 'yes' OR source.value = 'true'))
-            RETURN
-                sink.location as source_location,
-                sink.location as sink_location,
-                size([x in nodes(chain) where x:Expression]) as indirection_level
-
-            UNION
-
-            MATCH chain = (source:Literal {{ type: 'bool' }}) -[:DEF|USE|DEFLOOPITEM*0..]->()-[check_key:KEYWORD]->(sink:Task)
-            WHERE
-                (check_key.keyword =~ '{self.check_flags_regexp()}'
-                    AND NOT source.value)
-                OR
-                (check_key.keyword =~ '{self.disable_check_flags_regexp()}'
-                    AND source.value)
+                ({self.create_disable_check_integrity_flags_test("check_key.keyword")} AND {self._create_literal_bool_true_test("source")})
             RETURN
                 sink.location as source_location,
                 sink.location as sink_location,
                 size([x in nodes(chain) where x:Expression]) as indirection_level
         '''
 
-    def _create_query(self, source_type: str, value_prop: str) -> str:
+    def _create_query(self, source_type: str, value_prop: str, type_prop: str = '') -> str:
+        if type_prop:
+            type_prop = f'source.{type_prop}'
+        value_prop = f'source.{value_prop}'
         return f'''
             MATCH chain = (source:{source_type}) -[:DEF|USE|DEFLOOPITEM*0..]->()-[:KEYWORD]->(sink:Task)
-            WHERE source.{value_prop} =~ '{self.download_regexp()}'
-                AND NOT EXISTS {{
-                    MATCH ()-[check_key:KEYWORD]->(sink)
-                    WHERE check_key.keyword =~ '{self.checksum_regexp()}'
-                }}
+            WHERE {self.create_download_test(value_prop, type_prop)}
+                AND {" AND ".join(f'(NOT ()-[:KEYWORD {{ keyword: "args.{check_kw}" }}]->(sink))' for check_kw in self.CHECKSUM_TOKENS)}
             RETURN
                 sink.location as source_location,
                 sink.location as sink_location,

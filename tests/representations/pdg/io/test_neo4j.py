@@ -18,7 +18,7 @@ def describe_dump_node() -> None:
 
         result = dump_node(e, g)
 
-        assert result == 'CREATE (n0:Expression { expr: "{{ test }}", location: null, node_id: 0, non_idempotent_components: "[]", role_name: "testrole", role_version: "v1.0.0" })'
+        assert result == '(n0:Expression { expr: "{{ test }}", location: null, node_id: 0, non_idempotent_components: "[]", role_name: "testrole", role_version: "v1.0.0" })'
 
     def should_dump_variable(g: Graph) -> None:
         v = Variable(name='test', version=0, value_version=0, scope_level=1)
@@ -26,7 +26,7 @@ def describe_dump_node() -> None:
 
         result = dump_node(v, g)
 
-        assert result == 'CREATE (n0:Variable { location: null, name: "test", node_id: 0, role_name: "testrole", role_version: "v1.0.0", scope_level: 1, value_version: 0, version: 0 })'
+        assert result == '(n0:Variable { location: null, name: "test", node_id: 0, role_name: "testrole", role_version: "v1.0.0", scope_level: 1, value_version: 0, version: 0 })'
 
     def should_dump_task(g: Graph) -> None:
         t = Task(action='file', name='task name')
@@ -34,7 +34,7 @@ def describe_dump_node() -> None:
 
         result = dump_node(t, g)
 
-        assert result == 'CREATE (n0:Task { action: "file", location: null, name: "task name", node_id: 0, role_name: "testrole", role_version: "v1.0.0" })'
+        assert result == '(n0:Task { action: "file", location: null, name: "task name", node_id: 0, role_name: "testrole", role_version: "v1.0.0" })'
 
     def should_dump_task_with_location(g: Graph) -> None:
         t = Task(action='file', name='task name', location=NodeLocation('test.yml', 1, 10))
@@ -42,7 +42,7 @@ def describe_dump_node() -> None:
 
         result = dump_node(t, g)
 
-        assert result == 'CREATE (n0:Task { action: "file", location: "{\\"file\\": \\"test.yml\\", \\"line\\": 1, \\"column\\": 10, \\"includer_location\\": null}", name: "task name", node_id: 0, role_name: "testrole", role_version: "v1.0.0" })'
+        assert result == '(n0:Task { action: "file", location: "{\\"file\\": \\"test.yml\\", \\"line\\": 1, \\"column\\": 10, \\"includer_location\\": null}", name: "task name", node_id: 0, role_name: "testrole", role_version: "v1.0.0" })'
 
     def should_dump_literal_string(g: Graph) -> None:
         l = Literal(type='str', value='literal value')
@@ -50,7 +50,7 @@ def describe_dump_node() -> None:
 
         result = dump_node(l, g)
 
-        assert result == 'CREATE (n0:Literal { location: null, node_id: 0, role_name: "testrole", role_version: "v1.0.0", type: "str", value: "literal value" })'
+        assert result == '(n0:Literal { location: null, node_id: 0, role_name: "testrole", role_version: "v1.0.0", type: "str", value: "literal value" })'
 
     @pytest.mark.parametrize('type, value', [
             ('int', 0), ('int', 10), ('int', -10),
@@ -62,7 +62,7 @@ def describe_dump_node() -> None:
 
         result = dump_node(l, g)
 
-        assert result == f'CREATE (n0:Literal {{ location: null, node_id: 0, role_name: "testrole", role_version: "v1.0.0", type: "{type}", value: {str(value).lower()} }})'
+        assert result == f'(n0:Literal {{ location: null, node_id: 0, role_name: "testrole", role_version: "v1.0.0", type: "{type}", value: {str(value).lower()} }})'
 
 def describe_dump_edge() -> None:
 
@@ -74,7 +74,7 @@ def describe_dump_edge() -> None:
 
         result = dump_edge(e, n1, n2)
 
-        assert result == 'CREATE (n1)-[:ORDER { back: false, transitive: false }]->(n2)'
+        assert result == '(n1)-[:ORDER { back: false, transitive: false }]->(n2)'
 
     def should_dump_def_edge() -> None:
         n1, n2 = Node(), Node()
@@ -84,7 +84,7 @@ def describe_dump_edge() -> None:
 
         result = dump_edge(e, n1, n2)
 
-        assert result == 'CREATE (n1)-[:DEF]->(n2)'
+        assert result == '(n1)-[:DEF]->(n2)'
 
     def should_dump_use_edge() -> None:
         n1, n2 = Node(), Node()
@@ -94,7 +94,7 @@ def describe_dump_edge() -> None:
 
         result = dump_edge(e, n1, n2)
 
-        assert result == 'CREATE (n1)-[:USE]->(n2)'
+        assert result == '(n1)-[:USE]->(n2)'
 
     def should_dump_keyword_edge() -> None:
         n1, n2 = Node(), Node()
@@ -104,7 +104,7 @@ def describe_dump_edge() -> None:
 
         result = dump_edge(e, n1, n2)
 
-        assert result == 'CREATE (n1)-[:KEYWORD { keyword: "the.keyword" }]->(n2)'
+        assert result == '(n1)-[:KEYWORD { keyword: "the.keyword" }]->(n2)'
 
 
 def describe_dump_graph() -> None:
@@ -121,7 +121,7 @@ def describe_dump_graph() -> None:
 
         result = dump_graph(g)
 
-        assert result == dump_node(t, g) + ';'
+        assert result == 'CREATE ' + dump_node(t, g)
 
     def should_return_query_for_graph_with_multiple_nodes_without_edges(g: Graph) -> None:
         t = Task(action='file', name='task name')
@@ -133,7 +133,7 @@ def describe_dump_graph() -> None:
 
         result = dump_graph(g)
 
-        assert result == '\n'.join([dump_node(t, g), dump_node(v, g)]) + ';'
+        assert result == 'CREATE ' + ', \n'.join([dump_node(t, g), dump_node(v, g)])
 
     def should_return_query_for_graph_with_multiple_nodes_with_edges(g: Graph) -> None:
         t = Task(action='file', name='task name')
@@ -147,4 +147,4 @@ def describe_dump_graph() -> None:
 
         result = dump_graph(g)
 
-        assert result == '\n'.join([dump_node(t, g), dump_node(v, g), dump_edge(e, v, t)]) + ';'
+        assert result == 'CREATE ' + ', \n'.join([dump_node(t, g), dump_node(v, g), dump_edge(e, v, t)])

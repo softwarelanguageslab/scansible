@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from typing import Any
+
+import redis.commands.graph.node
+
 from .base import Rule
 
 
@@ -7,9 +11,8 @@ class EmptyPasswordRule(Rule):
 
     PASSWORD_TOKENS = ('pass', 'pwd')
 
-    @classmethod
-    def password_regexp(cls) -> str:
-        return f'.*({"|".join(cls.PASSWORD_TOKENS)}).*'
+    def create_password_test(self, key_getter: str) -> str:
+        return self._create_string_contains_test(self.PASSWORD_TOKENS, key_getter)
 
     @property
     def query(self) -> str:
@@ -22,7 +25,7 @@ class EmptyPasswordRule(Rule):
     def _construct_query(self, chain_tail: str, key_getter: str) -> str:
         return f'''
             MATCH chain = (source:Literal)-[:DEF|USE|DEFLOOPITEM*0..]->()-{chain_tail}
-            WHERE {key_getter} =~ '{self.password_regexp()}'
+            WHERE {self.create_password_test(key_getter)}
                 AND ((source.type = 'str' AND source.value = '' or source.value = 'omit')
                     OR source.type = 'NoneType')
             RETURN DISTINCT
@@ -30,4 +33,3 @@ class EmptyPasswordRule(Rule):
                 sink.location as sink_location,
                 size([x in nodes(chain) where x:Expression]) as indirection_level
         '''
-

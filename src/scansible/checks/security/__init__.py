@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from datetime import datetime
+
+from loguru import logger
+
 from scansible.representations.pdg import Graph, neo4j_dump
 
-from .db import Neo4jDatabase
+from .db import RedisGraphDatabase
 from .rules import get_all_rules, RuleResult
 
-def run_all_checks(pdg: Graph, db_url: str, db_user: str, db_pass: str) -> list[tuple[str, str]]:
+def run_all_checks(pdg: Graph) -> list[tuple[str, str]]:
     rules = get_all_rules()
     results = []
     pdg_import_query = neo4j_dump(pdg)
@@ -13,14 +17,22 @@ def run_all_checks(pdg: Graph, db_url: str, db_user: str, db_pass: str) -> list[
     if not pdg_import_query.strip():
         return []
 
-    with Neo4jDatabase(db_url, db_user, db_pass) as db:
-        try:
-            db.run(pdg_import_query)
-            for rule in rules:
-                raw_results = rule.run(db)
-                results.extend(_convert_results(raw_results))
-        finally:
-            db.run(f'MATCH (n {{role_name: "{pdg.role_name}", role_version: "{pdg.role_version}"}}) DETACH DELETE n;')
+    start_time = datetime.now()
+    prev_time = start_time
+    db = RedisGraphDatabase()
+
+    with db.temporary_graph(f'{pdg.role_name}@{pdg.role_version}', pdg_import_query) as graph:
+        logger.info(f'Imported graph of {len(pdg)} nodes and {len(pdg.edges())} edges in {(datetime.now() - prev_time).total_seconds():.2f}s')
+        prev_time = datetime.now()
+
+        for rule in rules:
+            raw_results = rule.run(graph)
+            results.extend(_convert_results(raw_results))
+        logger.info(f'Ran queries in {(datetime.now() - prev_time).total_seconds():.2f}s')
+        prev_time = datetime.now()
+
+    logger.info(f'Cleaned up in {(datetime.now() - prev_time).total_seconds():.2f}s')
+    logger.info(f'Running checks took a total of {(datetime.now() - start_time).total_seconds():.2f}s')
 
     return results
 
