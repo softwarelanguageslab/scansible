@@ -66,6 +66,7 @@ class IncludeContext:
             assert self.last_include_location is None
 
         self._include_stack.append((file_path, includer_location))
+        self._all_included_files.add(file_path.absolute)
         try:
             yield
         finally:
