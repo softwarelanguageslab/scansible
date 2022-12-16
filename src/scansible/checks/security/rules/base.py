@@ -20,7 +20,9 @@ class RuleResult(NamedTuple):
     indirection_level: int
 
 
-def _convert_location(neo_loc: str) -> str:
+def _convert_location(neo_loc: str | None) -> str:
+    if neo_loc is None:
+        return 'unknown file:-1:-1'
     loc = json.loads(neo_loc)
     return ':'.join((loc['file'], str(loc['line']), str(loc['column'])))
 
@@ -66,6 +68,26 @@ class Rule(abc.ABC):
 
     def _create_literal_bool_false_test(self, literal_name: str) -> str:
         return self._create_contained_in_test(['n', 'no', 'false', 'off', '0', 'f', '0.0'], f'toLower(trim(toString({literal_name}.value)))')
+
+    @property
+    def _query_returns(self) -> str:
+        return self._create_query_returns([], [])
+
+    def _create_query_returns(self, extra_returns: Sequence[str], extra_with: Sequence[str]) -> str:
+        returns = list(extra_returns) + [
+            '''CASE
+                WHEN source.location IS NOT NULL THEN source.location
+                WHEN size(source_var) = 1 THEN last(nodes(source_var[0])).location
+                WHEN size(source_task) = 1 THEN last(nodes(source_task[0])).location
+            END AS source_location''',
+            'sink.location AS sink_location',
+            'size([x in nodes(chain) where x:Expression]) AS indirection_level']
+        with_clauses = ['source', 'sink', 'chain'] + list(extra_with) + [
+            '((source) -[:DEF]-> (:Variable)) AS source_var',
+            '((source) -[:DEF*0..1]->()-[:KEYWORD]-> (:Task)) AS source_task',
+        ]
+
+        return f'WITH {", ".join(with_clauses)} RETURN {", ".join(returns)}'
 
     @abc.abstractproperty
     def query(self) -> str:

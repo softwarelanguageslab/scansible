@@ -45,8 +45,5 @@ class HardcodedSecretRule(Rule):
                 AND {self.create_secret_whitelist_test(key_getter)}
                 AND source.value <> ''
                 AND source.type = 'str'
-            RETURN DISTINCT
-                source.location as source_location,
-                sink.location as sink_location,
-                size([x in nodes(chain) where x:Expression]) as indirection_level
+            {self._query_returns}
         '''

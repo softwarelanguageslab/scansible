@@ -24,9 +24,6 @@ class AdminByDefaultRule(Rule):
                 {self.username_test}
                 AND
                 {self.admin_name_test}
-            RETURN DISTINCT
-                source.location as source_location,
-                sink.location as sink_location,
-                size([x in nodes(chain) where x:Expression]) as indirection_level
+            {self._query_returns}
         '''
 

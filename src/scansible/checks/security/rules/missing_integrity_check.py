@@ -40,10 +40,7 @@ class MissingIntegrityCheckRule(Rule):
                 ({self.create_check_integrity_flags_test("check_key.keyword")} AND {self._create_literal_bool_false_test("source")})
                 OR
                 ({self.create_disable_check_integrity_flags_test("check_key.keyword")} AND {self._create_literal_bool_true_test("source")})
-            RETURN
-                sink.location as source_location,
-                sink.location as sink_location,
-                size([x in nodes(chain) where x:Expression]) as indirection_level
+            {self._query_returns}
         '''
 
     def _create_query(self, source_type: str, value_prop: str, type_prop: str = '') -> str:
@@ -54,8 +51,5 @@ class MissingIntegrityCheckRule(Rule):
             MATCH chain = (source:{source_type}) -[:DEF|USE|DEFLOOPITEM*0..]->()-[:KEYWORD]->(sink:Task)
             WHERE {self.create_download_test(value_prop, type_prop)}
                 AND {" AND ".join(f'(NOT ()-[:KEYWORD {{ keyword: "args.{check_kw}" }}]->(sink))' for check_kw in self.CHECKSUM_TOKENS)}
-            RETURN
-                sink.location as source_location,
-                sink.location as sink_location,
-                size([x in nodes(chain) where x:Expression]) as indirection_level
+            {self._query_returns}
         '''

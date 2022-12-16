@@ -16,7 +16,7 @@ from scansible.representations.pdg.io.neo4j import dump_graph as pdg_to_neo4j
 
 @pytest.fixture(scope='module')
 def db_instance() -> Generator[RedisGraphDatabase, None, None]:
-    yield RedisGraphDatabase()
+    yield RedisGraphDatabase('localhost')
 
 
 @contextmanager
@@ -234,7 +234,7 @@ def describe_empty_password_rule() -> None:
             results = rules.EmptyPasswordRule().run(graph_db)
 
         assert results == [
-            RuleResult('EmptyPassword', 'unknown file:-1:-1', f'{pb_path}:4:19', 0)
+            RuleResult('EmptyPassword', f'{pb_path}:4:19', f'{pb_path}:4:19', 0)
         ]
 
     def matches_variable_on_task(db_instance: RedisGraphDatabase, tmp_path: Path) -> None:
@@ -514,7 +514,7 @@ def describe_missing_integrity_check_rule() -> None:
             results = rules.MissingIntegrityCheckRule().run(graph_db)
 
         assert results == [
-            RuleResult('MissingIntegrityCheck', f'{pb_path}:4:19', f'{pb_path}:4:19', 0)
+            RuleResult('MissingIntegrityCheck', f'{pb_path}:5:26', f'{pb_path}:4:19', 0)
         ]
 
     def matches_variable_on_task(db_instance: RedisGraphDatabase, tmp_path: Path) -> None:
@@ -531,7 +531,7 @@ def describe_missing_integrity_check_rule() -> None:
             results = rules.MissingIntegrityCheckRule().run(graph_db)
 
         assert results == [
-            RuleResult('MissingIntegrityCheck', f'{pb_path}:6:19', f'{pb_path}:6:19', 1)
+            RuleResult('MissingIntegrityCheck', f'{pb_path}:4:27', f'{pb_path}:6:19', 1)
         ]
 
     def matches_expression_creating_url(db_instance: RedisGraphDatabase, tmp_path: Path) -> None:
@@ -548,7 +548,7 @@ def describe_missing_integrity_check_rule() -> None:
             results = rules.MissingIntegrityCheckRule().run(graph_db)
 
         assert results == [
-            RuleResult('MissingIntegrityCheck', f'{pb_path}:6:19', f'{pb_path}:6:19', 1)
+            RuleResult('MissingIntegrityCheck', f'{pb_path}:7:26', f'{pb_path}:6:19', 1)
         ]
 
     def matches_disabled_gpgcheck(db_instance: RedisGraphDatabase, tmp_path: Path) -> None:
@@ -598,7 +598,7 @@ def describe_missing_integrity_check_rule() -> None:
             results = rules.MissingIntegrityCheckRule().run(graph_db)
 
         assert results == [
-            RuleResult('MissingIntegrityCheck', f'{pb_path}:6:19', f'{pb_path}:6:19', 1)
+            RuleResult('MissingIntegrityCheck', f'{pb_path}:4:17', f'{pb_path}:6:19', 1)
         ]
 
     def does_not_match_enabled_gpgcheck(db_instance: RedisGraphDatabase, tmp_path: Path) -> None:
@@ -898,5 +898,5 @@ def describe_glitch_test_cases() -> None:
 
         assert results == [
             RuleResult('WeakCryptoAlgorithm', f'{pb_path}:6:38', f'{pb_path}:8:19', 2),
-            RuleResult('WeakCryptoAlgorithm', f'unknown file:-1:-1', f'{pb_path}:8:19', 1)
+            RuleResult('WeakCryptoAlgorithm', f'{pb_path}:8:19', f'{pb_path}:8:19', 1)
         ]

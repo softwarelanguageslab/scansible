@@ -12,15 +12,17 @@ def _get_shared_node_attrs(g: Graph) -> dict[str, str]:
     return {'role_name': g.role_name, 'role_version': g.role_version}
 
 
-def dump_value(v: Any) -> str:
+def dump_value(v: Any, attr_key: str) -> str:
+    if attr_key == 'location' and isinstance(v, dict) and v['file'] == 'unknown file':
+        return 'NULL'
     if isinstance(v, (tuple, list, dict)):
         # Need to wrap [] and {} into quotes.
-        return dump_value(json.dumps(v))
+        return dump_value(json.dumps(v), attr_key)
     return json.dumps(v)
 
 def _create_attr_content(attrs: dict[str, Any]) -> str:
     return ', '.join(
-            f'{attr_key}: {dump_value(attr_value)}'
+            f'{attr_key}: {dump_value(attr_value, attr_key)}'
             for attr_key, attr_value in sorted(attrs.items()))
 
 def dump_node(n: Node, g: Graph) -> str:
