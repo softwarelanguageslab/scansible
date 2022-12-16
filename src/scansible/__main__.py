@@ -66,6 +66,7 @@ def build_pdg(
 @cli.command
 @click.argument('project_path', type=click.Path(exists=True, resolve_path=True, path_type=Path))
 @click.option('-t', '--type', 'project_type', type=click.Choice(['playbook', 'role']), help='Type of the provided project (default: autodetect)')
+@click.option('--db-host', help='DB host', envvar='DB_HOST')
 @click.option('--role-search-path', type=click.Path(file_okay=False, path_type=Path), envvar='ROLE_SEARCH_PATH', multiple=True, help='Additional search paths to find role dependencies. Can be specified as environment variable "ROLE_SEARCH_PATH" (multiple paths can be separated with ":"). Provided directories are prepended to Ansible defaults.')
 @click.option('--strict/--lenient', default=False, help='Whether extraction and building should be strict. This aborts processing files if a single task in that file is malformed. (default: lenient)')
 def check(
@@ -73,6 +74,7 @@ def check(
         role_search_path: Sequence[Path],
         project_type: str | None,
         strict: bool,
+        db_host: str,
     ) -> None:
     """Check the project residing at PROJECT_PATH for smells."""
     name = project_path.name
@@ -85,7 +87,7 @@ def check(
 
     from .checks import run_all_checks, TerminalReporter
     reporter = TerminalReporter()
-    results = run_all_checks(pdg)
+    results = run_all_checks(pdg, db_host)
     reporter.report_results(results)
 
 

@@ -8,8 +8,8 @@ import redis
 
 
 class RedisGraphDatabase:
-    def __init__(self) -> None:
-        self._redis = redis.Redis()
+    def __init__(self, db_host: str) -> None:
+        self._redis = redis.Redis(host=db_host)
 
     @contextmanager
     def temporary_graph(self, name: str, query: str) -> Any:  # type: ignore[misc]

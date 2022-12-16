@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from datetime import datetime
 
 from loguru import logger
@@ -7,32 +9,36 @@ from loguru import logger
 from scansible.representations.pdg import Graph, neo4j_dump
 
 from .db import RedisGraphDatabase
-from .rules import get_all_rules, RuleResult
+from .rules import get_all_rules, RuleResult, Rule
 
-def run_all_checks(pdg: Graph) -> list[tuple[str, str]]:
+def run_all_checks(pdg: Graph, db_host: str) -> list[tuple[str, str]]:
     rules = get_all_rules()
-    results = set()
     pdg_import_query = neo4j_dump(pdg)
 
     if not pdg_import_query.strip():
         return []
 
     start_time = datetime.now()
-    prev_time = start_time
-    db = RedisGraphDatabase()
+    db = RedisGraphDatabase(db_host)
 
     with db.temporary_graph(f'{pdg.role_name}@{pdg.role_version}', pdg_import_query) as graph:
-        logger.info(f'Imported graph of {len(pdg)} nodes and {len(pdg.edges())} edges in {(datetime.now() - prev_time).total_seconds():.2f}s')
-        prev_time = datetime.now()
+        logger.info(f'Imported graph of {len(pdg)} nodes and {len(pdg.edges())} edges in {(datetime.now() - start_time).total_seconds():.2f}s')
+        results = run_checks(pdg, rules)
 
-        for rule in rules:
-            raw_results = rule.run(graph)
-            results |= _convert_results(raw_results)
-        logger.info(f'Ran queries in {(datetime.now() - prev_time).total_seconds():.2f}s')
-        prev_time = datetime.now()
+    logger.info(f'Running checks took a total of {(datetime.now() - start_time).total_seconds():.2f}s')
+    return results
+
+def run_checks(graph_db: Any, rules: list[Rule]) -> list[tuple[str, str]]:
+    results = set()
+
+    prev_time = datetime.now()
+    for rule in rules:
+        raw_results = rule.run(graph_db)
+        results |= _convert_results(raw_results)
+    logger.info(f'Ran queries in {(datetime.now() - prev_time).total_seconds():.2f}s')
+    prev_time = datetime.now()
 
     logger.info(f'Cleaned up in {(datetime.now() - prev_time).total_seconds():.2f}s')
-    logger.info(f'Running checks took a total of {(datetime.now() - start_time).total_seconds():.2f}s')
 
     return sorted(results, key=lambda res: res[1])
 
