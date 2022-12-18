@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .base import Rule
+from ..rules.base import Rule
 
 
 class WeakCryptoAlgorithmRule(Rule):

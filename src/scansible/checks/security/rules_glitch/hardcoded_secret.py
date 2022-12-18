@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import itertools
-
-from .base import Rule
+from ..rules.base import Rule
 
 
 class HardcodedSecretRule(Rule):

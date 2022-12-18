@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .base import Rule, RuleResult
+from ..rules.base import Rule, RuleResult
 from .admin_by_default import AdminByDefaultRule
 from .empty_password import EmptyPasswordRule
 from .hardcoded_secret import HardcodedSecretRule

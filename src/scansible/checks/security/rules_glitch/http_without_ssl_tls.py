@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-import redis.commands.graph.node
-
-from .base import Rule
+from ..rules.base import Rule
 
 
 class HTTPWithoutSSLTLSRule(Rule):
