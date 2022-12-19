@@ -11,24 +11,22 @@ class HardcodedSecretRule(Rule):
     PRIV_KEY_PREFIXES = ('pvt', 'priv')
     PRIV_KEY_SUFFIXES = ('cert', 'key', 'rsa', 'secret', 'ssl')
 
-    KEYWORD_WHITELIST = ('update_password',)
+    KEYWORD_WHITELIST = ('update', 'generate')
 
     def create_secret_test(self, key_getter: str) -> str:
-        password_tests = [
-            '(' + ' AND '.join(self._create_single_string_contains_test(token, key_getter) for token in token_sequences) + ')'
+        password_test_parts = [
+            f'({" AND ".join(self._create_single_string_contains_test(token, key_getter) for token in token_sequences)})'
             for token_sequences in self.PASSWORD_TOKENS
         ]
-        priv_key_suffixes_test = ' OR '.join(self._create_single_string_contains_test(priv_key_suffix, key_getter) for priv_key_suffix in self.PRIV_KEY_SUFFIXES)
-        priv_key_tests = [
-            f'({self._create_single_string_contains_test(priv_key_prefix, key_getter)} AND ({priv_key_suffixes_test}))'
-            for priv_key_prefix in self.PRIV_KEY_PREFIXES
-        ]
+        password_test = f'({" OR ".join(password_test_parts)})'
+        priv_key_suffixes_test = self._create_string_contains_test(self.PRIV_KEY_SUFFIXES, key_getter)
+        priv_key_prefixes_test = self._create_string_contains_test(self.PRIV_KEY_PREFIXES, key_getter)
+        priv_key_test = f'(({priv_key_prefixes_test}) AND ({priv_key_suffixes_test}))'
 
-        return '(' + ' OR '.join(password_tests + priv_key_tests) + ')'
+        return f'({password_test} OR {priv_key_test})'
 
     def create_secret_whitelist_test(self, key_getter: str) -> str:
-        whitelist = [f'{prefix}{token}' for prefix, token in itertools.product(['args.', ''], self.KEYWORD_WHITELIST)]
-        return f'(NOT {self._create_contained_in_test(whitelist, key_getter)})'
+        return f'(NOT {self._create_string_contains_test(self.KEYWORD_WHITELIST, key_getter)})'
 
     @property
     def query(self) -> str:
