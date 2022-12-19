@@ -7,7 +7,7 @@ from .base import Rule
 
 class HardcodedSecretRule(Rule):
 
-    PASSWORD_TOKENS = (('pass', ), ('pwd', ), ('auth', 'token'), ('secret', ), ('ssh', 'key'))
+    PASSWORD_TOKENS = (('pass', ), ('pwd', ), ('token', ), ('secret', ), ('ssh', 'key'), ('ca', 'content'), ('ssl', 'content'))
     PRIV_KEY_PREFIXES = ('pvt', 'priv')
     PRIV_KEY_SUFFIXES = ('cert', 'key', 'rsa', 'secret', 'ssl')
 
