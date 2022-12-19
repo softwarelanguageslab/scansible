@@ -24,5 +24,5 @@ class EmptyPasswordRule(Rule):
             WHERE {self.create_password_test(key_getter)}
                 AND ((source.type = 'str' AND source.value = '')
                     OR source.type = 'NoneType')
-            RETURN {self._query_returns}
+            {self._query_returns}
         '''

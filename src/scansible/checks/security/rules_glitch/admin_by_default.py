@@ -25,6 +25,6 @@ class AdminByDefaultRule(Rule):
                 AND
                 {self.admin_name_test}
                 AND NOT (source.type <> 'str' AND toString(source.value) CONTAINS "{{{{")
-            RETURN {self._query_returns}
+            {self._query_returns}
         '''
 

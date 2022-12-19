@@ -21,7 +21,7 @@ class HTTPWithoutSSLTLSRule(Rule):
             MATCH chain = (source:{source_type}) -[:DEF|USE|DEFLOOPITEM*0..]->()-[:KEYWORD*0..1]->(sink)
             WHERE {self.create_http_test(value_getter, type_getter)}
                 AND (sink:Task OR (sink:Variable AND NOT (sink)-[:USE|KEYWORD]->()))
-            RETURN {self._query_returns}
+            {self._query_returns}
         '''
 
 

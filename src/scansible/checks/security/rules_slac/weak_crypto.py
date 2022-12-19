@@ -25,5 +25,5 @@ class WeakCryptoAlgorithmRule(Rule):
             MATCH chain = (source:{source_type}) -[:DEF|USE|DEFLOOPITEM*0..]->()-[check_arg:KEYWORD*0..1]->(sink)
             WHERE {self.create_bad_algo_test(value_accessor, type_accessor)}
                 AND (sink:Task OR (sink:Variable AND NOT (sink)-[:USE|KEYWORD]->()))
-            RETURN {self._query_returns}
+            {self._query_returns}
         '''

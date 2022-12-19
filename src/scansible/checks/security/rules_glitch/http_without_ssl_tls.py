@@ -33,9 +33,7 @@ class HTTPWithoutSSLTLSRule(Rule):
             WHERE {self.create_http_test(value_getter, type_getter)}
                 AND (NOT ({self.create_localhost_test(value_getter, type_getter)}))
                 AND (sink:Task OR (sink:Variable AND NOT (sink)-[:USE|KEYWORD]->()))
-            RETURN
-                source,
-                {self._query_returns}
+            {self._create_query_returns(["source"], [])}
         '''
 
     def postprocess_results(self, results: list[tuple[Any, ...]], db: Any) -> list[tuple[str, str, int]]:

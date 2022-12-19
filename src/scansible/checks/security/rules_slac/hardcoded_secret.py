@@ -35,5 +35,5 @@ class HardcodedSecretRule(Rule):
             MATCH chain = (source:Literal)-[:DEF|USE|DEFLOOPITEM*0..]->()-{chain_tail}
             WHERE {self.create_secret_test(key_getter)}
                 AND source.value <> '' AND source.type <> 'NoneType'
-            RETURN {self._query_returns}
+            {self._query_returns}
         '''

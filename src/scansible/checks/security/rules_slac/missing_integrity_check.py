@@ -30,7 +30,7 @@ class MissingIntegrityCheckRule(Rule):
             MATCH chain = (source:Literal) -[:DEF|USE|DEFLOOPITEM*0..]->()-[check_key:KEYWORD]->(sink:Task)
             WHERE
                 ({self.create_checksum_test("check_key.keyword")} AND (toLower(toString(source.value)) = "no" OR toLower(toString(source.value)) = "false"))
-            RETURN {self._query_returns}
+            {self._query_returns}
         '''
 
     def _create_query(self, source_type: str, value_prop: str, type_prop: str = '') -> str:
@@ -41,5 +41,5 @@ class MissingIntegrityCheckRule(Rule):
             MATCH chain = (source:{source_type}) -[:DEF|USE|DEFLOOPITEM*0..]->()-[:KEYWORD]->(sink:Task)
             WHERE {self.create_download_test(value_prop, type_prop)}
                 AND {" AND ".join(f'(NOT ()-[:KEYWORD {{ keyword: "args.{check_kw}" }}]->(sink))' for check_kw in self.CHECKSUM_TOKENS)}
-            RETURN {self._query_returns}
+            {self._query_returns}
         '''

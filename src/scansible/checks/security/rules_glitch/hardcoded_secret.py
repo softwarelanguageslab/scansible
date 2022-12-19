@@ -31,5 +31,5 @@ class HardcodedSecretRule(Rule):
             WHERE {self.create_secret_test(key_getter)}
                 AND source.value <> '' AND source.type <> 'NoneType'
                 AND NOT (source.type <> 'str' AND toString(source.value) CONTAINS "{{{{")
-            RETURN {self._query_returns}
+            {self._query_returns}
         '''

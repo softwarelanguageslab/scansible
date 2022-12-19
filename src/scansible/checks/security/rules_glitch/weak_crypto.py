@@ -32,5 +32,5 @@ class WeakCryptoAlgorithmRule(Rule):
                 AND NOT ({self.create_whitelist_test(value_accessor, type_accessor)})
                 AND NOT (sink:Variable AND {self.create_whitelist_test("sink.name")})
                 AND (sink:Task OR (sink:Variable AND NOT (sink)-[:USE|KEYWORD]->()))
-            RETURN {self._query_returns}
+            {self._query_returns}
         '''
