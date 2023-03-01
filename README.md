@@ -3,6 +3,7 @@
 // TODO: Write README.
 
 ## Running
+- `poetry install`
 - `poetry shell`
 - `python -m scansible --help`
 - `python -m scansible build-pdg --help`

@@ -1,16 +1,13 @@
-from collections.abc import Callable, Iterable
 from collections import defaultdict
-from pathlib import Path
-import csv
+from collections.abc import Callable, Iterable
 
-from ..models.graph import Graph
-from ..models.nodes import Expression, IntermediateValue, Variable
-from ..models.edges import Def
-from ..extractor.var_context import ScopeLevel
-from .base import Rule, RuleResult
+from scansible.representations.pdg import Graph, Variable
+from scansible.representations.pdg.extractor.var_context import ScopeLevel
+
 
 def is_globally_scoped(scope: int) -> bool:
     return scope in (17, 18)
+
 
 def partition_local_global(defs: set[tuple[str, int]]) -> tuple[set[str], set[str]]:
     loc, glob = (set(), set())
@@ -20,6 +17,7 @@ def partition_local_global(defs: set[tuple[str, int]]) -> tuple[set[str], set[st
         else:
             loc.add(role_name)
     return (loc - glob), glob
+
 
 def getvars(graph: Graph) -> Iterable[tuple[str, int]]:
     for node in graph.nodes():
@@ -39,7 +37,11 @@ def retain_only_highest(var_defs: list[tuple[str, int]]) -> list[tuple[str, int]
     return newlist
 
 
-def find_index(lst: list[tuple[str, int]], pred: Callable[[tuple[str, int]], bool], start_idx: int = 0) -> int | None:
+def find_index(
+    lst: list[tuple[str, int]],
+    pred: Callable[[tuple[str, int]], bool],
+    start_idx: int = 0,
+) -> int | None:
     search_lst = lst[start_idx:]
     for idx, item in enumerate(search_lst):
         if pred(item):
@@ -51,16 +53,24 @@ def find_index(lst: list[tuple[str, int]], pred: Callable[[tuple[str, int]], boo
 class ConflictingVariables:
     def __init__(self) -> None:
         self.roles: set[str] = set()
-        self.roles_to_variables_and_scope: dict[str, set[tuple[str, int]]] = defaultdict(set)
-        self.names_to_roles_and_scope: dict[str, set[tuple[str, int]]] = defaultdict(set)
+        self.roles_to_variables_and_scope: dict[
+            str, set[tuple[str, int]]
+        ] = defaultdict(set)
+        self.names_to_roles_and_scope: dict[str, set[tuple[str, int]]] = defaultdict(
+            set
+        )
 
     def add_all(self, role_name: str, defs: list[tuple[str, int]]) -> None:
         self.roles.add(role_name)
-        for (name, level) in defs:
+        for name, level in defs:
             self.names_to_roles_and_scope[name].add((role_name, level))
             self.roles_to_variables_and_scope[role_name].add((name, level))
 
-    def process(self) -> list[tuple[str, str, int, str, int]]: # var_name, hi_role, hi_prec, lo_role, lo_prec
+    def process(
+        self,
+    ) -> list[
+        tuple[str, str, int, str, int]
+    ]:  # var_name, hi_role, hi_prec, lo_role, lo_prec
         results: list[tuple[str, str, int, str, int]] = []
         for var_name, var_def_set in self.names_to_roles_and_scope.items():
             # Sort the definitions in precedence order (highest first)
@@ -69,7 +79,9 @@ class ConflictingVariables:
             var_defs = retain_only_highest(var_defs)
             # Throw out anything with precedence higher than set_fact/register
             # They are locally scoped, so they cannot cause conflicts
-            var_defs = [vd for vd in var_defs if vd[1] <= ScopeLevel.SET_FACTS_REGISTERED.value]
+            var_defs = [
+                vd for vd in var_defs if vd[1] <= ScopeLevel.SET_FACTS_REGISTERED.value
+            ]
 
             for idx, (role_name, scope) in enumerate(var_defs):
                 if scope < ScopeLevel.INCLUDE_VARS.value:
@@ -80,12 +92,16 @@ class ConflictingVariables:
                 # with any variable whose variable with the same name has lower
                 # precedence
                 # Find first index of a variable with lower precedence
-                lower_idx = find_index(var_defs, lambda var_def: var_def[1] < scope, idx + 1)
+                lower_idx = find_index(
+                    var_defs, lambda var_def: var_def[1] < scope, idx + 1
+                )
                 if lower_idx is None:
                     # There are no variables with a lower precedence any more,
                     # so we don't need to check anything else for this variable
                     # name
                     break
-                results.extend((var_name, role_name, scope, *lo) for lo in var_defs[lower_idx:])
+                results.extend(
+                    (var_name, role_name, scope, *lo) for lo in var_defs[lower_idx:]
+                )
 
         return results

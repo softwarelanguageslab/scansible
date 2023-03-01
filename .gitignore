@@ -4,3 +4,4 @@
 htmlcov
 out
 __pycache__
+dist

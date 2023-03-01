@@ -1,29 +1,32 @@
 """Neo4j exporting."""
-from typing import Any
-
 import json
+from typing import Any
 
 import attrs
 
-from .. import Graph, Node, Edge, representation as rep
+from .. import Edge, Graph, Node
+from .. import representation as rep
 
 
 def _get_shared_node_attrs(g: Graph) -> dict[str, str]:
-    return {'role_name': g.role_name, 'role_version': g.role_version}
+    return {"role_name": g.role_name, "role_version": g.role_version}
 
 
 def dump_value(v: Any, attr_key: str) -> str:
-    if attr_key == 'location' and isinstance(v, dict) and v['file'] == 'unknown file':
-        return 'NULL'
+    if attr_key == "location" and isinstance(v, dict) and v["file"] == "unknown file":
+        return "NULL"
     if isinstance(v, (tuple, list, dict)):
         # Need to wrap [] and {} into quotes.
         return dump_value(json.dumps(v), attr_key)
     return json.dumps(v)
 
+
 def _create_attr_content(attrs: dict[str, Any]) -> str:
-    return ', '.join(
-            f'{attr_key}: {dump_value(attr_value, attr_key)}'
-            for attr_key, attr_value in sorted(attrs.items()))
+    return ", ".join(
+        f"{attr_key}: {dump_value(attr_value, attr_key)}"
+        for attr_key, attr_value in sorted(attrs.items())
+    )
+
 
 def dump_node(n: Node, g: Graph) -> str:
     node_label = n.__class__.__name__
@@ -32,7 +35,7 @@ def dump_node(n: Node, g: Graph) -> str:
 
     attr_content = _create_attr_content(node_attrs)
 
-    return f'(n{node_id}:{node_label} {{ {attr_content} }})'
+    return f"(n{node_id}:{node_label} {{ {attr_content} }})"
 
 
 def dump_edge(e: Edge, source: Node, target: Node) -> str:
@@ -41,25 +44,25 @@ def dump_edge(e: Edge, source: Node, target: Node) -> str:
     edge_label = e.__class__.__name__.upper()
 
     if isinstance(e, rep.Order) and e.transitive:
-        return ''
+        return ""
 
     if attrs.has(type(e)):
         attr_content = _create_attr_content(attrs.asdict(e))
-        edge_spec = f':{edge_label} {{ {attr_content} }}'
+        edge_spec = f":{edge_label} {{ {attr_content} }}"
     else:
-        edge_spec = f':{edge_label}'
+        edge_spec = f":{edge_label}"
 
-    return f'(n{source_id})-[{edge_spec}]->(n{target_id})'
+    return f"(n{source_id})-[{edge_spec}]->(n{target_id})"
 
 
 def dump_graph(g: Graph) -> str:
     node_strs = [dump_node(n, g) for n in g]
     edge_strs = [
-            dump_edge(e['type'], src, target)
-            for (src, target, e) in g.edges(data=True)]
+        dump_edge(e["type"], src, target) for (src, target, e) in g.edges(data=True)
+    ]
 
-    query = ', \n'.join([s for s in node_strs + edge_strs if s])
+    query = ", \n".join([s for s in node_strs + edge_strs if s])
     if not query:
-        return ''
+        return ""
 
-    return 'CREATE ' + query
+    return "CREATE " + query
