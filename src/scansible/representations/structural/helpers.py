@@ -143,10 +143,17 @@ def find_all_files(dir_path: ProjectPath) -> list[ProjectPath]:
     results = []
     for child in dir_path.absolute.iterdir():
         child_path = dir_path.join(child)
+        if child.is_symlink():
+            continue
         if child.is_file() and child.suffix in ans.C.YAML_FILENAME_EXTENSIONS:
             results.append(child_path)
         elif child.is_dir():
-            results.extend(find_all_files(child_path))
+            try:
+                results.extend(find_all_files(child_path))
+            except RecursionError:
+                print(child)
+                # TODO: Why can this spin in an infinite loop??
+                pass
 
     return results
 
