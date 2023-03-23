@@ -10,13 +10,14 @@ from scansible.representations.structural.representation import AnyValue
 from ... import representation as rep
 from ..result import ExtractionResult
 from ..var_context import ScopeLevel
-from .base import TaskExtractor
+from .base import TaskExtractor, TaskVarsScopeLevel
 
 _IncludedContent = TypeVar("_IncludedContent")
 
 
 class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]):
     CONTENT_TYPE: ClassVar[str]
+    TASK_VARS_SCOPE_LEVEL: ClassVar[TaskVarsScopeLevel] = ScopeLevel.INCLUDE_PARAMS
 
     @abc.abstractmethod
     def _extract_included_name(self, args: dict[str, AnyValue]) -> AnyValue:
@@ -39,11 +40,12 @@ class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]
         raise NotImplementedError()
 
     def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
-        with self.setup_task_vars_scope(ScopeLevel.INCLUDE_PARAMS):
+        with self.setup_task_vars_scope(self.TASK_VARS_SCOPE_LEVEL):
             return self._do_extract(predecessors)
 
     def _do_extract(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
         args = dict(self.task.args)
+        current_predecessors = predecessors
 
         included_name = self._extract_included_name(args)
         if args:
@@ -91,9 +93,9 @@ class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]
             for added_var in included_result.added_variable_nodes:
                 self.context.graph.add_edge(condition_node, added_var, rep.DEFINED_IF)
 
-        return included_result.add_control_nodes(
-            conditional_nodes
-        ).add_next_predecessors(conditional_nodes)
+        return self._create_result(
+            included_result, current_predecessors, conditional_nodes
+        )
 
     def _load_and_extract_content(
         self, included_name: str, predecessors: Sequence[rep.ControlNode]
@@ -122,3 +124,13 @@ class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]
             self.context.graph.add_edge(predecessor, task_node, rep.ORDER)
 
         return ExtractionResult([task_node], [], [task_node])
+
+    def _create_result(
+        self,
+        included_result: ExtractionResult,
+        current_predecessors: Sequence[rep.ControlNode],
+        added_conditional_nodes: Sequence[rep.ControlNode],
+    ) -> ExtractionResult:
+        return included_result.add_control_nodes(
+            added_conditional_nodes
+        ).add_next_predecessors(added_conditional_nodes)

@@ -1,59 +1,56 @@
 from __future__ import annotations
 
+from typing import ContextManager
+
 from collections.abc import Sequence
+
+from scansible.representations.structural.representation import AnyValue, VariableFile
 
 from ... import representation as rep
 from ..result import ExtractionResult
 from ..var_context import ScopeLevel
 from ..variables import VariablesExtractor
-from .base import TaskExtractor
+from ._dynamic_includes import DynamicIncludesExtractor
 
 
-class IncludeVarsTaskExtractor(TaskExtractor):
-    def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
-        with self.setup_task_vars_scope(ScopeLevel.TASK_VARS):
-            return self._do_extract(predecessors)
+class IncludeVarsTaskExtractor(DynamicIncludesExtractor[VariableFile]):
+    CONTENT_TYPE = "variable file"
+    TASK_VARS_SCOPE_LEVEL = ScopeLevel.TASK_VARS
 
-    def _do_extract(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
-        args = dict(self.task.args)
-        result = ExtractionResult.empty(predecessors)
+    def _extract_included_name(self, args: dict[str, AnyValue]) -> AnyValue:
+        return args.pop("_raw_params", None)
 
-        incl_name = args.pop("_raw_params", "")
-        if not incl_name or not isinstance(incl_name, str):
-            self.logger.error(f"Unknown included file name!")
-            return result
+    def _load_content(self, included_name: str) -> ContextManager[VariableFile | None]:
+        return self.context.include_ctx.load_and_enter_var_file(
+            included_name, self.location
+        )
 
-        if args:
-            self.logger.warning(f"Additional arguments on included vars action")
+    def _extract_included_content(
+        self, included_content: VariableFile, predecessors: Sequence[rep.ControlNode]
+    ) -> ExtractionResult:
+        return VariablesExtractor(
+            self.context, included_content.variables
+        ).extract_variables(ScopeLevel.INCLUDE_VARS)
 
-        if "{{" in incl_name:
-            # TODO: When we do handle expressions here, we should make sure
-            # to check whether these expressions can or cannot use the include
-            # parameters. If they cannot, we should extract the included
-            # name before registering the variables.
-            self.logger.warning(
-                f"Cannot handle dynamic file name on {self.task.action} yet!"
+    def extract_condition(
+        self, predecessors: Sequence[rep.ControlNode]
+    ) -> ExtractionResult:
+        # Don't include these condition nodes into the CFG, see SetFactExtractor.
+        # Therefore, we won't provide any predecessors.
+        return super().extract_condition([])
+
+    def _create_result(
+        self,
+        included_result: ExtractionResult,
+        current_predecessors: Sequence[rep.ControlNode],
+        added_conditional_nodes: Sequence[rep.ControlNode],
+    ) -> ExtractionResult:
+        # See above, we don't want the conditional nodes to be included in the CFG,
+        # so we don't provide them as next predecessors.
+        return (
+            super()
+            ._create_result(
+                included_result, current_predecessors, added_conditional_nodes
             )
-            return result
-
-        with self.context.include_ctx.load_and_enter_var_file(
-            incl_name, self.location
-        ) as varfile:
-            if not varfile:
-                self.logger.error(f"Var file not found: {incl_name}")
-                return result
-
-            self.logger.info(f"Following include of {varfile.file_path}")
-            # Don't include these condition nodes into the CFG, see SetFactExtractor.
-            condition_nodes = self.extract_condition([]).added_control_nodes
-            inner_result = VariablesExtractor(
-                self.context, varfile.variables
-            ).extract_variables(ScopeLevel.INCLUDE_VARS)
-            for condition_node in condition_nodes:
-                for added_var in inner_result.added_variable_nodes:
-                    self.context.graph.add_edge(
-                        condition_node, added_var, rep.DEFINED_IF
-                    )
-
-        self.warn_remaining_kws()
-        return result.merge(inner_result)
+            .replace_next_predecessors(current_predecessors)
+        )

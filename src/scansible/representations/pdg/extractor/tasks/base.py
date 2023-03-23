@@ -16,6 +16,8 @@ from ..result import ExtractionResult
 from ..var_context import RecursiveDefinitionError, ScopeLevel
 from ..variables import VariablesExtractor
 
+TaskVarsScopeLevel = Literal[ScopeLevel.TASK_VARS, ScopeLevel.INCLUDE_PARAMS]
+
 
 class TaskExtractor(abc.ABC):
     @classmethod
@@ -108,7 +110,7 @@ class TaskExtractor(abc.ABC):
 
     @contextmanager
     def setup_task_vars_scope(
-        self, scope_level: Literal[ScopeLevel.TASK_VARS, ScopeLevel.INCLUDE_PARAMS]
+        self, scope_level: TaskVarsScopeLevel
     ) -> Generator[None, None, None]:
         # TODO: Revisit this when we re-introduce caching, sometimes the scope may be cached.
         with self.context.vars.enter_scope(scope_level):
