@@ -9,7 +9,6 @@ from .blocks import BlockExtractor
 from .context import ExtractionContext
 from .result import ExtractionResult
 from .tasks import task_extractor_factory
-from .var_context import ScopeLevel
 
 
 class HandlerListExtractor:

@@ -9,7 +9,6 @@ python = "^3.10"
 networkx = "^2.5.1"
 click = "^8.1.3"
 pydantic = "^1.8.1"
-pendulum = "^2.1.2"
 loguru = "^0.6.0"
 attrs = "^22.1.0"
 ansible-core = "^2.13.5,<2.14.0"
@@ -32,6 +31,7 @@ pytest-mock = "^3.10.0"
 types-redis = "^4.3.21.6"
 black = "^23.1.0"
 isort = "^5.12.0"
+pyright = "^1.1.300"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -42,6 +42,11 @@ profile = "black"
 add_imports = "from __future__ import annotations"
 known_typing = "typing"
 sections = "FUTURE,TYPING,STDLIB,THIRDPARTY,FIRSTPARTY,LOCALFOLDER"
+
+[tool.pyright]
+stubPath = "./lib/stubs"
+typeCheckingMode = "strict"
+reportImportCycles = "none"
 
 [tool.pytest.ini_options]
 addopts = "--cov=. --cov-report html"

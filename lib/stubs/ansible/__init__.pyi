@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import ansible.constants as constants
-import ansible.errors as errors
-import ansible.playbook as playbook
-import ansible.utils as utils
+from . import constants as constants
+from . import errors as errors
+from . import playbook as playbook
+from . import utils as utils

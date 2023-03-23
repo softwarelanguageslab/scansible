@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Mapping, Optional, Sequence, TypeVar, Union
+from typing import Any, Mapping, Sequence, TypeVar, Union
 
 from ansible.parsing.dataloader import DataLoader
 from ansible.parsing.yaml.objects import AnsibleMapping, AnsibleSequence, AnsibleUnicode

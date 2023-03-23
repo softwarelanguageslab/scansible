@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Literal, Optional, Set, Tuple
+from typing import Literal, Optional, Set, Tuple
 
 ENGINES: Set[_EngineValue]
 FORMATS: Set[_FormatValue]

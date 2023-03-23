@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Mapping, Tuple, Type, TypeVar
+from typing import Any, Callable, Dict, Type, TypeVar
 
 from enum import Enum
 
@@ -9,8 +9,8 @@ T = TypeVar("T")
 V = TypeVar("V")
 
 class UnstructureStrategy(Enum):
-    AS_DICT: str = ...
-    AS_TUPLE: str = ...
+    AS_DICT: str
+    AS_TUPLE: str
 
 class Converter:
     def __init__(

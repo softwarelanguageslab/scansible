@@ -6,7 +6,6 @@ from ansible.parsing.dataloader import DataLoader
 from ansible.playbook.base import Base
 from ansible.playbook.collectionsearch import CollectionSearch
 from ansible.playbook.conditional import Conditional
-from ansible.playbook.play import Play
 from ansible.playbook.taggable import Taggable
 from ansible.vars.manager import VariableManager
 

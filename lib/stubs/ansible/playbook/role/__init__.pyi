@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Mapping, Optional, Sequence
+from typing import Mapping, Optional, Sequence
 
 from ansible.parsing.dataloader import DataLoader
 from ansible.parsing.yaml.objects import AnsibleBaseYAMLObject
@@ -17,6 +17,7 @@ from ansible.vars.manager import VariableManager
 from . import definition as definition
 from . import include as include
 from . import metadata as metadata
+
 
 class Role(Base, Conditional, Taggable, CollectionSearch):
     @staticmethod

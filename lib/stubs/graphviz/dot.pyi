@@ -15,7 +15,7 @@ from typing import (
 from types import TracebackType
 
 from . import files
-from .backend import _EngineValue, _FormatValue
+from .backend import _EngineValue, _FormatValue  # pyright: ignore
 
 Attrs = Mapping[str, str]
 

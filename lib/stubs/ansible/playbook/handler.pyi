@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Sequence
-
 from ansible.parsing.dataloader import DataLoader
 from ansible.vars.manager import VariableManager
 
@@ -10,6 +8,7 @@ from .block import Block
 from .role import Role
 from .task import Task
 from .task_include import TaskInclude
+
 
 class Handler(Task):
     listen: list[str] = ...

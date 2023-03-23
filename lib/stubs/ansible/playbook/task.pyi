@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence
+from typing import Any, Sequence
 
 from ansible.parsing.dataloader import DataLoader
 from ansible.playbook.base import Base, Value
@@ -12,6 +12,7 @@ from ansible.playbook.role import Role
 from ansible.playbook.taggable import Taggable
 from ansible.playbook.task_include import TaskInclude
 from ansible.vars.manager import VariableManager
+
 
 class Task(Base, Conditional, Taggable, CollectionSearch):
     args: dict[str, Value] = ...

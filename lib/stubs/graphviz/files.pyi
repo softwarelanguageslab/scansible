@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, Optional, TypeVar
+from typing import Optional, TypeVar
 
-from .backend import _EngineValue, _FormatterValue, _FormatValue, _RendererValue
+from .backend import _EngineValue  # pyright: ignore
+from .backend import _FormatterValue  # pyright: ignore
+from .backend import _FormatValue  # pyright: ignore
+from .backend import _RendererValue  # pyright: ignore
 
 _Self = TypeVar("_Self", bound=Base)
 

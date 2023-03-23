@@ -5,41 +5,27 @@ from typing import Generic, Mapping, Type, TypedDict, TypeVar
 from collections.abc import Generator
 from xml.etree.ElementTree import Element
 
-from networkx.classes.graph import EdgeAttrT, Graph, GraphAttrT, NodeT
+from networkx._types import EdgeAttrT, GraphAttrT, NodeT
+
+from ..classes.graph import Graph
 
 GraphT = TypeVar("GraphT")
-
-# def write_graphml_xml(G, path, encoding: str = ..., prettyprint: bool = ..., infer_numeric_types: bool = ..., named_key_ids: bool = ..., edge_id_from_attribute: Incomplete | None = ...) -> None: ...
-# def write_graphml_lxml(G, path, encoding: str = ..., prettyprint: bool = ..., infer_numeric_types: bool = ..., named_key_ids: bool = ..., edge_id_from_attribute: Incomplete | None = ...): ...
-# def generate_graphml(G, encoding: str = ..., prettyprint: bool = ..., named_key_ids: bool = ..., edge_id_from_attribute: Incomplete | None = ...) -> None: ...
-# def read_graphml(path, node_type=..., edge_key_type=..., force_multigraph: bool = ...): ...
-# def parse_graphml(graphml_string, node_type=..., edge_key_type=..., force_multigraph: bool = ...): ...
 
 class GraphML: ...
 
 class GraphMLWriter(GraphML, Generic[NodeT, GraphAttrT, EdgeAttrT]):
     myElement: Type[Element] = ...
-    # infer_numeric_types: Incomplete
-    # prettyprint: Incomplete
-    # named_key_ids: Incomplete
-    # edge_id_from_attribute: Incomplete
-    # encoding: Incomplete
-    # xml: Incomplete
-    # keys: Incomplete
     attributes: dict[Element, list[tuple[str, object, str, object]]]
     attribute_types: dict[tuple[str, str], set[Type[object]]]
     def __init__(
         self,
-        graph: Graph[NodeT, GraphAttrT, EdgeAttrT] | None = ...,
+        graph: Graph[NodeT, GraphAttrT, EdgeAttrT] | None = ...,  # pyright: ignore
         encoding: str = ...,
         prettyprint: bool = ...,
         infer_numeric_types: bool = ...,
         named_key_ids: bool = ...,
         edge_id_from_attribute: str | None = ...,
     ) -> None: ...
-    # def attr_type(self, name, scope, value): ...
-    # def get_key(self, name, attr_type, scope, default): ...
-    # def add_data(self, name, element_type, value, scope: str = ..., default: Incomplete | None = ...): ...
     def add_attributes(
         self,
         scope: str,
@@ -54,44 +40,22 @@ class GraphMLWriter(GraphML, Generic[NodeT, GraphAttrT, EdgeAttrT]):
         self, G: Graph[NodeT, GraphAttrT, EdgeAttrT], graph_element: Element
     ) -> None: ...
     def add_graph_element(self, G: Graph[NodeT, GraphAttrT, EdgeAttrT]) -> None: ...
-    # def add_graphs(self, graph_list) -> None: ...
-    # def dump(self, stream) -> None: ...
-    # def indent(self, elem, level: int = ...) -> None: ...
 
 class IncrementalElement: ...
-
-# class GraphMLWriterLxml(GraphMLWriter):
-# myElement: Incomplete
-# named_key_ids: Incomplete
-# edge_id_from_attribute: Incomplete
-# infer_numeric_types: Incomplete
-# xml: Incomplete
-# keys: Incomplete
-# attribute_types: Incomplete
-# def __init__(self, path, graph: Incomplete | None = ..., encoding: str = ..., prettyprint: bool = ..., infer_numeric_types: bool = ..., named_key_ids: bool = ..., edge_id_from_attribute: Incomplete | None = ...) -> None: ...
-# def add_graph_element(self, G) -> None: ...
-# def add_attributes(self, scope, xml_obj, data, default) -> None: ...
-# def dump(self) -> None: ...
-
-# write_graphml = write_graphml_lxml
 
 GraphMLKeys = TypedDict(
     "GraphMLKeys", {"name": str, "type": Type[object], "for": object}
 )
 
 class GraphMLReader(GraphML, Generic[GraphT]):
-    ...
-    # node_type: Incomplete
-    # edge_key_type: Incomplete
     multigraph: bool
-    # edge_ids: Incomplete
+
     def __init__(
         self,
         node_type: Type[object] = ...,
         edge_key_type: Type[object] = ...,
         force_multigraph: bool = ...,
     ) -> None: ...
-    # xml: Incomplete
     def __call__(
         self, path: object | None = ..., string: str | None = ...
     ) -> Generator[GraphT, None, None]: ...
@@ -115,4 +79,3 @@ class GraphMLReader(GraphML, Generic[GraphT]):
     def decode_data_elements(
         self, graphml_keys: dict[str, GraphMLKeys], obj_xml: Element
     ) -> dict[str, str]: ...
-    # def find_graphml_keys(self, graph_element): ...
