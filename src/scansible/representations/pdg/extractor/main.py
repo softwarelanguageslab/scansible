@@ -13,7 +13,6 @@ from .. import representation as rep
 from .context import ExtractionContext
 from .playbook import PlaybookExtractor
 from .role import RoleExtractor
-from .var_context import ScopeLevel, VarContext
 
 
 def extract_pdg(

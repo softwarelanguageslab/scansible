@@ -11,7 +11,6 @@ from scansible.representations.structural import (
     RoleRequirement,
 )
 
-from .. import representation as rep
 from .context import ExtractionContext
 from .handler_lists import HandlerListExtractor
 from .result import ExtractionResult
@@ -57,6 +56,9 @@ class PlaybookExtractor:
                 # - Play vars_files
                 # TODO: Not clear whether this follows Ansible's search mechanism.
                 for vars_file_list in play.vars_files:
+                    if not vars_file_list:
+                        continue
+
                     # vars_files entries can themselves be lists, works as the first_found lookup.
                     if isinstance(vars_file_list, str):
                         vars_file_list = [vars_file_list]
@@ -75,7 +77,7 @@ class PlaybookExtractor:
                             break
                     else:
                         logger.bind(location=play.location).error(
-                            f"Could not load play vars_file {vars_file!r}"
+                            f"Could not load play vars_file {vars_file!r}"  # pyright: ignore
                         )
 
                 # Follow Ansible's execution order:

@@ -139,7 +139,7 @@ class Rule(abc.ABC):
 
     def run(self, graph_db: Any) -> list[RuleResult]:
         raw_results = graph_db.query(self.query)
-        results = []
+        results: list[RuleResult] = []
         for (
             source_location,
             sink_location,

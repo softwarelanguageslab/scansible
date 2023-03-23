@@ -69,7 +69,7 @@ class TaskExtractor(abc.ABC):
             loop_source_var = self.extract_value(loop_expr)
         except RecursiveDefinitionError as e:
             self.logger.error(e)
-            if self.context.include_ctx._lenient:
+            if self.context.include_ctx.lenient:
                 return None
             else:
                 raise
@@ -85,7 +85,7 @@ class TaskExtractor(abc.ABC):
             for (
                 loop_control_k,
                 _,
-            ) in self.task.loop_control._get_non_default_attributes():
+            ) in self.task.loop_control.__get_non_default_attributes__():
                 if loop_control_k == "loop_var":
                     continue
                 self.logger.warning(
@@ -118,7 +118,7 @@ class TaskExtractor(abc.ABC):
             yield
 
     def warn_remaining_kws(self, action: str = "") -> None:
-        for other_kw, _ in self.task._get_non_default_attributes():
+        for other_kw, _ in self.task.__get_non_default_attributes__():
             if not other_kw in self.SUPPORTED_TASK_ATTRIBUTES() and other_kw not in (
                 "raw",
                 "location",

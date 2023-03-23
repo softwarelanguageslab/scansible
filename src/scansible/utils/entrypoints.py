@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal, cast
 
 import os
 from collections.abc import Iterable
@@ -62,8 +62,11 @@ def is_entrypoint(path: Path) -> bool:
 
     return (
         isinstance(yaml_obj, list)
-        and all(isinstance(child, dict) for child in yaml_obj)
-        and all("hosts" in child or "import_playbook" in child for child in yaml_obj)
+        and all(isinstance(child, dict) for child in cast(list[Any], yaml_obj))
+        and all(
+            "hosts" in child or "import_playbook" in child
+            for child in cast(list[dict[Any, Any]], yaml_obj)
+        )
     )
 
 

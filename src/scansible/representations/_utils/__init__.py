@@ -11,7 +11,7 @@ from attrs_strict import type_validator as old_type_validator
 
 def _convert_union_type(type_: Any) -> object:
     if isinstance(type_, types.UnionType):
-        return Union.__getitem__(
+        return Union.__getitem__(  # pyright: ignore
             tuple(_convert_union_type(arg) for arg in type_.__args__)
         )
 

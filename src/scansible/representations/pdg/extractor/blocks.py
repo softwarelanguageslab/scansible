@@ -4,17 +4,15 @@ from typing import Sequence
 
 from loguru import logger
 
-from scansible.representations.structural import Block, Handler, Task
+from scansible.representations.structural import Block, Task
 
 from .. import representation as rep
 from .context import ExtractionContext
 from .result import ExtractionResult
-from .tasks import task_extractor_factory
 from .var_context import RecursiveDefinitionError, ScopeLevel
 
 
 class BlockExtractor:
-
     SUPPORTED_BLOCK_ATTRIBUTES = frozenset(
         (
             "name",
@@ -111,7 +109,7 @@ class BlockExtractor:
 
                 self.context.graph.add_edge(value, ctrl_node, rep.Keyword(misc_kw))
 
-        for kw, _ in self.block._get_non_default_attributes():
+        for kw, _ in self.block.__get_non_default_attributes__():
             if kw not in self.SUPPORTED_BLOCK_ATTRIBUTES and kw not in (
                 "location",
                 "raw",

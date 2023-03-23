@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Type, TypeVar, overload
+from typing import TypeVar, cast
 
 import itertools
 from collections.abc import Sequence
@@ -20,7 +20,7 @@ def _ensure_sequence(obj: _T | Sequence[_T] | None) -> Sequence[_T]:
     if obj is None:
         return []
     if isinstance(obj, Sequence):
-        return obj
+        return cast(Sequence[_T], obj)
     return [obj]
 
 

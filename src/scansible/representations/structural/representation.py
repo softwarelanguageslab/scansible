@@ -1,30 +1,14 @@
 """Structural model for roles."""
 from __future__ import annotations
 
-from typing import (
-    Any,
-    Callable,
-    Generic,
-    Iterable,
-    Mapping,
-    Protocol,
-    Sequence,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import Any, ClassVar, Iterable, Mapping, Protocol, Sequence, TypeVar, Union
 
 import datetime
 import re
-import types
 from abc import abstractmethod
-from functools import reduce
-from itertools import chain
 from pathlib import Path
 
 import attrs
-import rich.repr
-from ansible.parsing.yaml.objects import AnsibleMapping, AnsibleSequence, AnsibleUnicode
 from attrs import define, field, frozen
 
 from .._utils import type_validator
@@ -74,7 +58,7 @@ def path_field() -> Any:
 
 
 def validate_relative_path(inst: Any, attr: attrs.Attribute[Path], value: Path) -> None:
-    if not isinstance(value, Path):
+    if not isinstance(value, Path):  # pyright: ignore
         raise TypeError(
             f"Expected {attr.name} to be a Path, got {value} of type {type(value)} instead"
         )
@@ -85,7 +69,7 @@ def validate_relative_path(inst: Any, attr: attrs.Attribute[Path], value: Path) 
 
 
 def validate_absolute_path(inst: Any, attr: attrs.Attribute[Path], value: Path) -> None:
-    if not isinstance(value, Path):
+    if not isinstance(value, Path):  # pyright: ignore
         raise TypeError(
             f"Expected {attr.name} to be a Path, got {value} of type {type(value)} instead"
         )
@@ -179,6 +163,8 @@ class StructuralVisitor(Protocol[VisitorReturnType]):
 
 
 class StructuralBase:
+    __attrs_attrs__: ClassVar[Sequence[attrs.Attribute[Any]]]
+
     def accept(
         self, visitor: StructuralVisitor[VisitorReturnType]
     ) -> VisitorReturnType:
@@ -190,15 +176,15 @@ class StructuralBase:
 
     @classmethod
     def is_default(cls, attr_name: str, attr_value: Any) -> bool:  # type: ignore[misc]
-        attr = next(a for a in cls.__attrs_attrs__ if a.name == attr_name)  # type: ignore[attr-defined]
-        default = attr.default
+        attr = next(a for a in cls.__attrs_attrs__ if a.name == attr_name)
+        default: Any = attr.default
         return not (
             # If there's no default specified...
             default is attrs.NOTHING
             or (
                 default is not None
-                and isinstance(default, attrs.Factory)
-                and (  # type: ignore[arg-type]
+                and isinstance(default, attrs.Factory)  # type: ignore[arg-type]
+                and (
                     # or if it's a factory but it raises if no value is specified
                     default.factory is raise_if_missing
                     # or if it's a factory and the factory value is different from the actual value
@@ -206,28 +192,30 @@ class StructuralBase:
                 )
             )
             # or if it's a value and it's different from the actual value.
-            or (not isinstance(default, attrs.Factory) and attr_value != default)
-        )  # type: ignore[arg-type]
+            or (not isinstance(default, attrs.Factory) and attr_value != default)  # type: ignore[arg-type]
+        )
 
-    def _yield_non_default_representable_attributes(self) -> Iterable[tuple[str, Any]]:
-        for attr in self.__attrs_attrs__:  # type: ignore[attr-defined]
+    def __yield_non_default_representable_attributes__(
+        self,
+    ) -> Iterable[tuple[str, Any]]:
+        for attr in self.__attrs_attrs__:
             if not attr.repr:
                 continue
 
-            name = attr.name
+            name: str = attr.name
             value = getattr(self, name)
 
             if self.is_default(name, value):
                 yield name, value
 
-    def _get_non_default_attributes(self) -> list[tuple[str, Any]]:
+    def __get_non_default_attributes__(self) -> list[tuple[str, Any]]:
         return [
             (name, value)
-            for attr in self.__attrs_attrs__  # type: ignore[attr-defined]
+            for attr in self.__attrs_attrs__
             if not self.is_default((name := attr.name), (value := getattr(self, name)))
         ]
 
-    __rich_repr__ = _yield_non_default_representable_attributes
+    __rich_repr__ = __yield_non_default_representable_attributes__
 
 
 @frozen(str=False)
@@ -632,7 +620,6 @@ class Role(StructuralBase):
     )
 
     def __attrs_post_init__(self) -> None:
-
         # TODO: We need to lookup files in the graph builder too, so perhaps
         # we should create a custom subtype of dict and provide that.
         FileType = TypeVar("FileType")

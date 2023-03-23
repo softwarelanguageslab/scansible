@@ -3,6 +3,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Iterable
 from typing import Literal as LiteralT
+from typing import cast
+
+from collections.abc import Callable
 
 import attrs
 from attrs import define, field, frozen, setters
@@ -24,7 +27,7 @@ ValidTypeStr = LiteralT[
 ]
 
 
-def non_empty_validator(inst: object, attr: attrs.Attribute[str], value: str) -> None:
+def non_empty_validator(_inst: object, attr: attrs.Attribute[str], value: str) -> None:
     assert isinstance(value, str)
     if not value:
         raise ValueError(
@@ -70,7 +73,7 @@ class Node:
     )
 
     def __hash__(self) -> int:
-        if self.node_id is None or self.node_id < 0:
+        if self.node_id is None or self.node_id < 0:  # pyright: ignore
             raise ValueError(
                 f"attempting to hash a partially initialised {self.__class__.__name__}"
             )
@@ -151,7 +154,7 @@ class Expression(DataNode):
 
     non_idempotent_components: tuple[str, ...] = field(
         validator=type_validator(),
-        factory=tuple,
+        factory=cast(Callable[[], tuple[str, ...]], tuple),
         converter=_convert_to_tuple,
         on_setattr=setters.frozen,
     )
@@ -288,7 +291,7 @@ class Graph(BaseGraph):
         return self.graph["role_version"]
 
     def add_node(self, node: Node) -> None:  # type: ignore[override]
-        if not isinstance(node, Node):
+        if not isinstance(node, Node):  # pyright: ignore
             raise TypeError("Can only add Nodes to the graph")
 
         if node.node_id < 0:

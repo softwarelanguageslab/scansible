@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-import itertools
-
 from .base import Rule
 
 
 class HardcodedSecretRule(Rule):
-
     PASSWORD_TOKENS = (
         ("pass",),
         ("pwd",),

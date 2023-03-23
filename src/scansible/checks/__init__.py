@@ -30,7 +30,9 @@ def run_all_checks(
         )
     if enable_semantics:
         results.extend(
-            CheckResult(f"{res.rule_category}: {res.rule_name}", res.location)
+            CheckResult(
+                f"{res.rule_category}: {res.rule_name}", res.location or "Unknown file"
+            )
             for res in semantics.run_all_checks(
                 extraction_context.graph, extraction_context.visibility_information
             )

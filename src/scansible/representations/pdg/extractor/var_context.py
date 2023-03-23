@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Generator
 from typing import Literal as LiteralT
-from typing import NamedTuple, Optional, Union, cast, overload
+from typing import NamedTuple, TypeVar, cast, overload
 
 from collections import defaultdict
 from collections.abc import Callable, Iterable
@@ -19,6 +19,14 @@ if TYPE_CHECKING:
     from .context import ExtractionContext
 
 from .templates import LookupTargetLiteral, TemplateExpressionAST
+
+_T = TypeVar("_T")
+
+
+# TODO: Move elsewhere
+def not_none(value: _T | None) -> _T:
+    assert value is not None
+    return value
 
 
 class TemplateRecord(NamedTuple):
@@ -244,7 +252,8 @@ STATIC_TESTS = {
     "divisibleby",
     "eq",
     "equalto",
-    "==" "escaped",
+    "==",
+    "escaped",
     "even",
     "false",
     "filter",
@@ -253,7 +262,8 @@ STATIC_TESTS = {
     ">=",
     "gt",
     "greaterthan",
-    ">" "in",
+    ">",
+    "in",
     "integer",
     "iterable",
     "le",
@@ -298,7 +308,7 @@ STATIC_TESTS = {
 
 
 def get_nonidempotent_components(ast: TemplateExpressionAST) -> list[str]:
-    comps = []
+    comps: list[str] = []
 
     if ast.uses_now:
         comps.append("function 'now'")
@@ -501,7 +511,7 @@ class ScopeContext:
             self._scope_stack.append(Scope(level))
 
     @property
-    def _precedence_chain(self) -> Iterable[Scope]:
+    def precedence_chain(self) -> Iterable[Scope]:
         return self._calculate_precedence_chain(self._scope_stack)
 
     def _calculate_precedence_chain(self, scope_stack: list[Scope]) -> Iterable[Scope]:
@@ -535,13 +545,14 @@ class ScopeContext:
         self,
         key: str,
         type: LiteralT["variable_value", "variable_definition", "expression"],
-    ) -> tuple[
-        VariableValueRecord | VariableDefinitionRecord | TemplateRecord, Scope
-    ] | None:
+    ) -> (
+        tuple[VariableValueRecord | VariableDefinitionRecord | TemplateRecord, Scope]
+        | None
+    ):
         return next(
             (
                 (rec, scope)
-                for scope in self._precedence_chain
+                for scope in self.precedence_chain
                 if (rec := getattr(scope, f"get_{type}")(key)) is not None
             ),
             None,
@@ -596,7 +607,7 @@ class ScopeContext:
         return next(
             (
                 (vdef, scope)
-                for scope in self._precedence_chain
+                for scope in self.precedence_chain
                 if (vdef := scope.get_variable_definition(name)) is not None
                 and vdef.revision == revision
             ),
@@ -612,7 +623,7 @@ class ScopeContext:
             )
             if scope_ is None:
                 raise RuntimeError(
-                    "Attempting to access a scope which has " "not been entered"
+                    "Attempting to access a scope which has not been entered"
                 )
             scope_.set_variable_value(name, rec)
             return
@@ -630,7 +641,7 @@ class ScopeContext:
 
         tr = rec.template_record
         assert tr is not None
-        _, limit = self.get_variable_definition(name, rec.revision)  # type: ignore[misc]
+        _, limit = not_none(self.get_variable_definition(name, rec.revision))
 
         logger.debug(
             f"Searching for scope that contains {tr.used_variables!r}, stopping at {limit!r}"
@@ -667,7 +678,7 @@ class ScopeContext:
         scope_ = self._get_most_specific_scope(lambda scope: scope.level is scope_level)
         if scope_ is None:
             raise RuntimeError(
-                "Attempting to access a scope which has " "not been entered"
+                "Attempting to access a scope which has not been entered"
             )
         scope_.set_variable_definition(name, rec)
 
@@ -705,7 +716,7 @@ class ScopeContext:
         scope.set_expression(expr, rec)
 
     def _get_most_specific_scope(self, pred: Callable[[Scope], bool]) -> Scope | None:
-        for scope in self._precedence_chain:
+        for scope in self.precedence_chain:
             if pred(scope):
                 return scope
 
@@ -750,7 +761,7 @@ class ScopeContext:
             return False
 
         # Check transitive dependences
-        trans_tvals = []
+        trans_tvals: list[TemplateRecord] = []
         for uv in rec.used_variables:
             vval = get_val_from_scope(*uv)
             assert (
@@ -771,7 +782,7 @@ class ScopeContext:
 
     def get_currently_visible_definitions(self) -> set[tuple[str, int]]:
         visibles: dict[str, int] = {}
-        for scope in reversed(list(self._precedence_chain)):
+        for scope in reversed(list(self.precedence_chain)):
             visibles.update(scope.get_all_defined_variables())
         return set(visibles.items())
 
@@ -813,9 +824,7 @@ class VarContext:
         yield
         self._scopes.exit_scope()
 
-    def evaluate_template(
-        self, expr: str, is_conditional: bool, is_top_level: bool = True
-    ) -> TemplateRecord:
+    def evaluate_template(self, expr: str, is_conditional: bool) -> TemplateRecord:
         """Parse a template, add required nodes to the graph, and return the record."""
         logger.debug(f"Evaluating expression {expr!r}")
         location = self.context.get_location(expr)
@@ -835,7 +844,7 @@ class VarContext:
             )
             return TemplateRecord(ln, en, [], True)
 
-        used_values = self._resolve_expression_values(ast, is_top_level)
+        used_values = self._resolve_expression_values(ast)
 
         non_idempotent_components = get_nonidempotent_components(ast)
         existing_tr_pair = self._scopes.get_expression(expr, used_values)
@@ -865,7 +874,7 @@ class VarContext:
         return existing_tr_pair[0]
 
     def _resolve_expression_values(
-        self, ast: TemplateExpressionAST, is_top_level: bool
+        self, ast: TemplateExpressionAST
     ) -> list[VariableValueRecord]:
         used_variables: list[VariableValueRecord] = []
         # Disable cache approximation as it's very inaccurate
@@ -947,18 +956,23 @@ class VarContext:
         self._scopes.set_expression(expr, tr)
         return tr
 
-    def add_literal(self, value: Any) -> rep.Literal:
+    def add_literal(self, value: object) -> rep.Literal:
         location = self.context.get_location(value)
-        type_ = value.__class__.__name__
-        type_ = {
+        type_ = cast(rep.ValidTypeStr, value.__class__.__name__)
+        type_mappings: dict[str, rep.ValidTypeStr] = {
             "AnsibleUnicode": "str",
             "AnsibleSequence": "list",
             "AnsibleMapping": "dict",
             "AnsibleUnsafeText": "str",
-        }.get(type_, type_)
+        }
+        type_ = type_mappings.get(type_, type_)
         if isinstance(value, (dict, list)):
             logger.warning("I am not able to handle composite literals yet")
-            lit = rep.Literal(type=type_, value=str(value), location=location)
+            lit = rep.Literal(
+                type=type_,
+                value=str(value),  # pyright: ignore
+                location=location,
+            )
         elif isinstance(value, struct.VaultValue):
             lit = rep.Literal(type=type_, value=str(value), location=location)
         else:
@@ -1038,7 +1052,7 @@ class VarContext:
     def has_variable_at_scope(self, name: str, level: ScopeLevel) -> bool:
         return any(
             scope.level is level and scope.get_variable_definition(name) is not None
-            for scope in self._scopes._precedence_chain
+            for scope in self._scopes.precedence_chain
         )
 
     def _create_new_variable_node(
@@ -1118,7 +1132,7 @@ class VarContext:
         # Evaluate the expression, perhaps re-evaluating if necessary. If the
         # expression was already evaluated previously and still has the same
         # value, this will just return the previous record.
-        template_record: TemplateRecord = self.evaluate_template(expr, False, False)
+        template_record: TemplateRecord = self.evaluate_template(expr, False)
 
         # Try to find a pre-existing value record for this template record. If
         # it exists, we've already evaluated this variable before and we can

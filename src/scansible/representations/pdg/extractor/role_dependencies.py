@@ -19,7 +19,7 @@ def extract_role_dependency(
 ) -> ExtractionResult:
     with context.vars.enter_scope(ScopeLevel.INCLUDE_PARAMS):
         for var_name, var_init in dep.params.items():
-            result = context.vars.register_variable(
+            context.vars.register_variable(
                 var_name, ScopeLevel.INCLUDE_PARAMS, expr=var_init
             )
 

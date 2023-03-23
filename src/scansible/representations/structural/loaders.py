@@ -7,15 +7,18 @@ parsed data structure without modifications.
 
 from __future__ import annotations
 
-from typing import Any, Generator, Literal, Type, overload
+from typing import Any, Generator, Literal, Type, cast, overload
 
 import types
+from collections.abc import Sequence
 from contextlib import contextmanager
 from copy import deepcopy
 from pathlib import Path
 
+from scansible.representations._utils import actions
+
 from . import ansible_types as ans
-from .helpers import FatalError, ProjectPath, parse_file, validate_ansible_object
+from .helpers import ProjectPath, parse_file, validate_ansible_object
 
 
 class LoadError(Exception):
@@ -96,6 +99,8 @@ def load_role_metadata(path: ProjectPath) -> tuple[dict[str, ans.AnsibleValue], 
     if not isinstance(ds, dict):
         raise LoadTypeError("role metadata", dict, ds, path.relative)
 
+    ds = cast(dict[str, ans.AnsibleValue], ds)
+
     _validate_meta_galaxy_info(ds)
     _load_meta_platforms(ds)
     _load_meta_dependencies(ds)
@@ -127,13 +132,14 @@ def _load_meta_platforms(ds: dict[str, ans.AnsibleValue]) -> None:
         raise LoadTypeError("role metadata galaxy_info.platforms", list, platforms)
 
     validated_platforms = ans.AnsibleSequence()
-    for platform in platforms:
+    for platform in cast(Sequence[Any], platforms):
         if not isinstance(platform, dict):
             print(
                 f"Ignoring malformed platform {platform!r}: expected to be dict, got {_type_to_str(type(platform))}"
             )
             continue
 
+        platform = cast(dict[str, Any], platform)
         name = platform.get("name")
         versions = platform.get("versions", ["all"])
         # https://github.com/ansible/galaxy/blob/1fe0bd986aaeb4c45157d4e463b7049cad76a25e/galaxy/importer/loaders/role.py#L471
@@ -184,11 +190,13 @@ def load_variable_file(path: ProjectPath) -> tuple[dict[str, ans.AnsibleValue], 
 
     if not isinstance(ds, dict):
         raise LoadTypeError("variable file", dict, ds, path.relative)
+
+    ds = cast(dict[ans.AnsibleValue, ans.AnsibleValue], ds)
     for var_name in ds:
         if not isinstance(var_name, str):
             raise LoadTypeError("variable name", str, var_name, path.relative)
 
-    return ds, original_ds
+    return cast(dict[str, ans.AnsibleValue], ds), original_ds
 
 
 def load_tasks_file(path: ProjectPath) -> tuple[list[dict[str, ans.AnsibleValue]], Any]:
@@ -200,6 +208,8 @@ def load_tasks_file(path: ProjectPath) -> tuple[list[dict[str, ans.AnsibleValue]
 
     if not isinstance(ds, list):
         raise LoadTypeError("task file", list, ds, path.relative)
+
+    ds = cast(list[ans.AnsibleValue], ds)
     for content in ds:
         if not isinstance(content, dict) or not all(
             isinstance(prop, str) for prop in content
@@ -208,7 +218,7 @@ def load_tasks_file(path: ProjectPath) -> tuple[list[dict[str, ans.AnsibleValue]
                 "task file content", dict[str, Any], content, path.relative
             )
 
-    return ds, original_ds
+    return cast(list[dict[str, ans.AnsibleValue]], ds), original_ds
 
 
 @contextmanager
@@ -257,18 +267,18 @@ def _transform_task_static_include(
         is_static = ds["static"] is not None and ans.convert_bool(ds["static"])
 
         del ds["static"]
-        if _task_is_include(action):
+        if actions.is_bare_include(action):
             include_args = ds["include"]
             del ds["include"]
             if is_static:
                 ds["import_tasks"] = include_args
             else:
                 ds["include_tasks"] = include_args
-        elif _task_is_include_tasks(action) and is_static:
+        elif actions.is_include_tasks(action) and is_static:
             raise LoadError(
                 "task", "include_tasks with static: yes", extra_msg=repr(ds)
             )
-        elif _task_is_import_tasks(action) and not is_static:
+        elif actions.is_import_tasks(action) and not is_static:
             raise LoadError("task", "import_tasks with static: no", extra_msg=repr(ds))
 
 
@@ -337,52 +347,28 @@ def _transform_old_always_run(ds: dict[str, ans.AnsibleValue]) -> None:
             ds["check_mode"] = False
 
 
-def _task_is_include_import_tasks(action: str) -> bool:
-    return action in ans.C._ACTION_ALL_INCLUDE_IMPORT_TASKS
-
-
-def _task_is_include(action: str) -> bool:
-    return action in ans.C._ACTION_INCLUDE
-
-
-def _task_is_include_tasks(action: str) -> bool:
-    return action in ans.C._ACTION_INCLUDE_TASKS
-
-
-def _task_is_import_tasks(action: str) -> bool:
-    return action in ans.C._ACTION_IMPORT_TASKS
-
-
-def _task_is_import_playbook(action: str) -> bool:
-    return action in ans.C._ACTION_IMPORT_PLAYBOOK
-
-
-def _task_is_include_import_role(action: str) -> bool:
-    return action in ans.C._ACTION_ALL_PROPER_INCLUDE_IMPORT_ROLES
-
-
 @overload
 def load_task(
-    original_ds: dict[str, ans.AnsibleValue], as_handler: Literal[True]
+    original_ds: dict[str, ans.AnsibleValue] | None, as_handler: Literal[True]
 ) -> tuple[ans.Handler, Any]:
     ...
 
 
 @overload
 def load_task(
-    original_ds: dict[str, ans.AnsibleValue], as_handler: Literal[False]
+    original_ds: dict[str, ans.AnsibleValue] | None, as_handler: Literal[False]
 ) -> tuple[ans.Task, Any]:
     ...
 
 
 def load_task(
-    original_ds: dict[str, ans.AnsibleValue], as_handler: bool
+    original_ds: dict[str, ans.AnsibleValue] | None, as_handler: bool
 ) -> tuple[ans.Task | ans.Handler, Any]:
     ds = deepcopy(original_ds)
 
     # Apparently an empty Task is allowed by Ansible.
     if ds is None:
-        ds = {}  # type: ignore[unreachable]
+        ds = {}
 
     # Need to do this before mod_args parsing, since mod_args parsing can crash
     # because of the presence of old keywords.
@@ -391,16 +377,16 @@ def load_task(
 
     with _patch_modargs_parser(), _patch_lookup_loader():
         action = _get_task_action(ds)
-        is_include_tasks = _task_is_include_import_tasks(action)
+        is_include_tasks = actions.is_import_include_tasks(action)
 
-        if _task_is_import_playbook(action):
+        if actions.is_import_playbook(action):
             # This loader only gets called for tasks in task lists, so an
             # import_playbook is illegal here.
             raise LoadError(
                 "task", "import_playbook is only allowed as a top-level playbook task"
             )
 
-        if _task_is_include_import_tasks(action):
+        if actions.is_import_include_tasks(action):
             # Check for include/import tasks and transform them if the static
             # directive is present.
             _transform_task_static_include(ds, action)
@@ -412,7 +398,7 @@ def load_task(
 
         # Use the correct Ansible representation so that more validation is done.
         ansible_cls: Type[ans.Task]
-        if _task_is_include_import_role(action):
+        if actions.is_import_include_role(action):
             ansible_cls = ans.IncludeRole
         elif not as_handler:
             ansible_cls = ans.Task if not is_include_tasks else ans.TaskInclude
@@ -428,7 +414,6 @@ def load_task(
 
 
 class _PatchedBlock(ans.Block):
-
     block: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
     rescue: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
     always: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
@@ -468,7 +453,6 @@ def load_block(original_ds: dict[str, ans.AnsibleValue]) -> tuple[_PatchedBlock,
 
 
 class _PatchedPlay(ans.Play):
-
     tasks: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
     handlers: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
     pre_tasks: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
@@ -517,6 +501,8 @@ def load_playbook(path: ProjectPath) -> tuple[list[dict[str, ans.AnsibleValue]],
     if not isinstance(ds, list):
         raise LoadTypeError("playbook", list, ds, path.relative)
 
+    ds = cast(list[ans.AnsibleValue], ds)
+
     # Transform old include action into import_playbook
     for child in ds:
         if not isinstance(child, dict):
@@ -524,11 +510,10 @@ def load_playbook(path: ProjectPath) -> tuple[list[dict[str, ans.AnsibleValue]],
         if "include" in child:
             child["import_playbook"] = child.pop("include")
 
-    return ds, original_ds
+    return cast(list[dict[str, ans.AnsibleValue]], ds), original_ds
 
 
 class _PatchedRoleInclude(ans.role.RoleInclude):
-
     # Override the _load_role_path method so that it doesn't resolve the path.
     def _load_role_path(self, role_name: str) -> tuple[str, str]:
         return role_name, ""
@@ -545,7 +530,6 @@ def load_role_dependency(
     if isinstance(ds, dict):
         _transform_old_become(ds)
 
-    new_dep: str | dict[str, ans.AnsibleValue]
     if isinstance(ds, dict) and not ("name" in ds or "role" in ds) and allow_new_style:
         # new-style role dependency, needs to be parsed specially and converted
         # to old style for later loading.
@@ -565,7 +549,9 @@ def _load_old_style_role_dependency(
 
     # Validation from original RoleInclude, can't use the method because it
     # constructs a RoleInclude, which attempts to resolve the role path.
-    if not isinstance(ds, (str, dict, ans.AnsibleBaseYAMLObject, int)):
+    if not isinstance(
+        ds, (str, dict, ans.AnsibleBaseYAMLObject, int)
+    ):  # pyright: ignore
         raise LoadTypeError(
             "role dependency", str | dict | ans.AnsibleBaseYAMLObject, ds
         )

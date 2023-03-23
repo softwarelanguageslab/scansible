@@ -4,7 +4,6 @@ from ..rules.base import Rule
 
 
 class WeakCryptoAlgorithmRule(Rule):
-
     BAD_ALGOS = ("md5", "sha1")
 
     def create_bad_algo_test(self, value_accessor: str, type_accessor: str = "") -> str:

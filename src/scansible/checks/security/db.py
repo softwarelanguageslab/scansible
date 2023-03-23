@@ -13,7 +13,7 @@ class RedisGraphDatabase:
 
     @contextmanager
     def temporary_graph(self, name: str, query: str) -> Any:  # type: ignore[misc]
-        g = self._redis.graph(name)
+        g: Any = self._redis.graph(name)  # pyright: ignore
         g.query(query)
         try:
             yield g

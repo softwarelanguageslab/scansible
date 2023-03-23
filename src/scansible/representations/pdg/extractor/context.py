@@ -1,39 +1,31 @@
 from __future__ import annotations
 
-from typing import (
-    Generator,
-    Generic,
-    Literal,
-    Mapping,
-    Sequence,
-    TypeVar,
-    cast,
-    overload,
-)
+from typing import Generator, Sequence, TypeAlias, cast
 
 import json
 import textwrap
 from collections import defaultdict
 from contextlib import contextmanager
 from os.path import normpath
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
-from attrs import define
 from loguru import logger
 
 from scansible.representations import structural as struct_rep
 from scansible.representations.structural.helpers import (
     ProjectPath,
     capture_output,
+    find_file,
     prevent_undesired_operations,
 )
 
 from .. import representation as rep
 from .var_context import VarContext
 
+LocTuple: TypeAlias = tuple[str, int, int]
+
 
 class IncludeContext:
-
     _playbook_base_path: ProjectPath | None
 
     _include_stack: list[tuple[ProjectPath | None, rep.NodeLocation | None]]
@@ -58,7 +50,7 @@ class IncludeContext:
         *,
         lenient: bool,
     ) -> None:
-        self._lenient = lenient
+        self.lenient = lenient
         self._role_search_paths = role_search_paths
         self._role_stack = []
         self._include_stack = []
@@ -76,10 +68,10 @@ class IncludeContext:
                     model.root.main_tasks_file.file_path
                 )
 
-        self._all_included_files: set[Path] = set()
+        self.all_included_files: set[Path] = set()
         self._include_stack.append((_last_included_file_path, None))
         if self._last_included_file_path is not None:
-            self._all_included_files.add(self._last_included_file_path.absolute)
+            self.all_included_files.add(self._last_included_file_path.absolute)
 
     @contextmanager
     def _enter_file(
@@ -89,7 +81,7 @@ class IncludeContext:
             assert self.last_include_location is None
 
         self._include_stack.append((file_path, includer_location))
-        self._all_included_files.add(file_path.absolute)
+        self.all_included_files.add(file_path.absolute)
         try:
             yield
         finally:
@@ -133,7 +125,7 @@ class IncludeContext:
             yield None
             return
 
-        struct_ctx = struct_rep.extractor.ExtractionContext(lenient=self._lenient)
+        struct_ctx = struct_rep.extractor.ExtractionContext(lenient=self.lenient)
         try:
             with capture_output() as output, prevent_undesired_operations():
                 task_file = struct_rep.extractor.extract_tasks_file(
@@ -170,7 +162,7 @@ class IncludeContext:
 
         try:
             model = struct_rep.extractor.extract_role(
-                real_path.absolute, role_name, "UNKNOWN!", lenient=self._lenient
+                real_path.absolute, role_name, "UNKNOWN!", lenient=self.lenient
             )
         except Exception as e:
             logger.error(e)
@@ -219,9 +211,7 @@ class IncludeContext:
         with self._enter_file(real_path, includer_location):
             yield var_file
 
-    def _find_file(
-        self, short_path: str, base_dir: str
-    ) -> struct_rep.extractor.ProjectPath | None:
+    def _find_file(self, short_path: str, base_dir: str) -> ProjectPath | None:
         # Ansible's file resolution order:
         # <current role root>/{base_dir}/{path}
         # <current role root>/{path}
@@ -237,7 +227,7 @@ class IncludeContext:
             logger.error(f"Cannot handle absolute paths: {short_path}")
             return None
 
-        base_search_dirs = []
+        base_search_dirs: list[ProjectPath] = []
         if self._role_base_path is not None:
             base_search_dirs.extend(
                 [self._role_base_path.join(base_dir), self._role_base_path]
@@ -265,14 +255,14 @@ class IncludeContext:
                 )
                 continue
 
-            found_path = struct_rep.extractor.find_file(search_path, short_path)
+            found_path = find_file(search_path, short_path)
             if found_path is not None:
                 logger.debug(f"Found file: {found_path}")
                 return found_path
 
         return None
 
-    def _find_role(self, role_name: str) -> struct_rep.extractor.ProjectPath | None:
+    def _find_role(self, role_name: str) -> ProjectPath | None:
         # Ansible's role resolution order:
         # - collections (skipped)
         # - <playbook dir>/roles/{name}
@@ -280,7 +270,7 @@ class IncludeContext:
         # - <current role's parent dir>/{name}
         # - <playbook dir>/{name}
 
-        base_search_dirs = []
+        base_search_dirs: list[Path] = []
         if self._playbook_base_path is not None:
             base_search_dirs.append(self._playbook_base_path.join("roles").absolute)
 
@@ -347,7 +337,7 @@ class VisibilityInformation:
         return json.dumps(as_lists)
 
     @classmethod
-    def load(self, payload: str) -> VisibilityInformation:
+    def load(cls, payload: str) -> VisibilityInformation:
         inst = VisibilityInformation()
         as_lists = json.loads(payload)
         for k, vals in as_lists:
@@ -365,7 +355,7 @@ class ExtractionContext:
     # Auxiliary information about variable visibility. We don't store this in
     # the graph itself but in a companion file.
     visibility_information: VisibilityInformation
-    errors: list[tuple[str, tuple[str, int, int] | None]]
+    errors: list[tuple[str, LocTuple | None]]
     _next_iv_id: int
 
     def __init__(
@@ -389,6 +379,10 @@ class ExtractionContext:
         return self._next_iv_id - 1
 
     def get_location(self, ds: object) -> rep.NodeLocation:
+        file: str
+        line: int
+        column: int
+
         if hasattr(ds, "ansible_pos"):
             file, line, column = ds.ansible_pos  # type: ignore[attr-defined]
         elif hasattr(ds, "location"):
@@ -400,17 +394,15 @@ class ExtractionContext:
             file, line, column, self.include_ctx.last_include_location
         )
 
-    def record_extraction_error(
-        self, reason: str, location: tuple[str, int, int] | None
-    ) -> None:
+    def record_extraction_error(self, reason: str, location: LocTuple | None) -> None:
         self.errors.append((reason, location))
 
     def summarise_extraction_errors(self) -> str:
-        reason_to_location = defaultdict(list)
+        reason_to_location: dict[str, list[LocTuple | None]] = defaultdict(list)
         for reason, location in self.errors:
             reason_to_location[reason.strip()].append(location)
 
-        parts = []
+        parts: list[str] = []
         for reason, locations in sorted(reason_to_location.items()):
             num_unknown = len([loc for loc in locations if loc is None])
             loc_strs = sorted(
@@ -426,4 +418,4 @@ class ExtractionContext:
 
     @property
     def file_set(self) -> frozenset[Path]:
-        return frozenset(self.include_ctx._all_included_files)
+        return frozenset(self.include_ctx.all_included_files)

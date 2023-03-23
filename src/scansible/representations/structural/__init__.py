@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
-from . import extractor
-from .extractor import extract_playbook, extract_role
+from . import extractor as extractor
+from .extractor import extract_playbook as extract_playbook
+from .extractor import extract_role as extract_role
 from .representation import *

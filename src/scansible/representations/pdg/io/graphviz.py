@@ -2,16 +2,9 @@
 
 from __future__ import annotations
 
-import json
-
-import attrs
 import graphviz as gv
 
 from .. import representation as rep
-
-
-def _get_shared_node_attrs(g: rep.Graph) -> dict[str, str]:
-    return {"role_name": g.role_name, "role_version": g.role_version}
 
 
 def get_node_shape(n: rep.Node) -> str:
@@ -43,7 +36,7 @@ def get_node_label(n: rep.Node) -> str:
     return n.__class__.__name__
 
 
-def dump_node(n: rep.Node, g: rep.Graph, dot: gv.Digraph) -> None:
+def dump_node(n: rep.Node, dot: gv.Digraph) -> None:
     node_id = str(n.node_id)
     shape = get_node_shape(n)
     label = get_node_label(n)
@@ -68,7 +61,7 @@ def dump_graph(g: rep.Graph) -> gv.Digraph:
     dot = gv.Digraph()
 
     for n in g:
-        dump_node(n, g, dot)
+        dump_node(n, dot)
     for src, target, e in g.edges(data=True):
         dump_edge(e["type"], src, target, dot)
 

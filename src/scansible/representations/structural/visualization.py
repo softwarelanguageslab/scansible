@@ -119,7 +119,7 @@ class VisualizationVisitor:
 
     def visit_play(self, v: rep.Play) -> str:
         p_id = self.add_node(
-            _create_record("Play", *v._yield_non_default_representable_attributes())
+            _create_record("Play", *v.__yield_non_default_representable_attributes__())
         )
         special_directives = (
             "tasks",
@@ -130,7 +130,7 @@ class VisualizationVisitor:
             "vars_prompt",
         )
 
-        for attr_name, attr_value in v._yield_non_default_representable_attributes():
+        for attr_name, attr_value in v.__yield_non_default_representable_attributes__():
             if _is_scalar(attr_value):
                 continue
             if attr_name in special_directives:
@@ -178,7 +178,9 @@ class VisualizationVisitor:
 
     def visit_meta_file(self, v: rep.MetaFile) -> str:
         mf_id = self.add_node(
-            _create_record("MetaFile", *v._yield_non_default_representable_attributes())
+            _create_record(
+                "MetaFile", *v.__yield_non_default_representable_attributes__()
+            )
         )
         self.g.edge(f"{mf_id}:metablock", v.metablock.accept(self))
         return mf_id
@@ -186,7 +188,7 @@ class VisualizationVisitor:
     def visit_meta_block(self, v: rep.MetaBlock) -> str:
         mb_id = self.add_node(
             _create_record(
-                "MetaBlock", *v._yield_non_default_representable_attributes()
+                "MetaBlock", *v.__yield_non_default_representable_attributes__()
             )
         )
 
@@ -204,7 +206,9 @@ class VisualizationVisitor:
 
     def visit_task_file(self, v: rep.TaskFile) -> str:
         tf_id = self.add_node(
-            _create_record("TaskFile", *v._yield_non_default_representable_attributes())
+            _create_record(
+                "TaskFile", *v.__yield_non_default_representable_attributes__()
+            )
         )
         if v.tasks:
             tasks_id = self.add_node(_create_list(len(v.tasks)))
@@ -216,11 +220,11 @@ class VisualizationVisitor:
 
     def visit_block(self, v: rep.Block) -> str:
         b_id = self.add_node(
-            _create_record("Block", *v._yield_non_default_representable_attributes())
+            _create_record("Block", *v.__yield_non_default_representable_attributes__())
         )
         special_directives = ("block", "rescue", "always")
 
-        for attr_name, attr_value in v._yield_non_default_representable_attributes():
+        for attr_name, attr_value in v.__yield_non_default_representable_attributes__():
             if _is_scalar(attr_value):
                 continue
             if attr_name in special_directives:
@@ -235,10 +239,10 @@ class VisualizationVisitor:
 
     def visit_task(self, v: rep.Task) -> str:
         t_id = self.add_node(
-            _create_record("Task", *v._yield_non_default_representable_attributes())
+            _create_record("Task", *v.__yield_non_default_representable_attributes__())
         )
 
-        for attr_name, attr_value in v._yield_non_default_representable_attributes():
+        for attr_name, attr_value in v.__yield_non_default_representable_attributes__():
             if _is_scalar(attr_value):
                 continue
             if attr_name == "loop_control":
@@ -251,10 +255,12 @@ class VisualizationVisitor:
 
     def visit_handler(self, v: rep.Handler) -> str:
         t_id = self.add_node(
-            _create_record("Handler", *v._yield_non_default_representable_attributes())
+            _create_record(
+                "Handler", *v.__yield_non_default_representable_attributes__()
+            )
         )
 
-        for attr_name, attr_value in v._yield_non_default_representable_attributes():
+        for attr_name, attr_value in v.__yield_non_default_representable_attributes__():
             if _is_scalar(attr_value):
                 continue
             if attr_name == "loop_control":
@@ -268,11 +274,11 @@ class VisualizationVisitor:
     def visit_loop_control(self, v: rep.LoopControl) -> str:
         lc_id = self.add_node(
             _create_record(
-                "LoopControl", *v._yield_non_default_representable_attributes()
+                "LoopControl", *v.__yield_non_default_representable_attributes__()
             )
         )
 
-        for attr_name, attr_value in v._yield_non_default_representable_attributes():
+        for attr_name, attr_value in v.__yield_non_default_representable_attributes__():
             if _is_scalar(attr_value):
                 continue
 
@@ -283,7 +289,7 @@ class VisualizationVisitor:
     def visit_variable_file(self, v: rep.VariableFile) -> str:
         vf_id = self.add_node(
             _create_record(
-                "VariableFile", *v._yield_non_default_representable_attributes()
+                "VariableFile", *v.__yield_non_default_representable_attributes__()
             )
         )
         if v.variables:
@@ -299,17 +305,19 @@ class VisualizationVisitor:
 
     def visit_platform(self, v: rep.Platform) -> str:
         return self.add_node(
-            _create_record("Platform", *v._yield_non_default_representable_attributes())
+            _create_record(
+                "Platform", *v.__yield_non_default_representable_attributes__()
+            )
         )
 
     def visit_role_requirement(self, v: rep.RoleRequirement) -> str:
         rr_id = self.add_node(
             _create_record(
-                "RoleRequirement", *v._yield_non_default_representable_attributes()
+                "RoleRequirement", *v.__yield_non_default_representable_attributes__()
             )
         )
 
-        for attr_name, attr_value in v._yield_non_default_representable_attributes():
+        for attr_name, attr_value in v.__yield_non_default_representable_attributes__():
             if _is_scalar(attr_value):
                 continue
             if attr_name == "source_info":
@@ -323,18 +331,18 @@ class VisualizationVisitor:
     def visit_role_source_info(self, v: rep.RoleSourceInfo) -> str:
         return self.add_node(
             _create_record(
-                "RoleSourceInfo", *v._yield_non_default_representable_attributes()
+                "RoleSourceInfo", *v.__yield_non_default_representable_attributes__()
             )
         )
 
     def visit_vars_prompt(self, v: rep.VarsPrompt) -> str:
         vp_id = self.add_node(
             _create_record(
-                "VarsPrompt", *v._yield_non_default_representable_attributes()
+                "VarsPrompt", *v.__yield_non_default_representable_attributes__()
             )
         )
 
-        for attr_name, attr_value in v._yield_non_default_representable_attributes():
+        for attr_name, attr_value in v.__yield_non_default_representable_attributes__():
             if _is_scalar(attr_value):
                 continue
 

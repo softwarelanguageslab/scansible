@@ -6,14 +6,13 @@ from .base import Rule
 
 
 class HTTPWithoutSSLTLSRule(Rule):
-
     IP_WHITELIST = ("localhost", "127.0.0.1")
 
     def create_http_test(self, key_getter: str, type_getter: str) -> str:
         return self._create_string_startswith_test("http://", key_getter, type_getter)
 
     def create_localhost_test(self, key_getter: str, type_getter: str) -> str:
-        whitelist_tokens = []
+        whitelist_tokens: list[str] = []
         for ip in self.IP_WHITELIST:
             whitelist_tokens.extend([ip, f"http://{ip}"])
 
@@ -44,7 +43,7 @@ class HTTPWithoutSSLTLSRule(Rule):
         self, results: list[tuple[Any, ...]], db: Any
     ) -> list[tuple[str, str, int]]:
         # Postprocess to remove any results where the source expression node has another incoming node with localhost
-        new_results = []
+        new_results: list[tuple[str, str, int]] = []
         for source, source_loc, sink_loc, indirection_level in results:
             if "Expression" not in source.labels:
                 new_results.append((source_loc, sink_loc, indirection_level))

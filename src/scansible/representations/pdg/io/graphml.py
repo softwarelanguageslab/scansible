@@ -38,9 +38,9 @@ class CustomGraphMLWriter(WriterBase):
                 )
 
     def add_nodes(
-        self, g: Graph[rep.Node, Any, rep.Edge], graph_element: Element
+        self, G: Graph[rep.Node, Any, rep.Edge], graph_element: Element
     ) -> None:
-        for node, _ in g.nodes(data=True):
+        for node, _ in G.nodes(data=True):
             node_element = self.myElement("node", id=str(node.node_id))
             self.add_attributes(
                 "node", node_element, self._dump_node_attributes(node), {}
@@ -58,11 +58,11 @@ class CustomGraphMLWriter(WriterBase):
         return result
 
     def add_edges(
-        self, g: Graph[rep.Node, Any, rep.Edge], graph_element: Element
+        self, G: Graph[rep.Node, Any, rep.Edge], graph_element: Element
     ) -> None:
-        assert isinstance(g, rep.Graph)
+        assert isinstance(G, rep.Graph)
 
-        for u, v, key, data in g.edges(data=True, keys=True):
+        for u, v, key, data in G.edges(data=True, keys=True):
             edge_element = self.myElement(
                 "edge",
                 source=str(u.node_id),
@@ -96,7 +96,7 @@ class CustomGraphMLReader(ReaderBase):
 
     def add_node(
         self,
-        g: rep.Graph,
+        G: rep.Graph,
         node_xml: Element,
         graphml_keys: dict[str, GraphMLKeys],
         defaults: object,
@@ -106,7 +106,7 @@ class CustomGraphMLReader(ReaderBase):
         node = self._load_node(data)
 
         self._node_map[node.node_id] = node
-        g.add_node(node)
+        G.add_node(node)
 
     def _load_node(self, data: dict[str, str]) -> rep.Node:
         node_type = data["node_type"]
@@ -125,7 +125,7 @@ class CustomGraphMLReader(ReaderBase):
         return node
 
     def add_edge(
-        self, g: rep.Graph, edge_element: Element, graphml_keys: dict[str, GraphMLKeys]
+        self, G: rep.Graph, edge_element: Element, graphml_keys: dict[str, GraphMLKeys]
     ) -> None:
         source = self._node_map[int(edge_element.get("source"))]  # type: ignore[arg-type]
         target = self._node_map[int(edge_element.get("target"))]  # type: ignore[arg-type]
@@ -136,7 +136,7 @@ class CustomGraphMLReader(ReaderBase):
         edge_cls = getattr(rep, edge_type_to_name.get(edge_type, edge_type.title()))
         edge = edge_cls(**{k: json.loads(v) for k, v in data.items() if k != "type"})
 
-        g.add_edge(source, target, edge)
+        G.add_edge(source, target, edge)
 
 
 edge_type_to_name = {

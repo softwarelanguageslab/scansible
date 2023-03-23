@@ -107,7 +107,7 @@ def get_def_expression(
 
 def get_def_conditions(graph: Graph, v: Variable) -> list[Expression]:
     conditionals = get_node_predecessors(graph, v, node_type=Node, edge_type=DefinedIf)
-    conditional_data_nodes = []
+    conditional_data_nodes: list[Node] = []
     for cnode in conditionals:
         assert isinstance(
             cnode, Conditional
@@ -118,7 +118,7 @@ def get_def_conditions(graph: Graph, v: Variable) -> list[Expression]:
         ), f"Internal Error: {v!r} is conditionally defined but condition {cnode!r} uses no data"
         conditional_data_nodes.extend(cond_uses)
 
-    cond_exprs = []
+    cond_exprs: list[Expression] = []
     for civ in conditional_data_nodes:
         if isinstance(civ, Literal):
             continue
@@ -165,11 +165,11 @@ def get_all_used_variables(graph: Graph, expr: Expression) -> list[Variable]:
 def get_register_all_used_variables(graph: Graph, var: Variable) -> list[Variable]:
     """Like above, but for variables defined through register."""
     def_nodes = get_node_predecessors(graph, var, node_type=ControlNode, edge_type=Def)
-    usages = []
+    usages: list[Variable] = []
 
     for def_node in def_nodes:
         used_ivs = get_node_predecessors(
-            graph, var, node_type=IntermediateValue, edge_type=Use
+            graph, def_node, node_type=IntermediateValue, edge_type=Use
         )
         for used_iv in used_ivs:
             expr = get_def_expression(graph, used_iv)

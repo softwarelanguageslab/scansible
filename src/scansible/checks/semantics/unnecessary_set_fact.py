@@ -95,7 +95,7 @@ class UnnecessarySetFactRule(Rule):
                 warning_header = (
                     f'Unnecessary use of set_fact for variable "{v.name}@{v.version}"'
                 )
-                warning_body_lines = []
+                warning_body_lines: list[str] = []
 
                 if isinstance(vorigin, Literal):
                     warning_body_lines.append(

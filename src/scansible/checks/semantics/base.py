@@ -15,14 +15,12 @@ class RuleResult(BaseModel):
 
     role_name: str
     role_version: str
-    location: NodeLocation
+    location: NodeLocation | None
 
     class Config:
         arbitrary_types_allowed = True
 
 
 class Rule:
-    def scan(
-        self, graph: Graph, visibility_information: VisibilityInformation
-    ) -> list[RuleResult]:
+    def scan(self, graph: Graph, visinfo: VisibilityInformation) -> list[RuleResult]:
         ...

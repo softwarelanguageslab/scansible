@@ -90,7 +90,7 @@ def validate_ansible_object(obj: ans.FieldAttributeBase) -> None:
     # We have to reimplement Ansible's logic because it eagerly templates certain
     # expressions. We don't want that.
     templar = ans.Templar(ans.DataLoader())
-    for (name, attribute) in obj._valid_attrs.items():
+    for name, attribute in obj._valid_attrs.items():
         value = getattr(obj, name)
         if value is None:
             continue
@@ -115,8 +115,7 @@ def validate_ansible_object(obj: ans.FieldAttributeBase) -> None:
         except (TypeError, ValueError) as e:
             # Re-raise these errors like Ansible's base post_validate does.
             raise ans.AnsibleParserError(
-                f"the field '{name}' has an invalid value ({value}), and could not be converted to an {attribute.isa}. "
-                f"The error was: {e}",
+                f"the field '{name}' has an invalid value ({value}), and could not be converted to an {attribute.isa}. The error was: {e}",
                 obj=obj.get_ds(),
                 orig_exc=e,
             )
@@ -146,7 +145,7 @@ def find_file(dir_path: ProjectPath, file_name: str) -> ProjectPath | None:
 
 def find_all_files(dir_path: ProjectPath) -> list[ProjectPath]:
     """Recursively find all YAML files in a project directory."""
-    results = []
+    results: list[ProjectPath] = []
     for child in dir_path.absolute.iterdir():
         child_path = dir_path.join(child)
         if child.is_symlink():
@@ -221,11 +220,19 @@ def convert_ansible_values(obj: Any) -> Any:
     if isinstance(obj, ans.AnsibleVaultEncryptedUnicode):
         return rep.VaultValue(data=obj._ciphertext, location=obj.ansible_pos)
     if isinstance(obj, list):
-        seq = ans.AnsibleSequence([convert_ansible_values(el) for el in obj])
-        seq.ansible_pos = getattr(obj, "ansible_pos", ("unknown file", -1, -1))
+        seq = ans.AnsibleSequence(
+            [convert_ansible_values(el) for el in obj]  # pyright: ignore
+        )
+        seq.ansible_pos = getattr(
+            obj, "ansible_pos", ("unknown file", -1, -1)  # pyright: ignore
+        )
         return seq
     if isinstance(obj, dict):
-        dct = ans.AnsibleMapping({k: convert_ansible_values(v) for k, v in obj.items()})
-        dct.ansible_pos = getattr(obj, "ansible_pos", ("unknown file", -1, -1))
+        dct = ans.AnsibleMapping(
+            {k: convert_ansible_values(v) for k, v in obj.items()}  # pyright: ignore
+        )
+        dct.ansible_pos = getattr(
+            obj, "ansible_pos", ("unknown file", -1, -1)  # pyright: ignore
+        )
         return dct
     return obj

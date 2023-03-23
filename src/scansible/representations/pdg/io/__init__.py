@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from ..representation import Graph
 from .graphml import dump_graph as graphml_dump
 from .graphviz import dump_graph as dot_dump
@@ -7,6 +9,7 @@ from .neo4j import dump_graph as neo4j_dump
 
 
 def dump_graph(output_format: str, graph: Graph) -> str:
+    dumper: Callable[[Graph], str]
     match output_format:
         case "graphml":
             dumper = graphml_dump

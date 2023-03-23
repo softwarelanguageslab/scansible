@@ -12,6 +12,8 @@ def is_globally_scoped(scope: int) -> bool:
 
 
 def partition_local_global(defs: set[tuple[str, int]]) -> tuple[set[str], set[str]]:
+    loc: set[str]
+    glob: set[str]
     loc, glob = (set(), set())
     for role_name, scope in defs:
         if is_globally_scoped(scope):

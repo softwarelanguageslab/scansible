@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from ansible import constants as ansible_constants
-
+from scansible.representations._utils import actions
 from scansible.representations.structural import TaskBase
 
 from ..context import ExtractionContext
@@ -15,13 +14,13 @@ from .set_fact import SetFactTaskExtractor
 
 def task_extractor_factory(context: ExtractionContext, task: TaskBase) -> TaskExtractor:
     action = task.action
-    if action in ansible_constants._ACTION_SET_FACT:
+    if actions.is_set_fact(action):
         return SetFactTaskExtractor(context, task)
-    if action in ansible_constants._ACTION_INCLUDE_VARS:
+    if actions.is_include_vars(action):
         return IncludeVarsTaskExtractor(context, task)
-    if action in ansible_constants._ACTION_ALL_INCLUDE_IMPORT_TASKS:
+    if actions.is_import_include_tasks(action):
         return IncludeTaskExtractor(context, task)
-    if action in ansible_constants._ACTION_ALL_PROPER_INCLUDE_IMPORT_ROLES:
+    if actions.is_import_include_role(action):
         return IncludeRoleExtractor(context, task)
 
     return GenericTaskExtractor(context, task)

@@ -1,24 +1,24 @@
 """Extraction logic for structural model."""
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Literal, TypeVar, overload
+from typing import Any, Callable, Literal, TypeVar, overload
 
-from contextlib import redirect_stderr, redirect_stdout
+from collections.abc import Iterable
 from functools import partial
 from itertools import chain
 from pathlib import Path
+
+from scansible.representations._utils import actions
 
 from . import ansible_types as ans
 from . import loaders
 from . import representation as rep
 from .helpers import (
-    FatalError,
     ProjectPath,
     capture_output,
     convert_ansible_values,
     find_all_files,
     find_file,
-    parse_file,
     prevent_undesired_operations,
     validate_ansible_object,
 )
@@ -130,9 +130,15 @@ def extract_list_of_variables(
 def extract_tasks_file(
     path: ProjectPath, ctx: ExtractionContext, handlers: bool = False
 ) -> rep.TaskFile:
-    ds, raw_ds = loaders.load_tasks_file(path)
+    ds, _ = loaders.load_tasks_file(path)
 
-    content = extract_list_of_tasks_or_blocks(ds, ctx, handlers)  # type: ignore[call-overload]
+    # Something goes wrong with typing here.
+    content: list[rep.Handler | rep.Block] | list[rep.Task | rep.Block]
+    if handlers:
+        content = extract_list_of_tasks_or_blocks(ds, ctx, handlers)
+    else:
+        content = extract_list_of_tasks_or_blocks(ds, ctx, handlers)
+
     tf = rep.TaskFile(file_path=path.relative, tasks=content)
     for child in content:
         child.parent = tf
@@ -162,12 +168,28 @@ def extract_list_of_tasks_or_blocks(
     ctx: ExtractionContext,
     handlers: Literal[True, False] = False,
 ) -> list[rep.Task | rep.Block] | list[rep.Handler | rep.Block]:
-    content = []
+    if handlers:
+        return list(_extract_block_list_handlers(ds, ctx))
+    else:
+        return list(_extract_block_list(ds, ctx))
+
+
+def _extract_block_list_handlers(
+    ds: list[dict[str, ans.AnsibleValue]], ctx: ExtractionContext
+) -> Iterable[rep.Handler | rep.Block]:
     for inner_ds in ds:
-        inner_result = extract_task_or_block(inner_ds, ctx, handlers)
+        inner_result = extract_task_or_block(inner_ds, ctx, True)
         if inner_result is not None:
-            content.append(inner_result)
-    return content  # type: ignore[return-value]
+            yield inner_result
+
+
+def _extract_block_list(
+    ds: list[dict[str, ans.AnsibleValue]], ctx: ExtractionContext
+) -> Iterable[rep.Task | rep.Block]:
+    for inner_ds in ds:
+        inner_result = extract_task_or_block(inner_ds, ctx, False)
+        if inner_result is not None:
+            yield inner_result
 
 
 @overload
@@ -211,13 +233,13 @@ def extract_block(
     attrs = _ansible_to_dict(raw_block)
 
     attrs["block"] = extract_list_of_tasks_or_blocks(
-        raw_block.block, ctx, handlers=handlers
+        raw_block.block, ctx, handlers=handlers  # pyright: ignore
     )
     attrs["rescue"] = extract_list_of_tasks_or_blocks(
-        raw_block.rescue, ctx, handlers=handlers
+        raw_block.rescue, ctx, handlers=handlers  # pyright: ignore
     )
     attrs["always"] = extract_list_of_tasks_or_blocks(
-        raw_block.always, ctx, handlers=handlers
+        raw_block.always, ctx, handlers=handlers  # pyright: ignore
     )
     attrs["vars"] = extract_list_of_variables(raw_block.vars)
 
@@ -242,8 +264,9 @@ def extract_task(
     ctx: ExtractionContext,
     as_handler: Literal[True, False],
 ) -> rep.Task | rep.Handler | None:
+    raw_task: ans.Task | ans.Handler
     try:
-        raw_task, raw_ds = loaders.load_task(ds, as_handler)
+        raw_task, raw_ds = loaders.load_task(ds, as_handler)  # pyright: ignore
     except (ans.AnsibleError, loaders.LoadError) as e:
         if not ctx.lenient:
             raise
@@ -294,7 +317,7 @@ def extract_play(ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext) -> rep
 def extract_playbook_child(
     ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext
 ) -> rep.Play | None:
-    if any(directive in ans.C._ACTION_IMPORT_PLAYBOOK for directive in ds):
+    if any(actions.is_import_playbook(directive) for directive in ds):
         # Ignore import_playbook for now. The imported playbook can be checked as a separate entrypoint.
         return None
     else:
@@ -325,10 +348,10 @@ def extract_playbook(
     ctx = ExtractionContext(lenient)
 
     with capture_output() as output, prevent_undesired_operations():
-        ds, raw_ds = loaders.load_playbook(pb_path)
+        ds, _ = loaders.load_playbook(pb_path)
 
         # Parse the plays in the playbook
-        plays = []
+        plays: list[rep.Play] = []
         for play_ds in ds:
             try:
                 play = extract_playbook_child(play_ds, ctx)

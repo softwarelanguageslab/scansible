@@ -38,7 +38,7 @@ class LookupTargetUnknown(LookupTarget):
 
 
 def parse_wrapped_conditional(expr: str, env: Environment) -> nodes.Node:
-    expr = "{% if " + expr + " %}" " True " "{% else %}" " False " "{% endif %}"
+    expr = "{% if " + expr + " %} True {% else %} False {% endif %}"
     ast = env.parse(expr)
     assert isinstance(ast.body[0], nodes.If)
     return ast.body[0].test
@@ -113,7 +113,7 @@ class FindUndeclaredVariablesVisitor(NodeVisitor):
         else:
             self.declared.add(name_node.name)
 
-    def visit_Block(self, block_node: nodes.Block) -> None:
+    def visit_Block(self, _block_node: nodes.Block) -> None:
         # Don't visit blocks, they may have local declarations.
         # Not sure if we'd ever need to visit blocks.
         pass
@@ -144,7 +144,7 @@ class TemplateExpressionAST:
             if isinstance(call_node.node, nodes.Name)
         )
         self.used_lookups: set[LookupTarget] = {
-            create_lookup_target(call_node.args[0])
+            create_lookup_target(call_node.args[0])  # pyright: ignore
             for call_node in ast_root.find_all(nodes.Call)
             if (
                 (isinstance(call_node.node, nodes.Name))

@@ -61,7 +61,6 @@ class UnconditionalOverrideRule(Rule):
         nodes_sorted = sorted(nodes.items(), key=lambda n: n[0])
         for _, vals_v2_lst in nodes_sorted:
             v2 = vals_v2_lst[0]
-            vals_v2 = set(vals_v2_lst)
 
             # Find the v2 which would be overridden by this definition
             visibles = visinfo.get_info(v2.name, v2.version)

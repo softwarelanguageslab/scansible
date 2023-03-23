@@ -4,8 +4,6 @@ from collections.abc import Mapping
 
 from loguru import logger
 
-from scansible.representations.structural import VariableFile
-
 from .. import representation as rep
 from .context import ExtractionContext
 from .result import ExtractionResult
