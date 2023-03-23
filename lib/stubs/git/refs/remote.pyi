@@ -1,10 +1,15 @@
+from __future__ import annotations
+
 from .head import Head
-Repo = Any #from ..repo import Repo
-from typing import Any, Optional, Iterator, NoReturn
+
+Repo = Any  # from ..repo import Repo
+from typing import Any, Iterator, NoReturn, Optional
 
 class RemoteReference(Head):
     @classmethod
-    def iter_items(cls, repo: Repo, common_path: Optional[str] = ..., remote: Optional[str] = ...) -> Iterator[RemoteReference]: ...
+    def iter_items(
+        cls, repo: Repo, common_path: Optional[str] = ..., remote: Optional[str] = ...
+    ) -> Iterator[RemoteReference]: ...
     @classmethod
     def delete(cls, repo: Repo, *refs: RemoteReference, **kwargs: Any) -> None: ...  # type: ignore[override]
     @classmethod

@@ -1,7 +1,7 @@
-from scansible.representations.pdg.extractor.context import \
-    VisibilityInformation
-from scansible.representations.pdg.representation import (Graph, NodeLocation,
-                                                          Task)
+from __future__ import annotations
+
+from scansible.representations.pdg.extractor.context import VisibilityInformation
+from scansible.representations.pdg.representation import Graph, NodeLocation, Task
 
 from .base import Rule, RuleResult
 from .utils import get_nodes

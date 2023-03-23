@@ -1,13 +1,24 @@
-from scansible.representations.pdg.extractor.context import \
-    VisibilityInformation
+from __future__ import annotations
+
+from scansible.representations.pdg.extractor.context import VisibilityInformation
 from scansible.representations.pdg.extractor.var_context import ScopeLevel
-from scansible.representations.pdg.representation import (Def, Expression,
-                                                          Graph, Literal, Task,
-                                                          Variable)
+from scansible.representations.pdg.representation import (
+    Def,
+    Expression,
+    Graph,
+    Literal,
+    Task,
+    Variable,
+)
 
 from .base import Rule, RuleResult
-from .utils import (get_def_conditions, get_def_expression,
-                    get_node_predecessors, get_nodes, get_used_variables)
+from .utils import (
+    get_def_conditions,
+    get_def_expression,
+    get_node_predecessors,
+    get_nodes,
+    get_used_variables,
+)
 
 
 def get_var_origin(graph: Graph, node: Variable) -> Expression | Literal | Task | None:

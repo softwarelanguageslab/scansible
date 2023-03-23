@@ -1,21 +1,42 @@
+from __future__ import annotations
+
+from typing import (
+    IO,
+    Any,
+    AnyStr,
+    BinaryIO,
+    Callable,
+    Dict,
+    Generic,
+    Iterator,
+    List,
+    Optional,
+    Pattern,
+    TypedDict,
+    TypeVar,
+    Union,
+)
+
 import logging
-from typing import Any, AnyStr, BinaryIO, Callable, Dict, IO, List, Optional, Pattern, TypedDict, TypeVar, Union, Iterator, Generic
 from pathlib import Path
 
 from .config import GitConfigParser
 
 HIDE_WINDOWS_KNOWN_ERRORS: bool
 
-_Ft = TypeVar('_Ft')
-_V = TypeVar('_V')
+_Ft = TypeVar("_Ft")
+_V = TypeVar("_V")
 _PathType = Union[str, bytes, Path]
 
 def unbare_repo(func: _Ft) -> _Ft: ...
 def rmtree(path: _PathType) -> None: ...
-def stream_copy(source: BinaryIO, destination: BinaryIO, chunk_size: int = ...) -> int: ...
+def stream_copy(
+    source: BinaryIO, destination: BinaryIO, chunk_size: int = ...
+) -> int: ...
 def join_path(a: str, *p: str) -> str: ...
 def to_native_path_windows(path: str) -> str: ...
 def to_native_path_linux(path: str) -> str: ...
+
 to_native_path = to_native_path_windows
 to_native_path = to_native_path_linux
 
@@ -44,11 +65,23 @@ class RemoteProgress:
     def __init__(self) -> None: ...
     def new_message_handler(self) -> Callable[[str], None]: ...
     def line_dropped(self, line: str) -> None: ...
-    def update(self, op_code: int, cur_count: int, max_count: Optional[int] = ..., message: str = ...) -> None: ...
+    def update(
+        self,
+        op_code: int,
+        cur_count: int,
+        max_count: Optional[int] = ...,
+        message: str = ...,
+    ) -> None: ...
 
 class CallableRemoteProgress(RemoteProgress):
     def __init__(self, fn: Callable[[int, int, Optional[int], str], None]) -> None: ...
-    def update(self, op_code: int, cur_count: int, max_count: Optional[int] = ..., message: str = ...) -> None: ...
+    def update(
+        self,
+        op_code: int,
+        cur_count: int,
+        max_count: Optional[int] = ...,
+        message: str = ...,
+    ) -> None: ...
 
 class Actor:
     name_only_regex: Pattern[str] = ...
@@ -70,23 +103,20 @@ class Actor:
     @classmethod
     def author(cls, config_reader: Optional[GitConfigParser] = ...) -> Actor: ...
 
-
 class StatDict(TypedDict):
     insertions: int
     deletions: int
     lines: int
 
-
 class FullStatDict(StatDict):
     files: int
-
 
 class Stats:
     total: FullStatDict = ...
     files: Dict[str, StatDict] = ...
     def __init__(self, total: FullStatDict, files: Dict[str, StatDict]) -> None: ...
     @classmethod
-    def _list_from_string(cls, repo: Any, text: str) -> 'Stats': ...
+    def _list_from_string(cls, repo: Any, text: str) -> "Stats": ...
 
 class IndexFileSHA1Writer:
     f: Any = ...
@@ -102,7 +132,9 @@ class LockFile:
     def __del__(self) -> None: ...
 
 class BlockingLockFile(LockFile):
-    def __init__(self, file_path: str, check_interval_s: float = ..., max_block_time_s: int = ...) -> None: ...
+    def __init__(
+        self, file_path: str, check_interval_s: float = ..., max_block_time_s: int = ...
+    ) -> None: ...
 
 class IterableList(List[_V]):
     def __new__(cls, id_attr: str, prefix: str = ...) -> IterableList[_V]: ...
@@ -121,7 +153,5 @@ class Iterable:
 class NullHandler(logging.Handler):
     def emit(self, record: Any) -> None: ...
 
-
 # From gitdb.util
-class LazyMixin:
-    ...
+class LazyMixin: ...

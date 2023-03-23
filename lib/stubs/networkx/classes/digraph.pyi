@@ -1,6 +1,10 @@
-from _typeshed import Incomplete
+from __future__ import annotations
+
 from typing import Iterator
-from .graph import Graph, NodeT, EdgeAttrT, GraphAttrT
+
+from _typeshed import Incomplete
+
+from .graph import EdgeAttrT, Graph, GraphAttrT, NodeT
 
 class DiGraph(Graph[NodeT, GraphAttrT, EdgeAttrT]):
     ...

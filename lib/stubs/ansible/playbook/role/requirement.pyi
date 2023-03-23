@@ -1,4 +1,6 @@
-from ansible.parsing.yaml.objects import AnsibleUnicode, AnsibleMapping
+from __future__ import annotations
+
+from ansible.parsing.yaml.objects import AnsibleMapping, AnsibleUnicode
 
 from .definition import RoleDefinition
 

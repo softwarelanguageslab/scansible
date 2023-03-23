@@ -1,6 +1,10 @@
-from gitdb.db import GitDB as GitDB, LooseObjectDB  # type: ignore
-from gitdb.base import OStream, OInfo  # type: ignore
+from __future__ import annotations
+
 from typing import Any
+
+from gitdb.base import OInfo, OStream  # type: ignore
+from gitdb.db import GitDB as GitDB  # type: ignore
+from gitdb.db import LooseObjectDB
 
 from .cmd import Git
 

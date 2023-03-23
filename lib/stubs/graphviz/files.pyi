@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 from typing import Any, Optional, TypeVar
 
-from .backend import _EngineValue, _FormatValue, _FormatterValue, _RendererValue
+from .backend import _EngineValue, _FormatterValue, _FormatValue, _RendererValue
 
-_Self = TypeVar('_Self', bound=Base)
+_Self = TypeVar("_Self", bound=Base)
 
 class Base:
     @property
@@ -25,16 +27,64 @@ class File(Base):
     format: _FormatValue = ...
     engine: _EngineValue = ...
     encoding: str = ...
-    def __init__(self, filename: Optional[str] = ..., directory: Optional[str] = ..., format: Optional[_FormatValue] = ..., engine: Optional[_EngineValue] = ..., encoding: str = ...) -> None: ...
-    def pipe(self, format: Optional[_FormatValue] = ..., renderer: Optional[_RendererValue] = ..., formatter: Optional[_FormatterValue] = ..., quiet: bool = ...) -> bytes: ...
+    def __init__(
+        self,
+        filename: Optional[str] = ...,
+        directory: Optional[str] = ...,
+        format: Optional[_FormatValue] = ...,
+        engine: Optional[_EngineValue] = ...,
+        encoding: str = ...,
+    ) -> None: ...
+    def pipe(
+        self,
+        format: Optional[_FormatValue] = ...,
+        renderer: Optional[_RendererValue] = ...,
+        formatter: Optional[_FormatterValue] = ...,
+        quiet: bool = ...,
+    ) -> bytes: ...
     @property
     def filepath(self) -> str: ...
-    def save(self, filename: Optional[str] = ..., directory: Optional[str] = ...) -> str: ...
-    def render(self, filename: Optional[str] = ..., directory: Optional[str] = ..., view: bool = ..., cleanup: bool = ..., format: Optional[_FormatValue] = ..., renderer: Optional[_RendererValue] = ..., formatter: Optional[_FormatterValue] = ..., quiet: bool = ..., quiet_view: bool = ...) -> str: ...
-    def view(self, filename: Optional[str] = ..., directory: Optional[str] = ..., cleanup: bool = ..., quiet: bool = ..., quiet_view: bool = ...) -> str: ...
+    def save(
+        self, filename: Optional[str] = ..., directory: Optional[str] = ...
+    ) -> str: ...
+    def render(
+        self,
+        filename: Optional[str] = ...,
+        directory: Optional[str] = ...,
+        view: bool = ...,
+        cleanup: bool = ...,
+        format: Optional[_FormatValue] = ...,
+        renderer: Optional[_RendererValue] = ...,
+        formatter: Optional[_FormatterValue] = ...,
+        quiet: bool = ...,
+        quiet_view: bool = ...,
+    ) -> str: ...
+    def view(
+        self,
+        filename: Optional[str] = ...,
+        directory: Optional[str] = ...,
+        cleanup: bool = ...,
+        quiet: bool = ...,
+        quiet_view: bool = ...,
+    ) -> str: ...
 
 class Source(File):
     @classmethod
-    def from_file(cls, filename: str, directory: Optional[str] = ..., format: Optional[_FormatValue] = ..., engine: Optional[_EngineValue] = ..., encoding: str = ...) -> Source: ...
+    def from_file(
+        cls,
+        filename: str,
+        directory: Optional[str] = ...,
+        format: Optional[_FormatValue] = ...,
+        engine: Optional[_EngineValue] = ...,
+        encoding: str = ...,
+    ) -> Source: ...
     source: str = ...
-    def __init__(self, source: str, filename: Optional[str] = ..., directory: Optional[str] = ..., format: Optional[_FormatValue] = ..., engine: Optional[_EngineValue] = ..., encoding: str = ...) -> None: ...
+    def __init__(
+        self,
+        source: str,
+        filename: Optional[str] = ...,
+        directory: Optional[str] = ...,
+        format: Optional[_FormatValue] = ...,
+        engine: Optional[_EngineValue] = ...,
+        encoding: str = ...,
+    ) -> None: ...

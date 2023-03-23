@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 from pydantic import BaseModel
 
-from scansible.representations.pdg.extractor.context import \
-    VisibilityInformation
+from scansible.representations.pdg.extractor.context import VisibilityInformation
 from scansible.representations.pdg.representation import Graph, NodeLocation
 
 

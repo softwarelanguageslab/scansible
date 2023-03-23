@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 from typing import Any, Optional
 
-Repo = Any #from . import Repo
-from ..objects.base import Object
-from ..objects.tag import TagObject
-from ..objects.commit import Commit
+Repo = Any  # from . import Repo
 from ..db import GitCmdObjectDB
+from ..objects.base import Object
+from ..objects.commit import Commit
+from ..objects.tag import TagObject
 
 def touch(filename: str) -> str: ...
 def is_git_dir(d: str) -> bool: ...

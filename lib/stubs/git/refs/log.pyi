@@ -1,8 +1,11 @@
-from ..objects.util import Serializable
-from .symbolic import SymbolicReference
-from ..util import Actor
+from __future__ import annotations
+
+from typing import Any, Iterator, List, Optional, TextIO, Tuple, Union
+
 from ..config import GitConfigParser
-from typing import Any, Optional, Tuple, List, TextIO, Iterator, Union
+from ..objects.util import Serializable
+from ..util import Actor
+from .symbolic import SymbolicReference
 
 class RefLogEntry(Tuple[str, str, Actor, Tuple[int, int], str]):
     def format(self) -> str: ...
@@ -17,7 +20,15 @@ class RefLogEntry(Tuple[str, str, Actor, Tuple[int, int], str]):
     @property
     def message(self) -> str: ...
     @classmethod
-    def new(cls, oldhexsha: str, newhexsha: str, actor: Actor, time: int, tz_offset: int, message: str) -> RefLogEntry: ...
+    def new(
+        cls,
+        oldhexsha: str,
+        newhexsha: str,
+        actor: Actor,
+        time: int,
+        tz_offset: int,
+        message: str,
+    ) -> RefLogEntry: ...
     @classmethod
     def from_line(cls, line: str) -> RefLogEntry: ...
 
@@ -34,5 +45,12 @@ class RefLog(List[RefLogEntry], Serializable):
     def entry_at(cls, filepath: str, index: int) -> RefLogEntry: ...
     def to_file(self, filepath: str) -> None: ...
     @classmethod
-    def append_entry(cls, config_reader: GitConfigParser, filepath: str, oldbinsha: bytes, newbinsha: bytes, message: str) -> RefLogEntry: ...
+    def append_entry(
+        cls,
+        config_reader: GitConfigParser,
+        filepath: str,
+        oldbinsha: bytes,
+        newbinsha: bytes,
+        message: str,
+    ) -> RefLogEntry: ...
     def write(self) -> RefLog: ...

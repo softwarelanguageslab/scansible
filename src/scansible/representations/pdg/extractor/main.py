@@ -10,12 +10,21 @@ from loguru import logger
 from scansible.representations import structural as struct
 
 from .. import representation as rep
-from .var_context import ScopeLevel, VarContext
-from .role import RoleExtractor
-from .playbook import PlaybookExtractor
 from .context import ExtractionContext
+from .playbook import PlaybookExtractor
+from .role import RoleExtractor
+from .var_context import ScopeLevel, VarContext
 
-def extract_pdg(path: Path, project_id: str, project_rev: str, role_search_paths: Sequence[Path], *, as_pb: bool | None = None, lenient: bool = True) -> ExtractionContext:
+
+def extract_pdg(
+    path: Path,
+    project_id: str,
+    project_rev: str,
+    role_search_paths: Sequence[Path],
+    *,
+    as_pb: bool | None = None,
+    lenient: bool = True,
+) -> ExtractionContext:
     """
     Extract a PDG for a project at a given path.
 
@@ -41,22 +50,33 @@ def extract_pdg(path: Path, project_id: str, project_rev: str, role_search_paths
     if as_pb:
         model = struct.extract_playbook(path, project_id, project_rev, lenient=lenient)
     else:
-        model = struct.extract_role(path, project_id, project_rev, lenient=lenient, extract_all=False)
+        model = struct.extract_role(
+            path, project_id, project_rev, lenient=lenient, extract_all=False
+        )
 
     return StructuralGraphExtractor(model, role_search_paths, lenient).extract()
 
 
 def _project_is_role(path: Path) -> bool:
-    if path.is_dir() and any((path / child).is_dir() for child in ('tasks', 'defaults', 'handlers', 'vars', 'meta')):
+    if path.is_dir() and any(
+        (path / child).is_dir()
+        for child in ("tasks", "defaults", "handlers", "vars", "meta")
+    ):
         return True
-    if path.is_file() and path.suffix.lower() in ('.yml', '.yaml'):
+    if path.is_file() and path.suffix.lower() in (".yml", ".yaml"):
         return False
-    raise ValueError(f'Could not auto-detect whether project at {path} is a role or a playbook')
+    raise ValueError(
+        f"Could not auto-detect whether project at {path} is a role or a playbook"
+    )
 
 
 class StructuralGraphExtractor:
-
-    def __init__(self, model: struct.StructuralModel, role_search_paths: Sequence[Path], lenient: bool) -> None:
+    def __init__(
+        self,
+        model: struct.StructuralModel,
+        role_search_paths: Sequence[Path],
+        lenient: bool,
+    ) -> None:
         self.model = model
         graph = rep.Graph(model.id, model.version)
         for logstr in model.logs:
@@ -67,12 +87,16 @@ class StructuralGraphExtractor:
         for bf in model.root.broken_files:
             logger.bind(location=bf.path).error(bf.reason)
 
-        self.context = ExtractionContext(graph, model, role_search_paths, lenient=lenient)
+        self.context = ExtractionContext(
+            graph, model, role_search_paths, lenient=lenient
+        )
 
     def extract(self) -> ExtractionContext:
         # Set up capturing warning and error messages so they can be added to
         # the context.
-        log_handle = logger.add(self._capture_log_message, level='WARNING', format='{level} - {message}')
+        log_handle = logger.add(
+            self._capture_log_message, level="WARNING", format="{level} - {message}"
+        )
 
         if self.model.is_playbook:
             self._extract_playbook()
@@ -87,8 +111,8 @@ class StructuralGraphExtractor:
         return self.context
 
     def _capture_log_message(self, message: loguru.Message) -> None:
-        location = message.record.get('extra', {}).get('location')
-        if location is not None and location[0] == 'unknown file':
+        location = message.record.get("extra", {}).get("location")
+        if location is not None and location[0] == "unknown file":
             location = None
         reason = str(message)
         self.context.record_extraction_error(reason, location)
@@ -114,11 +138,16 @@ class StructuralGraphExtractor:
                 if not isinstance(node, rep.Task):
                     continue
                 for succ, succ_edges in list(self.context.graph[node].items()):
-                    if not any(isinstance(e['type'], rep.Order) for e in succ_edges.values()):
+                    if not any(
+                        isinstance(e["type"], rep.Order) for e in succ_edges.values()
+                    ):
                         continue
 
                     for trans_succ, succ_succ_edges in self.context.graph[succ].items():
-                        if not any(isinstance(e['type'], rep.Order) for e in succ_succ_edges.values()):
+                        if not any(
+                            isinstance(e["type"], rep.Order)
+                            for e in succ_succ_edges.values()
+                        ):
                             continue
 
                         # print(f'add {node} -> {trans_succ}')

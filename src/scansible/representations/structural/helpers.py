@@ -2,18 +2,20 @@
 
 from __future__ import annotations
 
-from typing import Generator, Callable, Any, NoReturn
+from typing import Any, Callable, Generator, NoReturn
 
 import io
 import os.path
 from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
 
-from . import ansible_types as ans, representation as rep
+from . import ansible_types as ans
+from . import representation as rep
 
 
 class FatalError(Exception):
     """Fatal error to stop all extraction."""
+
     pass
 
 
@@ -51,7 +53,7 @@ class ProjectPath:
         :param      root_path:  The root path to the project.
         :type       root_path:  Path
         """
-        return cls(root_path, '.')
+        return cls(root_path, ".")
 
     def join(self, other: Path | str) -> ProjectPath:
         """
@@ -63,7 +65,6 @@ class ProjectPath:
             other = Path(other)
 
         return ProjectPath(self.root, self.relative / other)
-
 
     @property
     def absolute(self) -> Path:
@@ -93,7 +94,7 @@ def validate_ansible_object(obj: ans.FieldAttributeBase) -> None:
         value = getattr(obj, name)
         if value is None:
             continue
-        if attribute.isa == 'class':
+        if attribute.isa == "class":
             assert isinstance(value, ans.FieldAttributeBase)
             validate_ansible_object(value)
             continue
@@ -115,7 +116,10 @@ def validate_ansible_object(obj: ans.FieldAttributeBase) -> None:
             # Re-raise these errors like Ansible's base post_validate does.
             raise ans.AnsibleParserError(
                 f"the field '{name}' has an invalid value ({value}), and could not be converted to an {attribute.isa}. "
-                f"The error was: {e}", obj=obj.get_ds(), orig_exc=e)
+                f"The error was: {e}",
+                obj=obj.get_ds(),
+                orig_exc=e,
+            )
         setattr(obj, name, validated_value)
 
 
@@ -127,7 +131,9 @@ def find_file(dir_path: ProjectPath, file_name: str) -> ProjectPath | None:
     """
     loader = ans.DataLoader()
     # DataLoader.find_vars_files is misnamed.
-    found_paths = loader.find_vars_files(str(dir_path.absolute), file_name, allow_dir=False)
+    found_paths = loader.find_vars_files(
+        str(dir_path.absolute), file_name, allow_dir=False
+    )
     # found_paths should always have at most one element, since it can only have
     # multiple elements when allow_dir=True
 
@@ -135,7 +141,7 @@ def find_file(dir_path: ProjectPath, file_name: str) -> ProjectPath | None:
         return None
 
     found_path = found_paths[0]
-    return dir_path.join(found_path.decode('utf-8'))
+    return dir_path.join(found_path.decode("utf-8"))
 
 
 def find_all_files(dir_path: ProjectPath) -> list[ProjectPath]:
@@ -178,6 +184,7 @@ def capture_output() -> Generator[io.StringIO, None, None]:
         stack.enter_context(redirect_stdout(buffer))
         yield buffer
 
+
 @contextmanager
 def prevent_undesired_operations() -> Generator[None, None, None]:
     """
@@ -185,8 +192,8 @@ def prevent_undesired_operations() -> Generator[None, None, None]:
     undesired operations such as evaluating template expressions or eagerly
     loading included files.
     """
-    from ansible.template import Templar
     from ansible.playbook import helpers
+    from ansible.template import Templar
 
     old_load_list_of_tasks = helpers.load_list_of_tasks
     old_templar_do_template = Templar.do_template
@@ -194,12 +201,13 @@ def prevent_undesired_operations() -> Generator[None, None, None]:
 
     def raise_if_called(name: str) -> Callable[[Any], NoReturn]:
         def raiser(*args: object, **kwargs: object) -> NoReturn:
-            raise FatalError(f'{name} was called when it was not supposed to be called')
+            raise FatalError(f"{name} was called when it was not supposed to be called")
+
         return raiser
 
-    helpers.load_list_of_tasks = raise_if_called('load_list_of_tasks')  # type: ignore[assignment]
-    Templar.do_template = raise_if_called('Templar.do_template')  # type: ignore[assignment]
-    Templar.template = raise_if_called('Templar.template')  # type: ignore[assignment]
+    helpers.load_list_of_tasks = raise_if_called("load_list_of_tasks")  # type: ignore[assignment]
+    Templar.do_template = raise_if_called("Templar.do_template")  # type: ignore[assignment]
+    Templar.template = raise_if_called("Templar.template")  # type: ignore[assignment]
 
     try:
         yield
@@ -214,10 +222,10 @@ def convert_ansible_values(obj: Any) -> Any:
         return rep.VaultValue(data=obj._ciphertext, location=obj.ansible_pos)
     if isinstance(obj, list):
         seq = ans.AnsibleSequence([convert_ansible_values(el) for el in obj])
-        seq.ansible_pos = getattr(obj, 'ansible_pos', ('unknown file', -1, -1))
+        seq.ansible_pos = getattr(obj, "ansible_pos", ("unknown file", -1, -1))
         return seq
     if isinstance(obj, dict):
         dct = ans.AnsibleMapping({k: convert_ansible_values(v) for k, v in obj.items()})
-        dct.ansible_pos = getattr(obj, 'ansible_pos', ('unknown file', -1, -1))
+        dct.ansible_pos = getattr(obj, "ansible_pos", ("unknown file", -1, -1))
         return dct
     return obj

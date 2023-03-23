@@ -1,16 +1,23 @@
+from __future__ import annotations
+
 from collections import defaultdict
 from collections.abc import Iterable
 
-from scansible.representations.pdg.extractor.context import \
-    VisibilityInformation
+from scansible.representations.pdg.extractor.context import VisibilityInformation
 from scansible.representations.pdg.extractor.var_context import ScopeLevel
 from scansible.representations.pdg.representation import Graph, Variable
 
 from .base import Rule, RuleResult
-from .utils import (find_variable_usages, get_all_used_variables,
-                    get_def_conditions, get_def_expression, get_nodes,
-                    get_register_all_used_variables, is_registered_variable,
-                    register_task_has_conditions)
+from .utils import (
+    find_variable_usages,
+    get_all_used_variables,
+    get_def_conditions,
+    get_def_expression,
+    get_nodes,
+    get_register_all_used_variables,
+    is_registered_variable,
+    register_task_has_conditions,
+)
 
 
 class UnconditionalOverrideRule(Rule):

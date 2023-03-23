@@ -1,14 +1,16 @@
-from typing import Sequence, Mapping
+from __future__ import annotations
 
+from typing import Mapping, Sequence
+
+from ansible.parsing.yaml.objects import AnsibleUnicode
 from ansible.playbook.base import Base, Value
 from ansible.playbook.collectionsearch import CollectionSearch
 from ansible.playbook.taggable import Taggable
-from ansible.parsing.yaml.objects import AnsibleUnicode
 
 from .block import Block
-from .task import Task
 from .handler import Handler
 from .role import Role
+from .task import Task
 
 class Play(Base, Taggable, CollectionSearch):
     def __init__(self) -> None: ...

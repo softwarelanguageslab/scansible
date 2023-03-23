@@ -1,9 +1,12 @@
-from typing import Any, Optional, Iterator
+from __future__ import annotations
 
-from .symbolic import SymbolicReference
-from ..util import Iterable, LazyMixin
+from typing import Any, Iterator, Optional
+
 from ..objects.base import Object
-Repo = Any # from ..repo import Repo
+from ..util import Iterable, LazyMixin
+from .symbolic import SymbolicReference
+
+Repo = Any  # from ..repo import Repo
 
 class Reference(SymbolicReference, LazyMixin, Iterable):
     def __init__(self, repo: Repo, path: str, check_path: bool = ...) -> None: ...
@@ -11,7 +14,9 @@ class Reference(SymbolicReference, LazyMixin, Iterable):
     @property
     def name(self) -> str: ...
     @classmethod
-    def iter_items(cls, repo: Repo, common_path: Optional[str] = ...) -> Iterator[Reference]: ...
+    def iter_items(
+        cls, repo: Repo, common_path: Optional[str] = ...
+    ) -> Iterator[Reference]: ...
     @property
     def remote_name(self) -> str: ...
     @property

@@ -1,9 +1,19 @@
-from typing import Any, Sequence, Generic, TypeVar, Hashable, Iterator, overload, Literal
+from __future__ import annotations
 
-NodeT = TypeVar('NodeT', bound=Hashable)
-GraphAttrT = TypeVar('GraphAttrT')
-EdgeAttrT = TypeVar('EdgeAttrT')
+from typing import (
+    Any,
+    Generic,
+    Hashable,
+    Iterator,
+    Literal,
+    Sequence,
+    TypeVar,
+    overload,
+)
 
+NodeT = TypeVar("NodeT", bound=Hashable)
+GraphAttrT = TypeVar("GraphAttrT")
+EdgeAttrT = TypeVar("EdgeAttrT")
 
 class Graph(Generic[NodeT, GraphAttrT, EdgeAttrT]):
     # node_dict_factory: Incomplete
@@ -26,7 +36,9 @@ class Graph(Generic[NodeT, GraphAttrT, EdgeAttrT]):
     def __len__(self) -> int: ...
     # def __getitem__(self, n): ...
     def add_node(self, node_for_adding: NodeT, **attr: str) -> None: ...
-    def add_nodes_from(self, nodes_for_adding: Sequence[NodeT], **attr: str) -> None: ...
+    def add_nodes_from(
+        self, nodes_for_adding: Sequence[NodeT], **attr: str
+    ) -> None: ...
     # def remove_node(self, n) -> None: ...
     # def remove_nodes_from(self, nodes) -> None: ...
     @overload

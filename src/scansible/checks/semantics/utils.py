@@ -1,18 +1,27 @@
 from __future__ import annotations
 
-from enum import Enum
 from typing import Type, TypeVar
 
+from enum import Enum
+
 from scansible.representations.pdg.extractor.var_context import ScopeLevel
-from scansible.representations.pdg.representation import (Conditional,
-                                                          ControlFlowEdge,
-                                                          ControlNode,
-                                                          DataFlowEdge, Def,
-                                                          DefinedIf, Edge,
-                                                          Expression, Graph,
-                                                          IntermediateValue,
-                                                          Literal, Node, Task,
-                                                          Use, Variable)
+from scansible.representations.pdg.representation import (
+    Conditional,
+    ControlFlowEdge,
+    ControlNode,
+    DataFlowEdge,
+    Def,
+    DefinedIf,
+    Edge,
+    Expression,
+    Graph,
+    IntermediateValue,
+    Literal,
+    Node,
+    Task,
+    Use,
+    Variable,
+)
 
 NodeT = TypeVar("NodeT", bound=Node)
 EdgeT = TypeVar("EdgeT", bound=Edge)

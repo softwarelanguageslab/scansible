@@ -1,5 +1,9 @@
-from gitdb.utils.encoding import force_bytes as force_bytes, force_text as force_text  # type: ignore
+from __future__ import annotations
+
 from typing import Any, Optional, Union
+
+from gitdb.utils.encoding import force_bytes as force_bytes  # type: ignore
+from gitdb.utils.encoding import force_text as force_text
 
 is_win: bool
 is_posix: bool

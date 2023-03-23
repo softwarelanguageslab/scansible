@@ -1,10 +1,13 @@
+from __future__ import annotations
+
+from typing import Mapping, Optional, Union
+
+from ansible.parsing.dataloader import DataLoader
 from ansible.playbook.base import Value
-from ansible.playbook.role.definition import RoleDefinition
 from ansible.playbook.play import Play
 from ansible.playbook.role import Role
+from ansible.playbook.role.definition import RoleDefinition
 from ansible.vars.manager import VariableManager
-from ansible.parsing.dataloader import DataLoader
-from typing import Mapping, Optional, Union
 
 __metaclass__ = type
 

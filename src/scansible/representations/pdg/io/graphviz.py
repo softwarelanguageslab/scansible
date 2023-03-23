@@ -1,5 +1,7 @@
 """GraphViz exporting."""
 
+from __future__ import annotations
+
 import json
 
 import attrs
@@ -9,17 +11,17 @@ from .. import representation as rep
 
 
 def _get_shared_node_attrs(g: rep.Graph) -> dict[str, str]:
-    return {'role_name': g.role_name, 'role_version': g.role_version}
+    return {"role_name": g.role_name, "role_version": g.role_version}
 
 
 def get_node_shape(n: rep.Node) -> str:
     if isinstance(n, rep.Expression):
-        return 'box'
+        return "box"
 
     if isinstance(n, (rep.Literal, rep.IntermediateValue, rep.Variable)):
-        return 'ellipse'
+        return "ellipse"
 
-    return 'diamond'
+    return "diamond"
 
 
 def get_node_label(n: rep.Node) -> str:
@@ -27,18 +29,19 @@ def get_node_label(n: rep.Node) -> str:
         return n.expr
 
     if isinstance(n, rep.Literal):
-        return f'{n.type}:{n.value}'
+        return f"{n.type}:{n.value}"
 
     if isinstance(n, rep.IntermediateValue):
-        return f'${n.identifier}'
+        return f"${n.identifier}"
 
     if isinstance(n, rep.Variable):
-        return f'{n.name}@{n.version},{n.value_version}'
+        return f"{n.name}@{n.version},{n.value_version}"
 
     if isinstance(n, rep.Task):
         return n.action
 
     return n.__class__.__name__
+
 
 def dump_node(n: rep.Node, g: rep.Graph, dot: gv.Digraph) -> None:
     node_id = str(n.node_id)
@@ -67,6 +70,6 @@ def dump_graph(g: rep.Graph) -> gv.Digraph:
     for n in g:
         dump_node(n, g, dot)
     for src, target, e in g.edges(data=True):
-        dump_edge(e['type'], src, target, dot)
+        dump_edge(e["type"], src, target, dot)
 
     return dot

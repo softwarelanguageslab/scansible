@@ -1,15 +1,26 @@
-from .reference import Reference
-from .symbolic import SymbolicReference
-from .remote import RemoteReference
+from __future__ import annotations
+
 from ..objects.commit import Commit
-Repo = Any # from ..repo import Repo
+from .reference import Reference
+from .remote import RemoteReference
+from .symbolic import SymbolicReference
+
+Repo = Any  # from ..repo import Repo
+from typing import Any, List, Optional, Union
+
 from ..config import GitConfigParser
-from typing import Any, Optional, Union, List
 
 class HEAD(SymbolicReference):
     def __init__(self, repo: Repo, path: str = ...) -> None: ...
     def orig_head(self) -> SymbolicReference: ...
-    def reset(self, commit: Union[str, Commit, SymbolicReference] = ..., index: bool = ..., working_tree: bool = ..., paths: Optional[Union[List[str], str]] = ..., **kwargs: Any) -> HEAD: ...
+    def reset(
+        self,
+        commit: Union[str, Commit, SymbolicReference] = ...,
+        index: bool = ...,
+        working_tree: bool = ...,
+        paths: Optional[Union[List[str], str]] = ...,
+        **kwargs: Any,
+    ) -> HEAD: ...
 
 class Head(Reference):
     k_config_remote: str = ...

@@ -7,10 +7,10 @@ from scansible.representations.structural import TaskBase
 from ..context import ExtractionContext
 from .base import TaskExtractor
 from .generic import GenericTaskExtractor
-from .set_fact import SetFactTaskExtractor
 from .include_role import IncludeRoleExtractor
 from .include_tasks import IncludeTaskExtractor
 from .include_vars import IncludeVarsTaskExtractor
+from .set_fact import SetFactTaskExtractor
 
 
 def task_extractor_factory(context: ExtractionContext, task: TaskBase) -> TaskExtractor:
@@ -25,12 +25,3 @@ def task_extractor_factory(context: ExtractionContext, task: TaskBase) -> TaskEx
         return IncludeRoleExtractor(context, task)
 
     return GenericTaskExtractor(context, task)
-
-
-
-
-
-
-
-
-

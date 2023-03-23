@@ -1,5 +1,10 @@
-from .converters import Converter as Converter, Converter as GenConverter, UnstructureStrategy as UnstructureStrategy
+from __future__ import annotations
+
 from typing import Any
+
+from .converters import Converter as Converter
+from .converters import Converter as GenConverter
+from .converters import UnstructureStrategy as UnstructureStrategy
 
 global_converter: Converter
 unstructure = global_converter.unstructure

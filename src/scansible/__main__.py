@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from typing import TextIO
+
 import sys
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TextIO
 
 import click
 from ansible import constants as ans_constants

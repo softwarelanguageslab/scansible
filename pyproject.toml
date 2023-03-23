@@ -30,10 +30,18 @@ coverage = "^6.5.0"
 pytest-cov = "^4.0.0"
 pytest-mock = "^3.10.0"
 types-redis = "^4.3.21.6"
+black = "^23.1.0"
+isort = "^5.12.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "black"
+add_imports = "from __future__ import annotations"
+known_typing = "typing"
+sections = "FUTURE,TYPING,STDLIB,THIRDPARTY,FIRSTPARTY,LOCALFOLDER"
 
 [tool.pytest.ini_options]
 addopts = "--cov=. --cov-report html"

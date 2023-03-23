@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from ansible.playbook.base import FieldAttributeBase as FieldAttributeBase
 
 class LoopControl(FieldAttributeBase):

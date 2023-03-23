@@ -1,13 +1,15 @@
-from typing import Any, Mapping, Optional, Sequence, Union, TypeVar
+from __future__ import annotations
 
-from ansible.vars.manager import VariableManager
+from typing import Any, Mapping, Optional, Sequence, TypeVar, Union
+
 from ansible.parsing.dataloader import DataLoader
-from ansible.parsing.yaml.objects import AnsibleSequence, AnsibleMapping, AnsibleUnicode
+from ansible.parsing.yaml.objects import AnsibleMapping, AnsibleSequence, AnsibleUnicode
+from ansible.vars.manager import VariableManager
 
 Scalar = Union[AnsibleUnicode, int, bool, float, None]
 Value = Union[Scalar, AnsibleSequence, AnsibleMapping]
 
-SelfType = TypeVar('SelfType', bound=Base)
+SelfType = TypeVar("SelfType", bound=Base)
 
 class FieldAttribute:
     isa: str
@@ -17,7 +19,9 @@ class FieldAttributeBase:
     _valid_attrs: Mapping[str, FieldAttribute] = ...
 
     def dump_attrs(self) -> Mapping[str, object]: ...
-    def get_validated_value(self, name: str, attribute: FieldAttribute, value: object, templar: object) -> object: ...
+    def get_validated_value(
+        self, name: str, attribute: FieldAttribute, value: object, templar: object
+    ) -> object: ...
     def get_ds(self) -> Any: ...
 
 class Base(FieldAttributeBase):
@@ -43,4 +47,9 @@ class Base(FieldAttributeBase):
     become_flags: str = ...
     become_exe: str = ...
 
-    def load_data(self: SelfType, ds: dict[str, Value], variable_manager: VariableManager | None = ..., loader: DataLoader | None = ...) -> SelfType: ...
+    def load_data(
+        self: SelfType,
+        ds: dict[str, Value],
+        variable_manager: VariableManager | None = ...,
+        loader: DataLoader | None = ...,
+    ) -> SelfType: ...

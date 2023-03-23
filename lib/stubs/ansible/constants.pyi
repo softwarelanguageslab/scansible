@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 DEFAULT_ROLES_PATH: list[str]
 DEPRECATION_WARNINGS: bool
 YAML_FILENAME_EXTENSIONS: list[str]

@@ -1,15 +1,17 @@
-from ansible.playbook.base import Base
+from __future__ import annotations
+
+from typing import Any, Mapping, Sequence
+
+from ansible.parsing.dataloader import DataLoader
+from ansible.playbook.base import Base, Value
+from ansible.playbook.block import Block
 from ansible.playbook.collectionsearch import CollectionSearch
 from ansible.playbook.conditional import Conditional
-from ansible.playbook.taggable import Taggable
 from ansible.playbook.loop_control import LoopControl
 from ansible.playbook.role import Role
-from ansible.playbook.block import Block
-from ansible.playbook.base import Value
+from ansible.playbook.taggable import Taggable
 from ansible.playbook.task_include import TaskInclude
-from ansible.parsing.dataloader import DataLoader
 from ansible.vars.manager import VariableManager
-from typing import Mapping, Sequence, Any
 
 class Task(Base, Conditional, Taggable, CollectionSearch):
     args: dict[str, Value] = ...
@@ -32,6 +34,12 @@ class Task(Base, Conditional, Taggable, CollectionSearch):
     parent: Block = ...
     def get_path(self) -> str: ...
     def get_name(self, include_role_fqcn: bool = ...) -> str: ...
-
     @staticmethod
-    def load(data: dict[str, Value], block: Block | None = ..., role: Role | None = ..., task_include: TaskInclude | None = ..., variable_manager: VariableManager | None = ..., loader: DataLoader | None = ...) -> Task: ...
+    def load(
+        data: dict[str, Value],
+        block: Block | None = ...,
+        role: Role | None = ...,
+        task_include: TaskInclude | None = ...,
+        variable_manager: VariableManager | None = ...,
+        loader: DataLoader | None = ...,
+    ) -> Task: ...

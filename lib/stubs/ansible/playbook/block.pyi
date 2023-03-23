@@ -1,10 +1,13 @@
+from __future__ import annotations
+
+from typing import Optional, Sequence, Union
+
 from ansible.playbook.base import Base as Base
 from ansible.playbook.collectionsearch import CollectionSearch as CollectionSearch
 from ansible.playbook.conditional import Conditional as Conditional
 from ansible.playbook.taggable import Taggable as Taggable
 from ansible.playbook.task import Task
 from ansible.playbook.task_include import TaskInclude
-from typing import Optional, Sequence, Union
 
 class Block(Base, Conditional, CollectionSearch, Taggable):
     block: Sequence[Union[Block, Task]] = ...

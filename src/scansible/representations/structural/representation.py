@@ -2,16 +2,16 @@
 from __future__ import annotations
 
 from typing import (
-        Any,
-        Callable,
-        Generic,
-        Iterable,
-        Mapping,
-        Protocol,
-        Sequence,
-        TypeVar,
-        Union,
-        cast,
+    Any,
+    Callable,
+    Generic,
+    Iterable,
+    Mapping,
+    Protocol,
+    Sequence,
+    TypeVar,
+    Union,
+    cast,
 )
 
 import datetime
@@ -24,16 +24,17 @@ from pathlib import Path
 
 import attrs
 import rich.repr
-from attrs import define, frozen, field
-from ansible.parsing.yaml.objects import AnsibleSequence, AnsibleMapping, AnsibleUnicode
+from ansible.parsing.yaml.objects import AnsibleMapping, AnsibleSequence, AnsibleUnicode
+from attrs import define, field, frozen
 
-from . import ansible_types as ans
 from .._utils import type_validator
-
+from . import ansible_types as ans
 
 # Type aliases
-TaskContainer = Union['Block', 'Play', 'TaskFile']
-Scalar = Union[bool, int, float, str, 'VaultValue', datetime.date, datetime.datetime, None]
+TaskContainer = Union["Block", "Play", "TaskFile"]
+Scalar = Union[
+    bool, int, float, str, "VaultValue", datetime.date, datetime.datetime, None
+]
 # These should be recursive types, but mypy doesn't support them so they'd be
 # Any anyway, and it also doesn't work with our type validation.
 AnyValue = Union[Scalar, Sequence[Any], Mapping[Scalar, Any]]
@@ -42,25 +43,31 @@ Position = tuple[str, int, int]
 
 def default_field(default: Any = attrs.NOTHING, factory: Any = None) -> Any:
     if default is attrs.NOTHING and factory is None:
-        raise TypeError('Either a default value or a factory needs to be specified')
+        raise TypeError("Either a default value or a factory needs to be specified")
     return field(validator=type_validator(), default=default, factory=factory)
 
+
 def raise_if_missing() -> None:
-    raise ValueError('Missing required field')
+    raise ValueError("Missing required field")
+
 
 def required_field() -> Any:
     # necessary because otherwise we can't do inheritance with defaults in super
     # and required params in sub.
     return default_field(factory=raise_if_missing)
 
+
 def parent_field() -> Any:
     return field(init=False, repr=False, eq=False, validator=type_validator())
+
 
 def raw_field() -> Any:
     return field(repr=False, eq=False)
 
+
 def position_field() -> Any:
-    return field(repr=False, eq=False, default=('unknown file', -1, -1))
+    return field(repr=False, eq=False, default=("unknown file", -1, -1))
+
 
 def path_field() -> Any:
     return field(validator=validate_relative_path)
@@ -68,67 +75,117 @@ def path_field() -> Any:
 
 def validate_relative_path(inst: Any, attr: attrs.Attribute[Path], value: Path) -> None:
     if not isinstance(value, Path):
-        raise TypeError(f'Expected {attr.name} to be a Path, got {value} of type {type(value)} instead')
+        raise TypeError(
+            f"Expected {attr.name} to be a Path, got {value} of type {type(value)} instead"
+        )
     if value.is_absolute():
-        raise ValueError(f'Expected {attr.name} to be a relative path, got absolute path {value} instead')
+        raise ValueError(
+            f"Expected {attr.name} to be a relative path, got absolute path {value} instead"
+        )
 
 
 def validate_absolute_path(inst: Any, attr: attrs.Attribute[Path], value: Path) -> None:
     if not isinstance(value, Path):
-        raise TypeError(f'Expected {attr.name} to be a Path, got {value} of type {type(value)} instead')
+        raise TypeError(
+            f"Expected {attr.name} to be a Path, got {value} of type {type(value)} instead"
+        )
     if not value.is_absolute():
-        raise ValueError(f'Expected {attr.name} to be an absolute path, got relative path {value} instead')
+        raise ValueError(
+            f"Expected {attr.name} to be an absolute path, got relative path {value} instead"
+        )
 
 
-VisitorReturnType = TypeVar('VisitorReturnType', covariant=True)
+VisitorReturnType = TypeVar("VisitorReturnType", covariant=True)
 
 
 class StructuralVisitor(Protocol[VisitorReturnType]):
     @abstractmethod
-    def visit_block(self, v: Block) -> VisitorReturnType: ...
+    def visit_block(self, v: Block) -> VisitorReturnType:
+        ...
+
     @abstractmethod
-    def visit_broken_file(self, v: BrokenFile) -> VisitorReturnType: ...
+    def visit_broken_file(self, v: BrokenFile) -> VisitorReturnType:
+        ...
+
     @abstractmethod
-    def visit_broken_task(self, v: BrokenTask) -> VisitorReturnType: ...
+    def visit_broken_task(self, v: BrokenTask) -> VisitorReturnType:
+        ...
+
     @abstractmethod
-    def visit_handler(self, v: Handler) -> VisitorReturnType: ...
+    def visit_handler(self, v: Handler) -> VisitorReturnType:
+        ...
+
     @abstractmethod
-    def visit_loop_control(self, v: LoopControl) -> VisitorReturnType: ...
+    def visit_loop_control(self, v: LoopControl) -> VisitorReturnType:
+        ...
+
     @abstractmethod
-    def visit_meta_block(self, v: MetaBlock) -> VisitorReturnType: ...
+    def visit_meta_block(self, v: MetaBlock) -> VisitorReturnType:
+        ...
+
     @abstractmethod
-    def visit_meta_file(self, v: MetaFile) -> VisitorReturnType: ...
+    def visit_meta_file(self, v: MetaFile) -> VisitorReturnType:
+        ...
+
     @abstractmethod
-    def visit_multi_structural_model(self, v: MultiStructuralModel) -> VisitorReturnType: ...
+    def visit_multi_structural_model(
+        self, v: MultiStructuralModel
+    ) -> VisitorReturnType:
+        ...
+
     @abstractmethod
-    def visit_platform(self, v: Platform) -> VisitorReturnType: ...
+    def visit_platform(self, v: Platform) -> VisitorReturnType:
+        ...
+
     @abstractmethod
-    def visit_play(self, v: Play) -> VisitorReturnType: ...
+    def visit_play(self, v: Play) -> VisitorReturnType:
+        ...
+
     @abstractmethod
-    def visit_playbook(self, v: Playbook) -> VisitorReturnType: ...
+    def visit_playbook(self, v: Playbook) -> VisitorReturnType:
+        ...
+
     @abstractmethod
-    def visit_role(self, v: Role) -> VisitorReturnType: ...
+    def visit_role(self, v: Role) -> VisitorReturnType:
+        ...
+
     @abstractmethod
-    def visit_role_requirement(self, v: RoleRequirement) -> VisitorReturnType: ...
+    def visit_role_requirement(self, v: RoleRequirement) -> VisitorReturnType:
+        ...
+
     @abstractmethod
-    def visit_role_source_info(self, v: RoleSourceInfo) -> VisitorReturnType: ...
+    def visit_role_source_info(self, v: RoleSourceInfo) -> VisitorReturnType:
+        ...
+
     @abstractmethod
-    def visit_structural_model(self, v: StructuralModel) -> VisitorReturnType: ...
+    def visit_structural_model(self, v: StructuralModel) -> VisitorReturnType:
+        ...
+
     @abstractmethod
-    def visit_task(self, v: Task) -> VisitorReturnType: ...
+    def visit_task(self, v: Task) -> VisitorReturnType:
+        ...
+
     @abstractmethod
-    def visit_task_file(self, v: TaskFile) -> VisitorReturnType: ...
+    def visit_task_file(self, v: TaskFile) -> VisitorReturnType:
+        ...
+
     @abstractmethod
-    def visit_variable_file(self, v: VariableFile) -> VisitorReturnType: ...
+    def visit_variable_file(self, v: VariableFile) -> VisitorReturnType:
+        ...
+
     @abstractmethod
-    def visit_vars_prompt(self, v: VarsPrompt) -> VisitorReturnType: ...
+    def visit_vars_prompt(self, v: VarsPrompt) -> VisitorReturnType:
+        ...
 
 
 class StructuralBase:
-
-    def accept(self, visitor: StructuralVisitor[VisitorReturnType]) -> VisitorReturnType:
-        cls_name_snake_case = re.sub(r'(?<!^)(?=[A-Z])', '_', self.__class__.__name__).lower()
-        method_name = f'visit_{cls_name_snake_case}'
+    def accept(
+        self, visitor: StructuralVisitor[VisitorReturnType]
+    ) -> VisitorReturnType:
+        cls_name_snake_case = re.sub(
+            r"(?<!^)(?=[A-Z])", "_", self.__class__.__name__
+        ).lower()
+        method_name = f"visit_{cls_name_snake_case}"
         return getattr(visitor, method_name)(self)  # type: ignore[no-any-return]
 
     @classmethod
@@ -138,13 +195,19 @@ class StructuralBase:
         return not (
             # If there's no default specified...
             default is attrs.NOTHING
-            or (default is not None and isinstance(default, attrs.Factory) and (  # type: ignore[arg-type]
-                # or if it's a factory but it raises if no value is specified
-                default.factory is raise_if_missing
-                # or if it's a factory and the factory value is different from the actual value
-                or default.factory() != attr_value))
+            or (
+                default is not None
+                and isinstance(default, attrs.Factory)
+                and (  # type: ignore[arg-type]
+                    # or if it's a factory but it raises if no value is specified
+                    default.factory is raise_if_missing
+                    # or if it's a factory and the factory value is different from the actual value
+                    or default.factory() != attr_value
+                )
+            )
             # or if it's a value and it's different from the actual value.
-            or (not isinstance(default, attrs.Factory) and attr_value != default))  # type: ignore[arg-type]
+            or (not isinstance(default, attrs.Factory) and attr_value != default)
+        )  # type: ignore[arg-type]
 
     def _yield_non_default_representable_attributes(self) -> Iterable[tuple[str, Any]]:
         for attr in self.__attrs_attrs__:  # type: ignore[attr-defined]
@@ -161,7 +224,8 @@ class StructuralBase:
         return [
             (name, value)
             for attr in self.__attrs_attrs__  # type: ignore[attr-defined]
-            if not self.is_default((name := attr.name), (value := getattr(self, name)))]
+            if not self.is_default((name := attr.name), (value := getattr(self, name)))
+        ]
 
     __rich_repr__ = _yield_non_default_representable_attributes
 
@@ -248,7 +312,7 @@ class MetaBlock(StructuralBase):
     #: Platforms supported by the role
     platforms: Sequence[Platform] = default_field(factory=list)
     #: Role dependencies
-    dependencies: Sequence['RoleRequirement'] = default_field(factory=list)
+    dependencies: Sequence["RoleRequirement"] = default_field(factory=list)
 
 
 @define
@@ -274,7 +338,7 @@ class LoopControl(StructuralBase):
     #: Position of the value.
     location: Position = position_field()
     #: The loop variable name. `item` by default.
-    loop_var: str = default_field(default='item')
+    loop_var: str = default_field(default="item")
     #: The index variable name.
     index_var: str | None = default_field(default=None)
     #: Loop label in output. Should technically be a string only, but Ansible
@@ -300,7 +364,7 @@ class DirectivesBase(StructuralBase):
     location: Position = position_field()
 
     #: Name of the task.
-    name: str | None = default_field(default='')
+    name: str | None = default_field(default="")
 
     #: Change the connection plugin.
     connection: str | None = default_field(default=None)
@@ -313,7 +377,9 @@ class DirectivesBase(StructuralBase):
     vars: Mapping[str, AnyValue] = default_field(factory=dict)
 
     #: Specify default arguments to modules in this entity.
-    module_defaults: list[Mapping[str, Mapping[str, AnyValue]]] | None = default_field(default=None)
+    module_defaults: list[Mapping[str, Mapping[str, AnyValue]]] | None = default_field(
+        default=None
+    )
 
     #: Dictionary converted into environment variables.
     environment: Sequence[Mapping[str, str] | str] | None = default_field(default=None)
@@ -380,7 +446,9 @@ class TaskBase(DirectivesBase):
     #: Loop on the task, or None if no loop. Can be a string (an expression),
     #: a list of arbitrary values, or, when the loop comes from `with_dict`, a
     #: dict of arbitrary items.
-    loop: str | Sequence[AnyValue] | Mapping[Scalar, AnyValue] | None = default_field(default=None)
+    loop: str | Sequence[AnyValue] | Mapping[Scalar, AnyValue] | None = default_field(
+        default=None
+    )
     #: The type of loop used in old looping syntax (`with_*`), e.g.
     #: `with_items` -> `items`.
     loop_with: str | None = default_field(default=None)
@@ -435,10 +503,14 @@ class Block(DirectivesBase):
     block: Sequence[Task | Block] | Sequence[Handler | Block] = required_field()
     #: List of tasks in the block's rescue section, i.e. the tasks that will
     #: execute when an exception occurs.
-    rescue: Sequence[Task | Block] | Sequence[Handler | Block] = default_field(factory=list)
+    rescue: Sequence[Task | Block] | Sequence[Handler | Block] = default_field(
+        factory=list
+    )
     #: List of tasks in the block's always section, like a try-catch's `finally`
     #: handler.
-    always: Sequence[Task | Block] | Sequence[Handler | Block] = default_field(factory=list)
+    always: Sequence[Task | Block] | Sequence[Handler | Block] = default_field(
+        factory=list
+    )
 
     #: List of handler names of handlers to notify.
     notify: Sequence[str] | None = default_field(default=None)
@@ -543,30 +615,39 @@ class Role(StructuralBase):
     broken_tasks: list[BrokenTask] = required_field()
 
     #: The defaults/main file.
-    main_defaults_file: VariableFile | None = field(init=False, validator=type_validator(), repr=False)
+    main_defaults_file: VariableFile | None = field(
+        init=False, validator=type_validator(), repr=False
+    )
     #: The vars/main file.
-    main_vars_file: VariableFile | None = field(init=False, validator=type_validator(), repr=False)
+    main_vars_file: VariableFile | None = field(
+        init=False, validator=type_validator(), repr=False
+    )
     #: The tasks/main file.
-    main_tasks_file: TaskFile | None = field(init=False, validator=type_validator(), repr=False)
+    main_tasks_file: TaskFile | None = field(
+        init=False, validator=type_validator(), repr=False
+    )
     #: The handlers/main file.
-    main_handlers_file: TaskFile | None = field(init=False, validator=type_validator(), repr=False)
+    main_handlers_file: TaskFile | None = field(
+        init=False, validator=type_validator(), repr=False
+    )
 
     def __attrs_post_init__(self) -> None:
 
         # TODO: We need to lookup files in the graph builder too, so perhaps
         # we should create a custom subtype of dict and provide that.
-        FileType = TypeVar('FileType')
+        FileType = TypeVar("FileType")
+
         def find_file(file_map: dict[str, FileType], stem: str) -> FileType | None:
-            for ext in ('.yml', '.yaml', '.json'):
-                file_name = f'{stem}{ext}'
+            for ext in (".yml", ".yaml", ".json"):
+                file_name = f"{stem}{ext}"
                 if file_name in file_map:
                     return file_map[file_name]
             return None
 
-        self.main_defaults_file = find_file(self.default_var_files, 'main')
-        self.main_vars_file = find_file(self.role_var_files, 'main')
-        self.main_tasks_file = find_file(self.task_files, 'main')
-        self.main_handlers_file = find_file(self.handler_files, 'main')
+        self.main_defaults_file = find_file(self.default_var_files, "main")
+        self.main_vars_file = find_file(self.role_var_files, "main")
+        self.main_tasks_file = find_file(self.task_files, "main")
+        self.main_handlers_file = find_file(self.handler_files, "main")
 
 
 @define
@@ -694,7 +775,9 @@ class StructuralModel(StructuralBase):
     def __attrs_post_init__(self) -> None:
         self.is_role = isinstance(self.root, Role)
         self.is_playbook = isinstance(self.root, Playbook)
-        assert self.is_role != self.is_playbook, 'is_role and is_playbook should be mutually exclusive, and one should be set.'
+        assert (
+            self.is_role != self.is_playbook
+        ), "is_role and is_playbook should be mutually exclusive, and one should be set."
 
 
 @define

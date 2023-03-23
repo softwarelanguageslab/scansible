@@ -1,5 +1,8 @@
 # from networkx.exception import *
+from __future__ import annotations
+
 from networkx.classes import *
+
 # from networkx.convert import *
 # from networkx.convert_matrix import *
 # from networkx.relabel import *

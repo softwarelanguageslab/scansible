@@ -4,17 +4,29 @@ from typing import Sequence
 
 from loguru import logger
 
-from scansible.representations.structural import Block, Task, Handler
+from scansible.representations.structural import Block, Handler, Task
 
 from .. import representation as rep
 from .context import ExtractionContext
 from .result import ExtractionResult
 from .tasks import task_extractor_factory
-from .var_context import ScopeLevel, RecursiveDefinitionError
+from .var_context import RecursiveDefinitionError, ScopeLevel
+
 
 class BlockExtractor:
 
-    SUPPORTED_BLOCK_ATTRIBUTES = frozenset(('name', 'block', 'rescue', 'always', 'vars', 'become', 'become_user', 'become_method'))
+    SUPPORTED_BLOCK_ATTRIBUTES = frozenset(
+        (
+            "name",
+            "block",
+            "rescue",
+            "always",
+            "vars",
+            "become",
+            "become_user",
+            "become_method",
+        )
+    )
 
     def __init__(self, context: ExtractionContext, block: Block) -> None:
         self.context = context
@@ -22,18 +34,24 @@ class BlockExtractor:
         self.location = context.get_location(block)
         self.logger = logger.bind(location=block.location)
 
-    def extract_block(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
+    def extract_block(
+        self, predecessors: Sequence[rep.ControlNode]
+    ) -> ExtractionResult:
         with self.context.vars.enter_scope(ScopeLevel.BLOCK_VARS):
             return self._extract_block(predecessors)
 
-    def _extract_block(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
+    def _extract_block(
+        self, predecessors: Sequence[rep.ControlNode]
+    ) -> ExtractionResult:
         for var_name, var_value in self.block.vars.items():
             # Apparently Ansible doesn't implement overriding of block-scoped
             # variables properly. Variables registered in an inner block don't
             # shadow variables registered in an outer block. However, it's
             # confirmed to be a bug, so we'll handle it as if it were
             # implemented correctly.
-            self.context.vars.register_variable(var_name, expr=var_value, level=ScopeLevel.BLOCK_VARS)
+            self.context.vars.register_variable(
+                var_name, expr=var_value, level=ScopeLevel.BLOCK_VARS
+            )
 
         # A block without a list of tasks should be impossible
         # TODO: Typing here is messed up, since Block's children could be handlers too.
@@ -62,7 +80,7 @@ class BlockExtractor:
             # will always be the last task of the always block, so use `chain`.
             result = result.chain(self._extract_children(self.block.always, result.next_predecessors))  # type: ignore[arg-type]
 
-        for misc_kw in ('become', 'become_user', 'become_method'):
+        for misc_kw in ("become", "become_user", "become_method"):
             kw_val = getattr(self.block, misc_kw)
             if self.block.is_default(misc_kw, kw_val):
                 continue
@@ -73,8 +91,12 @@ class BlockExtractor:
                 if not isinstance(ctrl_node, rep.Task):
                     continue
 
-                in_edges = self.context.graph.in_edges(ctrl_node, data='type')
-                has_overridden_kw = any(in_edge.keyword == misc_kw for _, _, in_edge in in_edges if isinstance(in_edge, rep.Keyword))
+                in_edges = self.context.graph.in_edges(ctrl_node, data="type")
+                has_overridden_kw = any(
+                    in_edge.keyword == misc_kw
+                    for _, _, in_edge in in_edges
+                    if isinstance(in_edge, rep.Keyword)
+                )
                 if has_overridden_kw:
                     continue
 
@@ -89,19 +111,29 @@ class BlockExtractor:
 
                 self.context.graph.add_edge(value, ctrl_node, rep.Keyword(misc_kw))
 
-
         for kw, _ in self.block._get_non_default_attributes():
-            if kw not in self.SUPPORTED_BLOCK_ATTRIBUTES and kw not in ('location', 'raw', 'parent'):
-                self.logger.warning(f'Unsupported block keyword {kw!r}!')
+            if kw not in self.SUPPORTED_BLOCK_ATTRIBUTES and kw not in (
+                "location",
+                "raw",
+                "parent",
+            ):
+                self.logger.warning(f"Unsupported block keyword {kw!r}!")
 
         return result
 
-    def _extract_children(self, child_list: Sequence[Task | Block], predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
+    def _extract_children(
+        self,
+        child_list: Sequence[Task | Block],
+        predecessors: Sequence[rep.ControlNode],
+    ) -> ExtractionResult:
         from .task_lists import TaskListExtractor
+
         return TaskListExtractor(self.context, child_list).extract_tasks(predecessors)
 
     # TODO: Duplicated from tasks.
-    def extract_value(self, value: object, is_conditional: bool = False) -> rep.DataNode:
+    def extract_value(
+        self, value: object, is_conditional: bool = False
+    ) -> rep.DataNode:
         if isinstance(value, str):
             tr = self.context.vars.evaluate_template(value, is_conditional)
             return tr.data_node

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any, AnyStr, Optional, Sequence, Union
 
 from .compat import safe_decode as safe_decode
@@ -15,25 +17,49 @@ class CommandError(GitError):
     status: Any = ...
     stdout: Optional[str] = ...
     stderr: Optional[str] = ...
-    def __init__(self, command: _CommandType, status: Optional[Any] = ..., stderr: Optional[str] = ..., stdout: Optional[str] = ...) -> None: ...
+    def __init__(
+        self,
+        command: _CommandType,
+        status: Optional[Any] = ...,
+        stderr: Optional[str] = ...,
+        stdout: Optional[str] = ...,
+    ) -> None: ...
 
 class GitCommandNotFound(CommandError):
     def __init__(self, command: _CommandType, cause: Any) -> None: ...
 
 class GitCommandError(CommandError):
-    def __init__(self, command: _CommandType, status: Any, stderr: Optional[str] = ..., stdout: Optional[str] = ...) -> None: ...
+    def __init__(
+        self,
+        command: _CommandType,
+        status: Any,
+        stderr: Optional[str] = ...,
+        stdout: Optional[str] = ...,
+    ) -> None: ...
 
 class CheckoutError(GitError):
     failed_files: Sequence[str] = ...
     failed_reasons: str = ...
     valid_files: Sequence[str] = ...
-    def __init__(self, message: str, failed_files: Sequence[str], valid_files: Sequence[str], failed_reasons: str) -> None: ...
+    def __init__(
+        self,
+        message: str,
+        failed_files: Sequence[str],
+        valid_files: Sequence[str],
+        failed_reasons: str,
+    ) -> None: ...
 
 class CacheError(GitError): ...
 class UnmergedEntriesError(CacheError): ...
 
 class HookExecutionError(CommandError):
-    def __init__(self, command: _CommandType, status: Any, stderr: Optional[str] = ..., stdout: Optional[str] = ...) -> None: ...
+    def __init__(
+        self,
+        command: _CommandType,
+        status: Any,
+        stderr: Optional[str] = ...,
+        stdout: Optional[str] = ...,
+    ) -> None: ...
 
 class RepositoryDirtyError(GitError):
     repo: Repo = ...

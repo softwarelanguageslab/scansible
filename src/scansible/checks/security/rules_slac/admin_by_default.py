@@ -6,19 +6,19 @@ from ..rules.base import Rule
 class AdminByDefaultRule(Rule):
 
     USER_ROLE_TOKENS = ["role", "user"]
-    ADMIN_NAMES = ('admin')
+    ADMIN_NAMES = "admin"
 
     @property
     def username_test(self) -> str:
-        return self._create_string_contains_test(self.USER_ROLE_TOKENS, 'arg.keyword')
+        return self._create_string_contains_test(self.USER_ROLE_TOKENS, "arg.keyword")
 
     @property
     def admin_name_test(self) -> str:
-        return self._create_contained_in_test(self.ADMIN_NAMES, 'source.value')
+        return self._create_contained_in_test(self.ADMIN_NAMES, "source.value")
 
     @property
     def query(self) -> str:
-        return f'''
+        return f"""
             MATCH chain = (source:Literal)-[:DEF|USE|DEFLOOPITEM*0..]->()-[arg:KEYWORD]->(sink:Task)
             WHERE
                 {self.username_test}
@@ -26,5 +26,4 @@ class AdminByDefaultRule(Rule):
                 {self.admin_name_test}
                 AND NOT (source.type <> 'str' AND toString(source.value) CONTAINS "{{{{")
             {self._query_returns}
-        '''
-
+        """

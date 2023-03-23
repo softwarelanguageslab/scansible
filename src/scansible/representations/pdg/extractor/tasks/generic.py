@@ -4,36 +4,57 @@ from collections.abc import Sequence
 
 from ... import representation as rep
 from ..result import ExtractionResult
-from ..var_context import ScopeLevel, RecursiveDefinitionError
+from ..var_context import RecursiveDefinitionError, ScopeLevel
 from .base import TaskExtractor
 
-class GenericTaskExtractor(TaskExtractor):
 
+class GenericTaskExtractor(TaskExtractor):
     @classmethod
     def SUPPORTED_TASK_ATTRIBUTES(cls) -> frozenset[str]:
-        return super().SUPPORTED_TASK_ATTRIBUTES().union({'vars', 'loop', 'loop_control', 'check_mode', 'register', 'become', 'become_user', 'become_method'})
+        return (
+            super()
+            .SUPPORTED_TASK_ATTRIBUTES()
+            .union(
+                {
+                    "vars",
+                    "loop",
+                    "loop_control",
+                    "check_mode",
+                    "register",
+                    "become",
+                    "become_user",
+                    "become_method",
+                }
+            )
+        )
 
     def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
-        self.logger.debug(f'Extracting task with name {self.task.name!r}')
+        self.logger.debug(f"Extracting task with name {self.task.name!r}")
         with self.setup_task_vars_scope(ScopeLevel.TASK_VARS):
             if self.task.loop:
                 result = self._extract_looping_task(predecessors)
             else:
                 result = self._extract_single_task(predecessors)
 
-            self.warn_remaining_kws('generic tasks')
+            self.warn_remaining_kws("generic tasks")
             return result
 
-    def _extract_single_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
+    def _extract_single_task(
+        self, predecessors: Sequence[rep.ControlNode]
+    ) -> ExtractionResult:
         if self.task.loop_control:
-            self.logger.warning('Found loop_control without loop')
+            self.logger.warning("Found loop_control without loop")
 
         return self._extract_bare_task(predecessors)
 
-    def _extract_looping_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
-        loop_node = rep.Loop(location=self.context.get_location(self.task.loop) or self.location)
+    def _extract_looping_task(
+        self, predecessors: Sequence[rep.ControlNode]
+    ) -> ExtractionResult:
+        loop_node = rep.Loop(
+            location=self.context.get_location(self.task.loop) or self.location
+        )
         source_and_name = self.extract_looping_value_and_name()
-        assert source_and_name is not None, 'Internal error'
+        assert source_and_name is not None, "Internal error"
 
         loop_source_var, loop_var_name = source_and_name
         self.context.graph.add_node(loop_node)
@@ -43,8 +64,12 @@ class GenericTaskExtractor(TaskExtractor):
 
         # For some reason, loop vars have the same precedence as include params.
         with self.context.vars.enter_scope(ScopeLevel.INCLUDE_PARAMS):
-            loop_target_var = self.context.vars.register_variable(loop_var_name, ScopeLevel.INCLUDE_PARAMS)
-            self.context.graph.add_edge(loop_source_var, loop_target_var, rep.DEF_LOOP_ITEM)
+            loop_target_var = self.context.vars.register_variable(
+                loop_var_name, ScopeLevel.INCLUDE_PARAMS
+            )
+            self.context.graph.add_edge(
+                loop_source_var, loop_target_var, rep.DEF_LOOP_ITEM
+            )
 
             inner_result = self._extract_bare_task([loop_node])
             # Add back edges to represent looping. The forward edges are already
@@ -59,14 +84,22 @@ class GenericTaskExtractor(TaskExtractor):
         # If it isn't empty, it'll always need to go back to the loop too.
         return inner_result.chain(ExtractionResult([loop_node], [], [loop_node]))
 
-    def _extract_bare_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
-        tn = rep.Task(name=self.task.name, action=self.task.action, location=self.location)
+    def _extract_bare_task(
+        self, predecessors: Sequence[rep.ControlNode]
+    ) -> ExtractionResult:
+        tn = rep.Task(
+            name=self.task.name, action=self.task.action, location=self.location
+        )
         self.context.graph.add_node(tn)
 
         # If there's a condition: preds -> first condition -> ... last condition -> task
         # Otherwise: preds -> task -> rest
         condition_result = self.extract_condition(predecessors)
-        first_node = condition_result.added_control_nodes[0] if condition_result.added_control_nodes else tn
+        first_node = (
+            condition_result.added_control_nodes[0]
+            if condition_result.added_control_nodes
+            else tn
+        )
 
         for condition_node in condition_result.next_predecessors:
             self.context.graph.add_edge(condition_node, tn, rep.ORDER)
@@ -81,13 +114,17 @@ class GenericTaskExtractor(TaskExtractor):
             except RecursiveDefinitionError as e:
                 self.logger.error(e)
                 continue
-            self.context.graph.add_edge(arg_node, tn, rep.Keyword(keyword=f'args.{arg_name}'))
+            self.context.graph.add_edge(
+                arg_node, tn, rep.Keyword(keyword=f"args.{arg_name}")
+            )
 
         registered_vars = self._define_registered_var(tn)
 
-        misc_kws = {'check_mode', 'become', 'become_user', 'become_method'}
+        misc_kws = {"check_mode", "become", "become_user", "become_method"}
         for misc_kw in misc_kws:
-            if not self.task.is_default(misc_kw, (kw_val := getattr(self.task, misc_kw))):
+            if not self.task.is_default(
+                misc_kw, (kw_val := getattr(self.task, misc_kw))
+            ):
                 try:
                     val_node = self.extract_value(kw_val)
                 except RecursiveDefinitionError as e:
@@ -103,7 +140,9 @@ class GenericTaskExtractor(TaskExtractor):
         if not self.task.register:
             return []
 
-        vn = self.context.vars.register_variable(self.task.register, ScopeLevel.SET_FACTS_REGISTERED)
+        vn = self.context.vars.register_variable(
+            self.task.register, ScopeLevel.SET_FACTS_REGISTERED
+        )
         self.context.graph.add_node(vn)
         self.context.graph.add_edge(task, vn, rep.DEF)
         return [vn]

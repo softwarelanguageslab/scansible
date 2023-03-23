@@ -1,7 +1,10 @@
-from typing import Any, Optional, Union, BinaryIO, Tuple
+from __future__ import annotations
+
+from typing import Any, BinaryIO, Optional, Tuple, Union
 
 from ..util import LazyMixin
-Repo = Any # from ..repo import Repo
+
+Repo = Any  # from ..repo import Repo
 from ..refs.reference import Reference
 
 class Object(LazyMixin):

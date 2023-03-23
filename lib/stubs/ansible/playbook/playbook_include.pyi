@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from .base import Base, Value
 from .conditional import Conditional
 from .taggable import Taggable

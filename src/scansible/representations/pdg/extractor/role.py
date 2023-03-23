@@ -8,20 +8,22 @@ from scansible.representations.structural import Role, RoleRequirement
 
 from .. import representation as rep
 from .context import ExtractionContext
-from .result import ExtractionResult
-from .task_lists import TaskListExtractor
 from .handler_lists import HandlerListExtractor
-from .variables import VariablesExtractor
-from .var_context import ScopeLevel
+from .result import ExtractionResult
 from .role_dependencies import extract_role_dependency
+from .task_lists import TaskListExtractor
+from .var_context import ScopeLevel
+from .variables import VariablesExtractor
+
 
 class RoleExtractor:
-
     def __init__(self, context: ExtractionContext, role: Role) -> None:
         self.context = context
         self.role = role
 
-    def extract_role(self, predecessors: Sequence[rep.ControlNode] | None = None) -> ExtractionResult:
+    def extract_role(
+        self, predecessors: Sequence[rep.ControlNode] | None = None
+    ) -> ExtractionResult:
         if predecessors is None:
             predecessors = []
 
@@ -31,17 +33,27 @@ class RoleExtractor:
         if (mf := self.role.meta_file) is not None:
             with self.context.include_ctx.enter_role_file(mf.file_path):
                 for dep in mf.metablock.dependencies:
-                    result = result.chain(extract_role_dependency(self.context, dep, result.next_predecessors))
+                    result = result.chain(
+                        extract_role_dependency(
+                            self.context, dep, result.next_predecessors
+                        )
+                    )
 
-        with self.context.vars.enter_scope(ScopeLevel.ROLE_DEFAULTS), self.context.vars.enter_scope(ScopeLevel.ROLE_VARS):
+        with self.context.vars.enter_scope(
+            ScopeLevel.ROLE_DEFAULTS
+        ), self.context.vars.enter_scope(ScopeLevel.ROLE_VARS):
             if (df := self.role.main_defaults_file) is not None:
                 with self.context.include_ctx.enter_role_file(df.file_path):
-                    df_result = VariablesExtractor(self.context, df.variables).extract_variables(ScopeLevel.ROLE_DEFAULTS)
+                    df_result = VariablesExtractor(
+                        self.context, df.variables
+                    ).extract_variables(ScopeLevel.ROLE_DEFAULTS)
                     result = result.merge(df_result)
 
             if (vf := self.role.main_vars_file) is not None:
                 with self.context.include_ctx.enter_role_file(vf.file_path):
-                    vf_result = VariablesExtractor(self.context, vf.variables).extract_variables(ScopeLevel.ROLE_VARS)
+                    vf_result = VariablesExtractor(
+                        self.context, vf.variables
+                    ).extract_variables(ScopeLevel.ROLE_VARS)
                     result = result.merge(vf_result)
 
             if self.role.main_tasks_file is not None:
@@ -52,18 +64,19 @@ class RoleExtractor:
                 # been loaded using IncludeContext.load_and_enter_role.
                 tf_result = TaskListExtractor(
                     self.context,
-                    self.role.main_tasks_file.tasks  # type: ignore[arg-type]
+                    self.role.main_tasks_file.tasks,  # type: ignore[arg-type]
                 ).extract_tasks(result.next_predecessors)
                 result = result.chain(tf_result)
             else:
-                logger.warning('No main task file')
+                logger.warning("No main task file")
 
             # TODO: These should somehow be linked to tasks.
             if (hf := self.role.main_handlers_file) is not None:
                 with self.context.include_ctx.enter_role_file(hf.file_path):
-                    result = result.chain(HandlerListExtractor(
-                        self.context,
-                        hf.tasks  # type: ignore[arg-type]
-                    ).extract_handlers(result.next_predecessors))
+                    result = result.chain(
+                        HandlerListExtractor(
+                            self.context, hf.tasks  # type: ignore[arg-type]
+                        ).extract_handlers(result.next_predecessors)
+                    )
 
         return result

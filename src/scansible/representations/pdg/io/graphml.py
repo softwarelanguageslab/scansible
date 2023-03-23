@@ -1,8 +1,9 @@
 """GraphML importer/exporter."""
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING, Any, Type
+
+import json
 from xml.etree.ElementTree import Element
 
 import attrs

@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import typing
+
 from .datetime import DateTime
 from .tz import UTC as UTC
 

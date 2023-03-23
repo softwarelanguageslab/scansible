@@ -1,6 +1,19 @@
 """Facilitate access to Ansible playbook types."""
+from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
+from ansible import constants as C
+from ansible.errors import AnsibleError, AnsibleParserError
+from ansible.module_utils.parsing.convert_bool import boolean as convert_bool
+from ansible.parsing.dataloader import DataLoader
+from ansible.parsing.mod_args import ModuleArgsParser
+from ansible.parsing.yaml.objects import (
+    AnsibleBaseYAMLObject,
+    AnsibleMapping,
+    AnsibleSequence,
+    AnsibleVaultEncryptedUnicode,
+)
 from ansible.playbook.base import FieldAttributeBase
 from ansible.playbook.block import Block
 from ansible.playbook.handler import Handler
@@ -11,16 +24,9 @@ from ansible.playbook.playbook_include import PlaybookInclude
 from ansible.playbook.role_include import IncludeRole
 from ansible.playbook.task import Task
 from ansible.playbook.task_include import TaskInclude
-
 from ansible.plugins.loader import PluginLoader
-from ansible.parsing.yaml.objects import AnsibleSequence, AnsibleMapping, AnsibleBaseYAMLObject, AnsibleVaultEncryptedUnicode
-from ansible.module_utils.parsing.convert_bool import boolean as convert_bool
 from ansible.template import Templar
-from ansible.parsing.dataloader import DataLoader
 from ansible.vars.manager import VariableManager
-from ansible.parsing.mod_args import ModuleArgsParser
-from ansible import constants as C
-from ansible.errors import AnsibleError, AnsibleParserError
 
 if TYPE_CHECKING:
     # This alias doesn't exist outside of the stub files

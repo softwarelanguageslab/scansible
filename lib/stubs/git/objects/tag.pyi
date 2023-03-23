@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 from typing import Any, Optional
 
 from .base import Object
-Repo = Any # from ..repo import Repo
+
+Repo = Any  # from ..repo import Repo
 from ..util import Actor
 
 class TagObject(Object):
@@ -12,4 +15,14 @@ class TagObject(Object):
     tagged_date: int = ...
     tagger_tz_offset: int = ...
     message: str = ...
-    def __init__(self, repo: Repo, binsha: bytes, object: Optional[Object] = ..., tag: Optional[str] = ..., tagger: Optional[Actor] = ..., tagged_date: Optional[int] = ..., tagger_tz_offset: Optional[int] = ..., message: Optional[str] = ...) -> None: ...
+    def __init__(
+        self,
+        repo: Repo,
+        binsha: bytes,
+        object: Optional[Object] = ...,
+        tag: Optional[str] = ...,
+        tagger: Optional[Actor] = ...,
+        tagged_date: Optional[int] = ...,
+        tagger_tz_offset: Optional[int] = ...,
+        message: Optional[str] = ...,
+    ) -> None: ...

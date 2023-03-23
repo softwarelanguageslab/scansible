@@ -1,12 +1,32 @@
-from .constants import SECONDS_PER_DAY as SECONDS_PER_DAY, SECONDS_PER_HOUR as SECONDS_PER_HOUR, SECONDS_PER_MINUTE as SECONDS_PER_MINUTE, US_PER_SECOND as US_PER_SECOND
-from datetime import timedelta
-from pendulum.utils._compat import PYPY as PYPY, decode as decode
-from typing import Any, Optional, Union, overload, Tuple, TypeVar
+from __future__ import annotations
 
-_Self = TypeVar('_Self', bound=Duration)
+from typing import Any, Optional, Tuple, TypeVar, Union, overload
+
+from datetime import timedelta
+
+from pendulum.utils._compat import PYPY as PYPY
+from pendulum.utils._compat import decode as decode
+
+from .constants import SECONDS_PER_DAY as SECONDS_PER_DAY
+from .constants import SECONDS_PER_HOUR as SECONDS_PER_HOUR
+from .constants import SECONDS_PER_MINUTE as SECONDS_PER_MINUTE
+from .constants import US_PER_SECOND as US_PER_SECOND
+
+_Self = TypeVar("_Self", bound=Duration)
 
 class Duration(timedelta):
-    def __new__(cls, days: int = ..., seconds: int = ..., microseconds: int = ..., milliseconds: int = ..., minutes: int = ..., hours: int = ..., weeks: int = ..., years: int = ..., months: int = ...) -> Duration: ...
+    def __new__(
+        cls,
+        days: int = ...,
+        seconds: int = ...,
+        microseconds: int = ...,
+        milliseconds: int = ...,
+        minutes: int = ...,
+        hours: int = ...,
+        weeks: int = ...,
+        years: int = ...,
+        months: int = ...,
+    ) -> Duration: ...
     def total_minutes(self) -> float: ...
     def total_hours(self) -> float: ...
     def total_days(self) -> float: ...
@@ -60,4 +80,15 @@ class Duration(timedelta):
     def __divmod__(self: _Self, other: timedelta) -> Tuple[int, _Self]: ...
 
 class AbsoluteDuration(Duration):
-    def __new__(cls, days: int = ..., seconds: int = ..., microseconds: int = ..., milliseconds: int = ..., minutes: int = ..., hours: int = ..., weeks: int = ..., years: int = ..., months: int = ...) -> AbsoluteDuration: ...
+    def __new__(
+        cls,
+        days: int = ...,
+        seconds: int = ...,
+        microseconds: int = ...,
+        milliseconds: int = ...,
+        minutes: int = ...,
+        hours: int = ...,
+        weeks: int = ...,
+        years: int = ...,
+        months: int = ...,
+    ) -> AbsoluteDuration: ...

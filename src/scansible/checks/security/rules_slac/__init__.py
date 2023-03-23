@@ -9,6 +9,7 @@ from .missing_integrity_check import MissingIntegrityCheckRule
 from .unrestricted_ip_address import UnrestrictedIPAddressRule
 from .weak_crypto import WeakCryptoAlgorithmRule
 
+
 def get_all_rules() -> list[Rule]:
     return [
         AdminByDefaultRule(),

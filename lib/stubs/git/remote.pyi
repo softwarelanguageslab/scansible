@@ -1,16 +1,21 @@
-from typing import Any, Optional, Union, Literal, Iterator, List, Callable
+from __future__ import annotations
 
-Repo = Any #from .repo import Repo
+from typing import Any, Callable, Iterator, List, Literal, Optional, Union
+
+Repo = Any  # from .repo import Repo
 from .config import GitConfigParser
-from .refs.reference import Reference
-from .refs.symbolic import SymbolicReference
-from .refs.remote import RemoteReference
-from .refs.tag import TagReference
-from .objects.commit import Commit
 from .objects.base import Object
-from .util import Iterable, LazyMixin, RemoteProgress as RemoteProgress, IterableList
+from .objects.commit import Commit
+from .refs.reference import Reference
+from .refs.remote import RemoteReference
+from .refs.symbolic import SymbolicReference
+from .refs.tag import TagReference
+from .util import Iterable, IterableList, LazyMixin
+from .util import RemoteProgress as RemoteProgress
 
-_ProgressReporter = Union[RemoteProgress, Callable[[int, int, Optional[int], str], None], None]
+_ProgressReporter = Union[
+    RemoteProgress, Callable[[int, int, Optional[int], str], None], None
+]
 
 class PushInfo:
     NEW_TAG: int = ...
@@ -28,7 +33,15 @@ class PushInfo:
     local_ref: SymbolicReference = ...
     remote_ref_string: str = ...
     summary: str = ...
-    def __init__(self, flags: int, local_ref: SymbolicReference, remote_ref_string: str, remote: Remote, old_commit: Optional[str] = ..., summary: str = ...) -> None: ...
+    def __init__(
+        self,
+        flags: int,
+        local_ref: SymbolicReference,
+        remote_ref_string: str,
+        remote: Remote,
+        old_commit: Optional[str] = ...,
+        summary: str = ...,
+    ) -> None: ...
     @property
     def old_commit(self) -> Optional[str]: ...
     @property
@@ -50,7 +63,14 @@ class FetchInfo:
     note: str = ...
     old_commit: Optional[Object] = ...
     remote_ref_path: Any = ...
-    def __init__(self, ref: Reference, flags: int, note: str = ..., old_commit: Optional[Object] = ..., remote_ref_path: Optional[str] = ...) -> None: ...
+    def __init__(
+        self,
+        ref: Reference,
+        flags: int,
+        note: str = ...,
+        old_commit: Optional[Object] = ...,
+        remote_ref_path: Optional[str] = ...,
+    ) -> None: ...
     @property
     def name(self) -> str: ...
     @property
@@ -67,7 +87,9 @@ class Remote(LazyMixin, Iterable):
     def exists(self) -> bool: ...
     @classmethod
     def iter_items(cls, repo: Repo) -> Iterator[Remote]: ...
-    def set_url(self, new_url: str, old_url: Optional[str] = ..., **kwargs: Any) -> Remote: ...
+    def set_url(
+        self, new_url: str, old_url: Optional[str] = ..., **kwargs: Any
+    ) -> Remote: ...
     def add_url(self, url: str, **kwargs: Any) -> Remote: ...
     def delete_url(self, url: str, **kwargs: Any) -> Remote: ...
     @property
@@ -84,9 +106,25 @@ class Remote(LazyMixin, Iterable):
     rm = remove
     def rename(self, new_name: str) -> Remote: ...
     def update(self, **kwargs: Any) -> Remote: ...
-    def fetch(self, refspec: Optional[Union[List[str], str]] = ..., progress: Optional[_ProgressReporter] = ..., verbose: bool = ..., **kwargs: Any) -> IterableList[FetchInfo]: ...
-    def pull(self, refspec: Optional[Union[List[str], str]] = ..., progress: Optional[_ProgressReporter] = ..., **kwargs: Any) -> IterableList[FetchInfo]: ...
-    def push(self, refspec: Optional[Union[List[str], str]] = ..., progress: Optional[_ProgressReporter] = ..., **kwargs: Any) -> IterableList[PushInfo]: ...
+    def fetch(
+        self,
+        refspec: Optional[Union[List[str], str]] = ...,
+        progress: Optional[_ProgressReporter] = ...,
+        verbose: bool = ...,
+        **kwargs: Any,
+    ) -> IterableList[FetchInfo]: ...
+    def pull(
+        self,
+        refspec: Optional[Union[List[str], str]] = ...,
+        progress: Optional[_ProgressReporter] = ...,
+        **kwargs: Any,
+    ) -> IterableList[FetchInfo]: ...
+    def push(
+        self,
+        refspec: Optional[Union[List[str], str]] = ...,
+        progress: Optional[_ProgressReporter] = ...,
+        **kwargs: Any,
+    ) -> IterableList[PushInfo]: ...
     @property
     def config_reader(self) -> GitConfigParser: ...
     @property

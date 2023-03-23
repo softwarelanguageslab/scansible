@@ -7,13 +7,15 @@ from loguru import logger
 from scansible.representations.structural import VariableFile
 
 from .. import representation as rep
-from .var_context import ScopeLevel
 from .context import ExtractionContext
 from .result import ExtractionResult
+from .var_context import ScopeLevel
+
 
 class VariablesExtractor:
-
-    def __init__(self, context: ExtractionContext, variables: Mapping[str, object]) -> None:
+    def __init__(
+        self, context: ExtractionContext, variables: Mapping[str, object]
+    ) -> None:
         self.context = context
         self.variables = variables
 
@@ -23,7 +25,9 @@ class VariablesExtractor:
             added_vars.append(self.extract_variable(var_name, var_init, scope_level))
         return ExtractionResult([], added_vars, [])
 
-    def extract_variable(self, var_name: str, var_init: object, scope_level: ScopeLevel) -> rep.Variable:
+    def extract_variable(
+        self, var_name: str, var_init: object, scope_level: ScopeLevel
+    ) -> rep.Variable:
         if not isinstance(var_init, (str, bool, int, float)):
-            logger.warning('I am not able to properly handle non-atomic values yet')
+            logger.warning("I am not able to properly handle non-atomic values yet")
         return self.context.vars.register_variable(var_name, scope_level, expr=var_init)

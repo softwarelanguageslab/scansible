@@ -1,12 +1,15 @@
-from typing import Any, Optional, Sequence, Union, Iterator
+from __future__ import annotations
+
+from typing import Any, Iterator, Optional, Sequence, Union
 
 from datetime import datetime
 
 from . import base
+
 Repo = Any  # from ..repo import Repo
-from .util import Serializable, Traversable
 from ..diff import Diffable
-from ..util import Iterable, Actor, Stats
+from ..util import Actor, Iterable, Stats
+from .util import Serializable, Traversable
 
 class Commit(base.Object, Iterable, Diffable, Traversable[Commit], Serializable):
     env_author_date: str = ...
@@ -25,7 +28,22 @@ class Commit(base.Object, Iterable, Diffable, Traversable[Commit], Serializable)
     parents: Sequence[Commit] = ...
     encoding: str = ...
     gpgsig: str = ...
-    def __init__(self, repo: Repo, binsha: bytes, tree: Optional[Any] = ..., author: Optional[Actor] = ..., authored_date: Optional[int] = ..., author_tz_offset: Optional[int] = ..., committer: Optional[Actor] = ..., committed_date: Optional[int] = ..., committer_tz_offset: Optional[int] = ..., message: Optional[str] = ..., parents: Optional[Sequence[Commit]] = ..., encoding: Optional[str] = ..., gpgsig: Optional[str] = ...) -> None: ...
+    def __init__(
+        self,
+        repo: Repo,
+        binsha: bytes,
+        tree: Optional[Any] = ...,
+        author: Optional[Actor] = ...,
+        authored_date: Optional[int] = ...,
+        author_tz_offset: Optional[int] = ...,
+        committer: Optional[Actor] = ...,
+        committed_date: Optional[int] = ...,
+        committer_tz_offset: Optional[int] = ...,
+        message: Optional[str] = ...,
+        parents: Optional[Sequence[Commit]] = ...,
+        encoding: Optional[str] = ...,
+        gpgsig: Optional[str] = ...,
+    ) -> None: ...
     @property
     def authored_datetime(self) -> datetime: ...
     @property
@@ -37,8 +55,21 @@ class Commit(base.Object, Iterable, Diffable, Traversable[Commit], Serializable)
     def name_rev(self) -> str: ...
     @classmethod
     def iter_items(cls, repo: Repo, rev: str, paths: Union[str, Sequence[str]] = ..., **kwargs: Any) -> Iterator[Commit]: ...  # type: ignore[override]
-    def iter_parents(self, paths: Union[str, Sequence[str]] = ..., **kwargs: Any) -> Iterator[Commit]: ...
+    def iter_parents(
+        self, paths: Union[str, Sequence[str]] = ..., **kwargs: Any
+    ) -> Iterator[Commit]: ...
     @property
     def stats(self) -> Stats: ...
     @classmethod
-    def create_from_tree(cls, repo: Repo, tree: Any, message: str, parent_commits: Optional[Sequence[Commit]] = ..., head: bool = ..., author: Optional[Actor] = ..., committer: Optional[Actor] = ..., author_date: Optional[int] = ..., commit_date: Optional[int] = ...) -> Commit: ...
+    def create_from_tree(
+        cls,
+        repo: Repo,
+        tree: Any,
+        message: str,
+        parent_commits: Optional[Sequence[Commit]] = ...,
+        head: bool = ...,
+        author: Optional[Actor] = ...,
+        committer: Optional[Actor] = ...,
+        author_date: Optional[int] = ...,
+        commit_date: Optional[int] = ...,
+    ) -> Commit: ...

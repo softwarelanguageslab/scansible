@@ -1,13 +1,18 @@
+from __future__ import annotations
+
 from collections import defaultdict
 from collections.abc import Collection, Iterable
 
-from scansible.representations.pdg.extractor.context import \
-    VisibilityInformation
+from scansible.representations.pdg.extractor.context import VisibilityInformation
 from scansible.representations.pdg.representation import Graph, Variable
 
 from .base import Rule, RuleResult
-from .utils import (ValueChangeReason, determine_value_version_change_reason,
-                    find_variable_usages, get_nodes)
+from .utils import (
+    ValueChangeReason,
+    determine_value_version_change_reason,
+    find_variable_usages,
+    get_nodes,
+)
 
 
 class ReuseChangedVariableRule(Rule):
