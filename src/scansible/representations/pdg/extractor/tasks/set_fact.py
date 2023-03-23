@@ -68,4 +68,15 @@ class SetFactTaskExtractor(TaskExtractor):
                 loop_source_var, loop_target_var, rep.DEF_LOOP_ITEM
             )
 
-            return self._extract_bare_task(predecessors)
+            loop_node = rep.Loop(
+                location=self.context.get_location(self.task.loop) or self.location
+            )
+            self.context.graph.add_node(loop_node)
+            self.context.graph.add_edge(loop_source_var, loop_node, rep.USE)
+
+            inner_result = self._extract_bare_task(predecessors)
+
+            for av in inner_result.added_variable_nodes:
+                self.context.graph.add_edge(loop_node, av, rep.DEF)
+
+            return inner_result
