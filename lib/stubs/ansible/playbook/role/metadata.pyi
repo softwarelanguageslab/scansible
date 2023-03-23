@@ -8,7 +8,6 @@ from ansible.playbook.role import Role
 
 from .include import RoleInclude
 
-
 class RoleMetadata(Base, CollectionSearch):
     allow_duplicates: bool = ...
     dependencies: Sequence[RoleInclude] = ...

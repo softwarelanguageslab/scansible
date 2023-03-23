@@ -13,7 +13,6 @@ from ansible.playbook.taggable import Taggable
 from ansible.playbook.task_include import TaskInclude
 from ansible.vars.manager import VariableManager
 
-
 class Task(Base, Conditional, Taggable, CollectionSearch):
     args: dict[str, Value] = ...
     action: str = ...

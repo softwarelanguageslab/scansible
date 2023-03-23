@@ -55,7 +55,6 @@ class SetFactTaskExtractor(TaskExtractor):
     def _extract_looping_task(
         self, predecessors: Sequence[rep.ControlNode]
     ) -> ExtractionResult:
-        self.logger.warning("loops on set_fact are not fully supported yet")
         source_and_name = self.extract_looping_value_and_name()
         assert source_and_name is not None, "Internal error"
 

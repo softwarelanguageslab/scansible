@@ -18,7 +18,6 @@ from . import definition as definition
 from . import include as include
 from . import metadata as metadata
 
-
 class Role(Base, Conditional, Taggable, CollectionSearch):
     @staticmethod
     def load(

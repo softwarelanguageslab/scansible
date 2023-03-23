@@ -9,7 +9,6 @@ from .role import Role
 from .task import Task
 from .task_include import TaskInclude
 
-
 class Handler(Task):
     listen: list[str] = ...
 
