@@ -40,24 +40,9 @@ class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]
 
     def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
         with self.setup_task_vars_scope(ScopeLevel.INCLUDE_PARAMS):
-            abort_result = ExtractionResult.empty(predecessors)
             args = dict(self.task.args)
 
             included_name = self._extract_included_name(args)
-            if not included_name or not isinstance(included_name, str):
-                self.logger.error(f"Unknown included file name!")
-                return abort_result
-
-            if "{{" in included_name:
-                # TODO: When we do handle expressions here, we should make sure
-                # to check whether these expressions can or cannot use the include
-                # parameters. If they cannot, we should extract the included
-                # name before registering the variables.
-                self.logger.warning(
-                    f"Cannot handle dynamic file name on {self.task.action} yet!"
-                )
-                return abort_result
-
             if args:
                 # Still arguments left?
                 self.logger.warning(
@@ -67,28 +52,35 @@ class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]
 
             self.logger.debug(included_name)
 
-            with self._load_content(included_name) as included_content:
-                if included_content is None:
-                    self.logger.error(f"{self.CONTENT_TYPE} not found: {included_name}")
-                    return abort_result
+            conditional_nodes: Sequence[rep.ControlNode]
+            if self.task.when:
+                condition_result = self.extract_condition(predecessors)
+                # Conditional execution leads to new predecessors
+                predecessors = condition_result.next_predecessors
+                # Save so we can conditionally define variables later
+                conditional_nodes = condition_result.added_control_nodes
+            else:
+                conditional_nodes = []
 
-                conditional_nodes: Sequence[rep.ControlNode]
-                if self.task.when:
-                    condition_result = self.extract_condition(predecessors)
-                    # Conditional execution leads to new predecessors
-                    predecessors = condition_result.next_predecessors
-                    # Save so we can conditionally define variables later
-                    conditional_nodes = condition_result.added_control_nodes
-                else:
-                    conditional_nodes = []
-
-                self.warn_remaining_kws()
-
-                self.logger.info(
-                    f"Following include of {self.CONTENT_TYPE} {included_name}"
+            if not included_name or not isinstance(included_name, str):
+                self.logger.error(f"Unknown included file name!")
+                included_result = self._create_placeholder_task(
+                    included_name, predecessors
                 )
-                included_result = self._extract_included_content(
-                    included_content, predecessors
+            elif "{{" in included_name:
+                # TODO: When we do handle expressions here, we should make sure
+                # to check whether these expressions can or cannot use the include
+                # parameters. If they cannot, we should extract the included
+                # name before registering the variables.
+                self.logger.warning(
+                    f"Cannot handle dynamic file name on {self.task.action} yet!"
+                )
+                included_result = self._create_placeholder_task(
+                    included_name, predecessors
+                )
+            else:
+                included_result = self._load_and_extract_content(
+                    included_name, predecessors
                 )
 
             # If there was a condition, make sure to link up any global variables
@@ -105,3 +97,31 @@ class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]
             return included_result.add_control_nodes(
                 conditional_nodes
             ).add_next_predecessors(conditional_nodes)
+
+    def _load_and_extract_content(
+        self, included_name: str, predecessors: Sequence[rep.ControlNode]
+    ) -> ExtractionResult:
+        with self._load_content(included_name) as included_content:
+            if included_content is None:
+                self.logger.error(f"{self.CONTENT_TYPE} not found: {included_name}")
+                return self._create_placeholder_task(included_name, predecessors)
+
+            self.warn_remaining_kws()
+
+            self.logger.info(
+                f"Following include of {self.CONTENT_TYPE} {included_name}"
+            )
+            return self._extract_included_content(included_content, predecessors)
+
+    def _create_placeholder_task(
+        self, included_name: AnyValue, predecessors: Sequence[rep.ControlNode]
+    ) -> ExtractionResult:
+        task_node = rep.Task(self.task.action, self.task.name, location=self.location)
+        included_name_node = self.extract_value(included_name)
+        self.context.graph.add_node(task_node)
+        self.context.graph.add_edge(task_node, included_name_node, rep.Keyword("arg"))
+
+        for predecessor in predecessors:
+            self.context.graph.add_edge(predecessor, task_node, rep.ORDER)
+
+        return ExtractionResult([task_node], [], [task_node])
