@@ -1,21 +1,21 @@
 """Extract information from template expressions."""
 from __future__ import annotations
 
+from attrs import frozen
 from jinja2 import Environment, nodes
 from jinja2.compiler import DependencyFinderVisitor
 from jinja2.exceptions import TemplateSyntaxError
 from jinja2.visitor import NodeVisitor
 from loguru import logger
-from pydantic import BaseModel
 
 ANSIBLE_GLOBALS = frozenset({"lookup", "query", "q", "now", "finalize", "omit"})
 
 
-class LookupTarget(BaseModel):
-    class Config:
-        frozen = True
+class LookupTarget:
+    pass
 
 
+@frozen(hash=True)
 class NamedLookupTarget(LookupTarget):
     name: str
 
@@ -30,6 +30,7 @@ class LookupTargetVariable(NamedLookupTarget):
         return self.name
 
 
+@frozen(hash=True)
 class LookupTargetUnknown(LookupTarget):
     value: str
 
@@ -144,7 +145,7 @@ class TemplateExpressionAST:
             if isinstance(call_node.node, nodes.Name)
         )
         self.used_lookups: set[LookupTarget] = {
-            create_lookup_target(call_node.args[0])  # pyright: ignore
+            create_lookup_target(call_node.args[0])
             for call_node in ast_root.find_all(nodes.Call)
             if (
                 (isinstance(call_node.node, nodes.Name))
