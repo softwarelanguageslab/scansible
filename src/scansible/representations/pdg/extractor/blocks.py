@@ -8,7 +8,7 @@ from scansible.representations.structural import Block, Task
 
 from .. import representation as rep
 from .context import ExtractionContext
-from .expressions import RecursiveDefinitionError, ScopeLevel
+from .expressions import EnvironmentType, RecursiveDefinitionError
 from .result import ExtractionResult
 
 
@@ -35,7 +35,7 @@ class BlockExtractor:
     def extract_block(
         self, predecessors: Sequence[rep.ControlNode]
     ) -> ExtractionResult:
-        with self.context.vars.enter_scope(ScopeLevel.BLOCK_VARS):
+        with self.context.vars.enter_scope(EnvironmentType.BLOCK_VARS):
             return self._extract_block(predecessors)
 
     def _extract_block(
@@ -48,7 +48,7 @@ class BlockExtractor:
             # confirmed to be a bug, so we'll handle it as if it were
             # implemented correctly.
             self.context.vars.register_variable(
-                var_name, expr=var_value, level=ScopeLevel.BLOCK_VARS
+                var_name, expr=var_value, level=EnvironmentType.BLOCK_VARS
             )
 
         # A block without a list of tasks should be impossible

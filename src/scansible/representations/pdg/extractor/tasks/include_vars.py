@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from scansible.representations.structural.representation import AnyValue, VariableFile
 
 from ... import representation as rep
-from ..expressions import ScopeLevel
+from ..expressions import EnvironmentType
 from ..result import ExtractionResult
 from ..variables import VariablesExtractor
 from ._dynamic_includes import DynamicIncludesExtractor
@@ -15,7 +15,7 @@ from ._dynamic_includes import DynamicIncludesExtractor
 
 class IncludeVarsTaskExtractor(DynamicIncludesExtractor[VariableFile]):
     CONTENT_TYPE = "variable file"
-    TASK_VARS_SCOPE_LEVEL = ScopeLevel.TASK_VARS
+    TASK_VARS_SCOPE_LEVEL = EnvironmentType.TASK_VARS
 
     def _extract_included_name(self, args: dict[str, AnyValue]) -> AnyValue:
         return args.pop("_raw_params", None)
@@ -30,7 +30,7 @@ class IncludeVarsTaskExtractor(DynamicIncludesExtractor[VariableFile]):
     ) -> ExtractionResult:
         return VariablesExtractor(
             self.context, included_content.variables
-        ).extract_variables(ScopeLevel.INCLUDE_VARS)
+        ).extract_variables(EnvironmentType.INCLUDE_VARS)
 
     def extract_condition(
         self, predecessors: Sequence[rep.ControlNode]

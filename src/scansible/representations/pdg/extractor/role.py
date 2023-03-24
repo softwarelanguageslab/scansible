@@ -8,7 +8,7 @@ from scansible.representations.structural import Role
 
 from .. import representation as rep
 from .context import ExtractionContext
-from .expressions import ScopeLevel
+from .expressions import EnvironmentType
 from .handler_lists import HandlerListExtractor
 from .result import ExtractionResult
 from .role_dependencies import extract_role_dependency
@@ -40,20 +40,20 @@ class RoleExtractor:
                     )
 
         with self.context.vars.enter_scope(
-            ScopeLevel.ROLE_DEFAULTS
-        ), self.context.vars.enter_scope(ScopeLevel.ROLE_VARS):
+            EnvironmentType.ROLE_DEFAULTS
+        ), self.context.vars.enter_scope(EnvironmentType.ROLE_VARS):
             if (df := self.role.main_defaults_file) is not None:
                 with self.context.include_ctx.enter_role_file(df.file_path):
                     df_result = VariablesExtractor(
                         self.context, df.variables
-                    ).extract_variables(ScopeLevel.ROLE_DEFAULTS)
+                    ).extract_variables(EnvironmentType.ROLE_DEFAULTS)
                     result = result.merge(df_result)
 
             if (vf := self.role.main_vars_file) is not None:
                 with self.context.include_ctx.enter_role_file(vf.file_path):
                     vf_result = VariablesExtractor(
                         self.context, vf.variables
-                    ).extract_variables(ScopeLevel.ROLE_VARS)
+                    ).extract_variables(EnvironmentType.ROLE_VARS)
                     result = result.merge(vf_result)
 
             if self.role.main_tasks_file is not None:

@@ -8,19 +8,20 @@ from scansible.representations.structural import RoleRequirement
 
 from .. import representation as rep
 from .context import ExtractionContext
-from .expressions import ScopeLevel
+from .expressions import EnvironmentType
 from .result import ExtractionResult
 
 
+# TODO: Distinguish between public and private role includes.
 def extract_role_dependency(
     context: ExtractionContext,
     dep: RoleRequirement,
     predecessors: Sequence[rep.ControlNode],
 ) -> ExtractionResult:
-    with context.vars.enter_scope(ScopeLevel.INCLUDE_PARAMS):
+    with context.vars.enter_scope(EnvironmentType.INCLUDE_PARAMS):
         for var_name, var_init in dep.params.items():
             context.vars.register_variable(
-                var_name, ScopeLevel.INCLUDE_PARAMS, expr=var_init
+                var_name, EnvironmentType.INCLUDE_PARAMS, expr=var_init
             )
 
         # TODO: Conditionals

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from ... import representation as rep
-from ..expressions import RecursiveDefinitionError, ScopeLevel
+from ..expressions import EnvironmentType, RecursiveDefinitionError
 from ..result import ExtractionResult
 from .base import TaskExtractor
 
@@ -14,7 +14,7 @@ class SetFactTaskExtractor(TaskExtractor):
         return super().SUPPORTED_TASK_ATTRIBUTES().union({"loop", "loop_control"})
 
     def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
-        with self.setup_task_vars_scope(ScopeLevel.TASK_VARS):
+        with self.setup_task_vars_scope(EnvironmentType.TASK_VARS):
             if self.task.loop:
                 return self._extract_looping_task(predecessors)
             return self._extract_bare_task(predecessors)
@@ -40,7 +40,7 @@ class SetFactTaskExtractor(TaskExtractor):
 
         for var_name, value_node in name_to_value.items():
             var_node = self.context.vars.register_variable(
-                var_name, ScopeLevel.SET_FACTS_REGISTERED
+                var_name, EnvironmentType.SET_FACTS_REGISTERED
             )
             added_vars.append(var_node)
 
@@ -59,9 +59,9 @@ class SetFactTaskExtractor(TaskExtractor):
         assert source_and_name is not None, "Internal error"
 
         loop_source_var, loop_var_name = source_and_name
-        with self.context.vars.enter_scope(ScopeLevel.INCLUDE_PARAMS):
+        with self.context.vars.enter_scope(EnvironmentType.INCLUDE_PARAMS):
             loop_target_var = self.context.vars.register_variable(
-                loop_var_name, ScopeLevel.INCLUDE_PARAMS
+                loop_var_name, EnvironmentType.INCLUDE_PARAMS
             )
             self.context.graph.add_edge(
                 loop_source_var, loop_target_var, rep.DEF_LOOP_ITEM

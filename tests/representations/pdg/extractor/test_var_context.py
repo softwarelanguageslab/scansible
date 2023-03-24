@@ -19,7 +19,10 @@ from scansible.representations.pdg import (
     Variable,
 )
 from scansible.representations.pdg.extractor.context import ExtractionContext
-from scansible.representations.pdg.extractor.expressions import ScopeLevel, VarContext
+from scansible.representations.pdg.extractor.expressions import (
+    EnvironmentType,
+    VarContext,
+)
 from test_utils.graph_matchers import assert_graphs_match, create_graph
 
 ContextCreator = Callable[[], tuple[VarContext, Graph]]
@@ -61,7 +64,9 @@ def describe_unmodified() -> None:
     def should_declare_literal_variable(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("test_var", ScopeLevel.PLAY_VARS, expr="hello world")
+        ctx.register_variable(
+            "test_var", EnvironmentType.HOST_FACTS, expr="hello world"
+        )
 
         assert_graphs_match(
             g,
@@ -69,7 +74,7 @@ def describe_unmodified() -> None:
                 {
                     "lit": Literal(type="str", value="hello world"),
                     "var": Variable(
-                        "test_var", 0, 0, ScopeLevel.PLAY_VARS.value
+                        "test_var", 0, 0, EnvironmentType.HOST_FACTS.value
                     ),  # UNUSED!
                 },
                 [("lit", "var", DEF)],
@@ -89,7 +94,7 @@ def describe_unmodified() -> None:
                         name="target",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.CLI_VALUES.value,
+                        scope_level=EnvironmentType.CLI_VALUES.value,
                     ),
                     "expr": Expression(expr="hello {{ target }}"),
                     "iv": IntermediateValue(identifier=0),
@@ -134,7 +139,7 @@ def describe_unmodified() -> None:
                         name="target",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.CLI_VALUES.value,
+                        scope_level=EnvironmentType.CLI_VALUES.value,
                     ),
                     "expression": Expression(expr="hello {{ target }}"),
                     "iv": IntermediateValue(identifier=1),
@@ -146,7 +151,9 @@ def describe_unmodified() -> None:
     def should_extract_variable_definition(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("msg", ScopeLevel.PLAY_VARS, expr="hello {{ target }}")
+        ctx.register_variable(
+            "msg", EnvironmentType.HOST_FACTS, expr="hello {{ target }}"
+        )
         ctx.evaluate_template("{{ msg }}", False)
 
         assert_graphs_match(
@@ -157,13 +164,13 @@ def describe_unmodified() -> None:
                         name="target",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.CLI_VALUES.value,
+                        scope_level=EnvironmentType.CLI_VALUES.value,
                     ),
                     "msg": Variable(
                         name="msg",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.PLAY_VARS.value,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
                     "e1": Expression(expr="hello {{ target }}"),
                     "e2": Expression(expr="{{ msg }}"),
@@ -241,10 +248,10 @@ def describe_modified() -> None:
     def should_reevaluate_when_variable_changed(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("a", ScopeLevel.PLAY_VARS, expr="hello")
+        ctx.register_variable("a", EnvironmentType.HOST_FACTS, expr="hello")
         ctx.evaluate_template("{{ a }} world", False)
-        with ctx.enter_scope(ScopeLevel.TASK_VARS):
-            ctx.register_variable("a", ScopeLevel.TASK_VARS, expr="hi")
+        with ctx.enter_scope(EnvironmentType.TASK_VARS):
+            ctx.register_variable("a", EnvironmentType.TASK_VARS, expr="hi")
             ctx.evaluate_template("{{ a }} world", False)
 
         assert_graphs_match(
@@ -255,7 +262,7 @@ def describe_modified() -> None:
                         name="a",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.PLAY_VARS.value,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
                     "l1": Literal(type="str", value="hello"),
                     "e1": Expression(expr="{{ a }} world"),
@@ -263,7 +270,7 @@ def describe_modified() -> None:
                         name="a",
                         version=1,
                         value_version=0,
-                        scope_level=ScopeLevel.TASK_VARS.value,
+                        scope_level=EnvironmentType.TASK_VARS.value,
                     ),
                     "l2": Literal(type="str", value="hi"),
                     "e2": Expression(expr="{{ a }} world"),
@@ -284,7 +291,7 @@ def describe_modified() -> None:
     def should_reevaluate_when_variable_dynamic(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("when", ScopeLevel.PLAY_VARS, expr="{{ now() }}")
+        ctx.register_variable("when", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
         ctx.evaluate_template("The time is {{ when }}", False)
         ctx.evaluate_template("The time is {{ when }}", False)
 
@@ -307,7 +314,7 @@ def describe_modified() -> None:
                         name="when",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.PLAY_VARS.value,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
                     "e2": e2,
                     "iv2": IntermediateValue(identifier=2),
@@ -317,7 +324,7 @@ def describe_modified() -> None:
                         name="when",
                         version=0,
                         value_version=1,
-                        scope_level=ScopeLevel.PLAY_VARS.value,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
                     "iv4": IntermediateValue(identifier=4),
                 },
@@ -339,11 +346,11 @@ def describe_modified() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("a", ScopeLevel.PLAY_VARS, expr="hello")
-        ctx.register_variable("b", ScopeLevel.PLAY_VARS, expr="{{ a }} world")
+        ctx.register_variable("a", EnvironmentType.HOST_FACTS, expr="hello")
+        ctx.register_variable("b", EnvironmentType.HOST_FACTS, expr="{{ a }} world")
         ctx.evaluate_template("{{ b }}!", False)
-        with ctx.enter_scope(ScopeLevel.TASK_VARS):
-            ctx.register_variable("a", ScopeLevel.TASK_VARS, expr="hi")
+        with ctx.enter_scope(EnvironmentType.TASK_VARS):
+            ctx.register_variable("a", EnvironmentType.TASK_VARS, expr="hi")
             ctx.evaluate_template("{{ b }}!", False)
 
         assert_graphs_match(
@@ -354,14 +361,14 @@ def describe_modified() -> None:
                         name="a",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.PLAY_VARS.value,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
                     "l1": Literal(type="str", value="hello"),
                     "b1": Variable(
                         name="b",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.PLAY_VARS.value,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
                     "e1": Expression(expr="{{ a }} world"),
                     "i1": IntermediateValue(identifier=1),
@@ -371,14 +378,14 @@ def describe_modified() -> None:
                         name="a",
                         version=1,
                         value_version=0,
-                        scope_level=ScopeLevel.TASK_VARS.value,
+                        scope_level=EnvironmentType.TASK_VARS.value,
                     ),
                     "l2": Literal(type="str", value="hi"),
                     "b2": Variable(
                         name="b",
                         version=0,
                         value_version=1,
-                        scope_level=ScopeLevel.PLAY_VARS.value,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
                     "e3": Expression(expr="{{ a }} world"),
                     "i3": IntermediateValue(identifier=3),
@@ -405,10 +412,10 @@ def describe_modified() -> None:
     def should_reevaluate_only_one_var(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("a", ScopeLevel.PLAY_VARS, expr="hello")
-        ctx.register_variable("b", ScopeLevel.PLAY_VARS, expr="world")
+        ctx.register_variable("a", EnvironmentType.HOST_FACTS, expr="hello")
+        ctx.register_variable("b", EnvironmentType.HOST_FACTS, expr="world")
         ctx.evaluate_template("{{ a }} {{ b }}!", False)
-        ctx.register_variable("a", ScopeLevel.PLAY_VARS_PROMPT, expr="hi")
+        ctx.register_variable("a", EnvironmentType.INCLUDE_VARS, expr="hi")
         ctx.evaluate_template("{{ a }} {{ b }}!", False)
 
         assert_graphs_match(
@@ -419,14 +426,14 @@ def describe_modified() -> None:
                         name="a",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.PLAY_VARS.value,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
                     "l1": Literal(type="str", value="hello"),
                     "b": Variable(
                         name="b",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.PLAY_VARS.value,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
                     "l2": Literal(type="str", value="world"),
                     "e1": Expression(expr="{{ a }} {{ b }}!"),
@@ -435,7 +442,7 @@ def describe_modified() -> None:
                         name="a",
                         version=1,
                         value_version=0,
-                        scope_level=ScopeLevel.PLAY_VARS_PROMPT.value,
+                        scope_level=EnvironmentType.INCLUDE_VARS.value,
                     ),
                     "l3": Literal(type="str", value="hi"),
                     "e2": Expression(expr="{{ a }} {{ b }}!"),
@@ -460,10 +467,10 @@ def describe_scoping() -> None:
     def should_use_most_specific_scope(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("a", ScopeLevel.PLAY_VARS, expr="1")
+        ctx.register_variable("a", EnvironmentType.HOST_FACTS, expr="1")
         ctx.evaluate_template("1 {{ a }}", False)
-        with ctx.enter_scope(ScopeLevel.TASK_VARS):
-            ctx.register_variable("a", ScopeLevel.TASK_VARS, expr="2")
+        with ctx.enter_scope(EnvironmentType.TASK_VARS):
+            ctx.register_variable("a", EnvironmentType.TASK_VARS, expr="2")
             ctx.evaluate_template("2 {{ a }}", False)
 
         assert_graphs_match(
@@ -474,7 +481,7 @@ def describe_scoping() -> None:
                         name="a",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.PLAY_VARS.value,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
                     "1": Literal(type="str", value="1"),
                     "e1": Expression(expr="1 {{ a }}"),
@@ -483,7 +490,7 @@ def describe_scoping() -> None:
                         name="a",
                         version=1,
                         value_version=0,
-                        scope_level=ScopeLevel.TASK_VARS.value,
+                        scope_level=EnvironmentType.TASK_VARS.value,
                     ),
                     "2": Literal(type="str", value="2"),
                     "e2": Expression(expr="2 {{ a }}"),
@@ -503,9 +510,9 @@ def describe_scoping() -> None:
     def should_override_root_scope_variables(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("a", ScopeLevel.PLAY_VARS, expr="1")
-        with ctx.enter_scope(ScopeLevel.TASK_VARS):
-            ctx.register_variable("a", ScopeLevel.SET_FACTS_REGISTERED, expr="2")
+        ctx.register_variable("a", EnvironmentType.HOST_FACTS, expr="1")
+        with ctx.enter_scope(EnvironmentType.TASK_VARS):
+            ctx.register_variable("a", EnvironmentType.SET_FACTS_REGISTERED, expr="2")
         ctx.evaluate_template("{{ a }}", False)
 
         assert_graphs_match(
@@ -517,13 +524,13 @@ def describe_scoping() -> None:
                         name="a",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.PLAY_VARS.value,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
                     ),  # UNUSED!
                     "ainner": Variable(
                         name="a",
                         version=1,
                         value_version=0,
-                        scope_level=ScopeLevel.SET_FACTS_REGISTERED.value,
+                        scope_level=EnvironmentType.SET_FACTS_REGISTERED.value,
                     ),
                     "2": Literal(type="str", value="2"),
                     "e": Expression(expr="{{ a }}"),
@@ -543,9 +550,9 @@ def describe_scoping() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("a", ScopeLevel.PLAY_VARS, expr="1")
+        ctx.register_variable("a", EnvironmentType.HOST_FACTS, expr="1")
         ctx.evaluate_template("1 {{ a }}", False)
-        with ctx.enter_scope(ScopeLevel.TASK_VARS):
+        with ctx.enter_scope(EnvironmentType.TASK_VARS):
             ctx.evaluate_template("1 {{ a }}", False)
 
         assert_graphs_match(
@@ -556,7 +563,7 @@ def describe_scoping() -> None:
                         name="a",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.PLAY_VARS.value,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
                     "1": Literal(type="str", value="1"),
                     "e1": Expression(expr="1 {{ a }}"),
@@ -575,10 +582,10 @@ def describe_scoping() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("a", ScopeLevel.PLAY_VARS, expr="1")
+        ctx.register_variable("a", EnvironmentType.HOST_FACTS, expr="1")
         ctx.evaluate_template("1 {{ a }}", False)
-        with ctx.enter_scope(ScopeLevel.TASK_VARS):
-            ctx.register_variable("a", ScopeLevel.TASK_VARS, expr="2")
+        with ctx.enter_scope(EnvironmentType.TASK_VARS):
+            ctx.register_variable("a", EnvironmentType.TASK_VARS, expr="2")
         ctx.evaluate_template("1 {{ a }}", False)
 
         assert_graphs_match(
@@ -589,13 +596,13 @@ def describe_scoping() -> None:
                         name="a",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.PLAY_VARS.value,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
                     "ainner": Variable(
                         name="a",
                         version=1,
                         value_version=0,
-                        scope_level=ScopeLevel.TASK_VARS.value,
+                        scope_level=EnvironmentType.TASK_VARS.value,
                     ),  # UNUSED!
                     "1": Literal(type="str", value="1"),
                     "2": Literal(type="str", value="2"),
@@ -614,11 +621,11 @@ def describe_scoping() -> None:
     def should_hoist_template(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("a", ScopeLevel.PLAY_VARS, expr="1")
-        with ctx.enter_scope(ScopeLevel.TASK_VARS):
-            ctx.register_variable("c", ScopeLevel.TASK_VARS, expr="c")
+        ctx.register_variable("a", EnvironmentType.HOST_FACTS, expr="1")
+        with ctx.enter_scope(EnvironmentType.TASK_VARS):
+            ctx.register_variable("c", EnvironmentType.TASK_VARS, expr="c")
             ctx.evaluate_template("1 {{ a }}", False)
-            ctx.register_variable("a", ScopeLevel.TASK_VARS, expr="2")
+            ctx.register_variable("a", EnvironmentType.TASK_VARS, expr="2")
         ctx.evaluate_template("1 {{ a }}", False)
 
         assert_graphs_match(
@@ -629,19 +636,19 @@ def describe_scoping() -> None:
                         name="a",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.PLAY_VARS.value,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
                     "c": Variable(
                         name="c",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.TASK_VARS.value,
+                        scope_level=EnvironmentType.TASK_VARS.value,
                     ),
                     "ainner": Variable(
                         name="a",
                         version=1,
                         value_version=0,
-                        scope_level=ScopeLevel.TASK_VARS.value,
+                        scope_level=EnvironmentType.TASK_VARS.value,
                     ),
                     "1": Literal(type="str", value="1"),
                     "clit": Literal(type="str", value="c"),
@@ -664,10 +671,10 @@ def describe_scoping() -> None:
 
         # Difference to 'should_use_most_specific_scope': Same template here,
         # different template there
-        ctx.register_variable("a", ScopeLevel.PLAY_VARS, expr="1")
+        ctx.register_variable("a", EnvironmentType.HOST_FACTS, expr="1")
         ctx.evaluate_template("1 {{ a }}", False)
-        with ctx.enter_scope(ScopeLevel.TASK_VARS):
-            ctx.register_variable("a", ScopeLevel.TASK_VARS, expr="2")
+        with ctx.enter_scope(EnvironmentType.TASK_VARS):
+            ctx.register_variable("a", EnvironmentType.TASK_VARS, expr="2")
             ctx.evaluate_template("1 {{ a }}", False)
         ctx.evaluate_template("1 {{ a }}", False)
 
@@ -679,7 +686,7 @@ def describe_scoping() -> None:
                         name="a",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.PLAY_VARS.value,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
                     "1": Literal(type="str", value="1"),
                     "e1": Expression(expr="1 {{ a }}"),
@@ -688,7 +695,7 @@ def describe_scoping() -> None:
                         name="a",
                         version=1,
                         value_version=0,
-                        scope_level=ScopeLevel.TASK_VARS.value,
+                        scope_level=EnvironmentType.TASK_VARS.value,
                     ),
                     "2": Literal(type="str", value="2"),
                     "e2": Expression(expr="1 {{ a }}"),
@@ -708,11 +715,11 @@ def describe_scoping() -> None:
     def should_evaluate_var_into_template_scope(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("a", ScopeLevel.PLAY_VARS, expr="{{ b }}")
-        with ctx.enter_scope(ScopeLevel.TASK_VARS):
-            ctx.register_variable("b", ScopeLevel.TASK_VARS, expr="1")
+        ctx.register_variable("a", EnvironmentType.HOST_FACTS, expr="{{ b }}")
+        with ctx.enter_scope(EnvironmentType.TASK_VARS):
+            ctx.register_variable("b", EnvironmentType.TASK_VARS, expr="1")
             ctx.evaluate_template("{{ a }}", False)
-        ctx.register_variable("b", ScopeLevel.PLAY_VARS, expr="2")
+        ctx.register_variable("b", EnvironmentType.HOST_FACTS, expr="2")
         ctx.evaluate_template("{{ a }}", False)
 
         assert_graphs_match(
@@ -723,7 +730,7 @@ def describe_scoping() -> None:
                         name="a",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.PLAY_VARS.value,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
                     "aei": Expression(expr="{{ b }}"),
                     "aeiv": IntermediateValue(identifier=0),
@@ -731,7 +738,7 @@ def describe_scoping() -> None:
                         name="b",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.TASK_VARS.value,
+                        scope_level=EnvironmentType.TASK_VARS.value,
                     ),
                     "bil": Literal(type="str", value="1"),
                     "ei": Expression(expr="{{ a }}"),
@@ -740,7 +747,7 @@ def describe_scoping() -> None:
                         name="b",
                         version=1,
                         value_version=0,
-                        scope_level=ScopeLevel.PLAY_VARS.value,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
                     "bol": Literal(type="str", value="2"),
                     "eo": Expression(expr="{{ a }}"),
@@ -749,7 +756,7 @@ def describe_scoping() -> None:
                         name="a",
                         version=0,
                         value_version=1,
-                        scope_level=ScopeLevel.PLAY_VARS.value,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
                     "aeo": Expression(expr="{{ b }}"),
                     "aeov": IntermediateValue(identifier=2),
@@ -774,14 +781,18 @@ def describe_scoping() -> None:
     def should_reuse_nested_templates(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        with ctx.enter_scope(ScopeLevel.TASK_VARS):
+        with ctx.enter_scope(EnvironmentType.TASK_VARS):
             ctx.register_variable(
-                "a", ScopeLevel.TASK_VARS, expr='{{ "hello" | reverse }}'
+                "a", EnvironmentType.TASK_VARS, expr='{{ "hello" | reverse }}'
             )
-            ctx.register_variable("b", ScopeLevel.TASK_VARS, expr="{{ c | reverse }}")
-            ctx.register_variable("c", ScopeLevel.TASK_VARS, expr="world")
+            ctx.register_variable(
+                "b", EnvironmentType.TASK_VARS, expr="{{ c | reverse }}"
+            )
+            ctx.register_variable("c", EnvironmentType.TASK_VARS, expr="world")
             ctx.evaluate_template("{{ b }} {{ a }}", False)
-        ctx.register_variable("a", ScopeLevel.PLAY_VARS, expr='{{ "hello" | reverse }}')
+        ctx.register_variable(
+            "a", EnvironmentType.HOST_FACTS, expr='{{ "hello" | reverse }}'
+        )
         ctx.evaluate_template("{{ b }} {{ a }}", False)
 
         assert_graphs_match(
@@ -792,7 +803,7 @@ def describe_scoping() -> None:
                         name="c",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.TASK_VARS.value,
+                        scope_level=EnvironmentType.TASK_VARS.value,
                     ),
                     "cl": Literal(type="str", value="world"),
                     "bie": Expression(expr="{{ c | reverse }}"),
@@ -801,7 +812,7 @@ def describe_scoping() -> None:
                         name="b",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.TASK_VARS.value,
+                        scope_level=EnvironmentType.TASK_VARS.value,
                     ),
                     "ae": Expression(expr='{{ "hello" | reverse }}'),
                     "aiv": IntermediateValue(identifier=1),
@@ -809,7 +820,7 @@ def describe_scoping() -> None:
                         name="a",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.TASK_VARS.value,
+                        scope_level=EnvironmentType.TASK_VARS.value,
                     ),
                     "ie": Expression(expr="{{ b }} {{ a }}"),
                     "iev": IntermediateValue(identifier=2),
@@ -817,13 +828,13 @@ def describe_scoping() -> None:
                         name="b",
                         version=1,
                         value_version=0,
-                        scope_level=ScopeLevel.CLI_VALUES.value,
+                        scope_level=EnvironmentType.CLI_VALUES.value,
                     ),
                     "ao": Variable(
                         name="a",
                         version=1,
                         value_version=0,
-                        scope_level=ScopeLevel.PLAY_VARS.value,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
                     "oe": Expression(expr="{{ b }} {{ a }}"),
                     "oev": IntermediateValue(identifier=3),
@@ -849,10 +860,10 @@ def describe_scoping() -> None:
     def should_hoist_variable_binding(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("a", ScopeLevel.PLAY_VARS, expr="{{ b }}")
-        with ctx.enter_scope(ScopeLevel.TASK_VARS):
-            ctx.register_variable("b", ScopeLevel.TASK_VARS, expr="1")
-            with ctx.enter_scope(ScopeLevel.TASK_VARS):
+        ctx.register_variable("a", EnvironmentType.HOST_FACTS, expr="{{ b }}")
+        with ctx.enter_scope(EnvironmentType.TASK_VARS):
+            ctx.register_variable("b", EnvironmentType.TASK_VARS, expr="1")
+            with ctx.enter_scope(EnvironmentType.TASK_VARS):
                 ctx.evaluate_template("{{ a }}", False)
             ctx.evaluate_template("{{ a }}", False)  # Should reuse above expr
 
@@ -864,13 +875,13 @@ def describe_scoping() -> None:
                         name="a",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.PLAY_VARS.value,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
                     "b": Variable(
                         name="b",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.TASK_VARS.value,
+                        scope_level=EnvironmentType.TASK_VARS.value,
                     ),
                     "lb": Literal(type="str", value="1"),
                     "ae": Expression(expr="{{ b }}"),
@@ -892,12 +903,12 @@ def describe_scoping() -> None:
     def should_respect_precedence(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        vn = ctx.register_variable("b", ScopeLevel.SET_FACTS_REGISTERED)
+        vn = ctx.register_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
         ln = Literal(type="int", value=1)
         g.add_node(ln)
         g.add_edge(ln, vn, DEF)
-        with ctx.enter_scope(ScopeLevel.TASK_VARS):
-            ctx.register_variable("b", ScopeLevel.TASK_VARS, expr="2")
+        with ctx.enter_scope(EnvironmentType.TASK_VARS):
+            ctx.register_variable("b", EnvironmentType.TASK_VARS, expr="2")
             ctx.evaluate_template("{{ b }}", False)
 
         assert_graphs_match(
@@ -910,13 +921,13 @@ def describe_scoping() -> None:
                         name="b",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.SET_FACTS_REGISTERED.value,
+                        scope_level=EnvironmentType.SET_FACTS_REGISTERED.value,
                     ),
                     "bt": Variable(
                         name="b",
                         version=1,
                         value_version=0,
-                        scope_level=ScopeLevel.TASK_VARS.value,
+                        scope_level=EnvironmentType.TASK_VARS.value,
                     ),
                     "be": Expression(expr="{{ b }}"),
                     "beiv": IntermediateValue(identifier=0),
@@ -935,9 +946,9 @@ def describe_scoping() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        with ctx.enter_scope(ScopeLevel.TASK_VARS):
-            ctx.register_variable("b", ScopeLevel.TASK_VARS, expr="1")
-        vn = ctx.register_variable("b", ScopeLevel.SET_FACTS_REGISTERED)
+        with ctx.enter_scope(EnvironmentType.TASK_VARS):
+            ctx.register_variable("b", EnvironmentType.TASK_VARS, expr="1")
+        vn = ctx.register_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
         ln = Literal(type="int", value=2)
         g.add_node(ln)
         g.add_edge(ln, vn, DEF)
@@ -953,13 +964,13 @@ def describe_scoping() -> None:
                         name="b",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.TASK_VARS.value,
+                        scope_level=EnvironmentType.TASK_VARS.value,
                     ),
                     "b": Variable(
                         name="b",
                         version=1,
                         value_version=0,
-                        scope_level=ScopeLevel.SET_FACTS_REGISTERED.value,
+                        scope_level=EnvironmentType.SET_FACTS_REGISTERED.value,
                     ),
                     "be": Expression(expr="{{ b }}"),
                     "beiv": IntermediateValue(identifier=0),
@@ -978,9 +989,9 @@ def describe_scoping() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        with ctx.enter_scope(ScopeLevel.TASK_VARS):
-            ctx.register_variable("b", ScopeLevel.TASK_VARS, expr="1")
-            vn = ctx.register_variable("b", ScopeLevel.SET_FACTS_REGISTERED)
+        with ctx.enter_scope(EnvironmentType.TASK_VARS):
+            ctx.register_variable("b", EnvironmentType.TASK_VARS, expr="1")
+            vn = ctx.register_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
             ln = Literal(type="int", value=2)
             g.add_node(ln)
             g.add_edge(ln, vn, DEF)
@@ -997,13 +1008,13 @@ def describe_scoping() -> None:
                         name="b",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.TASK_VARS.value,
+                        scope_level=EnvironmentType.TASK_VARS.value,
                     ),
                     "b": Variable(
                         name="b",
                         version=1,
                         value_version=0,
-                        scope_level=ScopeLevel.SET_FACTS_REGISTERED.value,
+                        scope_level=EnvironmentType.SET_FACTS_REGISTERED.value,
                     ),
                     "be": Expression(expr="{{ b }}"),
                     "beiv": IntermediateValue(identifier=0),
@@ -1023,8 +1034,8 @@ def _describe_caching() -> None:
     def should_cache_dynamic_template_variables(create_context: ContextCreator) -> None:
         ctx, _ = create_context()
 
-        ctx.register_variable("b", ScopeLevel.PLAY_VARS, expr="{{ now() }}")
-        with ctx.enter_cached_scope(ScopeLevel.TASK_VARS):
+        ctx.register_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
+        with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
             tr = ctx.evaluate_template("{{ b }}", False)
             tr2 = ctx.evaluate_template("{{ b }}", False)  # Should reuse above
 
@@ -1033,8 +1044,8 @@ def _describe_caching() -> None:
     def should_discard_after_leaving_scope(create_context: ContextCreator) -> None:
         ctx, _ = create_context()
 
-        ctx.register_variable("b", ScopeLevel.PLAY_VARS, expr="{{ now() }}")
-        with ctx.enter_cached_scope(ScopeLevel.TASK_VARS):
+        ctx.register_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
+        with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
             tr = ctx.evaluate_template("{{ b }}", False)
             tr2 = ctx.evaluate_template("{{ b }}", False)  # Should reuse above
         tr3 = ctx.evaluate_template("{{ b }}", False)  # Should not reuse above
@@ -1047,9 +1058,9 @@ def _describe_caching() -> None:
     ) -> None:
         ctx, _ = create_context()
 
-        ctx.register_variable("b", ScopeLevel.PLAY_VARS, expr="{{ now() }}")
+        ctx.register_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
         tr1 = ctx.evaluate_template("{{ b }}", False)
-        with ctx.enter_cached_scope(ScopeLevel.TASK_VARS):
+        with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
             tr2 = ctx.evaluate_template("{{ b }}", False)
         tr3 = ctx.evaluate_template("{{ b }}", False)
 
@@ -1060,7 +1071,7 @@ def _describe_caching() -> None:
     def should_not_cache_bare_expressions(create_context: ContextCreator) -> None:
         ctx, _ = create_context()
 
-        with ctx.enter_cached_scope(ScopeLevel.TASK_VARS):
+        with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
             tr1 = ctx.evaluate_template("{{ now() }}", False)
             tr2 = ctx.evaluate_template("{{ now() }}", False)
 
@@ -1069,10 +1080,10 @@ def _describe_caching() -> None:
     def should_not_reuse_outer_cache(create_context: ContextCreator) -> None:
         ctx, _ = create_context()
 
-        ctx.register_variable("b", ScopeLevel.PLAY_VARS, expr="{{ now() }}")
-        with ctx.enter_cached_scope(ScopeLevel.TASK_VARS):
+        ctx.register_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
+        with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
             tro1 = ctx.evaluate_template("{{ b }}", False)
-            with ctx.enter_cached_scope(ScopeLevel.TASK_VARS):
+            with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
                 tri1 = ctx.evaluate_template("{{ b }}", False)
                 tri2 = ctx.evaluate_template("{{ b }}", False)
             tro2 = ctx.evaluate_template("{{ b }}", False)
@@ -1084,9 +1095,9 @@ def _describe_caching() -> None:
     def should_cache_nested_variables(create_context: ContextCreator) -> None:
         ctx, _ = create_context()
 
-        ctx.register_variable("b", ScopeLevel.PLAY_VARS, expr="{{ now() }}")
-        ctx.register_variable("a", ScopeLevel.PLAY_VARS, expr="{{ b }}")
-        with ctx.enter_cached_scope(ScopeLevel.TASK_VARS):
+        ctx.register_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
+        ctx.register_variable("a", EnvironmentType.HOST_FACTS, expr="{{ b }}")
+        with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
             tr1 = ctx.evaluate_template("{{ a }}", False)
             tr2 = ctx.evaluate_template("{{ a }}", False)
 
@@ -1097,8 +1108,8 @@ def _describe_caching() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("b", ScopeLevel.PLAY_VARS, expr="{{ now() }}")
-        with ctx.enter_cached_scope(ScopeLevel.TASK_VARS):
+        ctx.register_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
+        with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
             ctx.evaluate_template("{{ b + 1 }}", False)
             ctx.evaluate_template("{{ b + 2 }}", False)
 
@@ -1110,7 +1121,7 @@ def _describe_caching() -> None:
                         name="b",
                         version=0,
                         value_version=0,
-                        scope_level=ScopeLevel.PLAY_VARS.value,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
                     "be": Expression(expr="{{ now() }}"),
                     "bei": IntermediateValue(identifier=0),

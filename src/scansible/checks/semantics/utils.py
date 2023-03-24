@@ -4,7 +4,7 @@ from typing import Type, TypeVar
 
 from enum import Enum
 
-from scansible.representations.pdg.extractor.expressions import ScopeLevel
+from scansible.representations.pdg.extractor.expressions import EnvironmentType
 from scansible.representations.pdg.representation import (
     Conditional,
     ControlFlowEdge,
@@ -180,7 +180,7 @@ def get_register_all_used_variables(graph: Graph, var: Variable) -> list[Variabl
 
 
 def is_registered_variable(graph: Graph, var: Variable) -> bool:
-    return var.scope_level == ScopeLevel.SET_FACTS_REGISTERED.value and bool(
+    return var.scope_level == EnvironmentType.SET_FACTS_REGISTERED.value and bool(
         get_node_predecessors(graph, var, node_type=Task, edge_type=Def)
     )
 

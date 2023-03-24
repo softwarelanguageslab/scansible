@@ -12,7 +12,7 @@ from scansible.representations.structural import (
 )
 
 from .context import ExtractionContext
-from .expressions import ScopeLevel
+from .expressions import EnvironmentType
 from .handler_lists import HandlerListExtractor
 from .result import ExtractionResult
 from .role_dependencies import extract_role_dependency
@@ -33,17 +33,17 @@ class PlaybookExtractor:
 
         for play in self.playbook.plays:
             with self.context.vars.enter_scope(
-                ScopeLevel.PLAY_VARS
+                EnvironmentType.PLAY_VARS
             ), self.context.vars.enter_scope(
-                ScopeLevel.PLAY_VARS_PROMPT
+                EnvironmentType.PLAY_VARS_PROMPT
             ), self.context.vars.enter_scope(
-                ScopeLevel.PLAY_VARS_FILES
+                EnvironmentType.PLAY_VARS_FILES
             ):
                 # Extract variables first. Order doesn't really matter.
 
                 # - Play variables
                 VariablesExtractor(self.context, play.vars).extract_variables(
-                    ScopeLevel.PLAY_VARS
+                    EnvironmentType.PLAY_VARS
                 )
 
                 # - Play vars_prompt
@@ -51,7 +51,7 @@ class PlaybookExtractor:
                 VariablesExtractor(
                     self.context,
                     {prompt.name: prompt.default for prompt in play.vars_prompt},
-                ).extract_variables(ScopeLevel.PLAY_VARS_PROMPT)
+                ).extract_variables(EnvironmentType.PLAY_VARS_PROMPT)
 
                 # - Play vars_files
                 # TODO: Not clear whether this follows Ansible's search mechanism.
@@ -73,7 +73,7 @@ class PlaybookExtractor:
 
                             VariablesExtractor(
                                 self.context, file_content.variables
-                            ).extract_variables(ScopeLevel.PLAY_VARS_FILES)
+                            ).extract_variables(EnvironmentType.PLAY_VARS_FILES)
                             break
                     else:
                         logger.bind(location=play.location).error(

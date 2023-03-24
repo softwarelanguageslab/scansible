@@ -11,6 +11,8 @@ from ..result import ExtractionResult
 from ._dynamic_includes import DynamicIncludesExtractor
 
 
+# TODO: Properly distinguish between private and public role includes, i.e.,
+# whether the scopes pop.
 class IncludeRoleExtractor(DynamicIncludesExtractor[Role]):
     CONTENT_TYPE = "role"
 

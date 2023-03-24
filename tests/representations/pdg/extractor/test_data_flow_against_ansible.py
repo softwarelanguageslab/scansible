@@ -26,22 +26,22 @@ from hypothesis import strategies as st
 
 from scansible.representations.pdg import representation as rep
 from scansible.representations.pdg.extractor import extract_pdg
-from scansible.representations.pdg.extractor.expressions import ScopeLevel
+from scansible.representations.pdg.extractor.expressions import EnvironmentType
 from scansible.representations.pdg.extractor.expressions.templates import (
     TemplateExpressionAST,
 )
 from scansible.representations.pdg.io.neo4j import dump_graph
 
 _considered_scopes = [
-    ScopeLevel.TASK_VARS,
-    ScopeLevel.BLOCK_VARS,
-    ScopeLevel.INCLUDE_VARS,
-    ScopeLevel.SET_FACTS_REGISTERED,
-    ScopeLevel.INCLUDE_PARAMS,
+    EnvironmentType.TASK_VARS,
+    EnvironmentType.BLOCK_VARS,
+    EnvironmentType.INCLUDE_VARS,
+    EnvironmentType.SET_FACTS_REGISTERED,
+    EnvironmentType.INCLUDE_PARAMS,
 ]
 _considered_init_scopes = [
-    ScopeLevel.ROLE_DEFAULTS,
-    ScopeLevel.ROLE_VARS,
+    EnvironmentType.ROLE_DEFAULTS,
+    EnvironmentType.ROLE_VARS,
 ]
 _ansible_scopes = st.sampled_from(_considered_scopes)
 _ansible_init_scopes = st.sampled_from(_considered_init_scopes)
@@ -160,15 +160,15 @@ class CodeGen:
     def is_in_nested_local_block(self) -> bool:
         return len(self._block_stack) > 4
 
-    def add_var_to_scope(self, scope_level: ScopeLevel) -> None:
+    def add_var_to_scope(self, scope_level: EnvironmentType) -> None:
         adders = {
-            ScopeLevel.ROLE_DEFAULTS: self._add_default,
-            ScopeLevel.ROLE_VARS: self._add_role_var,
-            ScopeLevel.BLOCK_VARS: self._add_block_local,
-            ScopeLevel.TASK_VARS: self._add_task_local,
-            ScopeLevel.INCLUDE_VARS: self._add_include,
-            ScopeLevel.SET_FACTS_REGISTERED: self._add_set_fact,
-            ScopeLevel.INCLUDE_PARAMS: self._add_include_tasks,
+            EnvironmentType.ROLE_DEFAULTS: self._add_default,
+            EnvironmentType.ROLE_VARS: self._add_role_var,
+            EnvironmentType.BLOCK_VARS: self._add_block_local,
+            EnvironmentType.TASK_VARS: self._add_task_local,
+            EnvironmentType.INCLUDE_VARS: self._add_include,
+            EnvironmentType.SET_FACTS_REGISTERED: self._add_set_fact,
+            EnvironmentType.INCLUDE_PARAMS: self._add_include_tasks,
         }
 
         adders[scope_level]()

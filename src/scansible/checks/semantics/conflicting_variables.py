@@ -4,7 +4,7 @@ from collections import defaultdict
 from collections.abc import Callable, Iterable
 
 from scansible.representations.pdg import Graph, Variable
-from scansible.representations.pdg.extractor.expressions import ScopeLevel
+from scansible.representations.pdg.extractor.expressions import EnvironmentType
 
 
 def is_globally_scoped(scope: int) -> bool:
@@ -84,11 +84,13 @@ class ConflictingVariables:
             # Throw out anything with precedence higher than set_fact/register
             # They are locally scoped, so they cannot cause conflicts
             var_defs = [
-                vd for vd in var_defs if vd[1] <= ScopeLevel.SET_FACTS_REGISTERED.value
+                vd
+                for vd in var_defs
+                if vd[1] <= EnvironmentType.SET_FACTS_REGISTERED.value
             ]
 
             for idx, (role_name, scope) in enumerate(var_defs):
-                if scope < ScopeLevel.INCLUDE_VARS.value:
+                if scope < EnvironmentType.INCLUDE_VARS.value:
                     # These cannot cause conflicts anymore
                     break
 

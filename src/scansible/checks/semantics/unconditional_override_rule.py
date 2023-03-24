@@ -4,7 +4,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 
 from scansible.representations.pdg.extractor.context import VisibilityInformation
-from scansible.representations.pdg.extractor.expressions import ScopeLevel
+from scansible.representations.pdg.extractor.expressions import EnvironmentType
 from scansible.representations.pdg.representation import Graph, Variable
 
 from .base import Rule, RuleResult
@@ -92,7 +92,7 @@ class UnconditionalOverrideRule(Rule):
                 e2_uses = get_all_used_variables(graph, e2)
                 if vals_v1 & set(e2_uses):
                     continue
-            elif v2.scope_level == ScopeLevel.SET_FACTS_REGISTERED.value:
+            elif v2.scope_level == EnvironmentType.SET_FACTS_REGISTERED.value:
                 # For variables defined through register, we instead check all
                 # variables used in the task evaluation
                 e2_uses = get_register_all_used_variables(graph, v2)

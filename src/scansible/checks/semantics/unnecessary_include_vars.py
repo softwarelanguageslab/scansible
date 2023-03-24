@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 from scansible.representations.pdg.extractor.context import VisibilityInformation
-from scansible.representations.pdg.extractor.expressions import ScopeLevel
+from scansible.representations.pdg.extractor.expressions import EnvironmentType
 from scansible.representations.pdg.representation import (
     Def,
     Expression,
@@ -52,7 +52,7 @@ def is_idempotent_expr(graph: Graph, expr: Expression) -> bool:
     changeable_used_vars = [
         uv
         for uv in used_vars
-        if uv.scope_level != ScopeLevel.SET_FACTS_REGISTERED.value
+        if uv.scope_level != EnvironmentType.SET_FACTS_REGISTERED.value
     ]
     # Find definitions of uses
     used_exprs: list[Expression] = [
@@ -72,7 +72,7 @@ class UnnecessaryIncludeVarsRule(Rule):
         included_vars = [
             node
             for node in get_nodes(graph, Variable)
-            if node.scope_level == ScopeLevel.INCLUDE_VARS.value
+            if node.scope_level == EnvironmentType.INCLUDE_VARS.value
         ]
         # Group into unique definitions so we only emit a warning for the first value version
         # We keep the other value versions so we can show all usages of this definition

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from ... import representation as rep
-from ..expressions import RecursiveDefinitionError, ScopeLevel
+from ..expressions import EnvironmentType, RecursiveDefinitionError
 from ..result import ExtractionResult
 from .base import TaskExtractor
 
@@ -30,7 +30,7 @@ class GenericTaskExtractor(TaskExtractor):
 
     def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
         self.logger.debug(f"Extracting task with name {self.task.name!r}")
-        with self.setup_task_vars_scope(ScopeLevel.TASK_VARS):
+        with self.setup_task_vars_scope(EnvironmentType.TASK_VARS):
             if self.task.loop:
                 result = self._extract_looping_task(predecessors)
             else:
@@ -63,9 +63,9 @@ class GenericTaskExtractor(TaskExtractor):
             self.context.graph.add_edge(pred, loop_node, rep.ORDER)
 
         # For some reason, loop vars have the same precedence as include params.
-        with self.context.vars.enter_scope(ScopeLevel.INCLUDE_PARAMS):
+        with self.context.vars.enter_scope(EnvironmentType.INCLUDE_PARAMS):
             loop_target_var = self.context.vars.register_variable(
-                loop_var_name, ScopeLevel.INCLUDE_PARAMS
+                loop_var_name, EnvironmentType.INCLUDE_PARAMS
             )
             self.context.graph.add_edge(
                 loop_source_var, loop_target_var, rep.DEF_LOOP_ITEM
@@ -141,7 +141,7 @@ class GenericTaskExtractor(TaskExtractor):
             return []
 
         vn = self.context.vars.register_variable(
-            self.task.register, ScopeLevel.SET_FACTS_REGISTERED
+            self.task.register, EnvironmentType.SET_FACTS_REGISTERED
         )
         self.context.graph.add_node(vn)
         self.context.graph.add_edge(task, vn, rep.DEF)

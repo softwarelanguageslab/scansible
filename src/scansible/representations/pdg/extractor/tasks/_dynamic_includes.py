@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from scansible.representations.structural.representation import AnyValue
 
 from ... import representation as rep
-from ..expressions import ScopeLevel
+from ..expressions import EnvironmentType
 from ..result import ExtractionResult
 from .base import TaskExtractor, TaskVarsScopeLevel
 
@@ -17,7 +17,7 @@ _IncludedContent = TypeVar("_IncludedContent")
 
 class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]):
     CONTENT_TYPE: ClassVar[str]
-    TASK_VARS_SCOPE_LEVEL: ClassVar[TaskVarsScopeLevel] = ScopeLevel.INCLUDE_PARAMS
+    TASK_VARS_SCOPE_LEVEL: ClassVar[TaskVarsScopeLevel] = EnvironmentType.INCLUDE_PARAMS
 
     @abc.abstractmethod
     def _extract_included_name(self, args: dict[str, AnyValue]) -> AnyValue:

@@ -4,7 +4,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 
 from scansible.representations.pdg.extractor.context import VisibilityInformation
-from scansible.representations.pdg.extractor.expressions import ScopeLevel
+from scansible.representations.pdg.extractor.expressions import EnvironmentType
 from scansible.representations.pdg.representation import Graph, Variable
 
 from .base import Rule, RuleResult
@@ -78,7 +78,7 @@ class UnusedOverriddenRule(Rule):
                 # the same name as a parameter. This new variable can be used
                 # when the included file is left. Example: jkupferer.openshift_aws_cleanup
                 assert (
-                    v1.scope_level == ScopeLevel.INCLUDE_PARAMS.value
+                    v1.scope_level == EnvironmentType.INCLUDE_PARAMS.value
                 ), f"Determined that variable {v2!r} should be unusable because it is shadowed by a higher precedence one, but there appear to be usages either way"
                 continue
 
