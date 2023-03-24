@@ -8,7 +8,7 @@ from functools import partial
 from itertools import chain
 from pathlib import Path
 
-from scansible.representations._utils import actions
+from scansible.utils import actions
 
 from . import ansible_types as ans
 from . import loaders

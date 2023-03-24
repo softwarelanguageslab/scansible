@@ -4,13 +4,13 @@ from typing import ContextManager, cast
 
 from collections.abc import Sequence
 
-from scansible.representations._utils import actions
 from scansible.representations.structural.representation import (
     AnyValue,
     Block,
     Task,
     TaskFile,
 )
+from scansible.utils import actions
 
 from ... import representation as rep
 from ..result import ExtractionResult

@@ -15,7 +15,7 @@ from contextlib import contextmanager
 from copy import deepcopy
 from pathlib import Path
 
-from scansible.representations._utils import actions
+from scansible.utils import actions
 
 from . import ansible_types as ans
 from .helpers import ProjectPath, parse_file, validate_ansible_object

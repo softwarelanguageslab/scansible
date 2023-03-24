@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Union
+from typing import Any, Union
 
 import types
+from collections.abc import Callable
 
 import attrs
 from attrs_strict import AttributeTypeError

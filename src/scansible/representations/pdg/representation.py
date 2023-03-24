@@ -11,7 +11,7 @@ import attrs
 from attrs import define, field, frozen, setters
 from networkx.classes import MultiDiGraph
 
-from .._utils import type_validator
+from scansible.utils.type_validators import type_validator
 
 ValidTypeStr = LiteralT[
     "str",

@@ -21,7 +21,8 @@ from pathlib import Path
 import attrs
 from attrs import define, field, frozen
 
-from .._utils import type_validator
+from scansible.utils.type_validators import type_validator
+
 from . import ansible_types as ans
 
 # Type aliases
