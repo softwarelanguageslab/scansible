@@ -4,7 +4,7 @@ from typing import NamedTuple
 
 import pytest
 
-from scansible.representations.pdg.extractor.templates import (
+from scansible.representations.pdg.extractor.expressions.templates import (
     LookupTarget,
     LookupTargetLiteral,
     LookupTargetVariable,

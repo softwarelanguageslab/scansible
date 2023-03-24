@@ -12,8 +12,8 @@ from scansible.representations.structural import TaskBase
 
 from ... import representation as rep
 from ..context import ExtractionContext
+from ..expressions import RecursiveDefinitionError, ScopeLevel
 from ..result import ExtractionResult
-from ..var_context import RecursiveDefinitionError, ScopeLevel
 from ..variables import VariablesExtractor
 
 TaskVarsScopeLevel = Literal[ScopeLevel.TASK_VARS, ScopeLevel.INCLUDE_PARAMS]

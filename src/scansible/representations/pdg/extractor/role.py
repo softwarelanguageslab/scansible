@@ -8,11 +8,11 @@ from scansible.representations.structural import Role
 
 from .. import representation as rep
 from .context import ExtractionContext
+from .expressions import ScopeLevel
 from .handler_lists import HandlerListExtractor
 from .result import ExtractionResult
 from .role_dependencies import extract_role_dependency
 from .task_lists import TaskListExtractor
-from .var_context import ScopeLevel
 from .variables import VariablesExtractor
 
 

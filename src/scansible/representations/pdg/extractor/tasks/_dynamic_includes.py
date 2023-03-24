@@ -8,8 +8,8 @@ from collections.abc import Sequence
 from scansible.representations.structural.representation import AnyValue
 
 from ... import representation as rep
+from ..expressions import ScopeLevel
 from ..result import ExtractionResult
-from ..var_context import ScopeLevel
 from .base import TaskExtractor, TaskVarsScopeLevel
 
 _IncludedContent = TypeVar("_IncludedContent")

@@ -20,7 +20,7 @@ from scansible.representations.structural.helpers import (
 )
 
 from .. import representation as rep
-from .var_context import VarContext
+from .expressions import VarContext
 
 LocTuple: TypeAlias = tuple[str, int, int]
 

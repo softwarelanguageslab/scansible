@@ -13,10 +13,10 @@ from loguru import logger
 
 from scansible.representations import structural as struct
 
-from .. import representation as rep
+from ... import representation as rep
 
 if TYPE_CHECKING:
-    from .context import ExtractionContext
+    from ..context import ExtractionContext
 
 from .templates import LookupTargetLiteral, TemplateExpressionAST
 

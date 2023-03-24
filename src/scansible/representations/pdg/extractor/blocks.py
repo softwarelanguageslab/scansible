@@ -8,8 +8,8 @@ from scansible.representations.structural import Block, Task
 
 from .. import representation as rep
 from .context import ExtractionContext
+from .expressions import RecursiveDefinitionError, ScopeLevel
 from .result import ExtractionResult
-from .var_context import RecursiveDefinitionError, ScopeLevel
 
 
 class BlockExtractor:

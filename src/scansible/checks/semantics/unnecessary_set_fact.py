@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from scansible.representations.pdg.extractor.context import VisibilityInformation
-from scansible.representations.pdg.extractor.var_context import ScopeLevel
+from scansible.representations.pdg.extractor.expressions import ScopeLevel
 from scansible.representations.pdg.representation import (
     Def,
     Expression,

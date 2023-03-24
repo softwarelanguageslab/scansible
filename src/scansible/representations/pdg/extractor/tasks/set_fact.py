@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from ... import representation as rep
+from ..expressions import RecursiveDefinitionError, ScopeLevel
 from ..result import ExtractionResult
-from ..var_context import RecursiveDefinitionError, ScopeLevel
 from .base import TaskExtractor
 
 

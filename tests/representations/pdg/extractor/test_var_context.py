@@ -18,7 +18,7 @@ from scansible.representations.pdg import (
     Variable,
 )
 from scansible.representations.pdg.extractor.context import ExtractionContext
-from scansible.representations.pdg.extractor.var_context import ScopeLevel, VarContext
+from scansible.representations.pdg.extractor.expressions import ScopeLevel, VarContext
 from test_utils.graph_matchers import assert_graphs_match, create_graph
 
 ContextCreator = Callable[[], tuple[VarContext, Graph]]

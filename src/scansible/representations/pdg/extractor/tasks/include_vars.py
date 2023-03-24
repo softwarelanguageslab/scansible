@@ -7,8 +7,8 @@ from collections.abc import Sequence
 from scansible.representations.structural.representation import AnyValue, VariableFile
 
 from ... import representation as rep
+from ..expressions import ScopeLevel
 from ..result import ExtractionResult
-from ..var_context import ScopeLevel
 from ..variables import VariablesExtractor
 from ._dynamic_includes import DynamicIncludesExtractor
 

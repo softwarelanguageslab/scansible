@@ -8,8 +8,8 @@ from scansible.representations.structural import RoleRequirement
 
 from .. import representation as rep
 from .context import ExtractionContext
+from .expressions import ScopeLevel
 from .result import ExtractionResult
-from .var_context import ScopeLevel
 
 
 def extract_role_dependency(
