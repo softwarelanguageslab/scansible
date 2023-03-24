@@ -14,7 +14,7 @@ def run_all_checks(ctx: ExtractionContext) -> list[CheckResult]:
     orig_results = orig_run_all_checks(ctx.graph, ctx.visibility_information)
     return [
         CheckResult(
-            f"{res.rule_category}: {res.rule_name}", res.location or "Unknown file"
+            f"{res.rule_category}: {res.rule_name}", str(res.location or "Unknown file")
         )
         for res in orig_results
     ]
