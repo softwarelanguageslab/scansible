@@ -1,7 +1,17 @@
 """Structural model for roles."""
 from __future__ import annotations
 
-from typing import Any, ClassVar, Iterable, Mapping, Protocol, Sequence, TypeVar, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Iterable,
+    Mapping,
+    Protocol,
+    Sequence,
+    TypeVar,
+    Union,
+)
 
 import datetime
 import re
@@ -163,7 +173,8 @@ class StructuralVisitor(Protocol[VisitorReturnType]):
 
 
 class StructuralBase:
-    __attrs_attrs__: ClassVar[Sequence[attrs.Attribute[Any]]]
+    if TYPE_CHECKING:
+        __attrs_attrs__: ClassVar[Sequence[attrs.Attribute[Any]]]
 
     def accept(
         self, visitor: StructuralVisitor[VisitorReturnType]

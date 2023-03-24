@@ -7,11 +7,10 @@ import json
 
 import attrs
 
-from .. import Edge, Graph, Node
 from .. import representation as rep
 
 
-def _get_shared_node_attrs(g: Graph) -> dict[str, str]:
+def _get_shared_node_attrs(g: rep.Graph) -> dict[str, str]:
     return {"role_name": g.role_name, "role_version": g.role_version}
 
 
@@ -31,7 +30,7 @@ def _create_attr_content(attrs: dict[str, Any]) -> str:
     )
 
 
-def dump_node(n: Node, g: Graph) -> str:
+def dump_node(n: rep.Node, g: rep.Graph) -> str:
     node_label = n.__class__.__name__
     node_id = n.node_id
     node_attrs = attrs.asdict(n) | _get_shared_node_attrs(g)
@@ -41,7 +40,7 @@ def dump_node(n: Node, g: Graph) -> str:
     return f"(n{node_id}:{node_label} {{ {attr_content} }})"
 
 
-def dump_edge(e: Edge, source: Node, target: Node) -> str:
+def dump_edge(e: rep.Edge, source: rep.Node, target: rep.Node) -> str:
     source_id = source.node_id
     target_id = target.node_id
     edge_label = e.__class__.__name__.upper()
@@ -58,7 +57,7 @@ def dump_edge(e: Edge, source: Node, target: Node) -> str:
     return f"(n{source_id})-[{edge_spec}]->(n{target_id})"
 
 
-def dump_graph(g: Graph) -> str:
+def dump_graph(g: rep.Graph) -> str:
     node_strs = [dump_node(n, g) for n in g]
     edge_strs = [
         dump_edge(e["type"], src, target) for (src, target, e) in g.edges(data=True)

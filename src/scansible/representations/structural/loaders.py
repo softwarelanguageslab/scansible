@@ -99,7 +99,7 @@ def load_role_metadata(path: ProjectPath) -> tuple[dict[str, ans.AnsibleValue], 
     if not isinstance(ds, dict):
         raise LoadTypeError("role metadata", dict, ds, path.relative)
 
-    ds = cast(dict[str, ans.AnsibleValue], ds)
+    ds = cast(dict[str, "ans.AnsibleValue"], ds)
 
     _validate_meta_galaxy_info(ds)
     _load_meta_platforms(ds)
@@ -191,12 +191,12 @@ def load_variable_file(path: ProjectPath) -> tuple[dict[str, ans.AnsibleValue], 
     if not isinstance(ds, dict):
         raise LoadTypeError("variable file", dict, ds, path.relative)
 
-    ds = cast(dict[ans.AnsibleValue, ans.AnsibleValue], ds)
+    ds = cast(dict["ans.AnsibleValue", "ans.AnsibleValue"], ds)
     for var_name in ds:
         if not isinstance(var_name, str):
             raise LoadTypeError("variable name", str, var_name, path.relative)
 
-    return cast(dict[str, ans.AnsibleValue], ds), original_ds
+    return cast(dict[str, "ans.AnsibleValue"], ds), original_ds
 
 
 def load_tasks_file(path: ProjectPath) -> tuple[list[dict[str, ans.AnsibleValue]], Any]:
@@ -209,7 +209,7 @@ def load_tasks_file(path: ProjectPath) -> tuple[list[dict[str, ans.AnsibleValue]
     if not isinstance(ds, list):
         raise LoadTypeError("task file", list, ds, path.relative)
 
-    ds = cast(list[ans.AnsibleValue], ds)
+    ds = cast(list["ans.AnsibleValue"], ds)
     for content in ds:
         if not isinstance(content, dict) or not all(
             isinstance(prop, str) for prop in content
@@ -218,7 +218,7 @@ def load_tasks_file(path: ProjectPath) -> tuple[list[dict[str, ans.AnsibleValue]
                 "task file content", dict[str, Any], content, path.relative
             )
 
-    return cast(list[dict[str, ans.AnsibleValue]], ds), original_ds
+    return cast(list[dict[str, "ans.AnsibleValue"]], ds), original_ds
 
 
 @contextmanager
@@ -501,7 +501,7 @@ def load_playbook(path: ProjectPath) -> tuple[list[dict[str, ans.AnsibleValue]],
     if not isinstance(ds, list):
         raise LoadTypeError("playbook", list, ds, path.relative)
 
-    ds = cast(list[ans.AnsibleValue], ds)
+    ds = cast(list["ans.AnsibleValue"], ds)
 
     # Transform old include action into import_playbook
     for child in ds:
@@ -510,7 +510,7 @@ def load_playbook(path: ProjectPath) -> tuple[list[dict[str, ans.AnsibleValue]],
         if "include" in child:
             child["import_playbook"] = child.pop("include")
 
-    return cast(list[dict[str, ans.AnsibleValue]], ds), original_ds
+    return cast(list[dict[str, "ans.AnsibleValue"]], ds), original_ds
 
 
 class _PatchedRoleInclude(ans.role.RoleInclude):
