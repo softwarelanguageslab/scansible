@@ -1,8 +1,10 @@
+# pyright: reportUnusedFunction = false
+
 from __future__ import annotations
 
-from typing import Any, Literal, Protocol
+from typing import Literal, Protocol
 
-from itertools import chain, product
+from itertools import product
 
 import pytest
 from _pytest.fixtures import FixtureRequest
@@ -12,7 +14,7 @@ from scansible.representations.pdg import representation as rep
 
 
 class NodeFactory(Protocol):
-    def __call__(self, location: rep.NodeLocation) -> rep.Node:
+    def __call__(self, loc: rep.NodeLocation) -> rep.Node:
         ...
 
 
@@ -122,7 +124,7 @@ def describe_literal() -> None:
 
     @pytest.mark.parametrize("value", [None, 1, ["values"], "value"])
     def should_have_value(value: object) -> None:
-        lit = rep.Literal(type="str", value=value)
+        _ = rep.Literal(type="str", value=value)
 
 
 @behaves_like(a_node)
@@ -184,7 +186,9 @@ def describe_add_node() -> None:
         g.add_node(n2)
 
         assert len(g) == 2
-        assert set(iter(g)) == {n1, n2}
+        assert sorted(g, key=lambda t: t.node_id) == sorted(
+            [n1, n2], key=lambda t: t.node_id
+        )
         assert n1 in g
         assert n2 in g
 
@@ -204,7 +208,9 @@ def describe_add_node() -> None:
         g.add_node(n2)
 
         assert len(g) == 2
-        assert set(iter(g)) == {n1, n2}
+        assert sorted(g, key=lambda t: t.node_id) == sorted(
+            [n1, n2], key=lambda t: t.node_id
+        )
         assert n1 in g
         assert n2 in g
 
@@ -228,7 +234,9 @@ def describe_add_nodes_from() -> None:
         g.add_nodes_from([n1, n2])
 
         assert len(g) == 2
-        assert set(iter(g)) == {n1, n2}
+        assert sorted(g, key=lambda t: t.node_id) == sorted(
+            [n1, n2], key=lambda t: t.node_id
+        )
         assert n1 in g
         assert n2 in g
 
@@ -246,7 +254,9 @@ def describe_add_nodes_from() -> None:
         g.add_nodes_from([n1, n2])
 
         assert len(g) == 2
-        assert set(iter(g)) == {n1, n2}
+        assert sorted(g, key=lambda t: t.node_id) == sorted(
+            [n1, n2], key=lambda t: t.node_id
+        )
         assert n1 in g
         assert n2 in g
 

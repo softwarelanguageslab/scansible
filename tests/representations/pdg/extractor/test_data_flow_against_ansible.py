@@ -1,4 +1,5 @@
 """Tests which test the inferred data flow against Ansible's behaviour."""
+# pyright: reportUnusedFunction = false
 
 from __future__ import annotations
 
@@ -9,9 +10,7 @@ import subprocess
 import tempfile
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
-from enum import Enum
-from pathlib import Path, PosixPath
+from pathlib import Path
 
 import jinja2
 import pytest
@@ -22,7 +21,7 @@ try:
 except ImportError:
     from yaml import Dumper  # type: ignore[misc]
 
-from hypothesis import Phase, assume, example, given, settings
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from scansible.representations.pdg import representation as rep
@@ -330,7 +329,7 @@ class CodeGen:
             ]
         else:
             # Defined at runtime, couple of edge cases to consider
-            new_rvs = []
+            new_rvs: list[str] = []
             for reusable_var in reusable_vars:
                 if reusable_var in self._set_facts_vars:
                     # Constant variable, no recursive definition possible, so
@@ -388,7 +387,7 @@ class CodeGen:
                 }
             )
 
-        files = []
+        files: list[tuple[Path, str]] = []
         for fp, content in self._files.items():
             if fp.parent.name != "tasks" and content:
                 content = content[0]  # type: ignore[assignment]
@@ -424,7 +423,7 @@ def test_inferred_dataflow_matches_actual(playbooks: list[PlaybookFile]) -> None
     with _setup_env(playbooks) as playbook_dir:
         try:
             graph = _parse_graph(playbook_dir / "roles" / "test")
-        except RecursionError as e:
+        except RecursionError:
             assume(False)
             return
 
@@ -570,7 +569,7 @@ def _observe_dataflow(playbook_dir: Path) -> Dataflow:
     )
     assert not proc.returncode, proc.stderr
     out = json.loads(proc.stdout)
-    result = []
+    result: list[str] = []
     from pprint import pprint
 
     pprint(out["plays"][0]["tasks"])

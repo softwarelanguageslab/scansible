@@ -1,3 +1,5 @@
+# pyright: reportUnusedFunction = false
+
 from __future__ import annotations
 
 from typing import Callable
@@ -14,7 +16,6 @@ from scansible.representations.pdg import (
     Graph,
     IntermediateValue,
     Literal,
-    NodeLocation,
     Variable,
 )
 from scansible.representations.pdg.extractor.context import ExtractionContext
@@ -1020,7 +1021,7 @@ def describe_scoping() -> None:
 # Caching was disabled.
 def _describe_caching() -> None:
     def should_cache_dynamic_template_variables(create_context: ContextCreator) -> None:
-        ctx, g = create_context()
+        ctx, _ = create_context()
 
         ctx.register_variable("b", ScopeLevel.PLAY_VARS, expr="{{ now() }}")
         with ctx.enter_cached_scope(ScopeLevel.TASK_VARS):
@@ -1030,7 +1031,7 @@ def _describe_caching() -> None:
         assert tr.data_node is tr2.data_node
 
     def should_discard_after_leaving_scope(create_context: ContextCreator) -> None:
-        ctx, g = create_context()
+        ctx, _ = create_context()
 
         ctx.register_variable("b", ScopeLevel.PLAY_VARS, expr="{{ now() }}")
         with ctx.enter_cached_scope(ScopeLevel.TASK_VARS):
@@ -1044,7 +1045,7 @@ def _describe_caching() -> None:
     def should_not_reuse_previous_value_of_dynamic_template_var(
         create_context: ContextCreator,
     ) -> None:
-        ctx, g = create_context()
+        ctx, _ = create_context()
 
         ctx.register_variable("b", ScopeLevel.PLAY_VARS, expr="{{ now() }}")
         tr1 = ctx.evaluate_template("{{ b }}", False)
@@ -1057,7 +1058,7 @@ def _describe_caching() -> None:
         assert tr2.data_node is not tr3.data_node
 
     def should_not_cache_bare_expressions(create_context: ContextCreator) -> None:
-        ctx, g = create_context()
+        ctx, _ = create_context()
 
         with ctx.enter_cached_scope(ScopeLevel.TASK_VARS):
             tr1 = ctx.evaluate_template("{{ now() }}", False)
@@ -1066,7 +1067,7 @@ def _describe_caching() -> None:
         assert tr1.data_node is not tr2.data_node
 
     def should_not_reuse_outer_cache(create_context: ContextCreator) -> None:
-        ctx, g = create_context()
+        ctx, _ = create_context()
 
         ctx.register_variable("b", ScopeLevel.PLAY_VARS, expr="{{ now() }}")
         with ctx.enter_cached_scope(ScopeLevel.TASK_VARS):
@@ -1081,7 +1082,7 @@ def _describe_caching() -> None:
         assert tri1.data_node is not tro1.data_node
 
     def should_cache_nested_variables(create_context: ContextCreator) -> None:
-        ctx, g = create_context()
+        ctx, _ = create_context()
 
         ctx.register_variable("b", ScopeLevel.PLAY_VARS, expr="{{ now() }}")
         ctx.register_variable("a", ScopeLevel.PLAY_VARS, expr="{{ b }}")

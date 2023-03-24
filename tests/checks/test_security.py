@@ -1,8 +1,9 @@
+# pyright: reportUnusedFunction = false
+
 from __future__ import annotations
 
 from typing import Any, Generator
 
-import os
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -34,7 +35,7 @@ def write_pb(content: str, path: Path) -> None:
 
 
 def run_all_checks(db: RedisGraphDatabase) -> list[RuleResult]:
-    results = []
+    results: list[RuleResult] = []
     for rule in rules.get_all_rules():
         results.extend(rule.run(db))
     return results

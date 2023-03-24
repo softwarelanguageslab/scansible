@@ -1,7 +1,10 @@
+# pyright: reportUnusedFunction = false
+
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -54,6 +57,11 @@ def load_pb(tmp_path: Path) -> LoadPlaybookType:
         return loaders.load_playbook(h.ProjectPath(tmp_path, "pb.yml"))
 
     return inner
+
+
+# shorthand for cast
+def _as_ansible(obj: dict[str, Any]) -> dict[str, ans.AnsibleValue]:
+    return obj
 
 
 def describe_load_role_metadata() -> None:
@@ -138,6 +146,7 @@ def describe_load_role_metadata() -> None:
             """
             )
 
+            assert isinstance(result[0]["galaxy_info"], dict)
             assert result[0]["galaxy_info"]["platforms"] == []
             assert "platforms" not in result[1]["galaxy_info"]
 
@@ -168,6 +177,7 @@ def describe_load_role_metadata() -> None:
             """
             )
 
+            assert isinstance(result[0]["galaxy_info"], dict)
             assert result[0]["galaxy_info"]["platforms"] == []
             captured = capsys.readouterr()
             assert "Ignoring malformed platform" in captured.out
@@ -185,6 +195,7 @@ def describe_load_role_metadata() -> None:
             """
             )
 
+            assert isinstance(result[0]["galaxy_info"], dict)
             assert result[0]["galaxy_info"]["platforms"] == []
             captured = capsys.readouterr()
             assert "Ignoring malformed platform" in captured.out
@@ -200,6 +211,7 @@ def describe_load_role_metadata() -> None:
             """
             )
 
+            assert isinstance(result[0]["galaxy_info"], dict)
             assert result[0]["galaxy_info"]["platforms"] == [
                 {"name": "Debian", "versions": ["all"]}
             ]
@@ -218,6 +230,7 @@ def describe_load_role_metadata() -> None:
             """
             )
 
+            assert isinstance(result[0]["galaxy_info"], dict)
             assert result[0]["galaxy_info"]["platforms"] == [
                 {"name": "Debian", "versions": ["all"]}
             ]
@@ -234,6 +247,7 @@ def describe_load_role_metadata() -> None:
             """
             )
 
+            assert isinstance(result[0]["galaxy_info"], dict)
             assert result[0]["galaxy_info"]["platforms"] == [
                 {"name": "1", "versions": ["v1", "v2"]}
             ]
@@ -250,6 +264,7 @@ def describe_load_role_metadata() -> None:
             """
             )
 
+            assert isinstance(result[0]["galaxy_info"], dict)
             assert result[0]["galaxy_info"]["platforms"] == [
                 {"name": "Fedora", "versions": ["6", "7.1"]}
             ]
@@ -268,6 +283,7 @@ def describe_load_role_metadata() -> None:
             """
             )
 
+            assert isinstance(result[0]["galaxy_info"], dict)
             assert result[0]["galaxy_info"]["platforms"] == [
                 {"name": "Debian", "versions": ["all"]}
             ]
@@ -286,6 +302,7 @@ def describe_load_role_metadata() -> None:
             """
             )
 
+            assert isinstance(result[0]["galaxy_info"], dict)
             assert result[0]["galaxy_info"]["platforms"] == [
                 {"name": "Debian", "versions": ["all"]}
             ]
@@ -304,6 +321,7 @@ def describe_load_role_metadata() -> None:
             """
             )
 
+            assert isinstance(result[0]["galaxy_info"], dict)
             assert result[0]["galaxy_info"]["platforms"] == []
             captured = capsys.readouterr()
             assert "Ignoring malformed platform" in captured.out
@@ -438,270 +456,296 @@ def describe_load_task_file() -> None:
 
 def describe_load_task() -> None:
     def loads_correct_task() -> None:
-        result = loaders.load_task(
-            {  # type: ignore[call-overload]
+        task_ds = _as_ansible(
+            {
                 "file": {
                     "path": "test.txt",
                     "state": "present",
                 },
                 "when": "x is not None",
             },
-            as_handler=False,
         )
 
-        assert isinstance(result[0], ans.Task)
-        assert result[0].action == "file"
-        assert result[0].args == {"path": "test.txt", "state": "present"}
-        assert result[0].when == ["x is not None"]
+        result, orig_ds = loaders.load_task(task_ds, as_handler=False)
+
+        assert isinstance(result, ans.Task)
+        assert result.action == "file"
+        assert result.args == {"path": "test.txt", "state": "present"}
+        assert result.when == ["x is not None"]
+        assert orig_ds == task_ds
 
     def loads_correct_handler() -> None:
-        result = loaders.load_task(
-            {  # type: ignore[call-overload]
+        handler_ds = _as_ansible(
+            {
                 "file": {
                     "path": "test.txt",
                     "state": "present",
                 },
                 "when": "x is not None",
                 "listen": "test",
-            },
-            as_handler=True,
+            }
         )
 
-        assert isinstance(result[0], ans.Handler)
-        assert result[0].action == "file"
-        assert result[0].args == {"path": "test.txt", "state": "present"}
-        assert result[0].when == ["x is not None"]
-        assert result[0].listen == ["test"]
+        result, orig_ds = loaders.load_task(handler_ds, as_handler=True)
+
+        assert isinstance(result, ans.Handler)
+        assert result.action == "file"
+        assert result.args == {"path": "test.txt", "state": "present"}
+        assert result.when == ["x is not None"]
+        assert result.listen == ["test"]
+        assert orig_ds == handler_ds
 
     def loads_correct_task_include() -> None:
-        result = loaders.load_task(
-            {  # type: ignore[call-overload]
+        task_ds = _as_ansible(
+            {
                 "include_tasks": "test.yml",
                 "when": "x is not None",
-            },
-            as_handler=False,
+            }
         )
 
-        assert isinstance(result[0], ans.TaskInclude)
-        assert result[0].action == "include_tasks"
-        assert result[0].args == {"_raw_params": "test.yml"}
-        assert result[0].when == ["x is not None"]
+        result, orig_ds = loaders.load_task(task_ds, as_handler=False)
+
+        assert isinstance(result, ans.TaskInclude)
+        assert result.action == "include_tasks"
+        assert result.args == {"_raw_params": "test.yml"}
+        assert result.when == ["x is not None"]
+        assert orig_ds == task_ds
 
     def loads_correct_task_include_import() -> None:
-        result = loaders.load_task(
-            {  # type: ignore[call-overload]
+        task_ds = _as_ansible(
+            {
                 "import_tasks": "test.yml",
                 "when": "x is not None",
-            },
-            as_handler=False,
+            }
         )
 
-        assert isinstance(result[0], ans.TaskInclude)
-        assert result[0].action == "import_tasks"
-        assert result[0].args == {"_raw_params": "test.yml"}
-        assert result[0].when == ["x is not None"]
+        result, orig_ds = loaders.load_task(task_ds, as_handler=False)
+
+        assert isinstance(result, ans.TaskInclude)
+        assert result.action == "import_tasks"
+        assert result.args == {"_raw_params": "test.yml"}
+        assert result.when == ["x is not None"]
+        assert orig_ds == task_ds
 
     def loads_correct_handler_include() -> None:
-        result = loaders.load_task(
-            {  # type: ignore[call-overload]
+        task_ds = _as_ansible(
+            {
                 "include_tasks": "test.yml",
                 "listen": "test",
-            },
-            as_handler=True,
+            }
         )
 
-        assert isinstance(result[0], ans.HandlerTaskInclude)
-        assert result[0].action == "include_tasks"
-        assert result[0].args == {"_raw_params": "test.yml"}
-        assert result[0].listen == ["test"]
+        result, orig_ds = loaders.load_task(task_ds, as_handler=True)
+
+        assert isinstance(result, ans.HandlerTaskInclude)
+        assert result.action == "include_tasks"
+        assert result.args == {"_raw_params": "test.yml"}
+        assert result.listen == ["test"]
+        assert orig_ds == task_ds
 
     def loads_correct_role_include() -> None:
-        result = loaders.load_task(
-            {  # type: ignore[call-overload]
+        task_ds = _as_ansible(
+            {
                 "include_role": {
                     "name": "test",
                     "tasks_from": "test.yml",
                 },
-            },
-            as_handler=False,
+            }
         )
 
-        assert isinstance(result[0], ans.IncludeRole)
-        assert result[0].action == "include_role"
-        assert result[0].args == {"name": "test", "tasks_from": "test.yml"}
+        result, orig_ds = loaders.load_task(task_ds, as_handler=False)
+
+        assert isinstance(result, ans.IncludeRole)
+        assert result.action == "include_role"
+        assert result.args == {"name": "test", "tasks_from": "test.yml"}
+        assert orig_ds == task_ds
 
     def transforms_static_include() -> None:
-        result = loaders.load_task(
-            {  # type: ignore[call-overload]
+        task_ds = _as_ansible(
+            {
                 "include": "test.yml",
                 "static": "yes",
-            },
-            as_handler=False,
+            }
         )
 
-        assert isinstance(result[0], ans.TaskInclude)
-        assert result[0].action == "import_tasks"
-        assert result[0].args == {"_raw_params": "test.yml"}
-        assert "include" in result[1]
-        assert "static" in result[1]
-        assert "import_tasks" not in result[1]
+        result, orig_ds = loaders.load_task(task_ds, as_handler=False)
+
+        assert isinstance(result, ans.TaskInclude)
+        assert result.action == "import_tasks"
+        assert result.args == {"_raw_params": "test.yml"}
+        assert orig_ds == task_ds
 
     def transforms_static_no_include() -> None:
-        result = loaders.load_task(
-            {  # type: ignore[call-overload]
+        task_ds = _as_ansible(
+            {
                 "include": "test.yml",
                 "static": "no",
-            },
-            as_handler=False,
+            }
         )
 
-        assert isinstance(result[0], ans.TaskInclude)
-        assert result[0].action == "include_tasks"
-        assert result[0].args == {"_raw_params": "test.yml"}
-        assert "include" in result[1]
-        assert "static" in result[1]
-        assert "include_tasks" not in result[1]
+        result, orig_ds = loaders.load_task(task_ds, as_handler=False)
+
+        assert isinstance(result, ans.TaskInclude)
+        assert result.action == "include_tasks"
+        assert result.args == {"_raw_params": "test.yml"}
+        assert orig_ds == task_ds
 
     def transforms_none_when() -> None:
         # devops-cmp/ansible-nodejs/tasks/main.yml @ ce6141fb61f1573b705db7006683af59ea792978
-        result = loaders.load_task(
-            {  # type: ignore[call-overload]
+        task_ds = _as_ansible(
+            {
                 "get_url": {
                     "url": "...",
                     "dest": "...",
                 },
                 "when": None,
-            },
-            as_handler=False,
+            }
         )
 
-        assert result[0].when == []
-        assert result[1]["when"] is None
+        result, orig_ds = loaders.load_task(task_ds, as_handler=False)
+
+        assert result.when == []
+        assert orig_ds == task_ds
 
     def transforms_always_run() -> None:
         # devops-cmp/ansible-nodejs/tasks/main.yml @ ce6141fb61f1573b705db7006683af59ea792978
-        result = loaders.load_task(
-            {  # type: ignore[call-overload]
+        task_ds = _as_ansible(
+            {
                 "get_url": {
                     "url": "...",
                     "dest": "...",
                 },
                 "always_run": "yes",
-            },
-            as_handler=False,
+            }
         )
 
-        assert result[0].check_mode is False
-        assert result[1]["always_run"] == "yes"
-        assert "check_mode" not in result[1]
+        result, orig_ds = loaders.load_task(task_ds, as_handler=False)
+
+        assert result.check_mode is False
+        assert orig_ds == task_ds
 
     def describe_transforming_old_become() -> None:
         @pytest.mark.parametrize("method", ["su", "sudo"])
         def transforms_old_become(method: str) -> None:
-            ds = {
-                "file": {},
-                f"{method}": "yes",
-                f"{method}_user": "me",
-                f"{method}_exe": "test",
-                f"{method}_flags": "--flag",
-                f"{method}_pass": "sekrit",
-            }
-            result = loaders.load_task(ds, as_handler=False)  # type: ignore[call-overload]
+            ds = _as_ansible(
+                {
+                    "file": {},
+                    f"{method}": "yes",
+                    f"{method}_user": "me",
+                    f"{method}_exe": "test",
+                    f"{method}_flags": "--flag",
+                    f"{method}_pass": "sekrit",
+                }
+            )
 
-            assert result[0].action == "file"
-            assert result[0].become is True
-            assert result[0].become_user == "me"
-            assert result[0].become_exe == "test"
-            assert result[0].become_flags == "--flag"
-            assert result[0].vars == {"ansible_become_password": "sekrit"}
-            assert result[1] == ds
+            result, orig_ds = loaders.load_task(ds, as_handler=False)
+
+            assert result.action == "file"
+            assert result.become is True
+            assert result.become_user == "me"
+            assert result.become_exe == "test"
+            assert result.become_flags == "--flag"
+            assert result.vars == {"ansible_become_password": "sekrit"}
+            assert orig_ds == ds
 
         @pytest.mark.parametrize("method", ["su", "sudo"])
         def transforms_old_become_with_multiple_vars(method: str) -> None:
-            ds = {
-                "file": {},
-                f"{method}": "yes",
-                f"{method}_user": "me",
-                f"{method}_exe": "test",
-                f"{method}_flags": "--flag",
-                f"{method}_pass": "sekrit",
-                "vars": {
-                    "other": "hello",
-                },
-            }
-            result = loaders.load_task(ds, as_handler=False)  # type: ignore[call-overload]
+            ds = _as_ansible(
+                {
+                    "file": {},
+                    f"{method}": "yes",
+                    f"{method}_user": "me",
+                    f"{method}_exe": "test",
+                    f"{method}_flags": "--flag",
+                    f"{method}_pass": "sekrit",
+                    "vars": {
+                        "other": "hello",
+                    },
+                }
+            )
 
-            assert result[0].action == "file"
-            assert result[0].become is True
-            assert result[0].become_user == "me"
-            assert result[0].become_exe == "test"
-            assert result[0].become_flags == "--flag"
-            assert result[0].vars == {
+            result, orig_ds = loaders.load_task(ds, as_handler=False)
+
+            assert result.action == "file"
+            assert result.become is True
+            assert result.become_user == "me"
+            assert result.become_exe == "test"
+            assert result.become_flags == "--flag"
+            assert result.vars == {
                 "other": "hello",
                 "ansible_become_password": "sekrit",
             }
-            assert result[1] == ds
+            assert orig_ds == ds
 
         @pytest.mark.parametrize(
             "combo", [("su", "sudo"), ("sudo", "become"), ("su", "become")]
         )
         def rejects_duplicate_become_method(combo: tuple[str, str]) -> None:
             with pytest.raises(LoadError, match="Invalid mix of directives"):
-                loaders.load_task(
-                    {  # type: ignore[call-overload]
+                task_ds = _as_ansible(
+                    {
                         "file": {},
                         combo[0]: "yes",
                         combo[1]: "yes",
-                    },
-                    as_handler=False,
+                    }
                 )
+                loaders.load_task(task_ds, as_handler=False)
 
     def transforms_become() -> None:
         # devops-cmp/ansible-nodejs/tasks/main.yml @ ce6141fb61f1573b705db7006683af59ea792978
-        result = loaders.load_task(
-            {  # type: ignore[call-overload]
+        task_ds = _as_ansible(
+            {
                 "get_url": {
                     "url": "...",
                     "dest": "...",
                 },
                 "when": None,
-            },
-            as_handler=False,
+            }
         )
 
-        assert result[0].when == []
-        assert result[1]["when"] is None
+        result, orig_ds = loaders.load_task(task_ds, as_handler=False)
+
+        assert result.when == []
+        assert orig_ds["when"] is None
 
 
 def describe_load_block() -> None:
     def loads_correct_block() -> None:
-        result = loaders.load_block(
+        block_ds = _as_ansible(
             {
-                "block": [{"file": {}}],  # type: ignore[dict-item]
-                "rescue": [{"file": {}}],  # type: ignore[dict-item]
+                "block": [{"file": {}}],
+                "rescue": [{"file": {}}],
             }
         )
 
-        assert result[0].block == [{"file": {}}]
-        assert result[0].rescue == [{"file": {}}]
-        assert result[0].always == []
+        result, orig_ds = loaders.load_block(block_ds)
+
+        assert result.block == [{"file": {}}]
+        assert result.rescue == [{"file": {}}]
+        assert result.always == []
+        assert orig_ds == block_ds
 
     def raises_if_not_a_block() -> None:
         with pytest.raises(LoadError, match="Not a block"):
-            loaders.load_block({"file": {}})  # type: ignore[dict-item]
+            ds = _as_ansible({"file": {}})
+
+            loaders.load_block(ds)
 
 
 def describe_load_play() -> None:
     def loads_correct_play() -> None:
-        result = loaders.load_play(
+        ds = _as_ansible(
             {
-                "hosts": "hello",  # type: ignore[dict-item]
-                "tasks": [],  # type: ignore[dict-item]
+                "hosts": "hello",
+                "tasks": [],
             }
         )
 
-        assert result[0].hosts == ["hello"]
-        assert result[0].tasks == []
+        result, orig_ds = loaders.load_play(ds)
+
+        assert result.hosts == ["hello"]
+        assert result.tasks == []
+        assert ds == orig_ds
 
 
 def describe_load_playbook() -> None:
@@ -746,59 +790,54 @@ def describe_load_playbook() -> None:
 
 def describe_load_role_dependency() -> None:
     def normalises_dependency_without_condition() -> None:
-        result: tuple[
-            ans.role.RoleInclude, dict[str, str] | None, Any
-        ] = loaders.load_role_dependency(
-            {"role": "test"}  # type: ignore[dict-item]
-        )
+        ds = _as_ansible({"role": "test"})
 
-        assert result[0].role == "test"
-        assert result[0].when == []
-        assert result[1] is None
-        assert result[2] == {"role": "test"}
+        result, parsed_def, orig_ds = loaders.load_role_dependency(ds)
+
+        assert result.role == "test"
+        assert result.when == []
+        assert parsed_def is None
+        assert orig_ds == ds
 
     def normalises_dependency_with_single_condition() -> None:
-        result: tuple[
-            ans.role.RoleInclude, dict[str, str] | None, Any
-        ] = loaders.load_role_dependency(
+        ds = _as_ansible(
             {
-                "role": "test",  # type: ignore[dict-item]
-                "when": "x is True",  # type: ignore[dict-item]
+                "role": "test",
+                "when": "x is True",
             }
         )
 
-        assert result[0].role == "test"
-        assert result[0].when == ["x is True"]
-        assert result[1] is None
+        result, parsed_def, orig_ds = loaders.load_role_dependency(ds)
+
+        assert result.role == "test"
+        assert result.when == ["x is True"]
+        assert parsed_def is None
+        assert orig_ds == ds
 
     def normalises_bare_string_dependency() -> None:
-        result: tuple[
-            ans.role.RoleInclude, dict[str, str] | None, Any
-        ] = loaders.load_role_dependency("test")
+        result, parsed_def, orig_ds = loaders.load_role_dependency("test")
 
-        assert result[0].role == "test"
-        assert result[0].when == []
-        assert result[1] is None
-        assert result[2] == "test"
+        assert result.role == "test"
+        assert result.when == []
+        assert parsed_def is None
+        assert orig_ds == "test"
 
     def normalises_dependency_with_name_instead_of_role() -> None:
-        result: tuple[
-            ans.role.RoleInclude, dict[str, str] | None, Any
-        ] = loaders.load_role_dependency(
-            {"name": "test"}  # type: ignore[dict-item]
-        )
+        ds = _as_ansible({"name": "test"})
 
-        assert result[0].role == "test"
-        assert result[0].when == []
-        assert result[1] is None
-        assert result[2] == {"name": "test"}
+        result, parsed_def, orig_ds = loaders.load_role_dependency(ds)
+
+        assert result.role == "test"
+        assert result.when == []
+        assert parsed_def is None
+        assert orig_ds == {"name": "test"}
 
     def normalises_int_role_name_to_str() -> None:
-        result: tuple[ans.role.RoleInclude, dict[str, str] | None, Any] = loaders.load_role_dependency(123)  # type: ignore[arg-type]
+        result, parsed_def, orig_ds = loaders.load_role_dependency(123)  # type: ignore[arg-type]
 
-        assert result[0].role == "123"
-        assert result[1] is None
-        assert result[2] == 123
+        assert result.role == "123"
+        assert parsed_def is None
+        assert orig_ds == 123
 
     def raises_on_wrong_dependency_type() -> None:
         with pytest.raises(
@@ -810,44 +849,52 @@ def describe_load_role_dependency() -> None:
         with pytest.raises(
             ans.AnsibleError, match="role definitions must contain a role name"
         ):
-            loaders.load_role_dependency({"when": "yes"})  # type: ignore[dict-item]
+            ds = _as_ansible({"when": "yes"})
+
+            loaders.load_role_dependency(ds)
 
     def raises_on_invalid_role_name_type() -> None:
         with pytest.raises(
             ans.AnsibleError, match="role definitions must contain a role name"
         ):
-            loaders.load_role_dependency({"role": ["abc"]})  # type: ignore[dict-item]
+            ds = _as_ansible({"role": ["abc"]})
 
-    def considers_superfluous_non_directive_dependency_properties_to_be_parameters() -> None:
-        result: tuple[
-            ans.role.RoleInclude, dict[str, str] | None, Any
-        ] = loaders.load_role_dependency(
+            loaders.load_role_dependency(ds)
+
+    def considers_extra_non_directive_dependency_properties_to_be_parameters() -> None:
+        ds = _as_ansible(
             {
-                "role": "test",  # type: ignore[dict-item]
+                "role": "test",
                 "param_x": 123,
-                "become": "yes",  # type: ignore[dict-item]
+                "become": "yes",
             }
         )
 
-        assert result[0].role == "test"
-        assert result[0].become == True
-        assert result[0]._role_params == {"param_x": 123}
+        result, parsed_def, orig_ds = loaders.load_role_dependency(ds)
+
+        assert result.role == "test"
+        assert result.become == True
+        assert result._role_params == {"param_x": 123}
+        assert parsed_def is None
+        assert orig_ds == ds
 
     def loads_new_style_role_requirements() -> None:
-        result: tuple[
-            ans.role.RoleInclude, dict[str, str] | None, Any
-        ] = loaders.load_role_dependency(
+        ds = _as_ansible(
             {
-                "src": "https://github.com/bennojoy/nginx",  # type: ignore[dict-item]
-                "version": "main",  # type: ignore[dict-item]
-            },
-            allow_new_style=True,
+                "src": "https://github.com/bennojoy/nginx",
+                "version": "main",
+            }
         )
 
-        assert result[0].role == "nginx"
-        assert result[1] == {
+        result, parsed_def, orig_ds = loaders.load_role_dependency(
+            ds, allow_new_style=True
+        )
+
+        assert result.role == "nginx"
+        assert parsed_def == {
             "name": "nginx",
             "src": "https://github.com/bennojoy/nginx",
             "version": "main",
             "scm": "git",
         }
+        assert orig_ds == ds

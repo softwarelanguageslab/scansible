@@ -1,8 +1,8 @@
+# pyright: reportUnusedFunction = false
+
 from __future__ import annotations
 
 from pathlib import Path
-
-import pytest
 
 from scansible.checks import CheckResult
 from scansible.checks.semantics import run_all_checks as orig_run_all_checks
@@ -13,7 +13,9 @@ from scansible.representations.pdg.extractor.context import ExtractionContext
 def run_all_checks(ctx: ExtractionContext) -> list[CheckResult]:
     orig_results = orig_run_all_checks(ctx.graph, ctx.visibility_information)
     return [
-        CheckResult(f"{res.rule_category}: {res.rule_name}", res.location)
+        CheckResult(
+            f"{res.rule_category}: {res.rule_name}", res.location or "Unknown file"
+        )
         for res in orig_results
     ]
 

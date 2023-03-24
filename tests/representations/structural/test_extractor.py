@@ -1,3 +1,5 @@
+# pyright: reportUnusedFunction = false
+
 from __future__ import annotations
 
 from typing import Any, Callable, Type
@@ -337,6 +339,7 @@ def describe_extracting_variables() -> None:
 TaskExtractor = Callable[
     [dict[str, "ans.AnsibleValue"], ext.ExtractionContext], rep.Task | None
 ]
+
 
 # Shared behaviour for task extractors
 def a_task_extractor() -> None:
@@ -928,6 +931,7 @@ def describe_extracting_blocks() -> None:
             ext.ExtractionContext(False),
         )
 
+        assert result is not None
         assert result == rep.Block(
             block=[
                 rep.Task(action="file", name="test", args={}, raw=None),
@@ -957,6 +961,7 @@ def describe_extracting_blocks() -> None:
             handlers=True,
         )
 
+        assert result is not None
         assert result == rep.Block(
             block=[
                 rep.Handler(action="file", name="test", args={}, raw=None),
@@ -989,6 +994,7 @@ def describe_extracting_blocks() -> None:
             ext.ExtractionContext(False),
         )
 
+        assert result is not None
         assert result == rep.Block(
             block=[
                 rep.Task(action="file", name="test", args={}, raw=None),
@@ -1023,6 +1029,7 @@ def describe_extracting_blocks() -> None:
             ext.ExtractionContext(False),
         )
 
+        assert result is not None
         assert result == rep.Block(
             block=[  # type: ignore[arg-type]
                 rep.Task(action="file", name="test", args={}, raw=None),
@@ -1060,6 +1067,7 @@ def describe_extracting_blocks() -> None:
             ext.ExtractionContext(False),
         )
 
+        assert result is not None
         assert result == rep.Block(
             block=[
                 rep.Task(action="import_tasks", args={"_raw_params": "test"}, raw=None),

@@ -1,3 +1,5 @@
+# pyright: reportUnusedFunction = false
+
 from __future__ import annotations
 
 from typing import Literal as LiteralT
