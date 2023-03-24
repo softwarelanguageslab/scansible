@@ -133,15 +133,19 @@ class CustomGraphMLReader(ReaderBase):
 
         edge_type = data["type"]
 
-        edge_cls = getattr(rep, edge_type_to_name.get(edge_type, edge_type.title()))
-        edge = edge_cls(**{k: json.loads(v) for k, v in data.items() if k != "type"})
+        edge = getattr(rep, edge_type_to_name.get(edge_type, edge_type), None)
+        if edge is None:
+            edge_cls = getattr(rep, edge_type.title())
+            edge = edge_cls(
+                **{k: json.loads(v) for k, v in data.items() if k != "type"}
+            )
 
         G.add_edge(source, target, edge)
 
 
 edge_type_to_name = {
-    "DEFLOOPITEM": "DefLoopItem",
-    "DEFINEDIF": "DefinedIf",
+    "DEFLOOPITEM": "DEF_LOOP_ITEM",
+    "DEFINEDIF": "DEFINED_IF",
 }
 
 
