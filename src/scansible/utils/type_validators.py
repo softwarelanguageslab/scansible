@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Union
+from typing import Any, TypeVar, Union
 
 import types
 from collections.abc import Callable
@@ -58,3 +58,11 @@ def type_validator(
             old_validator(instance, attribute, field)
 
     return converting_validator
+
+
+_T = TypeVar("_T")
+
+
+def ensure_not_none(value: _T | None) -> _T:
+    assert value is not None
+    return value

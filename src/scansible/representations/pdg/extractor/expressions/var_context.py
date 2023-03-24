@@ -1,32 +1,27 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Generator
+from typing import TYPE_CHECKING, Any
 from typing import Literal as LiteralT
-from typing import NamedTuple, TypeVar, cast, overload
+from typing import NamedTuple, cast, overload
 
 from collections import defaultdict
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Generator, Iterable
 from contextlib import contextmanager
 from enum import Enum
 
 from loguru import logger
 
 from scansible.representations import structural as struct
+from scansible.utils import SENTINEL, Sentinel
+from scansible.utils.type_validators import ensure_not_none
 
 from ... import representation as rep
+from .constants import PURE_FILTERS, PURE_LOOKUP_PLUGINS, PURE_TESTS
 
 if TYPE_CHECKING:
     from ..context import ExtractionContext
 
 from .templates import LookupTargetLiteral, TemplateExpressionAST
-
-_T = TypeVar("_T")
-
-
-# TODO: Move elsewhere
-def not_none(value: _T | None) -> _T:
-    assert value is not None
-    return value
 
 
 class TemplateRecord(NamedTuple):
@@ -96,217 +91,6 @@ class ChangeableVariableValueRecord(VariableValueRecord):
         )
 
 
-class Sentinel:
-    def __repr__(self) -> str:
-        return f"SENTINEL"
-
-
-SENTINEL = Sentinel()
-
-
-STATIC_LOOKUP_PLUGINS = {
-    "config",
-    "dict",
-    "indexed_items",
-    "items",
-    "list",
-    "nested",
-    "sequence",
-    "subelements",
-    "together",
-    "cartesian",
-    # TODO: This isn't idempotent, but we need a better way to filter these out
-    # as they lead to many false positives
-    "env",
-}
-
-STATIC_FILTERS = {
-    # Jinja2 built-in
-    "abs",
-    "attr",
-    "batch",
-    "capitalize",
-    "center",
-    "default",
-    "d",
-    "dictsort",
-    "escape",
-    "e",
-    "filesizeformat",
-    "first",
-    "float",
-    "forceescape",
-    "format",
-    "groupby",
-    "indent",
-    "int",
-    "join",
-    "last",
-    "length",
-    "count",
-    "list",
-    "lower",
-    "map",
-    "max",
-    "min",
-    "pprint",
-    "reject",
-    "rejectattr",
-    "replace",
-    "reverse",
-    "round",
-    "safe",
-    "select",
-    "selectattr",
-    "slice",
-    "sort",
-    "string",
-    "striptags",
-    "sum",
-    "title",
-    "tojson",
-    "trim",
-    "truncate",
-    "unique",
-    "upper",
-    "urlencode",
-    "urlize",
-    "wordcount",
-    "wordwrap",
-    "xmlattr",
-    # Ansible built-ins
-    "b64decode",
-    "b64encode",
-    "to_uuid",
-    "to_json",
-    "to_nice_json",
-    "from_json",
-    "to_yaml",
-    "to_nice_yaml",
-    "from_yaml",
-    "from_yaml_all",
-    "basename",
-    "dirname",
-    "expanduser",
-    "path_join",
-    "relpath",
-    "splitext",
-    "win_basename",
-    "win_dirname",
-    "win_splitdrive",
-    "bool",
-    "to_datetime",
-    "strftime",
-    "quote",
-    "md5",
-    "sha1",
-    "checksum",
-    "password_hash",
-    "hash",
-    "regex_replace",
-    "regex_escape",
-    "regex_search",
-    "regex_findall",
-    "ternary",
-    "mandatory",
-    "comment",
-    "type_debug",
-    "combine",
-    "extract",
-    "flatten",
-    "dict2items",
-    "items2dict",
-    "subelements",
-    "split",
-    "urldecode",
-    "urlencode",
-    "urlsplit",
-    "min",
-    "max",
-    "log",
-    "pow",
-    "root",
-    "unique",
-    "intersect",
-    "difference",
-    "symmetric_difference",
-    "union",
-    "product",
-    "permutations",
-    "combinations",
-    "human_readable",
-    "human_to_bytes",
-    "rekey_on_member",
-    "zip",
-    "zip_longest",
-    "json_query",
-    "ipaddr",
-    "version_compare",
-}
-
-STATIC_TESTS = {
-    # Jinja2 built-in
-    "boolean",
-    "callable",
-    "defined",
-    "divisibleby",
-    "eq",
-    "equalto",
-    "==",
-    "escaped",
-    "even",
-    "false",
-    "filter",
-    "float",
-    "ge",
-    ">=",
-    "gt",
-    "greaterthan",
-    ">",
-    "in",
-    "integer",
-    "iterable",
-    "le",
-    "<=",
-    "lower",
-    "lt",
-    "<",
-    "lessthan",
-    "mapping",
-    "ne",
-    "!=",
-    "none",
-    "number",
-    "odd",
-    "sameas",
-    "sequence",
-    "string",
-    "true",
-    "undefined",
-    "upper",
-    # Ansible built-in
-    "match",
-    "search",
-    "regex",
-    "version_compare",
-    "version",
-    "any",
-    "all",
-    "truthy",
-    "falsy",
-    "vault_encrypted",
-    "is_abs",
-    "abs",
-    "issubset",
-    "subset",
-    "issuperset",
-    "superset",
-    "contains",
-    "isnan",
-    "nan",
-}
-
-
 def get_nonidempotent_components(ast: TemplateExpressionAST) -> list[str]:
     comps: list[str] = []
 
@@ -316,17 +100,17 @@ def get_nonidempotent_components(ast: TemplateExpressionAST) -> list[str]:
     comps.extend(
         f"filter '{filter_op}'"
         for filter_op in ast.used_filters
-        if filter_op not in STATIC_FILTERS
+        if filter_op not in PURE_FILTERS
     )
     comps.extend(
-        f"test '{test_op}'" for test_op in ast.used_tests if test_op not in STATIC_TESTS
+        f"test '{test_op}'" for test_op in ast.used_tests if test_op not in PURE_TESTS
     )
     comps.extend(
         f"lookup {lookup_op}"
         for lookup_op in ast.used_lookups
         if not (
             isinstance(lookup_op, LookupTargetLiteral)
-            and lookup_op.name in STATIC_LOOKUP_PLUGINS
+            and lookup_op.name in PURE_LOOKUP_PLUGINS
         )
     )
 
@@ -641,7 +425,7 @@ class ScopeContext:
 
         tr = rec.template_record
         assert tr is not None
-        _, limit = not_none(self.get_variable_definition(name, rec.revision))
+        _, limit = ensure_not_none(self.get_variable_definition(name, rec.revision))
 
         logger.debug(
             f"Searching for scope that contains {tr.used_variables!r}, stopping at {limit!r}"
