@@ -47,7 +47,7 @@ class BlockExtractor:
             # shadow variables registered in an outer block. However, it's
             # confirmed to be a bug, so we'll handle it as if it were
             # implemented correctly.
-            self.context.vars.register_variable(
+            self.context.vars.define_variable(
                 var_name, expr=var_value, level=EnvironmentType.BLOCK_VARS
             )
 
@@ -133,7 +133,7 @@ class BlockExtractor:
         self, value: object, is_conditional: bool = False
     ) -> rep.DataNode:
         if isinstance(value, str):
-            tr = self.context.vars.evaluate_template(value, is_conditional)
+            tr = self.context.vars.build_expression(value, is_conditional)
             return tr.data_node
         else:
-            return self.context.vars.add_literal(value)
+            return self.context.vars.add_literal_node(value)

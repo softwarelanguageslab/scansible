@@ -64,7 +64,7 @@ class GenericTaskExtractor(TaskExtractor):
 
         # For some reason, loop vars have the same precedence as include params.
         with self.context.vars.enter_scope(EnvironmentType.INCLUDE_PARAMS):
-            loop_target_var = self.context.vars.register_variable(
+            loop_target_var = self.context.vars.define_variable(
                 loop_var_name, EnvironmentType.INCLUDE_PARAMS
             )
             self.context.graph.add_edge(
@@ -140,7 +140,7 @@ class GenericTaskExtractor(TaskExtractor):
         if not self.task.register:
             return []
 
-        vn = self.context.vars.register_variable(
+        vn = self.context.vars.define_variable(
             self.task.register, EnvironmentType.SET_FACTS_REGISTERED
         )
         self.context.graph.add_node(vn)

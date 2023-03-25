@@ -55,7 +55,7 @@ def describe_unmodified() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        ctx.evaluate_template(expr, False)
+        ctx.build_expression(expr, False)
 
         assert_graphs_match(
             g, create_graph({"lit": Literal(type="str", value=expr)}, [])
@@ -64,9 +64,7 @@ def describe_unmodified() -> None:
     def should_declare_literal_variable(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable(
-            "test_var", EnvironmentType.HOST_FACTS, expr="hello world"
-        )
+        ctx.define_variable("test_var", EnvironmentType.HOST_FACTS, expr="hello world")
 
         assert_graphs_match(
             g,
@@ -84,7 +82,7 @@ def describe_unmodified() -> None:
     def should_extract_variables(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.evaluate_template("hello {{ target }}", False)
+        ctx.build_expression("hello {{ target }}", False)
 
         assert_graphs_match(
             g,
@@ -110,8 +108,8 @@ def describe_unmodified() -> None:
         # We don't want to deduplicate template literals yet
         ctx, g = create_context()
 
-        ctx.evaluate_template("hello world", False)
-        ctx.evaluate_template("hello world", False)
+        ctx.build_expression("hello world", False)
+        ctx.build_expression("hello world", False)
 
         assert_graphs_match(
             g,
@@ -128,8 +126,8 @@ def describe_unmodified() -> None:
         # We don't want to deduplicate template literals yet
         ctx, g = create_context()
 
-        ctx.evaluate_template("hello {{ target }}", False)
-        ctx.evaluate_template("hello {{ target }}", False)
+        ctx.build_expression("hello {{ target }}", False)
+        ctx.build_expression("hello {{ target }}", False)
 
         assert_graphs_match(
             g,
@@ -151,10 +149,10 @@ def describe_unmodified() -> None:
     def should_extract_variable_definition(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable(
+        ctx.define_variable(
             "msg", EnvironmentType.HOST_FACTS, expr="hello {{ target }}"
         )
-        ctx.evaluate_template("{{ msg }}", False)
+        ctx.build_expression("{{ msg }}", False)
 
         assert_graphs_match(
             g,
@@ -200,8 +198,8 @@ def describe_unmodified() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        ctx.evaluate_template(expr, False)
-        ctx.evaluate_template(expr, False)
+        ctx.build_expression(expr, False)
+        ctx.build_expression(expr, False)
 
         assert_graphs_match(
             g,
@@ -230,8 +228,8 @@ def describe_modified() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        ctx.evaluate_template(expr, False)
-        ctx.evaluate_template(expr, False)
+        ctx.build_expression(expr, False)
+        ctx.build_expression(expr, False)
 
         assert_graphs_match(
             g,
@@ -248,11 +246,11 @@ def describe_modified() -> None:
     def should_reevaluate_when_variable_changed(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("a", EnvironmentType.HOST_FACTS, expr="hello")
-        ctx.evaluate_template("{{ a }} world", False)
+        ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="hello")
+        ctx.build_expression("{{ a }} world", False)
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.register_variable("a", EnvironmentType.TASK_VARS, expr="hi")
-            ctx.evaluate_template("{{ a }} world", False)
+            ctx.define_variable("a", EnvironmentType.TASK_VARS, expr="hi")
+            ctx.build_expression("{{ a }} world", False)
 
         assert_graphs_match(
             g,
@@ -291,9 +289,9 @@ def describe_modified() -> None:
     def should_reevaluate_when_variable_dynamic(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("when", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
-        ctx.evaluate_template("The time is {{ when }}", False)
-        ctx.evaluate_template("The time is {{ when }}", False)
+        ctx.define_variable("when", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
+        ctx.build_expression("The time is {{ when }}", False)
+        ctx.build_expression("The time is {{ when }}", False)
 
         e2 = Expression(expr="The time is {{ when }}")
         e3 = Expression(expr="The time is {{ when }}")
@@ -346,12 +344,12 @@ def describe_modified() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("a", EnvironmentType.HOST_FACTS, expr="hello")
-        ctx.register_variable("b", EnvironmentType.HOST_FACTS, expr="{{ a }} world")
-        ctx.evaluate_template("{{ b }}!", False)
+        ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="hello")
+        ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ a }} world")
+        ctx.build_expression("{{ b }}!", False)
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.register_variable("a", EnvironmentType.TASK_VARS, expr="hi")
-            ctx.evaluate_template("{{ b }}!", False)
+            ctx.define_variable("a", EnvironmentType.TASK_VARS, expr="hi")
+            ctx.build_expression("{{ b }}!", False)
 
         assert_graphs_match(
             g,
@@ -412,11 +410,11 @@ def describe_modified() -> None:
     def should_reevaluate_only_one_var(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("a", EnvironmentType.HOST_FACTS, expr="hello")
-        ctx.register_variable("b", EnvironmentType.HOST_FACTS, expr="world")
-        ctx.evaluate_template("{{ a }} {{ b }}!", False)
-        ctx.register_variable("a", EnvironmentType.INCLUDE_VARS, expr="hi")
-        ctx.evaluate_template("{{ a }} {{ b }}!", False)
+        ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="hello")
+        ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="world")
+        ctx.build_expression("{{ a }} {{ b }}!", False)
+        ctx.define_variable("a", EnvironmentType.INCLUDE_VARS, expr="hi")
+        ctx.build_expression("{{ a }} {{ b }}!", False)
 
         assert_graphs_match(
             g,
@@ -467,11 +465,11 @@ def describe_scoping() -> None:
     def should_use_most_specific_scope(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("a", EnvironmentType.HOST_FACTS, expr="1")
-        ctx.evaluate_template("1 {{ a }}", False)
+        ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="1")
+        ctx.build_expression("1 {{ a }}", False)
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.register_variable("a", EnvironmentType.TASK_VARS, expr="2")
-            ctx.evaluate_template("2 {{ a }}", False)
+            ctx.define_variable("a", EnvironmentType.TASK_VARS, expr="2")
+            ctx.build_expression("2 {{ a }}", False)
 
         assert_graphs_match(
             g,
@@ -510,10 +508,10 @@ def describe_scoping() -> None:
     def should_override_root_scope_variables(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("a", EnvironmentType.HOST_FACTS, expr="1")
+        ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="1")
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.register_variable("a", EnvironmentType.SET_FACTS_REGISTERED, expr="2")
-        ctx.evaluate_template("{{ a }}", False)
+            ctx.define_variable("a", EnvironmentType.SET_FACTS_REGISTERED, expr="2")
+        ctx.build_expression("{{ a }}", False)
 
         assert_graphs_match(
             g,
@@ -550,10 +548,10 @@ def describe_scoping() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("a", EnvironmentType.HOST_FACTS, expr="1")
-        ctx.evaluate_template("1 {{ a }}", False)
+        ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="1")
+        ctx.build_expression("1 {{ a }}", False)
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.evaluate_template("1 {{ a }}", False)
+            ctx.build_expression("1 {{ a }}", False)
 
         assert_graphs_match(
             g,
@@ -582,11 +580,11 @@ def describe_scoping() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("a", EnvironmentType.HOST_FACTS, expr="1")
-        ctx.evaluate_template("1 {{ a }}", False)
+        ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="1")
+        ctx.build_expression("1 {{ a }}", False)
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.register_variable("a", EnvironmentType.TASK_VARS, expr="2")
-        ctx.evaluate_template("1 {{ a }}", False)
+            ctx.define_variable("a", EnvironmentType.TASK_VARS, expr="2")
+        ctx.build_expression("1 {{ a }}", False)
 
         assert_graphs_match(
             g,
@@ -621,12 +619,12 @@ def describe_scoping() -> None:
     def should_hoist_template(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("a", EnvironmentType.HOST_FACTS, expr="1")
+        ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="1")
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.register_variable("c", EnvironmentType.TASK_VARS, expr="c")
-            ctx.evaluate_template("1 {{ a }}", False)
-            ctx.register_variable("a", EnvironmentType.TASK_VARS, expr="2")
-        ctx.evaluate_template("1 {{ a }}", False)
+            ctx.define_variable("c", EnvironmentType.TASK_VARS, expr="c")
+            ctx.build_expression("1 {{ a }}", False)
+            ctx.define_variable("a", EnvironmentType.TASK_VARS, expr="2")
+        ctx.build_expression("1 {{ a }}", False)
 
         assert_graphs_match(
             g,
@@ -671,12 +669,12 @@ def describe_scoping() -> None:
 
         # Difference to 'should_use_most_specific_scope': Same template here,
         # different template there
-        ctx.register_variable("a", EnvironmentType.HOST_FACTS, expr="1")
-        ctx.evaluate_template("1 {{ a }}", False)
+        ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="1")
+        ctx.build_expression("1 {{ a }}", False)
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.register_variable("a", EnvironmentType.TASK_VARS, expr="2")
-            ctx.evaluate_template("1 {{ a }}", False)
-        ctx.evaluate_template("1 {{ a }}", False)
+            ctx.define_variable("a", EnvironmentType.TASK_VARS, expr="2")
+            ctx.build_expression("1 {{ a }}", False)
+        ctx.build_expression("1 {{ a }}", False)
 
         assert_graphs_match(
             g,
@@ -715,12 +713,12 @@ def describe_scoping() -> None:
     def should_evaluate_var_into_template_scope(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("a", EnvironmentType.HOST_FACTS, expr="{{ b }}")
+        ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="{{ b }}")
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.register_variable("b", EnvironmentType.TASK_VARS, expr="1")
-            ctx.evaluate_template("{{ a }}", False)
-        ctx.register_variable("b", EnvironmentType.HOST_FACTS, expr="2")
-        ctx.evaluate_template("{{ a }}", False)
+            ctx.define_variable("b", EnvironmentType.TASK_VARS, expr="1")
+            ctx.build_expression("{{ a }}", False)
+        ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="2")
+        ctx.build_expression("{{ a }}", False)
 
         assert_graphs_match(
             g,
@@ -782,18 +780,18 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.register_variable(
+            ctx.define_variable(
                 "a", EnvironmentType.TASK_VARS, expr='{{ "hello" | reverse }}'
             )
-            ctx.register_variable(
+            ctx.define_variable(
                 "b", EnvironmentType.TASK_VARS, expr="{{ c | reverse }}"
             )
-            ctx.register_variable("c", EnvironmentType.TASK_VARS, expr="world")
-            ctx.evaluate_template("{{ b }} {{ a }}", False)
-        ctx.register_variable(
+            ctx.define_variable("c", EnvironmentType.TASK_VARS, expr="world")
+            ctx.build_expression("{{ b }} {{ a }}", False)
+        ctx.define_variable(
             "a", EnvironmentType.HOST_FACTS, expr='{{ "hello" | reverse }}'
         )
-        ctx.evaluate_template("{{ b }} {{ a }}", False)
+        ctx.build_expression("{{ b }} {{ a }}", False)
 
         assert_graphs_match(
             g,
@@ -860,12 +858,12 @@ def describe_scoping() -> None:
     def should_hoist_variable_binding(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("a", EnvironmentType.HOST_FACTS, expr="{{ b }}")
+        ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="{{ b }}")
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.register_variable("b", EnvironmentType.TASK_VARS, expr="1")
+            ctx.define_variable("b", EnvironmentType.TASK_VARS, expr="1")
             with ctx.enter_scope(EnvironmentType.TASK_VARS):
-                ctx.evaluate_template("{{ a }}", False)
-            ctx.evaluate_template("{{ a }}", False)  # Should reuse above expr
+                ctx.build_expression("{{ a }}", False)
+            ctx.build_expression("{{ a }}", False)  # Should reuse above expr
 
         assert_graphs_match(
             g,
@@ -903,13 +901,13 @@ def describe_scoping() -> None:
     def should_respect_precedence(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        vn = ctx.register_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
+        vn = ctx.define_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
         ln = Literal(type="int", value=1)
         g.add_node(ln)
         g.add_edge(ln, vn, DEF)
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.register_variable("b", EnvironmentType.TASK_VARS, expr="2")
-            ctx.evaluate_template("{{ b }}", False)
+            ctx.define_variable("b", EnvironmentType.TASK_VARS, expr="2")
+            ctx.build_expression("{{ b }}", False)
 
         assert_graphs_match(
             g,
@@ -947,12 +945,12 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.register_variable("b", EnvironmentType.TASK_VARS, expr="1")
-        vn = ctx.register_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
+            ctx.define_variable("b", EnvironmentType.TASK_VARS, expr="1")
+        vn = ctx.define_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
         ln = Literal(type="int", value=2)
         g.add_node(ln)
         g.add_edge(ln, vn, DEF)
-        ctx.evaluate_template("{{ b }}", False)
+        ctx.build_expression("{{ b }}", False)
 
         assert_graphs_match(
             g,
@@ -990,13 +988,13 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.register_variable("b", EnvironmentType.TASK_VARS, expr="1")
-            vn = ctx.register_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
+            ctx.define_variable("b", EnvironmentType.TASK_VARS, expr="1")
+            vn = ctx.define_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
             ln = Literal(type="int", value=2)
             g.add_node(ln)
             g.add_edge(ln, vn, DEF)
-            ctx.evaluate_template("{{ b }}", False)
-        ctx.evaluate_template("{{ b }}", False)  # Should reuse above expr
+            ctx.build_expression("{{ b }}", False)
+        ctx.build_expression("{{ b }}", False)  # Should reuse above expr
 
         assert_graphs_match(
             g,
@@ -1034,21 +1032,21 @@ def _describe_caching() -> None:
     def should_cache_dynamic_template_variables(create_context: ContextCreator) -> None:
         ctx, _ = create_context()
 
-        ctx.register_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
+        ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            tr = ctx.evaluate_template("{{ b }}", False)
-            tr2 = ctx.evaluate_template("{{ b }}", False)  # Should reuse above
+            tr = ctx.build_expression("{{ b }}", False)
+            tr2 = ctx.build_expression("{{ b }}", False)  # Should reuse above
 
         assert tr.data_node is tr2.data_node
 
     def should_discard_after_leaving_scope(create_context: ContextCreator) -> None:
         ctx, _ = create_context()
 
-        ctx.register_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
+        ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            tr = ctx.evaluate_template("{{ b }}", False)
-            tr2 = ctx.evaluate_template("{{ b }}", False)  # Should reuse above
-        tr3 = ctx.evaluate_template("{{ b }}", False)  # Should not reuse above
+            tr = ctx.build_expression("{{ b }}", False)
+            tr2 = ctx.build_expression("{{ b }}", False)  # Should reuse above
+        tr3 = ctx.build_expression("{{ b }}", False)  # Should not reuse above
 
         assert tr.data_node is tr2.data_node
         assert tr.data_node is not tr3.data_node
@@ -1058,11 +1056,11 @@ def _describe_caching() -> None:
     ) -> None:
         ctx, _ = create_context()
 
-        ctx.register_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
-        tr1 = ctx.evaluate_template("{{ b }}", False)
+        ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
+        tr1 = ctx.build_expression("{{ b }}", False)
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            tr2 = ctx.evaluate_template("{{ b }}", False)
-        tr3 = ctx.evaluate_template("{{ b }}", False)
+            tr2 = ctx.build_expression("{{ b }}", False)
+        tr3 = ctx.build_expression("{{ b }}", False)
 
         assert tr1.data_node is not tr2.data_node
         assert tr1.data_node is not tr3.data_node
@@ -1072,21 +1070,21 @@ def _describe_caching() -> None:
         ctx, _ = create_context()
 
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            tr1 = ctx.evaluate_template("{{ now() }}", False)
-            tr2 = ctx.evaluate_template("{{ now() }}", False)
+            tr1 = ctx.build_expression("{{ now() }}", False)
+            tr2 = ctx.build_expression("{{ now() }}", False)
 
         assert tr1.data_node is not tr2.data_node
 
     def should_not_reuse_outer_cache(create_context: ContextCreator) -> None:
         ctx, _ = create_context()
 
-        ctx.register_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
+        ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            tro1 = ctx.evaluate_template("{{ b }}", False)
+            tro1 = ctx.build_expression("{{ b }}", False)
             with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-                tri1 = ctx.evaluate_template("{{ b }}", False)
-                tri2 = ctx.evaluate_template("{{ b }}", False)
-            tro2 = ctx.evaluate_template("{{ b }}", False)
+                tri1 = ctx.build_expression("{{ b }}", False)
+                tri2 = ctx.build_expression("{{ b }}", False)
+            tro2 = ctx.build_expression("{{ b }}", False)
 
         assert tri1.data_node is tri2.data_node
         assert tro1.data_node is tro2.data_node
@@ -1095,11 +1093,11 @@ def _describe_caching() -> None:
     def should_cache_nested_variables(create_context: ContextCreator) -> None:
         ctx, _ = create_context()
 
-        ctx.register_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
-        ctx.register_variable("a", EnvironmentType.HOST_FACTS, expr="{{ b }}")
+        ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
+        ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="{{ b }}")
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            tr1 = ctx.evaluate_template("{{ a }}", False)
-            tr2 = ctx.evaluate_template("{{ a }}", False)
+            tr1 = ctx.build_expression("{{ a }}", False)
+            tr2 = ctx.build_expression("{{ a }}", False)
 
         assert tr1.data_node is tr2.data_node
 
@@ -1108,10 +1106,10 @@ def _describe_caching() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        ctx.register_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
+        ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            ctx.evaluate_template("{{ b + 1 }}", False)
-            ctx.evaluate_template("{{ b + 2 }}", False)
+            ctx.build_expression("{{ b + 1 }}", False)
+            ctx.build_expression("{{ b + 2 }}", False)
 
         assert_graphs_match(
             g,

@@ -103,10 +103,10 @@ class TaskExtractor(abc.ABC):
         self, value: object, is_conditional: bool = False
     ) -> rep.DataNode:
         if isinstance(value, str):
-            tr = self.context.vars.evaluate_template(value, is_conditional)
+            tr = self.context.vars.build_expression(value, is_conditional)
             return tr.data_node
         else:
-            return self.context.vars.add_literal(value)
+            return self.context.vars.add_literal_node(value)
 
     @contextmanager
     def setup_task_vars_scope(

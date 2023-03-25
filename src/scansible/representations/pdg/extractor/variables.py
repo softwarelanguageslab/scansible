@@ -28,4 +28,4 @@ class VariablesExtractor:
     ) -> rep.Variable:
         if not isinstance(var_init, (str, bool, int, float)):
             logger.warning("I am not able to properly handle non-atomic values yet")
-        return self.context.vars.register_variable(var_name, scope_level, expr=var_init)
+        return self.context.vars.define_variable(var_name, scope_level, expr=var_init)

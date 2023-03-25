@@ -33,7 +33,7 @@ class RecursiveDefinitionError(Exception):
     pass
 
 
-def get_impure_components(ast: TemplateExpressionAST) -> list[str]:
+def _get_impure_components(ast: TemplateExpressionAST) -> list[str]:
     comps: list[str] = []
 
     if ast.uses_now:
@@ -66,30 +66,32 @@ class VarContext:
     """Context for variable management."""
 
     def __init__(self, context: ExtractionContext) -> None:
-        self._scopes = EnvironmentStack()
+        self._envs = EnvironmentStack()
         self.context = context
-        self._next_revnos: dict[str, int] = defaultdict(lambda: 0)
-        self._next_valnos: dict[tuple[str, int], int] = {}
-        self._valno_to_var: dict[tuple[str, int, int], tuple[rep.Variable, bool]] = {}
+        self._next_def_revisions: dict[str, int] = defaultdict(lambda: 0)
+        self._next_val_revisions: dict[tuple[str, int], int] = {}
+        self._val_revision_to_var: dict[
+            tuple[str, int, int], tuple[rep.Variable, bool]
+        ] = {}
 
     @contextmanager
-    def enter_scope(self, level: LocalEnvType) -> Generator[None, None, None]:
-        self._scopes.enter_scope(level)
+    def enter_scope(self, env_type: LocalEnvType) -> Generator[None, None, None]:
+        self._envs.enter_scope(env_type)
         yield
-        self._scopes.exit_scope()
+        self._envs.exit_scope()
 
     @contextmanager
-    def enter_cached_scope(self, level: LocalEnvType) -> Generator[None, None, None]:
-        self._scopes.enter_cached_scope(level)
+    def enter_cached_scope(self, env_type: LocalEnvType) -> Generator[None, None, None]:
+        self._envs.enter_cached_scope(env_type)
         yield
-        self._scopes.exit_scope()
+        self._envs.exit_scope()
 
-    def evaluate_template(self, expr: str, is_conditional: bool) -> TemplateRecord:
+    def build_expression(self, expr: str, is_conditional: bool) -> TemplateRecord:
         """Parse a template, add required nodes to the graph, and return the record."""
         logger.debug(f"Evaluating expression {expr!r}")
         location = self.context.get_location(expr)
         ast = TemplateExpressionAST.parse(
-            expr, is_conditional, self._scopes.get_variable_initialisers()
+            expr, is_conditional, self._envs.get_variable_initialisers()
         )
 
         if ast is None or ast.is_literal():
@@ -104,8 +106,8 @@ class VarContext:
 
         used_values = self._resolve_expression_values(ast)
 
-        impure_components = get_impure_components(ast)
-        existing_tr_pair = self._scopes.get_expression(expr, used_values)
+        impure_components = _get_impure_components(ast)
+        existing_tr_pair = self._envs.get_expression(expr, used_values)
         if existing_tr_pair is None:
             logger.debug(
                 f"Expression {expr!r} was (re-)evaluated, creating new expression result"
@@ -151,7 +153,7 @@ class VarContext:
     ) -> VariableValueRecord:
         # Try loading from the cache if there is one we should use
         if should_use_cache:
-            cached_val_record = self._scopes.top_environment.cached_results.get(
+            cached_val_record = self._envs.top_environment.cached_results.get(
                 var_name, None
             )
             if cached_val_record is not None:
@@ -174,7 +176,7 @@ class VarContext:
         # Store the variable in the cache for potential later reuse, if we need to
         if should_use_cache:
             logger.debug(f"Saving {vr!r} in cache for reuse")
-            self._scopes.top_environment.cached_results[var_name] = vr
+            self._envs.top_environment.cached_results[var_name] = vr
 
         return vr
 
@@ -199,7 +201,7 @@ class VarContext:
         def get_var_node_for_val_record(
             val_record: VariableValueRecord,
         ) -> rep.Variable:
-            return self._valno_to_var[
+            return self._val_revision_to_var[
                 (val_record.name, val_record.revision, val_record.value_revision)
             ][0]
 
@@ -211,10 +213,10 @@ class VarContext:
             (vval.name, vval.revision, vval.value_revision) for vval in used_values
         ]
         tr = TemplateRecord(iv, en, used_value_ids, False)
-        self._scopes.set_expression(expr, tr)
+        self._envs.set_expression(expr, tr)
         return tr
 
-    def add_literal(self, value: object) -> rep.Literal:
+    def add_literal_node(self, value: object) -> rep.Literal:
         location = self.context.get_location(value)
         type_ = cast(rep.ValidTypeStr, value.__class__.__name__)
         type_mappings: dict[str, rep.ValidTypeStr] = {
@@ -239,7 +241,7 @@ class VarContext:
         self.context.graph.add_node(lit)
         return lit
 
-    def register_variable(
+    def define_variable(
         self, name: str, level: EnvironmentType, *, expr: Any = SENTINEL
     ) -> rep.Variable:
         """Declare a variable, initialized with the given expression.
@@ -253,9 +255,9 @@ class VarContext:
         logger.debug(
             f"Registering variable {name} of type {type(expr).__name__} at scope level {level.name}"
         )
-        var_rev = self._next_revnos[name]
-        self._next_revnos[name] += 1
-        self._next_valnos[(name, var_rev)] = 0
+        var_rev = self._next_def_revisions[name]
+        self._next_def_revisions[name] += 1
+        self._next_val_revisions[(name, var_rev)] = 0
 
         logger.debug(f"Selected revision {var_rev} for {name}")
         var_node = rep.Variable(
@@ -271,14 +273,14 @@ class VarContext:
         # time this variable is registered, i.e. the ones that are "visible" to the current
         # definition.
         self.context.visibility_information.set_info(
-            name, var_rev, self._scopes.get_currently_visible_definitions()
+            name, var_rev, self._envs.get_currently_visible_definitions()
         )
 
         if (
             isinstance(expr, str)
             and (
                 ast := TemplateExpressionAST.parse(
-                    expr, False, self._scopes.get_variable_initialisers()
+                    expr, False, self._envs.get_variable_initialisers()
                 )
             )
             is not None
@@ -289,20 +291,23 @@ class VarContext:
             template_expr = SENTINEL
         else:
             template_expr = SENTINEL
-            lit_node = self.add_literal(expr)
+            lit_node = self.add_literal_node(expr)
             self.context.graph.add_edge(lit_node, var_node, rep.DEF)
 
         def_record = VariableDefinitionRecord(name, var_rev, template_expr)
-        self._scopes.set_variable_definition(name, def_record, level)
+        self._envs.set_variable_definition(name, def_record, level)
 
         # Assume the value is used by the caller is constant if they don't provide an expression.
         # Also assume the variable node we create and add here is already in use then.
         # At the very least, the caller should link it with DEF (e.g. set_fact or register)
         # or USE (e.g. undefined variables in evaluate_template).
-        self._valno_to_var[(name, var_rev, 0)] = (var_node, template_expr is SENTINEL)
+        self._val_revision_to_var[(name, var_rev, 0)] = (
+            var_node,
+            template_expr is SENTINEL,
+        )
         if template_expr is SENTINEL:
             val_record = ConstantVariableValueRecord(def_record)
-            self._scopes.set_constant_variable_value(name, val_record, level)
+            self._envs.set_constant_variable_value(name, val_record, level)
         # If the variable isn't a constant value, we'll only create value records whenever it's evaluated
 
         return var_node
@@ -310,7 +315,7 @@ class VarContext:
     def has_variable_at_scope(self, name: str, level: EnvironmentType) -> bool:
         return any(
             scope.env_type is level and scope.get_variable_definition(name) is not None
-            for scope in self._scopes.precedence_chain
+            for scope in self._envs.precedence_chain
         )
 
     def _create_new_variable_node(
@@ -320,7 +325,7 @@ class VarContext:
             vval.value_revision >= 1
         ), f"Internal Error: Unacceptable value version provided"
         var_node_idx = (vval.name, vval.revision, vval.value_revision)
-        old_var_node, _ = self._valno_to_var[(vval.name, vval.revision, 0)]
+        old_var_node, _ = self._val_revision_to_var[(vval.name, vval.revision, 0)]
 
         new_var_node = rep.Variable(
             name=vval.name,
@@ -331,7 +336,7 @@ class VarContext:
         )
         self.context.graph.add_node(new_var_node)
 
-        self._valno_to_var[var_node_idx] = (new_var_node, True)
+        self._val_revision_to_var[var_node_idx] = (new_var_node, True)
 
         # Copy over all DEFINED_IF edges applied by the caller of this class as they should
         # apply to any new variable value revision as well. DEFINED_IF only
@@ -354,18 +359,18 @@ class VarContext:
         initializer, if necessary.
         """
         logger.debug(f"Resolving variable {name}")
-        vdef_pair = self._scopes.get_variable_definition(name)
+        vdef_pair = self._envs.get_variable_definition(name)
 
         # Undefined variables: Assume lowest scope
         if vdef_pair is None:
-            assert not self._scopes.has_variable_value(
+            assert not self._envs.has_variable_value(
                 name
             ), f"Internal Error: Variable {name!r} has no definition but does have value"
             logger.debug(
                 f"Variable {name} has not yet been defined, registering new value at lowest precedence level"
             )
-            self.register_variable(name, EnvironmentType.CLI_VALUES)
-            vval_pair = self._scopes.get_variable_value(name)
+            self.define_variable(name, EnvironmentType.CLI_VALUES)
+            vval_pair = self._envs.get_variable_value(name)
             assert vval_pair is not None and isinstance(
                 vval_pair[0], ConstantVariableValueRecord
             ), f"Internal Error: Expected registered variable for {name!r} to be constant"
@@ -378,7 +383,7 @@ class VarContext:
         if isinstance(expr, Sentinel):
             # No template expression, so it cannot be evaluated. There must be
             # a constant value record for it, we'll return that.
-            vval_pair = self._scopes.get_variable_value_for_constant_definition(
+            vval_pair = self._envs.get_variable_value_for_constant_definition(
                 name, vdef.revision
             )
             assert vval_pair is not None and isinstance(
@@ -392,12 +397,12 @@ class VarContext:
         # Evaluate the expression, perhaps re-evaluating if necessary. If the
         # expression was already evaluated previously and still has the same
         # value, this will just return the previous record.
-        template_record: TemplateRecord = self.evaluate_template(expr, False)
+        template_record: TemplateRecord = self.build_expression(expr, False)
 
         # Try to find a pre-existing value record for this template record. If
         # it exists, we've already evaluated this variable before and we can
         # just reuse the previous one.
-        vval_pair = self._scopes.get_variable_value_for_cached_expression(
+        vval_pair = self._envs.get_variable_value_for_cached_expression(
             name, vdef.revision, template_record
         )
         if vval_pair is not None:
@@ -413,20 +418,20 @@ class VarContext:
         # We'll also need to add a new variable node to the graph, although we
         # may be able to reuse the one added while registering the variable in
         # case it hasn't been used before.
-        value_revision = self._next_valnos[(name, vdef.revision)]
-        self._next_valnos[(name, vdef.revision)] += 1
+        value_revision = self._next_val_revisions[(name, vdef.revision)]
+        self._next_val_revisions[(name, vdef.revision)] += 1
         logger.debug(
             f"Creating new value for {name!r} with value revision {value_revision}"
         )
         value_record = ChangeableVariableValueRecord(
             vdef, value_revision, template_record
         )
-        self._scopes.set_changeable_variable_value(name, value_record)
+        self._envs.set_changeable_variable_value(name, value_record)
 
         var_node: rep.Variable | None = None
         var_node_idx = (name, vdef.revision, value_revision)
-        if var_node_idx in self._valno_to_var:
-            var_node, in_use = self._valno_to_var[var_node_idx]
+        if var_node_idx in self._val_revision_to_var:
+            var_node, in_use = self._val_revision_to_var[var_node_idx]
             if in_use:
                 var_node = None
             else:
@@ -438,7 +443,7 @@ class VarContext:
                 ), "Internal Error: Bad reuse of var node, val revision differs"
                 logger.debug(f"Using existing variable node {var_node!r}")
                 # Mark as in use now.
-                self._valno_to_var[var_node_idx] = (var_node, True)
+                self._val_revision_to_var[var_node_idx] = (var_node, True)
 
         if var_node is None:
             logger.debug(f"Creating new variable node to represent value")
