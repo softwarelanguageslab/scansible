@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from typing import Literal as LiteralT
-from typing import overload
+from typing import TypeVar
 
 import operator
 from collections.abc import Callable, Sequence
+from functools import reduce
 from itertools import chain
 
 from loguru import logger
 
+from scansible.utils import Sentinel, first, first_where
 from scansible.utils.type_validators import ensure_not_none
 
 from ..records import (
@@ -20,6 +21,8 @@ from ..records import (
 )
 from .environment import Environment
 from .types import GLOBAL_ENV_TYPES, LOCAL_ENV_TYPES, EnvironmentType, LocalEnvType
+
+_ElType = TypeVar("_ElType")
 
 
 def _values_have_changed(
@@ -72,50 +75,67 @@ class EnvironmentStack:
     def _calculate_precedence_chain(
         self, environments: Sequence[Environment]
     ) -> Sequence[Environment]:
-        return sorted(environments, key=lambda scope: scope.level.value)[::-1]
+        return sorted(environments, key=lambda scope: scope.env_type.value)[::-1]
 
     @property
-    def current_environment(self) -> Environment:
+    def top_environment(self) -> Environment:
         return self.environment_stack[-1]
 
-    @overload
-    def _get_most_specific(
-        self, key: str, type: LiteralT["variable_value"]
-    ) -> tuple[VariableValueRecord, Environment] | None:
-        """See non-overloaded variant."""
-        ...
+    def _get_highest_precedence_element(
+        self,
+        getter: Callable[[Environment], _ElType | None],
+        predicate: Callable[[_ElType], bool],
+    ) -> tuple[_ElType, Environment] | None:
+        return first(
+            (el, env)
+            for env in self.precedence_chain
+            if (el := getter(env)) is not None and predicate(el)
+        )
 
-    @overload
-    def _get_most_specific(
-        self, key: str, type: LiteralT["variable_definition"]
-    ) -> tuple[VariableDefinitionRecord, Environment] | None:
-        """See non-overloaded variant."""
-        ...
-
-    @overload
-    def _get_most_specific(
-        self, key: str, type: LiteralT["expression"]
-    ) -> tuple[TemplateRecord, Environment] | None:
-        ...
-
-    def _get_most_specific(
+    def _get_highest_precedence_variable_value(
         self,
         key: str,
-        type: LiteralT["variable_value", "variable_definition", "expression"],
-    ) -> (
-        tuple[
-            VariableValueRecord | VariableDefinitionRecord | TemplateRecord, Environment
-        ]
-        | None
-    ):
-        return next(
-            (
-                (rec, scope)
-                for scope in self.precedence_chain
-                if (rec := getattr(scope, f"get_{type}")(key)) is not None
-            ),
-            None,
+        predicate: Callable[[VariableValueRecord], bool] = lambda _: True,
+    ) -> tuple[VariableValueRecord, Environment] | None:
+        return self._get_highest_precedence_element(
+            operator.methodcaller("get_variable_value", key), predicate
         )
+
+    def _get_highest_precedence_variable_definition(
+        self,
+        key: str,
+        predicate: Callable[[VariableDefinitionRecord], bool] = lambda _: True,
+    ) -> tuple[VariableDefinitionRecord, Environment] | None:
+        return self._get_highest_precedence_element(
+            operator.methodcaller("get_variable_definition", key), predicate
+        )
+
+    def _get_highest_precedence_expression(
+        self,
+        key: str,
+        predicate: Callable[[TemplateRecord], bool] = lambda _: True,
+    ) -> tuple[TemplateRecord, Environment] | None:
+        return self._get_highest_precedence_element(
+            operator.methodcaller("get_expression", key), predicate
+        )
+
+    def _get_topmost_environment(self, env_type: EnvironmentType) -> Environment:
+        env = first_where(self.environment_stack, lambda env: env.env_type == env_type)
+        if env is None:
+            raise RuntimeError(
+                "Attempting to access an environment which has not been entered"
+            )
+        return env
+
+    def get_variable_definition(
+        self, name: str
+    ) -> tuple[VariableDefinitionRecord, Environment] | None:
+        return self._get_highest_precedence_variable_definition(name)
+
+    def set_variable_definition(
+        self, name: str, rec: VariableDefinitionRecord, env_type: EnvironmentType
+    ) -> None:
+        self._get_topmost_environment(env_type).set_variable_definition(name, rec)
 
     def get_variable_value(
         self,
@@ -157,42 +177,21 @@ class EnvironmentStack:
         logger.debug("No matching value record found")
         return None
 
-    def get_variable_definition(
-        self, name: str, revision: int = -1
-    ) -> tuple[VariableDefinitionRecord, Environment] | None:
-        if revision < 0:
-            return self._get_most_specific(name, "variable_definition")
-
-        return next(
-            (
-                (vdef, scope)
-                for scope in self.precedence_chain
-                if (vdef := scope.get_variable_definition(name)) is not None
-                and vdef.revision == revision
-            ),
-            None,
-        )
-
     def set_constant_variable_value(
-        self, name: str, rec: ConstantVariableValueRecord, scope_level: EnvironmentType
+        self, name: str, rec: ConstantVariableValueRecord, env_type: EnvironmentType
     ) -> None:
-        if scope_level.value >= 0:
-            scope_ = self._get_most_specific_scope(
-                lambda scope: scope.level is scope_level
-            )
-            if scope_ is None:
-                raise RuntimeError(
-                    "Attempting to access a scope which has not been entered"
-                )
-            scope_.set_variable_value(name, rec)
-            return
+        self._get_topmost_environment(env_type).set_variable_value(name, rec)
 
     def set_dynamic_variable_value(
         self, name: str, rec: ChangeableVariableValueRecord
     ) -> None:
         tr = rec.template_record
         assert tr is not None
-        _, limit = ensure_not_none(self.get_variable_definition(name, rec.revision))
+        _, limit = ensure_not_none(
+            self._get_highest_precedence_variable_definition(
+                name, lambda vdef: vdef.revision == rec.revision
+            )
+        )
 
         logger.debug(
             f"Searching for scope that contains {tr.used_variables!r}, stopping at {limit!r}"
@@ -210,29 +209,16 @@ class EnvironmentStack:
             )
             scope_idx = self.environment_stack.index(limit)
         else:
-            logger.debug(f"Found scope at level {template_scope.level.name}")
+            logger.debug(f"Found scope at level {template_scope.env_type.name}")
             scope_idx = max(
                 self.environment_stack.index(template_scope),
                 self.environment_stack.index(limit),
             )
         scope = self.environment_stack[scope_idx]
         logger.debug(
-            f"Adding {rec!r} to scope of level {scope.level.name} (scope number {scope_idx})"
+            f"Adding {rec!r} to scope of level {scope.env_type.name} (scope number {scope_idx})"
         )
         scope.set_variable_value(name, rec)
-
-    def set_variable_definition(
-        self, name: str, rec: VariableDefinitionRecord, scope_level: EnvironmentType
-    ) -> None:
-        if scope_level.value < 0:
-            raise ValueError("Cannot store variable definition in relative scopes")
-
-        scope_ = self._get_most_specific_scope(lambda scope: scope.level is scope_level)
-        if scope_ is None:
-            raise RuntimeError(
-                "Attempting to access a scope which has not been entered"
-            )
-        scope_.set_variable_definition(name, rec)
 
     def get_expression(
         self, expr: str, used_values: list[VariableValueRecord]
@@ -263,18 +249,9 @@ class EnvironmentStack:
             logger.debug(f"Found no suitable scope for template record {rec!r}")
             scope = self.environment_stack[0]
         logger.debug(
-            f"Adding template record {rec!r} to scope of level {scope.level.name}"
+            f"Adding template record {rec!r} to scope of level {scope.env_type.name}"
         )
         scope.set_expression(expr, rec)
-
-    def _get_most_specific_scope(
-        self, pred: Callable[[Environment], bool]
-    ) -> Environment | None:
-        for scope in self.precedence_chain:
-            if pred(scope):
-                return scope
-
-        return None
 
     def _get_outermost_scope_in_which_value_valid(
         self, rec: TemplateRecord
@@ -328,17 +305,30 @@ class EnvironmentStack:
             self._scope_sees_all_values(scope, trans_tval) for trans_tval in trans_tvals
         )
 
-    def get_variable_mapping(self) -> dict[str, str]:
-        mapping: dict[str, str] = {}
-        for scope in self.environment_stack:
-            mapping |= scope.get_var_mapping()
-        return mapping
+    def _get_all_visible_definitions(self) -> dict[str, VariableDefinitionRecord]:
+        return reduce(
+            operator.or_,
+            (
+                env.get_all_variable_definitions()
+                for env in reversed(self.precedence_chain)
+            ),
+        )
+
+    def get_variable_initialisers(self) -> dict[str, str]:
+        all_vars = self._get_all_visible_definitions()
+
+        # Need to do the filtering for vars without initialisers at the end
+        # instead of while iterating, because a var without an initialiser may
+        # override a var with an initialiser.
+        return {
+            vdef.name: vdef.template_expr
+            for vdef in all_vars.values()
+            if not isinstance(vdef.template_expr, Sentinel)
+        }
 
     def get_currently_visible_definitions(self) -> set[tuple[str, int]]:
-        visibles: dict[str, int] = {}
-        for scope in reversed(list(self.precedence_chain)):
-            visibles.update(scope.get_all_defined_variables())
-        return set(visibles.items())
+        all_vars = self._get_all_visible_definitions()
+        return set((vdef.name, vdef.revision) for vdef in all_vars.values())
 
     def enter_scope(self, env_type: LocalEnvType) -> None:
         if env_type not in LOCAL_ENV_TYPES:

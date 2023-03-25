@@ -89,7 +89,7 @@ class VarContext:
         logger.debug(f"Evaluating expression {expr!r}")
         location = self.context.get_location(expr)
         ast = TemplateExpressionAST.parse(
-            expr, is_conditional, self._scopes.get_variable_mapping()
+            expr, is_conditional, self._scopes.get_variable_initialisers()
         )
 
         if ast is None or ast.is_literal():
@@ -153,7 +153,7 @@ class VarContext:
     ) -> VariableValueRecord:
         # Try loading from the cache if there is one we should use
         if should_use_cache:
-            cached_val_record = self._scopes.current_environment.cached_results.get(
+            cached_val_record = self._scopes.top_environment.cached_results.get(
                 var_name, None
             )
             if cached_val_record is not None:
@@ -176,7 +176,7 @@ class VarContext:
         # Store the variable in the cache for potential later reuse, if we need to
         if should_use_cache:
             logger.debug(f"Saving {vr!r} in cache for reuse")
-            self._scopes.current_environment.cached_results[var_name] = vr
+            self._scopes.top_environment.cached_results[var_name] = vr
 
         return vr
 
@@ -280,7 +280,7 @@ class VarContext:
             isinstance(expr, str)
             and (
                 ast := TemplateExpressionAST.parse(
-                    expr, False, self._scopes.get_variable_mapping()
+                    expr, False, self._scopes.get_variable_initialisers()
                 )
             )
             is not None
@@ -311,7 +311,7 @@ class VarContext:
 
     def has_variable_at_scope(self, name: str, level: EnvironmentType) -> bool:
         return any(
-            scope.level is level and scope.get_variable_definition(name) is not None
+            scope.env_type is level and scope.get_variable_definition(name) is not None
             for scope in self._scopes.precedence_chain
         )
 
@@ -328,7 +328,7 @@ class VarContext:
             name=vval.name,
             version=vval.revision,
             value_version=vval.value_revision,
-            scope_level=scope.level.value,
+            scope_level=scope.env_type.value,
             location=self.context.get_location(vval.name),
         )
         self.context.graph.add_node(new_var_node)

@@ -16,7 +16,7 @@ class TemplateRecord(NamedTuple):
     is_literal: bool
 
     @property
-    def may_be_dynamic(self) -> bool:
+    def may_be_impure(self) -> bool:
         return not self.expr_node.idempotent
 
     def __repr__(self) -> str:
@@ -72,11 +72,11 @@ class ConstantVariableValueRecord(VariableValueRecord):
 class ChangeableVariableValueRecord(VariableValueRecord):
     def __init__(
         self,
-        var_def: VariableDefinitionRecord,
-        val_revision: int,
+        variable_definition: VariableDefinitionRecord,
+        value_revision: int,
         template_record: TemplateRecord,
     ) -> None:
-        super().__init__(var_def, val_revision)
+        super().__init__(variable_definition, value_revision)
         self.template_record = template_record
 
     def copy(self) -> ChangeableVariableValueRecord:
