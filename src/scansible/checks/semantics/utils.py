@@ -200,7 +200,7 @@ def register_task_has_conditions(graph: Graph, var: Variable) -> bool:
 
 
 class ValueChangeReason(Enum):
-    EXPRESSION_NOT_IDEMPOTENT = 1
+    EXPRESSION_IMPURE = 1
     DEPENDENCY_REDEFINED = 2
     DEPENDENCY_VALUE_CHANGED = 3
 
@@ -214,11 +214,11 @@ def determine_value_version_change_reason(
         e1 is not None and e2 is not None
     ), f"It should not be possible for variables {v1!r} and {v2!r} to not have been defined!"
     assert (
-        e1.expr == e2.expr and e1.idempotent == e2.idempotent
+        e1.expr == e2.expr and e1.is_pure == e2.is_pure
     ), f"Variables {v1!r} and {v2!r} use different expressions"
 
-    if not e1.idempotent:
-        return ValueChangeReason.EXPRESSION_NOT_IDEMPOTENT, e1
+    if not e1.is_pure:
+        return ValueChangeReason.EXPRESSION_IMPURE, e1
 
     e1_uses = set(get_used_variables(graph, e1))
     e2_uses = set(get_used_variables(graph, e2))
@@ -228,7 +228,7 @@ def determine_value_version_change_reason(
     common_uses = e1_uses & e2_uses
     assert len(common_uses) < len(
         e1_uses
-    ), f"Expressions used by {v1!r} and {v2!r} share all variable uses and are idempotent, yet still have different value versions"
+    ), f"Expressions used by {v1!r} and {v2!r} share all variable uses and are pure, yet still have different value versions"
 
     unique_e1_uses = sorted(e1_uses - common_uses, key=lambda v: v.name)
     unique_e2_uses = sorted(e2_uses - common_uses, key=lambda v: v.name)

@@ -36,7 +36,7 @@ def describe_dump_node() -> None:
 
         assert (
             result
-            == '(n0:Expression { expr: "{{ test }}", location: null, node_id: 0, non_idempotent_components: "[]", role_name: "testrole", role_version: "v1.0.0" })'
+            == '(n0:Expression { expr: "{{ test }}", impure_components: "[]", location: null, node_id: 0, role_name: "testrole", role_version: "v1.0.0" })'
         )
 
     def should_dump_variable(g: Graph) -> None:

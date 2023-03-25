@@ -38,14 +38,14 @@ def get_var_origin(graph: Graph, node: Variable) -> Expression | Literal | Task 
     return get_def_expression(graph, node)
 
 
-def is_idempotent_expr(graph: Graph, expr: Expression) -> bool:
-    if not expr.idempotent:
+def is_pure_expr(graph: Graph, expr: Expression) -> bool:
+    if not expr.is_pure:
         return False
 
-    # Expression itself is idempotent, but perhaps its dependences aren't
+    # Expression itself is pure, but perhaps its dependences aren't
     used_vars = get_used_variables(graph, expr)
     # Ignore dependences which themselves have been defined using set_fact or register,
-    # even though their expression might be non-idempotent, the variable value itself isn't
+    # even though their expression might be impure, the variable value itself isn't
     changeable_used_vars = [
         uv
         for uv in used_vars
@@ -61,7 +61,7 @@ def is_idempotent_expr(graph: Graph, expr: Expression) -> bool:
     if not used_exprs:
         return True
 
-    return all(is_idempotent_expr(graph, d) for d in used_exprs)
+    return all(is_pure_expr(graph, d) for d in used_exprs)
 
 
 class UnnecessarySetFactRule(Rule):
@@ -83,15 +83,13 @@ class UnnecessarySetFactRule(Rule):
                 # register, not set_fact
                 continue
 
-            is_idempotent_def = isinstance(vorigin, Literal) or is_idempotent_expr(
-                graph, vorigin
-            )
+            is_pure_def = isinstance(vorigin, Literal) or is_pure_expr(graph, vorigin)
             conditions = get_def_conditions(graph, v)
-            is_idempotent_condition = (not conditions) or all(
-                is_idempotent_expr(graph, cond) for cond in conditions
+            is_pure_condition = (not conditions) or all(
+                is_pure_expr(graph, cond) for cond in conditions
             )
 
-            if is_idempotent_def and is_idempotent_condition:
+            if is_pure_def and is_pure_condition:
                 warning_header = (
                     f'Unnecessary use of set_fact for variable "{v.name}@{v.version}"'
                 )
@@ -105,10 +103,10 @@ class UnnecessarySetFactRule(Rule):
                     warning_body_lines.append(
                         f"Variable {v!r} is defined the expression `{vorigin.expr}`"
                     )
-                warning_body_lines.append("This initialiser is fully idempotent.")
+                warning_body_lines.append("This initialiser is fully pure.")
                 if conditions:
                     warning_body_lines.append(
-                        "Moreover, all conditionals for this variable are idempotent:"
+                        "Moreover, all conditionals for this variable are pure:"
                     )
                     warning_body_lines.extend(
                         [f" - `{condition.expr}`" for condition in conditions]

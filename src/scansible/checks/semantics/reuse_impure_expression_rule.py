@@ -43,7 +43,7 @@ class ReuseImpureExpressionRule(Rule):
 
         # Sort the nodes so we can check each pair of (prev_value, next_value) individually.
         # In the following, for each of these pairs, we check their expressions
-        # and check whether they had been re-evaluated following a non-idempotent expression.
+        # and check whether they had been re-evaluated following an impure expression.
         # (i.e. different value version) of one of their dependencies. We only
         # care about changes due to non-idempotency of direct dependences,
         # we'll check further issues downstream.
@@ -53,26 +53,21 @@ class ReuseImpureExpressionRule(Rule):
                 value_version_change_reason,
                 value_change_context,
             ) = determine_value_version_change_reason(graph, v1, v2)
-            if (
-                value_version_change_reason
-                != ValueChangeReason.EXPRESSION_NOT_IDEMPOTENT
-            ):
+            if value_version_change_reason != ValueChangeReason.EXPRESSION_IMPURE:
                 continue
             assert isinstance(
                 value_change_context, Expression
             ), "Internal Error: Unexpected value change context type"
 
-            warning_header = f'Potentially unsafe reuse of variable "{v2.name}@{v2.version}" due to potential non-idempotent expression.'
+            warning_header = f'Potentially unsafe reuse of variable "{v2.name}@{v2.version}" due to potential impure expression.'
             warning_expl_lines = [
                 f"This variable was previously used as {v1!r}, but now as {v2!r}.",
-                f"The expression defining this variable has remained the same, however, it may not be idempotent.",
+                f"The expression defining this variable has remained the same, however, it may not be pure.",
                 f"Therefore, its value may have changed since the previous evaluation.",
-                f"{value_change_context.expr!r} may be non-idempotent due to the usage of the following components:",
+                f"{value_change_context.expr!r} may be impure due to the usage of the following components:",
             ]
-            for (
-                non_idempotent_component
-            ) in value_change_context.non_idempotent_components:
-                warning_expl_lines.append(f" - {non_idempotent_component}")
+            for impure_component in value_change_context.impure_components:
+                warning_expl_lines.append(f" - {impure_component}")
 
             warning_expl_lines.append(f"All usages of {v1!r}:")
             warning_expl_lines.extend(

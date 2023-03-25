@@ -152,7 +152,7 @@ class Expression(DataNode):
         validator=[type_validator(), non_empty_validator], on_setattr=setters.frozen
     )
 
-    non_idempotent_components: tuple[str, ...] = field(
+    impure_components: tuple[str, ...] = field(
         validator=type_validator(),
         factory=cast(Callable[[], tuple[str, ...]], tuple),
         converter=_convert_to_tuple,
@@ -160,8 +160,8 @@ class Expression(DataNode):
     )
 
     @property
-    def idempotent(self) -> bool:
-        return not self.non_idempotent_components
+    def is_pure(self) -> bool:
+        return not self.impure_components
 
 
 class Edge:

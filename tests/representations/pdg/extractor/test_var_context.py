@@ -237,7 +237,7 @@ def describe_modified() -> None:
             g,
             create_graph(
                 {
-                    "e": Expression(expr=expr, non_idempotent_components=components),
+                    "e": Expression(expr=expr, impure_components=components),
                     "iv1": IntermediateValue(identifier=1),
                     "iv2": IntermediateValue(identifier=2),
                 },
@@ -307,7 +307,7 @@ def describe_modified() -> None:
                 {
                     "e1": Expression(
                         expr="{{ now() }}",
-                        non_idempotent_components=("function 'now'",),
+                        impure_components=("function 'now'",),
                     ),
                     "iv1": IntermediateValue(identifier=1),
                     "when1": Variable(

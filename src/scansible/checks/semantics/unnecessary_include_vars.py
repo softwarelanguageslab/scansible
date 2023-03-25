@@ -41,14 +41,14 @@ def get_var_origin(graph: Graph, node: Variable) -> Expression | Literal | Task 
     return get_def_expression(graph, node)
 
 
-def is_idempotent_expr(graph: Graph, expr: Expression) -> bool:
-    if not expr.idempotent:
+def is_pure_expr(graph: Graph, expr: Expression) -> bool:
+    if not expr.is_pure:
         return False
 
-    # Expression itself is idempotent, but perhaps its dependences aren't
+    # Expression itself is pure, but perhaps its dependences aren't
     used_vars = get_used_variables(graph, expr)
     # Ignore dependences which themselves have been defined using set_fact or register,
-    # even though their expression might be non-idempotent, the variable value itself isn't
+    # even though their expression might be impure, the variable value itself isn't
     changeable_used_vars = [
         uv
         for uv in used_vars
@@ -64,7 +64,7 @@ def is_idempotent_expr(graph: Graph, expr: Expression) -> bool:
     if not used_exprs:
         return True
 
-    return all(is_idempotent_expr(graph, d) for d in used_exprs)
+    return all(is_pure_expr(graph, d) for d in used_exprs)
 
 
 class UnnecessaryIncludeVarsRule(Rule):

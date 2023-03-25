@@ -11,8 +11,7 @@ PURE_LOOKUP_PLUGINS = {
     "subelements",
     "together",
     "cartesian",
-    # TODO: This isn't idempotent, but we need a better way to filter these out
-    # as they lead to many false positives
+    # TODO: Is `env` really pure? It might not be, but it leads to a lot of false positives.
     "env",
 }
 

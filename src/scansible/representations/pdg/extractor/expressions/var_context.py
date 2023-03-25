@@ -33,7 +33,7 @@ class RecursiveDefinitionError(Exception):
     pass
 
 
-def get_nonidempotent_components(ast: TemplateExpressionAST) -> list[str]:
+def get_impure_components(ast: TemplateExpressionAST) -> list[str]:
     comps: list[str] = []
 
     if ast.uses_now:
@@ -99,21 +99,19 @@ class VarContext:
             # Create this node purely to adhere to TemplateRecord typings so we
             # don't have to accept None as a possibility. It's never added to
             # the graph and the template record is never cached either.
-            en = rep.Expression(
-                expr=expr or "<empty string>", non_idempotent_components=()
-            )
+            en = rep.Expression(expr=expr or "<empty string>", impure_components=())
             return TemplateRecord(ln, en, [], True)
 
         used_values = self._resolve_expression_values(ast)
 
-        non_idempotent_components = get_nonidempotent_components(ast)
+        impure_components = get_impure_components(ast)
         existing_tr_pair = self._scopes.get_expression(expr, used_values)
         if existing_tr_pair is None:
             logger.debug(
                 f"Expression {expr!r} was (re-)evaluated, creating new expression result"
             )
             return self._create_new_expression_result(
-                expr, location, used_values, non_idempotent_components
+                expr, location, used_values, impure_components
             )
 
         existing_tr, existing_tr_scope = existing_tr_pair
@@ -121,9 +119,9 @@ class VarContext:
             f"Expression {expr!r} was already evaluated with the same input values, reusing previous result {existing_tr!r} from {existing_tr_scope!r}"
         )
 
-        if non_idempotent_components:
+        if impure_components:
             logger.debug(
-                f"Determined that expression {expr!r} may not be idempotent, creating new expression result"
+                f"Determined that expression {expr!r} may not be pure, creating new expression result"
             )
             iv = rep.IntermediateValue(identifier=self.context.next_iv_id())
             logger.debug(f"Using IV {iv!r}")
@@ -185,11 +183,11 @@ class VarContext:
         expr: str,
         location: rep.NodeLocation,
         used_values: list[VariableValueRecord],
-        non_idempotent_components: list[str],
+        impure_components: list[str],
     ) -> TemplateRecord:
         en = rep.Expression(
             expr=expr,
-            non_idempotent_components=tuple(non_idempotent_components),
+            impure_components=tuple(impure_components),
             location=location,
         )
         iv = rep.IntermediateValue(identifier=self.context.next_iv_id())

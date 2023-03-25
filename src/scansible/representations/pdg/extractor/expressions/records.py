@@ -17,7 +17,7 @@ class TemplateRecord(NamedTuple):
 
     @property
     def may_be_impure(self) -> bool:
-        return not self.expr_node.idempotent
+        return not self.expr_node.is_pure
 
     def __repr__(self) -> str:
         return f"TemplateRecord(expr={self.expr_node.expr!r}, data_node={self.data_node.node_id}, expr_node={self.expr_node.node_id})"

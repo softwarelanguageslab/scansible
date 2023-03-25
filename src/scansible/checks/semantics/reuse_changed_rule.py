@@ -47,7 +47,7 @@ class ReuseChangedVariableRule(Rule):
         # (i.e. different version, not different value version) of one of their
         # dependencies. We don't care about new value versions due to redefinitions
         # because of an upstream new value version. These occur under two circumstances:
-        # non-idempotent expressions (different check), and a cascade of a redefinition
+        # impure expressions (different check), and a cascade of a redefinition
         # upstream. We ignore the latter, as we'll analyse the impact of a redefinition
         # upstream, not here.
         nodes_sorted = sorted(nodes, key=lambda n: n.value_version)
