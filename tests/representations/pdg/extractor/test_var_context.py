@@ -1034,22 +1034,22 @@ def _describe_caching() -> None:
 
         ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            tr = ctx.build_expression("{{ b }}", False)
-            tr2 = ctx.build_expression("{{ b }}", False)  # Should reuse above
+            d1 = ctx.build_expression("{{ b }}", False)
+            d2 = ctx.build_expression("{{ b }}", False)  # Should reuse above
 
-        assert tr.data_node is tr2.data_node
+        assert d1 is d2
 
     def should_discard_after_leaving_scope(create_context: ContextCreator) -> None:
         ctx, _ = create_context()
 
         ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            tr = ctx.build_expression("{{ b }}", False)
-            tr2 = ctx.build_expression("{{ b }}", False)  # Should reuse above
-        tr3 = ctx.build_expression("{{ b }}", False)  # Should not reuse above
+            d1 = ctx.build_expression("{{ b }}", False)
+            d2 = ctx.build_expression("{{ b }}", False)  # Should reuse above
+        d3 = ctx.build_expression("{{ b }}", False)  # Should not reuse above
 
-        assert tr.data_node is tr2.data_node
-        assert tr.data_node is not tr3.data_node
+        assert d1 is d2
+        assert d1 is not d3
 
     def should_not_reuse_previous_value_of_dynamic_template_var(
         create_context: ContextCreator,
@@ -1057,38 +1057,38 @@ def _describe_caching() -> None:
         ctx, _ = create_context()
 
         ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
-        tr1 = ctx.build_expression("{{ b }}", False)
+        d1 = ctx.build_expression("{{ b }}", False)
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            tr2 = ctx.build_expression("{{ b }}", False)
-        tr3 = ctx.build_expression("{{ b }}", False)
+            d2 = ctx.build_expression("{{ b }}", False)
+        d3 = ctx.build_expression("{{ b }}", False)
 
-        assert tr1.data_node is not tr2.data_node
-        assert tr1.data_node is not tr3.data_node
-        assert tr2.data_node is not tr3.data_node
+        assert d1 is not d2
+        assert d1 is not d3
+        assert d2 is not d3
 
     def should_not_cache_bare_expressions(create_context: ContextCreator) -> None:
         ctx, _ = create_context()
 
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            tr1 = ctx.build_expression("{{ now() }}", False)
-            tr2 = ctx.build_expression("{{ now() }}", False)
+            d1 = ctx.build_expression("{{ now() }}", False)
+            d2 = ctx.build_expression("{{ now() }}", False)
 
-        assert tr1.data_node is not tr2.data_node
+        assert d1 is not d2
 
     def should_not_reuse_outer_cache(create_context: ContextCreator) -> None:
         ctx, _ = create_context()
 
         ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            tro1 = ctx.build_expression("{{ b }}", False)
+            do1 = ctx.build_expression("{{ b }}", False)
             with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-                tri1 = ctx.build_expression("{{ b }}", False)
-                tri2 = ctx.build_expression("{{ b }}", False)
-            tro2 = ctx.build_expression("{{ b }}", False)
+                di1 = ctx.build_expression("{{ b }}", False)
+                di2 = ctx.build_expression("{{ b }}", False)
+            do2 = ctx.build_expression("{{ b }}", False)
 
-        assert tri1.data_node is tri2.data_node
-        assert tro1.data_node is tro2.data_node
-        assert tri1.data_node is not tro1.data_node
+        assert di1 is di2
+        assert do1 is do2
+        assert di1 is not do1
 
     def should_cache_nested_variables(create_context: ContextCreator) -> None:
         ctx, _ = create_context()
@@ -1096,10 +1096,10 @@ def _describe_caching() -> None:
         ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
         ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="{{ b }}")
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            tr1 = ctx.build_expression("{{ a }}", False)
-            tr2 = ctx.build_expression("{{ a }}", False)
+            d1 = ctx.build_expression("{{ a }}", False)
+            d2 = ctx.build_expression("{{ a }}", False)
 
-        assert tr1.data_node is tr2.data_node
+        assert d1 is d2
 
     def should_reuse_variables_in_different_expressions(
         create_context: ContextCreator,

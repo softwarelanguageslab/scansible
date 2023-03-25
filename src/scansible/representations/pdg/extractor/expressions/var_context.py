@@ -86,7 +86,10 @@ class VarContext:
         yield
         self._envs.exit_scope()
 
-    def build_expression(self, expr: str, is_conditional: bool) -> TemplateRecord:
+    def build_expression(self, expr: str, is_conditional: bool) -> rep.DataNode:
+        return self._build_expression(expr, is_conditional).data_node
+
+    def _build_expression(self, expr: str, is_conditional: bool) -> TemplateRecord:
         """Parse a template, add required nodes to the graph, and return the record."""
         logger.debug(f"Evaluating expression {expr!r}")
         location = self.context.get_location(expr)
@@ -397,7 +400,7 @@ class VarContext:
         # Evaluate the expression, perhaps re-evaluating if necessary. If the
         # expression was already evaluated previously and still has the same
         # value, this will just return the previous record.
-        template_record: TemplateRecord = self.build_expression(expr, False)
+        template_record: TemplateRecord = self._build_expression(expr, False)
 
         # Try to find a pre-existing value record for this template record. If
         # it exists, we've already evaluated this variable before and we can
