@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import TypeVar
 
 import operator
-from collections.abc import Callable, Sequence
-from functools import reduce
+from collections.abc import Callable, Iterable, Sequence
+from functools import partial, reduce
 from itertools import chain
 
 from loguru import logger
@@ -137,42 +137,75 @@ class EnvironmentStack:
     ) -> None:
         self._get_topmost_environment(env_type).set_variable_definition(name, rec)
 
-    def get_variable_value(
-        self,
-        name: str,
-        revision: int = -1,
-        template_record: TemplateRecord | None = None,
-    ) -> tuple[VariableValueRecord, Environment] | None:
-        for scope in self.environment_stack[::-1]:
-            possible_vval = scope.get_variable_value(name)
-            if possible_vval is None:
-                continue
+    def _iter_variable_values(
+        self, name: str
+    ) -> Iterable[tuple[VariableValueRecord, Environment]]:
+        # TODO: Why do we use the nesting order here instead of the precedence order?
+        for env in reversed(self.environment_stack):
+            vval = env.get_variable_value(name)
+            if vval is not None:
+                logger.debug(f"Found possible value for {name!r}: {vval!r}")
+                yield vval, env
 
-            logger.debug(f"Found possible value for {name!r}: {possible_vval!r}")
-            if revision >= 0 and possible_vval.revision != revision:
+    def _iter_variable_values_for_definition(
+        self, name: str, def_revision: int
+    ) -> Iterable[tuple[VariableValueRecord, Environment]]:
+        for vval, env in self._iter_variable_values(name):
+            if vval.revision != def_revision:
                 logger.debug("Ignoring: Wrong definition version")
                 continue
 
-            is_correct_type = (template_record is None) == isinstance(
-                possible_vval, ConstantVariableValueRecord
-            )
-            if not is_correct_type:
-                logger.debug("Ignoring: Wrong type for request")
+            yield vval, env
+
+    def has_variable_value(self, name: str) -> bool:
+        return first(self._iter_variable_values(name)) is not None
+
+    def get_variable_value_for_cached_expression(
+        self, name: str, def_revision: int, template_record: TemplateRecord
+    ) -> tuple[ChangeableVariableValueRecord, Environment] | None:
+        for vval, env in self._iter_variable_values_for_definition(name, def_revision):
+            if not isinstance(vval, ChangeableVariableValueRecord):
+                logger.debug("Ignoring: Expecting changeable value")
                 continue
 
-            if template_record is None:
-                logger.debug("Hit!")
-                return possible_vval, scope
-
-            assert isinstance(possible_vval, ChangeableVariableValueRecord)
-            if possible_vval.template_record != template_record:
+            if vval.template_record != template_record:
                 logger.debug(
-                    f"Ignoring: Wrong template record: {possible_vval.template_record!r} vs {template_record!r}"
+                    f"Ignoring: Wrong template record: {vval.template_record!r} vs {template_record!r}"
                 )
                 continue
 
             logger.debug("Hit!")
-            return possible_vval, scope
+            return vval, env
+
+        logger.debug("No matching value record found")
+        return None
+
+    def get_variable_value_for_constant_definition(
+        self, name: str, def_revision: int
+    ) -> tuple[ConstantVariableValueRecord, Environment] | None:
+        for vval, env in self._iter_variable_values_for_definition(name, def_revision):
+            if not isinstance(vval, ConstantVariableValueRecord):
+                logger.debug("Ignoring: Expecting constant value")
+                continue
+
+            logger.debug("Hit!")
+            return vval, env
+
+        logger.debug("No matching value record found")
+        return None
+
+    def get_variable_value(
+        self,
+        name: str,
+    ) -> tuple[VariableValueRecord, Environment] | None:
+        candidates = list(self._iter_variable_values(name))
+
+        assert (
+            len(candidates) <= 1
+        ), f"Found multiple values for {name}, perhaps a more specific resolution is necessary"
+
+        if candidates:
+            return candidates[0]
 
         logger.debug("No matching value record found")
         return None
@@ -182,52 +215,120 @@ class EnvironmentStack:
     ) -> None:
         self._get_topmost_environment(env_type).set_variable_value(name, rec)
 
-    def set_dynamic_variable_value(
+    def set_changeable_variable_value(
         self, name: str, rec: ChangeableVariableValueRecord
     ) -> None:
-        tr = rec.template_record
-        assert tr is not None
-        _, limit = ensure_not_none(
+        # The environment in which the expression is evaluated isn't necessarily
+        # the same environment as where the variable is defined. The expression
+        # may also depend on variables that are defined in deeper environments.
+        # We'll thus find the outermost environment in which this variable's
+        # expression would evaluate to this value, and store the value in that
+        # environment.
+        target_env = self._find_env_for_evaluated_variable(
+            name, rec.revision, rec.template_record
+        )
+        logger.debug(f"Adding {rec!r} to env of type {target_env.env_type.name}")
+        target_env.set_variable_value(name, rec)
+
+    def _find_env_for_evaluated_variable(
+        self, name: str, def_revision: int, template_record: TemplateRecord
+    ) -> Environment:
+        _, outermost_env = ensure_not_none(
             self._get_highest_precedence_variable_definition(
-                name, lambda vdef: vdef.revision == rec.revision
+                name, lambda vdef: vdef.revision == def_revision
             )
         )
 
         logger.debug(
-            f"Searching for scope that contains {tr.used_variables!r}, stopping at {limit!r}"
+            f"Searching for environment that contains {template_record.used_variables!r}, "
+            + f"stopping at {outermost_env!r}"
         )
-        # We're searching for the most general scope in which the variable's
-        # expression can produce this value. This is the deepest scope in which
-        # at least one of the expression's used variables is defined with the
-        # given revision. We're limiting the search to the scope in which the
-        # variable was defined, since above that scope, the variable would be
-        # inaccessible.
-        template_scope = self._get_outermost_scope_in_which_value_valid(tr)
-        if template_scope is None:
+
+        # We're searching for the most general environment in which the template
+        # record's evaluation is valid, i.e., the deepest environment in which
+        # all of the expression's referenced variables would evaluate to the
+        # data used in the actual evaluation.
+        # We're limiting the search to the env in which the variable was defined,
+        # since outside of that env, the variable would be inaccessible.
+        template_env = self._get_outermost_env_for_template(template_record)
+        if template_env is None:
+            # TODO: Can this even happen? If so, how and why?
             logger.debug(
-                "Did not find matching scope, just adding to least specific possible"
+                "Did not find matching environment, just adding to outermost possible"
             )
-            scope_idx = self.environment_stack.index(limit)
+            env_idx = self.environment_stack.index(outermost_env)
         else:
-            logger.debug(f"Found scope at level {template_scope.env_type.name}")
-            scope_idx = max(
-                self.environment_stack.index(template_scope),
-                self.environment_stack.index(limit),
+            logger.debug(f"Found environment of type {template_env.env_type.name}")
+            env_idx = max(
+                self.environment_stack.index(template_env),
+                self.environment_stack.index(outermost_env),
             )
-        scope = self.environment_stack[scope_idx]
-        logger.debug(
-            f"Adding {rec!r} to scope of level {scope.env_type.name} (scope number {scope_idx})"
+
+        return self.environment_stack[env_idx]
+
+    def _get_outermost_env_for_template(
+        self, rec: TemplateRecord
+    ) -> Environment | None:
+        # We're looking for the outermost scope in which we can find every single
+        # one of the variable values referenced by the template record, both
+        # directly and indirectly. After this scope is popped, the evaluation
+        # should be invalidated.
+        return first_where(
+            self.environment_stack,
+            partial(self._all_used_values_are_visible_in_env, rec=rec),
         )
-        scope.set_variable_value(name, rec)
+
+    def _all_used_values_are_visible_in_env(
+        self, env: Environment, rec: TemplateRecord
+    ) -> bool:
+        scope_idx = self.environment_stack.index(env)
+        prec_chain = list(
+            self._calculate_precedence_chain(self.environment_stack[: scope_idx + 1])
+        )
+
+        def get_val_from_env(
+            name: str, def_rev: int, val_rev: int
+        ) -> VariableValueRecord | None:
+            return first(
+                (
+                    vval
+                    for env in prec_chain
+                    if (vval := env.get_variable_value(name)) is not None
+                    and vval.revision == def_rev
+                    and vval.value_revision == val_rev
+                ),
+            )
+
+        def is_visible(name: str, def_rev: int, val_rev: int) -> bool:
+            return get_val_from_env(name, def_rev, val_rev) is not None
+
+        sees_all_direct_dependences = all(is_visible(*uv) for uv in rec.used_variables)
+        if not sees_all_direct_dependences:
+            return False
+
+        # Check transitive dependences
+        transitive_dependences: list[TemplateRecord] = []
+        for used_var in rec.used_variables:
+            # Cannot be none, we just checked that they're all visible
+            vval = ensure_not_none(get_val_from_env(*used_var))
+            if isinstance(vval, ChangeableVariableValueRecord):
+                transitive_dependences.append(vval.template_record)
+
+        return (not transitive_dependences) or all(
+            self._all_used_values_are_visible_in_env(env, trans_dep)
+            for trans_dep in transitive_dependences
+        )
 
     def get_expression(
         self, expr: str, used_values: list[VariableValueRecord]
     ) -> tuple[TemplateRecord, Environment] | None:
         logger.debug(
-            f"Searching for previous evaluation of {expr!r} in reverse scope order"
+            f"Searching for previous evaluation of {expr!r} in reverse nesting order"
         )
-        for scope in self.environment_stack[::-1]:
-            possible_tr = scope.get_expression(expr)
+        # TODO: Why are we using the reverse nesting order here,
+        # instead of precedence order?
+        for env in reversed(self.environment_stack):
+            possible_tr = env.get_expression(expr)
             if possible_tr is None:
                 continue
 
@@ -238,72 +339,21 @@ class EnvironmentStack:
                 continue
 
             logger.debug("Hit!")
-            return possible_tr, scope
+            return possible_tr, env
 
         logger.debug("Miss!")
         return None
 
     def set_expression(self, expr: str, rec: TemplateRecord) -> None:
-        scope = self._get_outermost_scope_in_which_value_valid(rec)
-        if scope is None:
-            logger.debug(f"Found no suitable scope for template record {rec!r}")
-            scope = self.environment_stack[0]
+        env = self._get_outermost_env_for_template(rec)
+        if env is None:
+            # TODO: Can this even happen?
+            logger.debug(f"Found no suitable environment for template record {rec!r}")
+            env = self.environment_stack[0]
         logger.debug(
-            f"Adding template record {rec!r} to scope of level {scope.env_type.name}"
+            f"Adding template record {rec!r} to environment of type {env.env_type.name}"
         )
-        scope.set_expression(expr, rec)
-
-    def _get_outermost_scope_in_which_value_valid(
-        self, rec: TemplateRecord
-    ) -> Environment | None:
-        # We're looking for the outermost scope in which we can find every single
-        # one of the variable values referenced by the template record, both
-        # directly and indirectly. After this scope is popped, the value should
-        # be invalidated.
-        for scope in self.environment_stack:
-            if self._scope_sees_all_values(scope, rec):
-                return scope
-
-        return None
-
-    def _scope_sees_all_values(self, scope: Environment, rec: TemplateRecord) -> bool:
-        scope_idx = self.environment_stack.index(scope)
-        prec_chain = list(
-            self._calculate_precedence_chain(self.environment_stack[: scope_idx + 1])
-        )
-
-        def get_val_from_scope(
-            name: str, def_rev: int, val_rev: int
-        ) -> VariableValueRecord | None:
-            return next(
-                (
-                    sc.get_variable_value(name)
-                    for sc in prec_chain
-                    if sc.has_variable_value(name, def_rev, val_rev)
-                ),
-                None,
-            )
-
-        def is_visible(name: str, def_rev: int, val_rev: int) -> bool:
-            return get_val_from_scope(name, def_rev, val_rev) is not None
-
-        sees_all_direct_dependences = all(is_visible(*uv) for uv in rec.used_variables)
-        if not sees_all_direct_dependences:
-            return False
-
-        # Check transitive dependences
-        trans_tvals: list[TemplateRecord] = []
-        for uv in rec.used_variables:
-            vval = get_val_from_scope(*uv)
-            assert (
-                vval is not None
-            )  # Impossible, we just checked that they're all visible
-            if isinstance(vval, ChangeableVariableValueRecord):
-                trans_tvals.append(vval.template_record)
-
-        return (not trans_tvals) or all(
-            self._scope_sees_all_values(scope, trans_tval) for trans_tval in trans_tvals
-        )
+        env.set_expression(expr, rec)
 
     def _get_all_visible_definitions(self) -> dict[str, VariableDefinitionRecord]:
         return reduce(

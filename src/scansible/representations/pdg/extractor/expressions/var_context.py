@@ -358,8 +358,8 @@ class VarContext:
 
         # Undefined variables: Assume lowest scope
         if vdef_pair is None:
-            assert (
-                self._scopes.get_variable_value(name) is None
+            assert not self._scopes.has_variable_value(
+                name
             ), f"Internal Error: Variable {name!r} has no definition but does have value"
             logger.debug(
                 f"Variable {name} has not yet been defined, registering new value at lowest precedence level"
@@ -378,7 +378,9 @@ class VarContext:
         if isinstance(expr, Sentinel):
             # No template expression, so it cannot be evaluated. There must be
             # a constant value record for it, we'll return that.
-            vval_pair = self._scopes.get_variable_value(name, vdef.revision)
+            vval_pair = self._scopes.get_variable_value_for_constant_definition(
+                name, vdef.revision
+            )
             assert vval_pair is not None and isinstance(
                 vval_pair[0], ConstantVariableValueRecord
             ), f"Internal Error: Could not find constant value for variable without expression ({name!r})"
@@ -395,7 +397,7 @@ class VarContext:
         # Try to find a pre-existing value record for this template record. If
         # it exists, we've already evaluated this variable before and we can
         # just reuse the previous one.
-        vval_pair = self._scopes.get_variable_value(
+        vval_pair = self._scopes.get_variable_value_for_cached_expression(
             name, vdef.revision, template_record
         )
         if vval_pair is not None:
@@ -419,7 +421,7 @@ class VarContext:
         value_record = ChangeableVariableValueRecord(
             vdef, value_revision, template_record
         )
-        self._scopes.set_dynamic_variable_value(name, value_record)
+        self._scopes.set_changeable_variable_value(name, value_record)
 
         var_node: rep.Variable | None = None
         var_node_idx = (name, vdef.revision, value_revision)
