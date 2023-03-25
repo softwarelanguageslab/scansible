@@ -10,6 +10,7 @@ from loguru import logger
 
 from scansible.representations import structural as struct
 from scansible.utils import SENTINEL, Sentinel
+from scansible.utils.type_validators import ensure_not_none
 
 from ... import representation as rep
 from .constants import PURE_FILTERS, PURE_LOOKUP_PLUGINS, PURE_TESTS
@@ -87,25 +88,23 @@ class VarContext:
         self._envs.exit_scope()
 
     def build_expression(self, expr: str, is_conditional: bool) -> rep.DataNode:
-        return self._build_expression(expr, is_conditional).data_node
-
-    def _build_expression(self, expr: str, is_conditional: bool) -> TemplateRecord:
-        """Parse a template, add required nodes to the graph, and return the record."""
-        logger.debug(f"Evaluating expression {expr!r}")
-        location = self.context.get_location(expr)
         ast = TemplateExpressionAST.parse(
             expr, is_conditional, self._envs.get_variable_initialisers()
         )
-
         if ast is None or ast.is_literal():
-            logger.debug(f"{expr!r} is a literal or broken expression")
-            ln = rep.Literal(value=expr, type="str", location=location)
-            self.context.graph.add_node(ln)
-            # Create this node purely to adhere to TemplateRecord typings so we
-            # don't have to accept None as a possibility. It's never added to
-            # the graph and the template record is never cached either.
-            en = rep.Expression(expr=expr or "<empty string>", impure_components=())
-            return TemplateRecord(ln, en, [], True)
+            if ast is None:
+                logger.warning(f"{expr!r} is malformed")
+            logger.debug(f"{expr!r} is a literal or malformed expression")
+            return self.add_literal_node(expr)
+
+        return self._build_expression(ast).data_node
+
+    def _build_expression(self, ast: TemplateExpressionAST) -> TemplateRecord:
+        """Parse a template, add required nodes to the graph, and return the record."""
+        expr = ast.raw
+        logger.debug(f"Evaluating expression {expr!r}")
+
+        assert not ast.is_literal(), f"Expected a valid expression, got {expr}"
 
         used_values = self._resolve_expression_values(ast)
 
@@ -116,7 +115,7 @@ class VarContext:
                 f"Expression {expr!r} was (re-)evaluated, creating new expression result"
             )
             return self._create_new_expression_result(
-                expr, location, used_values, impure_components
+                expr, used_values, impure_components
             )
 
         existing_tr, existing_tr_scope = existing_tr_pair
@@ -186,14 +185,13 @@ class VarContext:
     def _create_new_expression_result(
         self,
         expr: str,
-        location: rep.NodeLocation,
         used_values: list[VariableValueRecord],
         impure_components: list[str],
     ) -> TemplateRecord:
         en = rep.Expression(
             expr=expr,
             impure_components=tuple(impure_components),
-            location=location,
+            location=self.context.get_location(expr),
         )
         iv = rep.IntermediateValue(identifier=self.context.next_iv_id())
         logger.debug(f"Using IV {iv!r}")
@@ -400,7 +398,12 @@ class VarContext:
         # Evaluate the expression, perhaps re-evaluating if necessary. If the
         # expression was already evaluated previously and still has the same
         # value, this will just return the previous record.
-        template_record: TemplateRecord = self._build_expression(expr, False)
+        ast = ensure_not_none(
+            TemplateExpressionAST.parse(
+                expr, False, self._envs.get_variable_initialisers()
+            )
+        )
+        template_record: TemplateRecord = self._build_expression(ast)
 
         # Try to find a pre-existing value record for this template record. If
         # it exists, we've already evaluated this variable before and we can
