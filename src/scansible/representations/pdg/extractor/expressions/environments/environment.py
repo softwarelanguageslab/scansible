@@ -51,13 +51,13 @@ class Environment:
     def get_all_variable_definitions(self) -> dict[str, VariableDefinitionRecord]:
         return dict(self._var_def_store)
 
-    def get_expression(self, expr: str) -> TemplateRecord | None:
+    def get_cached_expression_evaluation(self, expr: str) -> TemplateRecord | None:
         return self._expr_store.get(expr)
 
-    def set_expression(self, expr: str, rec: TemplateRecord) -> None:
+    def set_cached_expression_evaluation(self, expr: str, rec: TemplateRecord) -> None:
         self._expr_store[expr] = rec
 
-    def has_expression(self, expr: str) -> bool:
+    def has_cached_expression_evaluation(self, expr: str) -> bool:
         return expr in self._expr_store
 
     def __str__(self) -> str:

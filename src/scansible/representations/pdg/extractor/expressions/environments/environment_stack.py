@@ -332,7 +332,7 @@ class EnvironmentStack:
             for trans_dep in transitive_dependences
         )
 
-    def get_expression(
+    def get_cached_expression_evaluation(
         self, expr: str, used_values: list[VariableValueRecord]
     ) -> tuple[TemplateRecord, Environment] | tuple[None, None]:
         logger.debug(
@@ -341,7 +341,7 @@ class EnvironmentStack:
         # TODO: Why are we using the reverse nesting order here,
         # instead of precedence order?
         for env in reversed(self.environment_stack):
-            possible_tr = env.get_expression(expr)
+            possible_tr = env.get_cached_expression_evaluation(expr)
             if possible_tr is None:
                 continue
 
@@ -357,7 +357,7 @@ class EnvironmentStack:
         logger.debug("Miss!")
         return None, None
 
-    def set_expression(self, expr: str, rec: TemplateRecord) -> None:
+    def set_cached_expression_evaluation(self, expr: str, rec: TemplateRecord) -> None:
         env = self._get_outermost_env_for_template(rec)
         if env is None:
             # TODO: Can this even happen?
@@ -366,7 +366,7 @@ class EnvironmentStack:
         logger.debug(
             f"Adding template record {rec!r} to environment of type {env.env_type.name}"
         )
-        env.set_expression(expr, rec)
+        env.set_cached_expression_evaluation(expr, rec)
 
     def _get_all_visible_definitions(self) -> dict[str, VariableDefinitionRecord]:
         return reduce(

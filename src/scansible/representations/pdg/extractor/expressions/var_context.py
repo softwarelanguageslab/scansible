@@ -109,7 +109,7 @@ class VarContext:
         used_values = self._resolve_expression_values(ast)
 
         impure_components = _get_impure_components(ast)
-        existing_tr, _ = self._envs.get_expression(expr, used_values)
+        existing_tr, _ = self._envs.get_cached_expression_evaluation(expr, used_values)
         if existing_tr is None:
             logger.debug(
                 f"Expression {expr!r} was (re-)evaluated, creating new expression result"
@@ -213,7 +213,7 @@ class VarContext:
             (vval.name, vval.revision, vval.value_revision) for vval in used_values
         ]
         tr = TemplateRecord(iv, en, used_value_ids, False)
-        self._envs.set_expression(expr, tr)
+        self._envs.set_cached_expression_evaluation(expr, tr)
         return tr
 
     def add_literal_node(self, value: object) -> rep.Literal:
