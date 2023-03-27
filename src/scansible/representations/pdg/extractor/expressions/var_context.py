@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Iterable, cast
 
 from collections import defaultdict
 from collections.abc import Generator
@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from loguru import logger
 
 from scansible.representations import structural as struct
-from scansible.utils import SENTINEL, Sentinel
+from scansible.utils import SENTINEL, Sentinel, first
 from scansible.utils.type_validators import ensure_not_none
 
 from ... import representation as rep
@@ -34,21 +34,19 @@ class RecursiveDefinitionError(Exception):
     pass
 
 
-def _get_impure_components(ast: TemplateExpressionAST) -> list[str]:
-    comps: list[str] = []
-
+def _get_impure_components(ast: TemplateExpressionAST) -> Iterable[str]:
     if ast.uses_now:
-        comps.append("function 'now'")
+        yield "function 'now'"
 
-    comps.extend(
+    yield from (
         f"filter '{filter_op}'"
         for filter_op in ast.used_filters
         if filter_op not in PURE_FILTERS
     )
-    comps.extend(
+    yield from (
         f"test '{test_op}'" for test_op in ast.used_tests if test_op not in PURE_TESTS
     )
-    comps.extend(
+    yield from (
         f"lookup {lookup_op}"
         for lookup_op in ast.used_lookups
         if not (
@@ -57,7 +55,9 @@ def _get_impure_components(ast: TemplateExpressionAST) -> list[str]:
         )
     )
 
-    return comps
+
+def _is_impure_expression(ast: TemplateExpressionAST) -> bool:
+    return first(_get_impure_components(ast)) is not None
 
 
 # TODO: Literal types
@@ -105,43 +105,27 @@ class VarContext:
 
     def _build_expression(self, ast: TemplateExpressionAST) -> TemplateRecord:
         """Parse a template, add required nodes to the graph, and return the record."""
-        expr = ast.raw
-        logger.debug(f"Evaluating expression {expr!r}")
+        logger.debug(f"Building expression {ast.raw!r}")
+        assert not ast.is_literal(), f"Expected an expression, got literal {ast.raw!r}"
 
-        assert not ast.is_literal(), f"Expected a valid expression, got {expr}"
+        used_values = list(self._resolve_expression_values(ast))
 
-        used_values = self._resolve_expression_values(ast)
+        tr, _ = self._envs.get_cached_expression_evaluation(ast.raw, used_values)
+        if tr is None:
+            logger.debug(f"First evaluation of expression {ast.raw!r} in this context")
+            return self._create_new_expression_result(ast, used_values)
 
-        impure_components = _get_impure_components(ast)
-        existing_tr, _ = self._envs.get_cached_expression_evaluation(expr, used_values)
-        if existing_tr is None:
-            logger.debug(
-                f"Expression {expr!r} was (re-)evaluated, creating new expression result"
-            )
-            return self._create_new_expression_result(
-                expr, used_values, impure_components
-            )
+        logger.debug(f"Re-evaluation of {tr!r} for expression {ast.raw!r}")
+        if _is_impure_expression(ast):
+            logger.debug(f"Expression {ast.raw!r} may be impure, creating new result")
+            return self._create_reevaluated_impure_expression_result(tr)
 
-        logger.debug(
-            f"Expression {expr!r} was already evaluated with the same input values, reusing previous result {existing_tr!r}"
-        )
-
-        if impure_components:
-            logger.debug(
-                f"Determined that expression {expr!r} may not be pure, creating new expression result"
-            )
-            iv = rep.IntermediateValue(identifier=self.extraction_ctx.next_iv_id())
-            logger.debug(f"Using IV {iv!r}")
-            self.extraction_ctx.graph.add_node(iv)
-            self.extraction_ctx.graph.add_edge(existing_tr.expr_node, iv, rep.DEF)
-            return existing_tr._replace(data_node=iv)
-
-        return existing_tr
+        logger.debug(f"Expression {ast.raw!r} is pure, reusing prior evaluation")
+        return tr
 
     def _resolve_expression_values(
         self, ast: TemplateExpressionAST
-    ) -> list[VariableValueRecord]:
-        used_variables: list[VariableValueRecord] = []
+    ) -> Iterable[VariableValueRecord]:
         # Disable cache approximation as it's very inaccurate
         should_use_cache = False  # is_top_level and self._scopes.last_scope.is_cached
 
@@ -149,52 +133,50 @@ class VarContext:
             logger.debug(f"Resolving variable {var_name!r}")
             value_record = self._resolve_expression_value(var_name, should_use_cache)
             logger.debug(f"Determined that {ast.raw!r} uses {value_record!r}")
-            used_variables.append(value_record)
-
-        return used_variables
+            yield value_record
 
     def _resolve_expression_value(
         self, var_name: str, should_use_cache: bool
     ) -> VariableValueRecord:
-        # Try loading from the cache if there is one we should use
         if should_use_cache:
-            cached_val_record = self._envs.top_environment.cached_results.get(
-                var_name, None
-            )
-            if cached_val_record is not None:
-                logger.debug(
-                    f"Variable {var_name!r} cached in scope, reusing {cached_val_record!r}"
-                )
-                return cached_val_record
+            return self._resolve_expression_cached_value(var_name)
+        else:
+            return self._resolve_expression_uncached_value(var_name)
 
-        # Cache miss or not using cache, get the variable value. If the variable
-        # is initialised with an expression, this will recursively evaluate the
-        # expression to give an up-to-date value. The value might be reused from
-        # a previous evaluation.
+    def _resolve_expression_uncached_value(self, var_name: str) -> VariableValueRecord:
+        # If the variable is initialised with an expression, this will
+        # recursively evaluate the expression to give an up-to-date value.
+        # The value might be reused from a previous evaluation.
         try:
-            vr = self._get_variable_value_record(var_name)
+            return self._get_variable_value_record(var_name)
         except RecursionError:
             raise RecursiveDefinitionError(
                 f"Self-referential definition detected for {var_name!r}"
             ) from None
 
-        # Store the variable in the cache for potential later reuse, if we need to
-        if should_use_cache:
-            logger.debug(f"Saving {vr!r} in cache for reuse")
-            self._envs.top_environment.cached_results[var_name] = vr
+    def _resolve_expression_cached_value(self, var_name: str) -> VariableValueRecord:
+        # Try loading from the cache
+        vr = self._envs.top_environment.cached_results.get(var_name, None)
+        if vr is not None:
+            logger.debug(f"Variable {var_name!r} cached in current env, reusing {vr!r}")
+            return vr
+
+        # Cache miss, proceed as normal
+        vr = self._resolve_expression_uncached_value(var_name)
+
+        # Store the variable in the cache for potential later reuse
+        logger.debug(f"Saving {vr!r} in cache for reuse")
+        self._envs.top_environment.cached_results[var_name] = vr
 
         return vr
 
     def _create_new_expression_result(
-        self,
-        expr: str,
-        used_values: list[VariableValueRecord],
-        impure_components: list[str],
+        self, ast: TemplateExpressionAST, used_values: list[VariableValueRecord]
     ) -> TemplateRecord:
         en = rep.Expression(
-            expr=expr,
-            impure_components=tuple(impure_components),
-            location=self.extraction_ctx.get_location(expr),
+            expr=ast.raw,
+            impure_components=tuple(_get_impure_components(ast)),
+            location=self.extraction_ctx.get_location(ast.raw),
         )
         iv = rep.IntermediateValue(identifier=self.extraction_ctx.next_iv_id())
         logger.debug(f"Using IV {iv!r}")
@@ -217,9 +199,20 @@ class VarContext:
             (vval.name, vval.revision, vval.value_revision) for vval in used_values
         ]
         tr = TemplateRecord(iv, en, used_value_ids, False)
-        self._envs.set_cached_expression_evaluation(expr, tr)
+        self._envs.set_cached_expression_evaluation(ast.raw, tr)
         return tr
 
+    def _create_reevaluated_impure_expression_result(
+        self, tr: TemplateRecord
+    ) -> TemplateRecord:
+        iv = rep.IntermediateValue(identifier=self.extraction_ctx.next_iv_id())
+        logger.debug(f"Using IV {iv!r}")
+
+        self.extraction_ctx.graph.add_node(iv)
+        self.extraction_ctx.graph.add_edge(tr.expr_node, iv, rep.DEF)
+        return tr._replace(data_node=iv)
+
+    # TODO: Make private later.
     def add_literal_node(self, value: object) -> rep.Literal:
         location = self.extraction_ctx.get_location(value)
         type_ = cast(rep.ValidTypeStr, value.__class__.__name__)
