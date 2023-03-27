@@ -109,8 +109,8 @@ class VarContext:
         used_values = self._resolve_expression_values(ast)
 
         impure_components = _get_impure_components(ast)
-        existing_tr_pair = self._envs.get_expression(expr, used_values)
-        if existing_tr_pair is None:
+        existing_tr, existing_tr_env = self._envs.get_expression(expr, used_values)
+        if existing_tr is None:
             logger.debug(
                 f"Expression {expr!r} was (re-)evaluated, creating new expression result"
             )
@@ -118,9 +118,8 @@ class VarContext:
                 expr, used_values, impure_components
             )
 
-        existing_tr, existing_tr_scope = existing_tr_pair
         logger.debug(
-            f"Expression {expr!r} was already evaluated with the same input values, reusing previous result {existing_tr!r} from {existing_tr_scope!r}"
+            f"Expression {expr!r} was already evaluated with the same input values, reusing previous result {existing_tr!r} from {existing_tr_env!r}"
         )
 
         if impure_components:
@@ -133,7 +132,7 @@ class VarContext:
             self.context.graph.add_edge(existing_tr.expr_node, iv, rep.DEF)
             return existing_tr._replace(data_node=iv)
 
-        return existing_tr_pair[0]
+        return existing_tr
 
     def _resolve_expression_values(
         self, ast: TemplateExpressionAST
@@ -360,10 +359,10 @@ class VarContext:
         initializer, if necessary.
         """
         logger.debug(f"Resolving variable {name}")
-        vdef_pair = self._envs.get_variable_definition(name)
+        vdef, vdef_env = self._envs.get_variable_definition(name)
 
         # Undefined variables: Assume lowest scope
-        if vdef_pair is None:
+        if vdef is None or vdef_env is None:
             assert not self._envs.has_variable_value(
                 name
             ), f"Internal Error: Variable {name!r} has no definition but does have value"
@@ -371,29 +370,28 @@ class VarContext:
                 f"Variable {name} has not yet been defined, registering new value at lowest precedence level"
             )
             self.define_variable(name, EnvironmentType.CLI_VALUES)
-            vval_pair = self._envs.get_variable_value(name)
-            assert vval_pair is not None and isinstance(
-                vval_pair[0], ConstantVariableValueRecord
+            vval, _ = self._envs.get_variable_value(name)
+            assert vval is not None and isinstance(
+                vval, ConstantVariableValueRecord
             ), f"Internal Error: Expected registered variable for {name!r} to be constant"
-            return vval_pair[0]
+            return vval
 
-        vdef, vdef_scope = vdef_pair
         expr = vdef.template_expr
-        logger.debug(f"Found existing variable {vdef!r} from scope {vdef_scope!r}")
+        logger.debug(f"Found existing variable {vdef!r} from scope {vdef_env!r}")
 
         if isinstance(expr, Sentinel):
             # No template expression, so it cannot be evaluated. There must be
             # a constant value record for it, we'll return that.
-            vval_pair = self._envs.get_variable_value_for_constant_definition(
+            vval, vval_env = self._envs.get_variable_value_for_constant_definition(
                 name, vdef.revision
             )
-            assert vval_pair is not None and isinstance(
-                vval_pair[0], ConstantVariableValueRecord
+            assert vval is not None and isinstance(
+                vval, ConstantVariableValueRecord
             ), f"Internal Error: Could not find constant value for variable without expression ({name!r})"
             logger.debug(
-                f"Variable {name!r} has no initialiser, using constant value record {vval_pair[0]!r} found in {vval_pair[1]!r}"
+                f"Variable {name!r} has no initialiser, using constant value record {vval!r} found in {vval_env!r}"
             )
-            return vval_pair[0]
+            return vval
 
         # Evaluate the expression, perhaps re-evaluating if necessary. If the
         # expression was already evaluated previously and still has the same
@@ -408,17 +406,17 @@ class VarContext:
         # Try to find a pre-existing value record for this template record. If
         # it exists, we've already evaluated this variable before and we can
         # just reuse the previous one.
-        vval_pair = self._envs.get_variable_value_for_cached_expression(
+        vval, vval_env = self._envs.get_variable_value_for_cached_expression(
             name, vdef.revision, template_record
         )
-        if vval_pair is not None:
+        if vval is not None:
             logger.debug(
-                f"Found pre-existing value {vval_pair[0]!r} originating from {vval_pair[1]!r}, reusing"
+                f"Found pre-existing value {vval!r} originating from {vval_env!r}, reusing"
             )
             assert isinstance(
-                vval_pair[0], ChangeableVariableValueRecord
+                vval, ChangeableVariableValueRecord
             ), f"Expected evaluated value to be changeable"
-            return vval_pair[0]
+            return vval
 
         # No variable value record exists yet, so we need to create a new one.
         # We'll also need to add a new variable node to the graph, although we
@@ -453,7 +451,7 @@ class VarContext:
 
         if var_node is None:
             logger.debug(f"Creating new variable node to represent value")
-            var_node = self._create_new_variable_node(value_record, vdef_scope)
+            var_node = self._create_new_variable_node(value_record, vdef_env)
 
         # Link the edge
         self.context.graph.add_edge(template_record.data_node, var_node, rep.DEF)

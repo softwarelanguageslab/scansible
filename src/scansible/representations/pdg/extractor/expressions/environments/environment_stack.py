@@ -129,8 +129,8 @@ class EnvironmentStack:
 
     def get_variable_definition(
         self, name: str
-    ) -> tuple[VariableDefinitionRecord, Environment] | None:
-        return self._get_highest_precedence_variable_definition(name)
+    ) -> tuple[VariableDefinitionRecord, Environment] | tuple[None, None]:
+        return self._get_highest_precedence_variable_definition(name) or (None, None)
 
     def set_variable_definition(
         self, name: str, rec: VariableDefinitionRecord, env_type: EnvironmentType
@@ -162,7 +162,7 @@ class EnvironmentStack:
 
     def get_variable_value_for_cached_expression(
         self, name: str, def_revision: int, template_record: TemplateRecord
-    ) -> tuple[ChangeableVariableValueRecord, Environment] | None:
+    ) -> tuple[ChangeableVariableValueRecord, Environment] | tuple[None, None]:
         for vval, env in self._iter_variable_values_for_definition(name, def_revision):
             if not isinstance(vval, ChangeableVariableValueRecord):
                 logger.debug("Ignoring: Expecting changeable value")
@@ -178,11 +178,11 @@ class EnvironmentStack:
             return vval, env
 
         logger.debug("No matching value record found")
-        return None
+        return None, None
 
     def get_variable_value_for_constant_definition(
         self, name: str, def_revision: int
-    ) -> tuple[ConstantVariableValueRecord, Environment] | None:
+    ) -> tuple[ConstantVariableValueRecord, Environment] | tuple[None, None]:
         for vval, env in self._iter_variable_values_for_definition(name, def_revision):
             if not isinstance(vval, ConstantVariableValueRecord):
                 logger.debug("Ignoring: Expecting constant value")
@@ -192,12 +192,12 @@ class EnvironmentStack:
             return vval, env
 
         logger.debug("No matching value record found")
-        return None
+        return None, None
 
     def get_variable_value(
         self,
         name: str,
-    ) -> tuple[VariableValueRecord, Environment] | None:
+    ) -> tuple[VariableValueRecord, Environment] | tuple[None, None]:
         candidates = list(self._iter_variable_values(name))
 
         assert (
@@ -208,7 +208,7 @@ class EnvironmentStack:
             return candidates[0]
 
         logger.debug("No matching value record found")
-        return None
+        return None, None
 
     def set_constant_variable_value(
         self, name: str, rec: ConstantVariableValueRecord, env_type: EnvironmentType
@@ -321,7 +321,7 @@ class EnvironmentStack:
 
     def get_expression(
         self, expr: str, used_values: list[VariableValueRecord]
-    ) -> tuple[TemplateRecord, Environment] | None:
+    ) -> tuple[TemplateRecord, Environment] | tuple[None, None]:
         logger.debug(
             f"Searching for previous evaluation of {expr!r} in reverse nesting order"
         )
@@ -342,7 +342,7 @@ class EnvironmentStack:
             return possible_tr, env
 
         logger.debug("Miss!")
-        return None
+        return None, None
 
     def set_expression(self, expr: str, rec: TemplateRecord) -> None:
         env = self._get_outermost_env_for_template(rec)
