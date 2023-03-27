@@ -88,9 +88,13 @@ class VarContext:
         self._envs.exit_scope()
 
     def build_expression(self, expr: str, is_conditional: bool) -> rep.DataNode:
-        ast = TemplateExpressionAST.parse(
-            expr, is_conditional, self._envs.get_variable_initialisers()
-        )
+        if is_conditional:
+            ast = TemplateExpressionAST.parse_conditional(
+                expr, self._envs.get_variable_initialisers()
+            )
+        else:
+            ast = TemplateExpressionAST.parse(expr)
+
         if ast is None or ast.is_literal():
             if ast is None:
                 logger.warning(f"{expr!r} is malformed")
@@ -278,12 +282,7 @@ class VarContext:
 
         if (
             isinstance(expr, str)
-            and (
-                ast := TemplateExpressionAST.parse(
-                    expr, False, self._envs.get_variable_initialisers()
-                )
-            )
-            is not None
+            and (ast := TemplateExpressionAST.parse(expr)) is not None
             and not ast.is_literal()
         ):
             template_expr: str | Sentinel = expr
@@ -396,11 +395,7 @@ class VarContext:
         # Evaluate the expression, perhaps re-evaluating if necessary. If the
         # expression was already evaluated previously and still has the same
         # value, this will just return the previous record.
-        ast = ensure_not_none(
-            TemplateExpressionAST.parse(
-                expr, False, self._envs.get_variable_initialisers()
-            )
-        )
+        ast = ensure_not_none(TemplateExpressionAST.parse(expr))
         template_record: TemplateRecord = self._build_expression(ast)
 
         # Try to find a pre-existing value record for this template record. If

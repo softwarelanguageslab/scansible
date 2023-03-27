@@ -163,40 +163,49 @@ class TemplateExpressionAST:
         )
 
     @classmethod
-    def parse(
-        cls,
-        expression: str,
-        is_conditional: bool = False,
-        variable_mappings: dict[str, str] | None = None,
-    ) -> TemplateExpressionAST | None:
+    def parse(cls, expression: str) -> TemplateExpressionAST | None:
         """
-        Parse a template expression to an AST.
+        Parse a bare template expression to an AST.
+        For conditionals, use `parse_conditional`.
 
         :param      expression:      The template expression
         :type       expression:      str
-        :param      is_conditional:  Whether the statement is a conditional. In
-                                     case it is, it is assumed to be bare and
-                                     will be wrapped in a template expression.
-        :type       is_conditional:  bool
 
         :returns:   The template expression AST instance.
         :rtype:     TemplateExpressionAST
         """
-        if variable_mappings is None:
-            variable_mappings = {}
-
-        extra_references: set[str] = set()
-
         env = Environment(cache_size=0)
 
         try:
-            if is_conditional:
-                ast, extra_references = parse_conditional(
-                    expression, env, variable_mappings
-                )
-                return cls(ast, expression, extra_references)
-
             return cls(env.parse(expression), expression)
+        except TemplateSyntaxError as tse:
+            logger.error("Template syntax error: " + str(tse))
+            return None
+
+    @classmethod
+    def parse_conditional(
+        cls, expression: str, variable_mappings: dict[str, str]
+    ) -> TemplateExpressionAST | None:
+        """
+        Parse a template expression to an AST.
+
+        :param      expression:         The template expression
+        :type       expression:         str
+        :param      variable_mappings:  Mappings from variables to their
+                                        initialisers, used to resolve
+                                        multi-level expressions.
+        :type       variable_mappings:  dict[str, str]
+
+        :returns:   The template expression AST instance.
+        :rtype:     TemplateExpressionAST
+        """
+        env = Environment(cache_size=0)
+
+        try:
+            ast, extra_references = parse_conditional(
+                expression, env, variable_mappings
+            )
+            return cls(ast, expression, extra_references)
         except TemplateSyntaxError as tse:
             logger.error("Template syntax error: " + str(tse))
             return None

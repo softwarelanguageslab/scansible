@@ -52,6 +52,9 @@ test_cases = [
     ),
     Case(expr="The time is {{ now() }}", uses_now=True),
     Case(expr='Inline {{ expressions }} work {{ "too" }}!', variables={"expressions"}),
+]
+
+conditional_test_cases = [
     Case(
         expr='url is match("http://example.com/users/.*/resources/")',
         variables={"url"},
@@ -82,46 +85,48 @@ test_cases = [
 ]
 
 
+def _do_parse(case: Case) -> TemplateExpressionAST | None:
+    if case.is_conditional:
+        return TemplateExpressionAST.parse_conditional(
+            case.expr, case.variable_mappings
+        )
+    return TemplateExpressionAST.parse(case.expr)
+
+
 @pytest.mark.parametrize("case", test_cases)
 def describe_template_parser() -> None:
     def should_parse_expressions(case: Case) -> None:
-        ast = TemplateExpressionAST.parse(
-            case.expr, case.is_conditional, case.variable_mappings
-        )
+        ast = _do_parse(case)
+
         assert ast is not None
         assert ast.ast_root is not None
 
     def should_find_variables(case: Case) -> None:
-        ast = TemplateExpressionAST.parse(
-            case.expr, case.is_conditional, case.variable_mappings
-        )
+        ast = _do_parse(case)
+
         assert ast is not None
         assert ast.referenced_variables == case.variables
 
     def should_find_filters(case: Case) -> None:
-        ast = TemplateExpressionAST.parse(
-            case.expr, case.is_conditional, case.variable_mappings
-        )
+        ast = _do_parse(case)
+
         assert ast is not None
         assert ast.used_filters == case.filters
 
     def should_find_tests(case: Case) -> None:
-        ast = TemplateExpressionAST.parse(
-            case.expr, case.is_conditional, case.variable_mappings
-        )
+        ast = _do_parse(case)
+
         assert ast is not None
         assert ast.used_tests == case.tests
 
     def should_find_now_usage(case: Case) -> None:
-        ast = TemplateExpressionAST.parse(
-            case.expr, case.is_conditional, case.variable_mappings
-        )
+        ast = _do_parse(case)
+
         assert ast is not None
         assert ast.uses_now == case.uses_now
 
     def should_find_lookups(case: Case) -> None:
-        ast = TemplateExpressionAST.parse(
-            case.expr, case.is_conditional, case.variable_mappings
-        )
+        ast = _do_parse(case)
+
         assert ast is not None
         assert ast.used_lookups == case.lookup_targets
