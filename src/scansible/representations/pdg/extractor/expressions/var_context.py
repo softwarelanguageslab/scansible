@@ -110,7 +110,7 @@ class VarContext:
 
         used_values = list(self._resolve_expression_values(ast))
 
-        tr, _ = self._envs.get_cached_expression_evaluation(ast.raw, used_values)
+        tr, _ = self._envs.get_expression_evaluation_result(ast.raw, used_values)
         if tr is None:
             logger.debug(f"First evaluation of expression {ast.raw!r} in this context")
             return self._create_new_expression_result(ast, used_values)
@@ -199,7 +199,7 @@ class VarContext:
             (vval.name, vval.revision, vval.value_revision) for vval in used_values
         ]
         tr = TemplateRecord(iv, en, used_value_ids, False)
-        self._envs.set_cached_expression_evaluation(ast.raw, tr)
+        self._envs.set_expression_evaluation_result(ast.raw, tr)
         return tr
 
     def _create_reevaluated_impure_expression_result(
