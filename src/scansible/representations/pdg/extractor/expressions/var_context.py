@@ -87,7 +87,18 @@ class VarContext:
         yield
         self._envs.exit_scope()
 
-    def build_expression(self, expr: str, is_conditional: bool) -> rep.DataNode:
+    def build_expression(self, expr: struct.AnyValue) -> rep.DataNode:
+        return self._build_expression(expr, is_conditional=False)
+
+    def build_conditional_expression(self, expr: struct.AnyValue) -> rep.DataNode:
+        return self._build_expression(expr, is_conditional=True)
+
+    def _build_expression(
+        self, expr: struct.AnyValue, is_conditional: bool
+    ) -> rep.DataNode:
+        if not isinstance(expr, str):
+            return self._add_literal_node(expr)
+
         if is_conditional:
             ast = TemplateExpressionAST.parse_conditional(
                 expr, self._envs.get_variable_initialisers()
@@ -99,11 +110,36 @@ class VarContext:
             if ast is None:
                 logger.warning(f"{expr!r} is malformed")
             logger.debug(f"{expr!r} is a literal or malformed expression")
-            return self.add_literal_node(expr)
+            return self._add_literal_node(expr)
 
-        return self._build_expression(ast).data_node
+        return self._resolve_expression(ast).data_node
 
-    def _build_expression(self, ast: TemplateExpressionAST) -> TemplateRecord:
+    def _add_literal_node(self, value: object) -> rep.Literal:
+        location = self.extraction_ctx.get_location(value)
+        type_ = cast(rep.ValidTypeStr, value.__class__.__name__)
+        type_mappings: dict[str, rep.ValidTypeStr] = {
+            "AnsibleUnicode": "str",
+            "AnsibleSequence": "list",
+            "AnsibleMapping": "dict",
+            "AnsibleUnsafeText": "str",
+        }
+        type_ = type_mappings.get(type_, type_)
+        if isinstance(value, (dict, list)):
+            logger.warning("I am not able to handle composite literals yet")
+            lit = rep.Literal(
+                type=type_,
+                value=str(value),  # pyright: ignore
+                location=location,
+            )
+        elif isinstance(value, struct.VaultValue):
+            lit = rep.Literal(type=type_, value=str(value), location=location)
+        else:
+            lit = rep.Literal(type=type_, value=value, location=location)
+
+        self.extraction_ctx.graph.add_node(lit)
+        return lit
+
+    def _resolve_expression(self, ast: TemplateExpressionAST) -> TemplateRecord:
         """Parse a template, add required nodes to the graph, and return the record."""
         logger.debug(f"Building expression {ast.raw!r}")
         assert not ast.is_literal(), f"Expected an expression, got literal {ast.raw!r}"
@@ -209,32 +245,6 @@ class VarContext:
         self.extraction_ctx.graph.add_edge(tr.expr_node, iv, rep.DEF)
         return tr.__replace__(data_node=iv)  # type: ignore[return-value]
 
-    # TODO: Make private later.
-    def add_literal_node(self, value: object) -> rep.Literal:
-        location = self.extraction_ctx.get_location(value)
-        type_ = cast(rep.ValidTypeStr, value.__class__.__name__)
-        type_mappings: dict[str, rep.ValidTypeStr] = {
-            "AnsibleUnicode": "str",
-            "AnsibleSequence": "list",
-            "AnsibleMapping": "dict",
-            "AnsibleUnsafeText": "str",
-        }
-        type_ = type_mappings.get(type_, type_)
-        if isinstance(value, (dict, list)):
-            logger.warning("I am not able to handle composite literals yet")
-            lit = rep.Literal(
-                type=type_,
-                value=str(value),  # pyright: ignore
-                location=location,
-            )
-        elif isinstance(value, struct.VaultValue):
-            lit = rep.Literal(type=type_, value=str(value), location=location)
-        else:
-            lit = rep.Literal(type=type_, value=value, location=location)
-
-        self.extraction_ctx.graph.add_node(lit)
-        return lit
-
     def define_variable(
         self, name: str, level: EnvironmentType, *, expr: Any = SENTINEL
     ) -> rep.Variable:
@@ -280,7 +290,7 @@ class VarContext:
             template_expr = SENTINEL
         else:
             template_expr = SENTINEL
-            lit_node = self.add_literal_node(expr)
+            lit_node = self._add_literal_node(expr)
             self.extraction_ctx.graph.add_edge(lit_node, var_node, rep.DEF)
 
         def_record = VariableDefinitionRecord(name, var_rev, template_expr)
@@ -386,7 +396,7 @@ class VarContext:
         # expression was already evaluated previously and still has the same
         # value, this will just return the previous record.
         ast = ensure_not_none(TemplateExpressionAST.parse(expr))
-        template_record: TemplateRecord = self._build_expression(ast)
+        template_record: TemplateRecord = self._resolve_expression(ast)
 
         # Try to find a pre-existing value record for this template record. If
         # it exists, we've already evaluated this variable before and we can

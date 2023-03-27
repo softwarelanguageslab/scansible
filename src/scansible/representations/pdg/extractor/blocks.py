@@ -99,7 +99,7 @@ class BlockExtractor:
                     continue
 
                 try:
-                    value = prev_value or self.extract_value(kw_val)
+                    value = prev_value or self.context.vars.build_expression(kw_val)
                 except RecursiveDefinitionError as e:
                     self.logger.error(e)
                     continue
@@ -127,12 +127,3 @@ class BlockExtractor:
         from .task_lists import TaskListExtractor
 
         return TaskListExtractor(self.context, child_list).extract_tasks(predecessors)
-
-    # TODO: Duplicated from tasks.
-    def extract_value(
-        self, value: object, is_conditional: bool = False
-    ) -> rep.DataNode:
-        if isinstance(value, str):
-            return self.context.vars.build_expression(value, is_conditional)
-        else:
-            return self.context.vars.add_literal_node(value)

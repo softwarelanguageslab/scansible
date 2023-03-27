@@ -32,7 +32,7 @@ class SetFactTaskExtractor(TaskExtractor):
         name_to_value: dict[str, rep.DataNode] = {}
         for var_name, var_value in self.task.args.items():
             try:
-                name_to_value[var_name] = self.extract_value(var_value)
+                name_to_value[var_name] = self.context.vars.build_expression(var_value)
             except RecursiveDefinitionError as e:
                 self.logger.error(e)
                 continue

@@ -55,7 +55,7 @@ def describe_unmodified() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        ctx.build_expression(expr, False)
+        ctx.build_expression(expr)
 
         assert_graphs_match(
             g, create_graph({"lit": Literal(type="str", value=expr)}, [])
@@ -82,7 +82,7 @@ def describe_unmodified() -> None:
     def should_extract_variables(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.build_expression("hello {{ target }}", False)
+        ctx.build_expression("hello {{ target }}")
 
         assert_graphs_match(
             g,
@@ -108,8 +108,8 @@ def describe_unmodified() -> None:
         # We don't want to deduplicate template literals yet
         ctx, g = create_context()
 
-        ctx.build_expression("hello world", False)
-        ctx.build_expression("hello world", False)
+        ctx.build_expression("hello world")
+        ctx.build_expression("hello world")
 
         assert_graphs_match(
             g,
@@ -126,8 +126,8 @@ def describe_unmodified() -> None:
         # We don't want to deduplicate template literals yet
         ctx, g = create_context()
 
-        ctx.build_expression("hello {{ target }}", False)
-        ctx.build_expression("hello {{ target }}", False)
+        ctx.build_expression("hello {{ target }}")
+        ctx.build_expression("hello {{ target }}")
 
         assert_graphs_match(
             g,
@@ -152,7 +152,7 @@ def describe_unmodified() -> None:
         ctx.define_variable(
             "msg", EnvironmentType.HOST_FACTS, expr="hello {{ target }}"
         )
-        ctx.build_expression("{{ msg }}", False)
+        ctx.build_expression("{{ msg }}")
 
         assert_graphs_match(
             g,
@@ -198,8 +198,8 @@ def describe_unmodified() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        ctx.build_expression(expr, False)
-        ctx.build_expression(expr, False)
+        ctx.build_expression(expr)
+        ctx.build_expression(expr)
 
         assert_graphs_match(
             g,
@@ -228,8 +228,8 @@ def describe_modified() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        ctx.build_expression(expr, False)
-        ctx.build_expression(expr, False)
+        ctx.build_expression(expr)
+        ctx.build_expression(expr)
 
         assert_graphs_match(
             g,
@@ -247,10 +247,10 @@ def describe_modified() -> None:
         ctx, g = create_context()
 
         ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="hello")
-        ctx.build_expression("{{ a }} world", False)
+        ctx.build_expression("{{ a }} world")
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
             ctx.define_variable("a", EnvironmentType.TASK_VARS, expr="hi")
-            ctx.build_expression("{{ a }} world", False)
+            ctx.build_expression("{{ a }} world")
 
         assert_graphs_match(
             g,
@@ -290,8 +290,8 @@ def describe_modified() -> None:
         ctx, g = create_context()
 
         ctx.define_variable("when", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
-        ctx.build_expression("The time is {{ when }}", False)
-        ctx.build_expression("The time is {{ when }}", False)
+        ctx.build_expression("The time is {{ when }}")
+        ctx.build_expression("The time is {{ when }}")
 
         e2 = Expression(expr="The time is {{ when }}")
         e3 = Expression(expr="The time is {{ when }}")
@@ -346,10 +346,10 @@ def describe_modified() -> None:
 
         ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="hello")
         ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ a }} world")
-        ctx.build_expression("{{ b }}!", False)
+        ctx.build_expression("{{ b }}!")
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
             ctx.define_variable("a", EnvironmentType.TASK_VARS, expr="hi")
-            ctx.build_expression("{{ b }}!", False)
+            ctx.build_expression("{{ b }}!")
 
         assert_graphs_match(
             g,
@@ -412,9 +412,9 @@ def describe_modified() -> None:
 
         ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="hello")
         ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="world")
-        ctx.build_expression("{{ a }} {{ b }}!", False)
+        ctx.build_expression("{{ a }} {{ b }}!")
         ctx.define_variable("a", EnvironmentType.INCLUDE_VARS, expr="hi")
-        ctx.build_expression("{{ a }} {{ b }}!", False)
+        ctx.build_expression("{{ a }} {{ b }}!")
 
         assert_graphs_match(
             g,
@@ -466,10 +466,10 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="1")
-        ctx.build_expression("1 {{ a }}", False)
+        ctx.build_expression("1 {{ a }}")
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
             ctx.define_variable("a", EnvironmentType.TASK_VARS, expr="2")
-            ctx.build_expression("2 {{ a }}", False)
+            ctx.build_expression("2 {{ a }}")
 
         assert_graphs_match(
             g,
@@ -511,7 +511,7 @@ def describe_scoping() -> None:
         ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="1")
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
             ctx.define_variable("a", EnvironmentType.SET_FACTS_REGISTERED, expr="2")
-        ctx.build_expression("{{ a }}", False)
+        ctx.build_expression("{{ a }}")
 
         assert_graphs_match(
             g,
@@ -549,9 +549,9 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="1")
-        ctx.build_expression("1 {{ a }}", False)
+        ctx.build_expression("1 {{ a }}")
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.build_expression("1 {{ a }}", False)
+            ctx.build_expression("1 {{ a }}")
 
         assert_graphs_match(
             g,
@@ -581,10 +581,10 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="1")
-        ctx.build_expression("1 {{ a }}", False)
+        ctx.build_expression("1 {{ a }}")
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
             ctx.define_variable("a", EnvironmentType.TASK_VARS, expr="2")
-        ctx.build_expression("1 {{ a }}", False)
+        ctx.build_expression("1 {{ a }}")
 
         assert_graphs_match(
             g,
@@ -622,9 +622,9 @@ def describe_scoping() -> None:
         ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="1")
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
             ctx.define_variable("c", EnvironmentType.TASK_VARS, expr="c")
-            ctx.build_expression("1 {{ a }}", False)
+            ctx.build_expression("1 {{ a }}")
             ctx.define_variable("a", EnvironmentType.TASK_VARS, expr="2")
-        ctx.build_expression("1 {{ a }}", False)
+        ctx.build_expression("1 {{ a }}")
 
         assert_graphs_match(
             g,
@@ -670,11 +670,11 @@ def describe_scoping() -> None:
         # Difference to 'should_use_most_specific_scope': Same template here,
         # different template there
         ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="1")
-        ctx.build_expression("1 {{ a }}", False)
+        ctx.build_expression("1 {{ a }}")
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
             ctx.define_variable("a", EnvironmentType.TASK_VARS, expr="2")
-            ctx.build_expression("1 {{ a }}", False)
-        ctx.build_expression("1 {{ a }}", False)
+            ctx.build_expression("1 {{ a }}")
+        ctx.build_expression("1 {{ a }}")
 
         assert_graphs_match(
             g,
@@ -716,9 +716,9 @@ def describe_scoping() -> None:
         ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="{{ b }}")
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
             ctx.define_variable("b", EnvironmentType.TASK_VARS, expr="1")
-            ctx.build_expression("{{ a }}", False)
+            ctx.build_expression("{{ a }}")
         ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="2")
-        ctx.build_expression("{{ a }}", False)
+        ctx.build_expression("{{ a }}")
 
         assert_graphs_match(
             g,
@@ -787,11 +787,11 @@ def describe_scoping() -> None:
                 "b", EnvironmentType.TASK_VARS, expr="{{ c | reverse }}"
             )
             ctx.define_variable("c", EnvironmentType.TASK_VARS, expr="world")
-            ctx.build_expression("{{ b }} {{ a }}", False)
+            ctx.build_expression("{{ b }} {{ a }}")
         ctx.define_variable(
             "a", EnvironmentType.HOST_FACTS, expr='{{ "hello" | reverse }}'
         )
-        ctx.build_expression("{{ b }} {{ a }}", False)
+        ctx.build_expression("{{ b }} {{ a }}")
 
         assert_graphs_match(
             g,
@@ -862,8 +862,8 @@ def describe_scoping() -> None:
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
             ctx.define_variable("b", EnvironmentType.TASK_VARS, expr="1")
             with ctx.enter_scope(EnvironmentType.TASK_VARS):
-                ctx.build_expression("{{ a }}", False)
-            ctx.build_expression("{{ a }}", False)  # Should reuse above expr
+                ctx.build_expression("{{ a }}")
+            ctx.build_expression("{{ a }}")  # Should reuse above expr
 
         assert_graphs_match(
             g,
@@ -907,7 +907,7 @@ def describe_scoping() -> None:
         g.add_edge(ln, vn, DEF)
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
             ctx.define_variable("b", EnvironmentType.TASK_VARS, expr="2")
-            ctx.build_expression("{{ b }}", False)
+            ctx.build_expression("{{ b }}")
 
         assert_graphs_match(
             g,
@@ -950,7 +950,7 @@ def describe_scoping() -> None:
         ln = Literal(type="int", value=2)
         g.add_node(ln)
         g.add_edge(ln, vn, DEF)
-        ctx.build_expression("{{ b }}", False)
+        ctx.build_expression("{{ b }}")
 
         assert_graphs_match(
             g,
@@ -993,8 +993,8 @@ def describe_scoping() -> None:
             ln = Literal(type="int", value=2)
             g.add_node(ln)
             g.add_edge(ln, vn, DEF)
-            ctx.build_expression("{{ b }}", False)
-        ctx.build_expression("{{ b }}", False)  # Should reuse above expr
+            ctx.build_expression("{{ b }}")
+        ctx.build_expression("{{ b }}")  # Should reuse above expr
 
         assert_graphs_match(
             g,
@@ -1034,8 +1034,8 @@ def _describe_caching() -> None:
 
         ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            d1 = ctx.build_expression("{{ b }}", False)
-            d2 = ctx.build_expression("{{ b }}", False)  # Should reuse above
+            d1 = ctx.build_expression("{{ b }}")
+            d2 = ctx.build_expression("{{ b }}")  # Should reuse above
 
         assert d1 is d2
 
@@ -1044,9 +1044,9 @@ def _describe_caching() -> None:
 
         ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            d1 = ctx.build_expression("{{ b }}", False)
-            d2 = ctx.build_expression("{{ b }}", False)  # Should reuse above
-        d3 = ctx.build_expression("{{ b }}", False)  # Should not reuse above
+            d1 = ctx.build_expression("{{ b }}")
+            d2 = ctx.build_expression("{{ b }}")  # Should reuse above
+        d3 = ctx.build_expression("{{ b }}")  # Should not reuse above
 
         assert d1 is d2
         assert d1 is not d3
@@ -1057,10 +1057,10 @@ def _describe_caching() -> None:
         ctx, _ = create_context()
 
         ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
-        d1 = ctx.build_expression("{{ b }}", False)
+        d1 = ctx.build_expression("{{ b }}")
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            d2 = ctx.build_expression("{{ b }}", False)
-        d3 = ctx.build_expression("{{ b }}", False)
+            d2 = ctx.build_expression("{{ b }}")
+        d3 = ctx.build_expression("{{ b }}")
 
         assert d1 is not d2
         assert d1 is not d3
@@ -1070,8 +1070,8 @@ def _describe_caching() -> None:
         ctx, _ = create_context()
 
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            d1 = ctx.build_expression("{{ now() }}", False)
-            d2 = ctx.build_expression("{{ now() }}", False)
+            d1 = ctx.build_expression("{{ now() }}")
+            d2 = ctx.build_expression("{{ now() }}")
 
         assert d1 is not d2
 
@@ -1080,11 +1080,11 @@ def _describe_caching() -> None:
 
         ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            do1 = ctx.build_expression("{{ b }}", False)
+            do1 = ctx.build_expression("{{ b }}")
             with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-                di1 = ctx.build_expression("{{ b }}", False)
-                di2 = ctx.build_expression("{{ b }}", False)
-            do2 = ctx.build_expression("{{ b }}", False)
+                di1 = ctx.build_expression("{{ b }}")
+                di2 = ctx.build_expression("{{ b }}")
+            do2 = ctx.build_expression("{{ b }}")
 
         assert di1 is di2
         assert do1 is do2
@@ -1096,8 +1096,8 @@ def _describe_caching() -> None:
         ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
         ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="{{ b }}")
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            d1 = ctx.build_expression("{{ a }}", False)
-            d2 = ctx.build_expression("{{ a }}", False)
+            d1 = ctx.build_expression("{{ a }}")
+            d2 = ctx.build_expression("{{ a }}")
 
         assert d1 is d2
 
@@ -1108,8 +1108,8 @@ def _describe_caching() -> None:
 
         ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            ctx.build_expression("{{ b + 1 }}", False)
-            ctx.build_expression("{{ b + 2 }}", False)
+            ctx.build_expression("{{ b + 1 }}")
+            ctx.build_expression("{{ b + 2 }}")
 
         assert_graphs_match(
             g,

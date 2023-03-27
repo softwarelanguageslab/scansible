@@ -110,7 +110,7 @@ class GenericTaskExtractor(TaskExtractor):
         # Link data flow
         for arg_name, arg_value in self.task.args.items():
             try:
-                arg_node = self.extract_value(arg_value)
+                arg_node = self.context.vars.build_expression(arg_value)
             except RecursiveDefinitionError as e:
                 self.logger.error(e)
                 continue
@@ -126,7 +126,7 @@ class GenericTaskExtractor(TaskExtractor):
                 misc_kw, (kw_val := getattr(self.task, misc_kw))
             ):
                 try:
-                    val_node = self.extract_value(kw_val)
+                    val_node = self.context.vars.build_expression(kw_val)
                 except RecursiveDefinitionError as e:
                     self.logger.error(e)
                     continue

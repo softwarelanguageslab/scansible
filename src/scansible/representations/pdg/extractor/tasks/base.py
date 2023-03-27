@@ -42,8 +42,8 @@ class TaskExtractor(abc.ABC):
         for condition in self.task.when:
             # Create an IV for each condition and link it to the conditional node.
             try:
-                condition_value_node = self.extract_value(
-                    condition, is_conditional=True
+                condition_value_node = self.context.vars.build_conditional_expression(
+                    condition
                 )
             except RecursiveDefinitionError as e:
                 self.logger.error(e)
@@ -68,7 +68,7 @@ class TaskExtractor(abc.ABC):
             return None
 
         try:
-            loop_source_var = self.extract_value(loop_expr)
+            loop_source_var = self.context.vars.build_expression(loop_expr)
         except RecursiveDefinitionError as e:
             self.logger.error(e)
             if self.context.include_ctx.lenient:
@@ -97,15 +97,6 @@ class TaskExtractor(abc.ABC):
             loop_var_name = "item"
 
         return loop_source_var, loop_var_name
-
-    # TODO: This doesn't really belong here...
-    def extract_value(
-        self, value: object, is_conditional: bool = False
-    ) -> rep.DataNode:
-        if isinstance(value, str):
-            return self.context.vars.build_expression(value, is_conditional)
-        else:
-            return self.context.vars.add_literal_node(value)
 
     @contextmanager
     def setup_task_vars_scope(
