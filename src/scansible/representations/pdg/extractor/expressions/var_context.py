@@ -210,7 +210,7 @@ class VarContext:
 
         self.extraction_ctx.graph.add_node(iv)
         self.extraction_ctx.graph.add_edge(tr.expr_node, iv, rep.DEF)
-        return tr._replace(data_node=iv)
+        return tr.__replace__(data_node=iv)  # type: ignore[return-value]
 
     # TODO: Make private later.
     def add_literal_node(self, value: object) -> rep.Literal:
