@@ -68,7 +68,7 @@ class VarContext:
 
     def __init__(self, context: ExtractionContext) -> None:
         self._envs = EnvironmentStack()
-        self.context = context
+        self.extraction_ctx = context
         self._next_def_revisions: dict[str, int] = defaultdict(lambda: 0)
         self._next_val_revisions: dict[tuple[str, int], int] = {}
         self._val_revision_to_var: dict[
@@ -126,10 +126,10 @@ class VarContext:
             logger.debug(
                 f"Determined that expression {expr!r} may not be pure, creating new expression result"
             )
-            iv = rep.IntermediateValue(identifier=self.context.next_iv_id())
+            iv = rep.IntermediateValue(identifier=self.extraction_ctx.next_iv_id())
             logger.debug(f"Using IV {iv!r}")
-            self.context.graph.add_node(iv)
-            self.context.graph.add_edge(existing_tr.expr_node, iv, rep.DEF)
+            self.extraction_ctx.graph.add_node(iv)
+            self.extraction_ctx.graph.add_edge(existing_tr.expr_node, iv, rep.DEF)
             return existing_tr._replace(data_node=iv)
 
         return existing_tr
@@ -190,13 +190,13 @@ class VarContext:
         en = rep.Expression(
             expr=expr,
             impure_components=tuple(impure_components),
-            location=self.context.get_location(expr),
+            location=self.extraction_ctx.get_location(expr),
         )
-        iv = rep.IntermediateValue(identifier=self.context.next_iv_id())
+        iv = rep.IntermediateValue(identifier=self.extraction_ctx.next_iv_id())
         logger.debug(f"Using IV {iv!r}")
-        self.context.graph.add_node(en)
-        self.context.graph.add_node(iv)
-        self.context.graph.add_edge(en, iv, rep.DEF)
+        self.extraction_ctx.graph.add_node(en)
+        self.extraction_ctx.graph.add_node(iv)
+        self.extraction_ctx.graph.add_edge(en, iv, rep.DEF)
 
         def get_var_node_for_val_record(
             val_record: VariableValueRecord,
@@ -207,7 +207,7 @@ class VarContext:
 
         for used_value in used_values:
             var_node = get_var_node_for_val_record(used_value)
-            self.context.graph.add_edge(var_node, en, rep.USE)
+            self.extraction_ctx.graph.add_edge(var_node, en, rep.USE)
 
         used_value_ids = [
             (vval.name, vval.revision, vval.value_revision) for vval in used_values
@@ -217,7 +217,7 @@ class VarContext:
         return tr
 
     def add_literal_node(self, value: object) -> rep.Literal:
-        location = self.context.get_location(value)
+        location = self.extraction_ctx.get_location(value)
         type_ = cast(rep.ValidTypeStr, value.__class__.__name__)
         type_mappings: dict[str, rep.ValidTypeStr] = {
             "AnsibleUnicode": "str",
@@ -238,7 +238,7 @@ class VarContext:
         else:
             lit = rep.Literal(type=type_, value=value, location=location)
 
-        self.context.graph.add_node(lit)
+        self.extraction_ctx.graph.add_node(lit)
         return lit
 
     def define_variable(
@@ -265,14 +265,14 @@ class VarContext:
             version=var_rev,
             value_version=0,
             scope_level=level.value,
-            location=self.context.get_location(name),
+            location=self.extraction_ctx.get_location(name),
         )
-        self.context.graph.add_node(var_node)
+        self.extraction_ctx.graph.add_node(var_node)
 
         # Store auxiliary information about which other variables are available at the
         # time this variable is registered, i.e. the ones that are "visible" to the current
         # definition.
-        self.context.visibility_information.set_info(
+        self.extraction_ctx.visibility_information.set_info(
             name, var_rev, self._envs.get_currently_visible_definitions()
         )
 
@@ -292,7 +292,7 @@ class VarContext:
         else:
             template_expr = SENTINEL
             lit_node = self.add_literal_node(expr)
-            self.context.graph.add_edge(lit_node, var_node, rep.DEF)
+            self.extraction_ctx.graph.add_edge(lit_node, var_node, rep.DEF)
 
         def_record = VariableDefinitionRecord(name, var_rev, template_expr)
         self._envs.set_variable_definition(name, def_record, level)
@@ -332,9 +332,9 @@ class VarContext:
             version=vval.revision,
             value_version=vval.value_revision,
             scope_level=scope.env_type.value,
-            location=self.context.get_location(vval.name),
+            location=self.extraction_ctx.get_location(vval.name),
         )
-        self.context.graph.add_node(new_var_node)
+        self.extraction_ctx.graph.add_node(new_var_node)
 
         self._val_revision_to_var[var_node_idx] = (new_var_node, True)
 
@@ -343,11 +343,11 @@ class VarContext:
         # applies to definitions, not individual possible values. We'll
         # retrieve these from the first variable node, as that will be the one
         # manipulated by the caller.
-        for predecessor in self.context.graph.predecessors(old_var_node):
-            edge_type = self.context.graph[predecessor][old_var_node][0]["type"]
+        for predecessor in self.extraction_ctx.graph.predecessors(old_var_node):
+            edge_type = self.extraction_ctx.graph[predecessor][old_var_node][0]["type"]
             if edge_type is not rep.DEFINED_IF:
                 continue
-            self.context.graph.add_edge(predecessor, new_var_node, edge_type)
+            self.extraction_ctx.graph.add_edge(predecessor, new_var_node, edge_type)
 
         return new_var_node
 
@@ -452,5 +452,5 @@ class VarContext:
             var_node = self._create_new_variable_node(value_record, vdef_env)
 
         # Link the edge
-        self.context.graph.add_edge(template_record.data_node, var_node, rep.DEF)
+        self.extraction_ctx.graph.add_edge(template_record.data_node, var_node, rep.DEF)
         return value_record
