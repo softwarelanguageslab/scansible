@@ -29,11 +29,8 @@ def _values_have_changed(
     tr: TemplateRecord, used_values: list[VariableValueRecord]
 ) -> bool:
     logger.debug(f"Checking whether dependences of {tr!r} match desired state")
-    prev_used = sorted(tr.used_variables, key=lambda uv: uv[0])
-    curr_used = sorted(
-        [(uv.name, uv.revision, uv.value_revision) for uv in used_values],
-        key=lambda uv: uv[0],
-    )
+    prev_used = sorted(tr.used_variables, key=operator.attrgetter("name"))
+    curr_used = sorted(used_values, key=operator.attrgetter("name"))
 
     if len(prev_used) != len(curr_used):
         logger.debug(
@@ -43,10 +40,10 @@ def _values_have_changed(
     # Pairwise check. We could arguably just do prev_used == curr_used but we want informative debug logs
     for prev, curr in zip(prev_used, curr_used):
         if prev != curr:
-            pname, prevision, pval = prev
-            cname, crevision, cval = curr
             logger.debug(
-                f"Previous uses {pname}@{prevision}.{pval}, current uses {cname}@{crevision}.{cval}. DECISION: CHANGED"
+                f"Previous uses {prev.name}@{prev.revision}.{prev.value_revision}, "
+                + f"current uses {curr.name}@{curr.revision}.{curr.value_revision}. "
+                + "DECISION: CHANGED"
             )
             return True
 
@@ -299,23 +296,15 @@ class EnvironmentStack:
             self._calculate_precedence_chain(self.environment_stack[: scope_idx + 1])
         )
 
-        def get_val_from_env(
-            name: str, def_rev: int, val_rev: int
-        ) -> VariableValueRecord | None:
-            return first(
-                (
-                    vval
-                    for env in prec_chain
-                    if (vval := env.get_variable_value(name)) is not None
-                    and vval.revision == def_rev
-                    and vval.value_revision == val_rev
-                ),
+        def is_visible(vval: VariableValueRecord) -> bool:
+            highest_prec_vval = first(
+                candidate_vval
+                for env in prec_chain
+                if (candidate_vval := env.get_variable_value(vval.name)) is not None
             )
+            return highest_prec_vval is not None and highest_prec_vval == vval
 
-        def is_visible(name: str, def_rev: int, val_rev: int) -> bool:
-            return get_val_from_env(name, def_rev, val_rev) is not None
-
-        sees_all_direct_dependences = all(is_visible(*uv) for uv in rec.used_variables)
+        sees_all_direct_dependences = all(is_visible(uv) for uv in rec.used_variables)
         if not sees_all_direct_dependences:
             return False
 
@@ -323,9 +312,8 @@ class EnvironmentStack:
         transitive_dependences: list[TemplateRecord] = []
         for used_var in rec.used_variables:
             # Cannot be none, we just checked that they're all visible
-            vval = ensure_not_none(get_val_from_env(*used_var))
-            if isinstance(vval, ChangeableVariableValueRecord):
-                transitive_dependences.append(vval.template_record)
+            if isinstance(used_var, ChangeableVariableValueRecord):
+                transitive_dependences.append(used_var.template_record)
 
         return (not transitive_dependences) or all(
             self._all_used_values_are_visible_in_env(env, trans_dep)
@@ -335,9 +323,7 @@ class EnvironmentStack:
     def get_expression_evaluation_result(
         self, expr: str, used_values: list[VariableValueRecord]
     ) -> tuple[TemplateRecord, Environment] | tuple[None, None]:
-        logger.debug(
-            f"Searching for previous evaluation of {expr!r} in reverse nesting order"
-        )
+        logger.debug(f"Searching for previous evaluation of {expr!r}")
         # TODO: Why are we using the reverse nesting order here,
         # instead of precedence order?
         for env in reversed(self.environment_stack):

@@ -20,7 +20,7 @@ class TemplateRecord(_RecordBase):
 
     data_node: rep.DataNode
     expr_node: rep.Expression
-    used_variables: list[tuple[str, int, int]]
+    used_variables: list[VariableValueRecord]
     is_literal: bool = field(repr=False)
 
     @property

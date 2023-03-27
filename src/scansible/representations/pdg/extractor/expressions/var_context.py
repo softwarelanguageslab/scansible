@@ -195,10 +195,7 @@ class VarContext:
             var_node = get_var_node_for_val_record(used_value)
             self.extraction_ctx.graph.add_edge(var_node, en, rep.USE)
 
-        used_value_ids = [
-            (vval.name, vval.revision, vval.value_revision) for vval in used_values
-        ]
-        tr = TemplateRecord(iv, en, used_value_ids, False)
+        tr = TemplateRecord(iv, en, used_values, False)
         self._envs.set_expression_evaluation_result(ast.raw, tr)
         return tr
 
