@@ -109,7 +109,7 @@ class VarContext:
         used_values = self._resolve_expression_values(ast)
 
         impure_components = _get_impure_components(ast)
-        existing_tr, existing_tr_env = self._envs.get_expression(expr, used_values)
+        existing_tr, _ = self._envs.get_expression(expr, used_values)
         if existing_tr is None:
             logger.debug(
                 f"Expression {expr!r} was (re-)evaluated, creating new expression result"
@@ -119,7 +119,7 @@ class VarContext:
             )
 
         logger.debug(
-            f"Expression {expr!r} was already evaluated with the same input values, reusing previous result {existing_tr!r} from {existing_tr_env!r}"
+            f"Expression {expr!r} was already evaluated with the same input values, reusing previous result {existing_tr!r}"
         )
 
         if impure_components:
@@ -377,19 +377,19 @@ class VarContext:
             return vval
 
         expr = vdef.template_expr
-        logger.debug(f"Found existing variable {vdef!r} from scope {vdef_env!r}")
+        logger.debug(f"Found existing variable {vdef!r}")
 
         if isinstance(expr, Sentinel):
             # No template expression, so it cannot be evaluated. There must be
             # a constant value record for it, we'll return that.
-            vval, vval_env = self._envs.get_variable_value_for_constant_definition(
+            vval, _ = self._envs.get_variable_value_for_constant_definition(
                 name, vdef.revision
             )
             assert vval is not None and isinstance(
                 vval, ConstantVariableValueRecord
             ), f"Internal Error: Could not find constant value for variable without expression ({name!r})"
             logger.debug(
-                f"Variable {name!r} has no initialiser, using constant value record {vval!r} found in {vval_env!r}"
+                f"Variable {name!r} has no initialiser, using constant value record {vval!r}"
             )
             return vval
 
@@ -406,13 +406,11 @@ class VarContext:
         # Try to find a pre-existing value record for this template record. If
         # it exists, we've already evaluated this variable before and we can
         # just reuse the previous one.
-        vval, vval_env = self._envs.get_variable_value_for_cached_expression(
+        vval, _ = self._envs.get_variable_value_for_cached_expression(
             name, vdef.revision, template_record
         )
         if vval is not None:
-            logger.debug(
-                f"Found pre-existing value {vval!r} originating from {vval_env!r}, reusing"
-            )
+            logger.debug(f"Found pre-existing value {vval!r}, reusing")
             assert isinstance(
                 vval, ChangeableVariableValueRecord
             ), f"Expected evaluated value to be changeable"

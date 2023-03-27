@@ -130,7 +130,14 @@ class EnvironmentStack:
     def get_variable_definition(
         self, name: str
     ) -> tuple[VariableDefinitionRecord, Environment] | tuple[None, None]:
-        return self._get_highest_precedence_variable_definition(name) or (None, None)
+        logger.debug(f"Looking up variable definition for {name!r}")
+        result = self._get_highest_precedence_variable_definition(name)
+        if result is None:
+            logger.debug("Miss!")
+            return (None, None)
+
+        logger.debug(f"Hit! Found {result[0]!r} in {result[1]!r}")
+        return result
 
     def set_variable_definition(
         self, name: str, rec: VariableDefinitionRecord, env_type: EnvironmentType
@@ -163,6 +170,9 @@ class EnvironmentStack:
     def get_variable_value_for_cached_expression(
         self, name: str, def_revision: int, template_record: TemplateRecord
     ) -> tuple[ChangeableVariableValueRecord, Environment] | tuple[None, None]:
+        logger.debug(
+            f"Looking up variable value for {name!r}@{def_revision}, evaluated as {template_record!r}"
+        )
         for vval, env in self._iter_variable_values_for_definition(name, def_revision):
             if not isinstance(vval, ChangeableVariableValueRecord):
                 logger.debug("Ignoring: Expecting changeable value")
@@ -174,7 +184,7 @@ class EnvironmentStack:
                 )
                 continue
 
-            logger.debug("Hit!")
+            logger.debug(f"Hit! Found {vval!r} in {env!r}")
             return vval, env
 
         logger.debug("No matching value record found")
@@ -183,12 +193,13 @@ class EnvironmentStack:
     def get_variable_value_for_constant_definition(
         self, name: str, def_revision: int
     ) -> tuple[ConstantVariableValueRecord, Environment] | tuple[None, None]:
+        logger.debug(f"Looking up constant value for {name!r}@{def_revision}")
         for vval, env in self._iter_variable_values_for_definition(name, def_revision):
             if not isinstance(vval, ConstantVariableValueRecord):
                 logger.debug("Ignoring: Expecting constant value")
                 continue
 
-            logger.debug("Hit!")
+            logger.debug(f"Hit! Found {vval!r} in {env!r}")
             return vval, env
 
         logger.debug("No matching value record found")
@@ -198,6 +209,7 @@ class EnvironmentStack:
         self,
         name: str,
     ) -> tuple[VariableValueRecord, Environment] | tuple[None, None]:
+        logger.debug(f"Looking up value for {name!r}")
         candidates = list(self._iter_variable_values(name))
 
         assert (
@@ -205,6 +217,7 @@ class EnvironmentStack:
         ), f"Found multiple values for {name}, perhaps a more specific resolution is necessary"
 
         if candidates:
+            logger.debug(f"Hit! Found {candidates[0][0]!r} in {candidates[0][1]!r}")
             return candidates[0]
 
         logger.debug("No matching value record found")
@@ -338,7 +351,7 @@ class EnvironmentStack:
                 logger.debug("Ignoring: Different value versions")
                 continue
 
-            logger.debug("Hit!")
+            logger.debug(f"Hit! Found {possible_tr!r} in {env!r}")
             return possible_tr, env
 
         logger.debug("Miss!")
