@@ -249,7 +249,7 @@ class DefinedIf(DataFlowEdge):
             raise TypeError("DefinedIf edges must originate from conditionals")
 
 
-class DefLoopItem(DataFlowEdge):
+class DefLoopItem(Def):
     """Edges representing data definitions for single loop items."""
 
     @classmethod
