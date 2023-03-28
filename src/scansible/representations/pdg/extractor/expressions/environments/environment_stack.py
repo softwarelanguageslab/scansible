@@ -198,24 +198,6 @@ class EnvironmentStack:
         logger.debug("No matching value record found")
         return None
 
-    def get_variable_value(
-        self,
-        name: str,
-    ) -> VariableValueRecord | None:
-        logger.debug(f"Looking up value for {name!r}")
-        candidates = list(self._iter_variable_values(name))
-
-        assert (
-            len(candidates) <= 1
-        ), f"Found multiple values for {name}, perhaps a more specific resolution is necessary"
-
-        if candidates:
-            logger.debug(f"Hit! Found {candidates[0][0]!r} in {candidates[0][1]!r}")
-            return candidates[0][0]
-
-        logger.debug("No matching value record found")
-        return None
-
     def set_constant_variable_value(
         self, name: str, rec: ConstantVariableValueRecord
     ) -> None:

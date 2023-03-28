@@ -13,7 +13,13 @@ from scansible.utils import SENTINEL, Sentinel, first
 from scansible.utils.type_validators import ensure_not_none
 
 from ... import representation as rep
-from .constants import PURE_FILTERS, PURE_LOOKUP_PLUGINS, PURE_TESTS
+from .constants import (
+    MAGIC_VAR_NAMES,
+    PURE_FILTERS,
+    PURE_LOOKUP_PLUGINS,
+    PURE_TESTS,
+    UNQUALIFIED_HOST_FACT_NAMES,
+)
 from .environments import EnvironmentStack, EnvironmentType
 from .environments.types import LocalEnvType
 from .records import (
@@ -58,6 +64,27 @@ def _get_impure_components(ast: TemplateExpressionAST) -> Iterable[str]:
 
 def _is_impure_expression(ast: TemplateExpressionAST) -> bool:
     return first(_get_impure_components(ast)) is not None
+
+
+def _is_magic_variable(name: str) -> bool:
+    return name in MAGIC_VAR_NAMES
+
+
+def _is_likely_host_fact(name: str) -> bool:
+    # Approximate: There are a lot of host facts, but they should always start
+    # with "ansible_". This is only called for undefined variable names anyway.
+    return name in UNQUALIFIED_HOST_FACT_NAMES or name.startswith("ansible_")
+
+
+def _is_ignored_override_of_special_variable(
+    name: str, vdef: VariableDefinitionRecord
+) -> bool:
+    return (
+        _is_magic_variable(name) and vdef.env_type is not EnvironmentType.MAGIC_VARS
+    ) or (
+        _is_likely_host_fact(name)
+        and vdef.env_type.value < EnvironmentType.HOST_FACTS.value
+    )
 
 
 _DefRevisionMap = dict[str, int]
@@ -388,6 +415,14 @@ class VarContext:
             return self._get_undefined_variable_value(name)
 
         logger.debug(f"Found existing variable {vdef!r}")
+        # Check for magic variables and likely host vars, and prevent using an
+        # attempted but unused override. This will define the correct definition
+        # in the appropriate environment, which may not have been done yet.
+        if _is_ignored_override_of_special_variable(name, vdef):
+            logger.debug(
+                f"Wrong definition for special variable {name!r}, defining new one."
+            )
+            return self._define_constant_and_get_value(name)
         if isinstance(vdef.template_expr, Sentinel):
             return self._get_variable_value_without_initialiser(vdef)
 
@@ -444,17 +479,27 @@ class VarContext:
         assert not self._envs.has_variable_value(
             name
         ), f"Internal Error: Variable {name!r} has no definition but does have value"
-        logger.debug(
-            f"Variable {name} has not yet been defined, "
-            + "registering new value at lowest precedence level"
-        )
 
-        # Undefined variables: Assume lowest scope
-        self.define_variable(name, EnvironmentType.UNDEFINED)
-        vval = self._envs.get_variable_value(name)
-        assert vval is not None and isinstance(
-            vval, ConstantVariableValueRecord
-        ), f"Internal Error: Expected registered variable for {name!r} to be constant"
+        return self._define_constant_and_get_value(name)
+
+    def _define_constant_and_get_value(self, name: str) -> ConstantVariableValueRecord:
+        if _is_magic_variable(name):
+            env_type = EnvironmentType.MAGIC_VARS
+        elif _is_likely_host_fact(name):
+            env_type = EnvironmentType.HOST_FACTS
+        else:
+            logger.debug(
+                f"Variable {name} has not yet been defined, "
+                + "registering new value at lowest precedence level"
+            )
+            env_type = EnvironmentType.UNDEFINED
+
+        self.define_variable(name, env_type)
+        # Retrieve the value record that should've been created
+        vval = self._envs.get_variable_value_for_constant_definition(
+            name, self._next_def_revisions[name] - 1
+        )
+        assert vval is not None, f"Internal Error: No value for newly-defined var"
         return vval
 
     def _get_variable_value_without_initialiser(

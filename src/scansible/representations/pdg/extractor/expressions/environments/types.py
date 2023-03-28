@@ -34,6 +34,7 @@ class EnvironmentType(Enum):
     ROLE_PARAMS = 19
     INCLUDE_PARAMS = 20
     EXTRA_VARS = 21
+    MAGIC_VARS = 22  # Undocumented, take highest precedence
 
 
 LocalEnvType = Union[

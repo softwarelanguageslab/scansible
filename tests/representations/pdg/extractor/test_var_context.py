@@ -104,6 +104,56 @@ def describe_unmodified() -> None:
             ),
         )
 
+    def should_extract_magic_variables(create_context: ContextCreator) -> None:
+        ctx, g = create_context()
+
+        ctx.build_expression("hello {{ ansible_version }}")
+
+        assert_graphs_match(
+            g,
+            create_graph(
+                {
+                    "var": Variable(
+                        name="ansible_version",
+                        version=0,
+                        value_version=0,
+                        scope_level=EnvironmentType.MAGIC_VARS.value,
+                    ),
+                    "expr": Expression(expr="hello {{ ansible_version }}"),
+                    "iv": IntermediateValue(identifier=0),
+                },
+                [
+                    ("var", "expr", USE),
+                    ("expr", "iv", DEF),
+                ],
+            ),
+        )
+
+    def should_extract_host_facts(create_context: ContextCreator) -> None:
+        ctx, g = create_context()
+
+        ctx.build_expression("hello {{ ansible_os_family }}")
+
+        assert_graphs_match(
+            g,
+            create_graph(
+                {
+                    "var": Variable(
+                        name="ansible_os_family",
+                        version=0,
+                        value_version=0,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
+                    ),
+                    "expr": Expression(expr="hello {{ ansible_os_family }}"),
+                    "iv": IntermediateValue(identifier=0),
+                },
+                [
+                    ("var", "expr", USE),
+                    ("expr", "iv", DEF),
+                ],
+            ),
+        )
+
     def should_reevaluate_template_literal(create_context: ContextCreator) -> None:
         # We don't want to deduplicate template literals yet
         ctx, g = create_context()
@@ -539,6 +589,219 @@ def describe_scoping() -> None:
                     ("2", "ainner", DEF),
                     ("ainner", "e", USE),
                     ("e", "iv", DEF),
+                ],
+            ),
+        )
+
+    def should_never_override_magic_variables(create_context: ContextCreator) -> None:
+        ctx, g = create_context()
+
+        with ctx.enter_scope(EnvironmentType.INCLUDE_PARAMS):
+            ctx.define_variable("ansible_version", EnvironmentType.INCLUDE_PARAMS)
+            ctx.build_expression("{{ ansible_version }}")
+
+        assert_graphs_match(
+            g,
+            create_graph(
+                {
+                    "unused": Variable(
+                        name="ansible_version",
+                        version=0,
+                        value_version=0,
+                        scope_level=EnvironmentType.INCLUDE_PARAMS.value,
+                    ),  # UNUSED!
+                    "actual": Variable(
+                        name="ansible_version",
+                        version=1,
+                        value_version=0,
+                        scope_level=EnvironmentType.MAGIC_VARS.value,
+                    ),
+                    "e": Expression(expr="{{ ansible_version }}"),
+                    "iv": IntermediateValue(identifier=1),
+                },
+                [
+                    ("actual", "e", USE),
+                    ("e", "iv", DEF),
+                ],
+            ),
+        )
+
+    def should_use_same_magic_variable(create_context: ContextCreator) -> None:
+        ctx, g = create_context()
+
+        with ctx.enter_scope(EnvironmentType.INCLUDE_PARAMS):
+            ctx.define_variable("ansible_version", EnvironmentType.INCLUDE_PARAMS)
+            ctx.build_expression("1: {{ ansible_version }}")
+            ctx.build_expression("2: {{ ansible_version }}")
+
+        assert_graphs_match(
+            g,
+            create_graph(
+                {
+                    "unused": Variable(
+                        name="ansible_version",
+                        version=0,
+                        value_version=0,
+                        scope_level=EnvironmentType.INCLUDE_PARAMS.value,
+                    ),  # UNUSED!
+                    "actual": Variable(
+                        name="ansible_version",
+                        version=1,
+                        value_version=0,
+                        scope_level=EnvironmentType.MAGIC_VARS.value,
+                    ),
+                    "e1": Expression(expr="1: {{ ansible_version }}"),
+                    "e2": Expression(expr="2: {{ ansible_version }}"),
+                    "iv1": IntermediateValue(identifier=1),
+                    "iv2": IntermediateValue(identifier=2),
+                },
+                [
+                    ("actual", "e1", USE),
+                    ("actual", "e2", USE),
+                    ("e1", "iv1", DEF),
+                    ("e2", "iv2", DEF),
+                ],
+            ),
+        )
+
+    def should_override_host_facts_at_higher_prec(
+        create_context: ContextCreator,
+    ) -> None:
+        ctx, g = create_context()
+
+        with ctx.enter_scope(EnvironmentType.INCLUDE_PARAMS):
+            ctx.define_variable("ansible_os_family", EnvironmentType.INCLUDE_PARAMS)
+            ctx.build_expression("{{ ansible_os_family }}")
+
+        assert_graphs_match(
+            g,
+            create_graph(
+                {
+                    "actual": Variable(
+                        name="ansible_os_family",
+                        version=0,
+                        value_version=0,
+                        scope_level=EnvironmentType.INCLUDE_PARAMS.value,
+                    ),
+                    "e": Expression(expr="{{ ansible_os_family }}"),
+                    "iv": IntermediateValue(identifier=1),
+                },
+                [
+                    ("actual", "e", USE),
+                    ("e", "iv", DEF),
+                ],
+            ),
+        )
+
+    def should_not_override_host_facts_at_lower_prec(
+        create_context: ContextCreator,
+    ) -> None:
+        ctx, g = create_context()
+
+        with ctx.enter_scope(EnvironmentType.ROLE_DEFAULTS):
+            ctx.define_variable("ansible_os_family", EnvironmentType.ROLE_DEFAULTS)
+            ctx.build_expression("{{ ansible_os_family }}")
+
+        assert_graphs_match(
+            g,
+            create_graph(
+                {
+                    "unused": Variable(
+                        name="ansible_os_family",
+                        version=0,
+                        value_version=0,
+                        scope_level=EnvironmentType.ROLE_DEFAULTS.value,
+                    ),
+                    "actual": Variable(
+                        name="ansible_os_family",
+                        version=1,
+                        value_version=0,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
+                    ),
+                    "e": Expression(expr="{{ ansible_os_family }}"),
+                    "iv": IntermediateValue(identifier=1),
+                },
+                [
+                    ("actual", "e", USE),
+                    ("e", "iv", DEF),
+                ],
+            ),
+        )
+
+    def should_override_host_facts_combo_precedence(
+        create_context: ContextCreator,
+    ) -> None:
+        ctx, g = create_context()
+
+        with ctx.enter_scope(EnvironmentType.ROLE_DEFAULTS):
+            ctx.define_variable("ansible_os_family", EnvironmentType.ROLE_DEFAULTS)
+            ctx.build_expression("{{ ansible_os_family }}")
+            with ctx.enter_scope(EnvironmentType.ROLE_VARS):
+                ctx.define_variable("ansible_os_family", EnvironmentType.ROLE_VARS)
+                ctx.build_expression("{{ ansible_os_family }}")
+
+        assert_graphs_match(
+            g,
+            create_graph(
+                {
+                    "unused": Variable(
+                        name="ansible_os_family",
+                        version=0,
+                        value_version=0,
+                        scope_level=EnvironmentType.ROLE_DEFAULTS.value,
+                    ),
+                    "actual_host_fact": Variable(
+                        name="ansible_os_family",
+                        version=1,
+                        value_version=0,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
+                    ),
+                    "actual_role_var": Variable(
+                        name="ansible_os_family",
+                        version=2,
+                        value_version=0,
+                        scope_level=EnvironmentType.ROLE_VARS.value,
+                    ),
+                    "e_host_fact": Expression(expr="{{ ansible_os_family }}"),
+                    "e_role_var": Expression(expr="{{ ansible_os_family }}"),
+                    "iv_host_fact": IntermediateValue(identifier=1),
+                    "iv_role_var": IntermediateValue(identifier=2),
+                },
+                [
+                    ("actual_host_fact", "e_host_fact", USE),
+                    ("e_host_fact", "iv_host_fact", DEF),
+                    ("actual_role_var", "e_role_var", USE),
+                    ("e_role_var", "iv_role_var", DEF),
+                ],
+            ),
+        )
+
+    def should_use_same_host_fact(create_context: ContextCreator) -> None:
+        ctx, g = create_context()
+
+        ctx.build_expression("1: {{ ansible_os_family }}")
+        ctx.build_expression("2: {{ ansible_os_family }}")
+
+        assert_graphs_match(
+            g,
+            create_graph(
+                {
+                    "actual": Variable(
+                        name="ansible_os_family",
+                        version=0,
+                        value_version=0,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
+                    ),
+                    "e1": Expression(expr="1: {{ ansible_os_family }}"),
+                    "e2": Expression(expr="2: {{ ansible_os_family }}"),
+                    "iv1": IntermediateValue(identifier=1),
+                    "iv2": IntermediateValue(identifier=2),
+                },
+                [
+                    ("actual", "e1", USE),
+                    ("actual", "e2", USE),
+                    ("e1", "iv1", DEF),
+                    ("e2", "iv2", DEF),
                 ],
             ),
         )
