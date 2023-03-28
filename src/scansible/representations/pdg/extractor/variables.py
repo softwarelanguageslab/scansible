@@ -4,6 +4,8 @@ from collections.abc import Mapping
 
 from loguru import logger
 
+from scansible.representations import structural as struct
+
 from .. import representation as rep
 from .context import ExtractionContext
 from .expressions import EnvironmentType
@@ -12,7 +14,7 @@ from .result import ExtractionResult
 
 class VariablesExtractor:
     def __init__(
-        self, context: ExtractionContext, variables: Mapping[str, object]
+        self, context: ExtractionContext, variables: Mapping[str, struct.AnyValue]
     ) -> None:
         self.context = context
         self.variables = variables
@@ -24,7 +26,7 @@ class VariablesExtractor:
         return ExtractionResult([], added_vars, [])
 
     def extract_variable(
-        self, var_name: str, var_init: object, scope_level: EnvironmentType
+        self, var_name: str, var_init: struct.AnyValue, scope_level: EnvironmentType
     ) -> rep.Variable:
         if not isinstance(var_init, (str, bool, int, float)):
             logger.warning("I am not able to properly handle non-atomic values yet")

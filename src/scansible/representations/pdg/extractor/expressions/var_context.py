@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Iterable, cast
+from typing import TYPE_CHECKING, Iterable, cast
 
 from collections import defaultdict
 from collections.abc import Generator
@@ -14,7 +14,7 @@ from scansible.utils.type_validators import ensure_not_none
 
 from ... import representation as rep
 from .constants import PURE_FILTERS, PURE_LOOKUP_PLUGINS, PURE_TESTS
-from .environments import Environment, EnvironmentStack, EnvironmentType
+from .environments import EnvironmentStack, EnvironmentType
 from .environments.types import LocalEnvType
 from .records import (
     ChangeableVariableValueRecord,
@@ -60,7 +60,12 @@ def _is_impure_expression(ast: TemplateExpressionAST) -> bool:
     return first(_get_impure_components(ast)) is not None
 
 
-# TODO: Literal types
+_DefRevisionMap = dict[str, int]
+_ValRevisionMap = dict[VariableDefinitionRecord, int]
+_ValueToVarMap = dict[tuple[VariableDefinitionRecord, int], rep.Variable]
+
+
+# TODO: Composite literals
 # TODO: Maybe simplify single-variable templates ("{{ var }}") to bypass
 # intermediate values?
 class VarContext:
@@ -69,11 +74,67 @@ class VarContext:
     def __init__(self, context: ExtractionContext) -> None:
         self._envs = EnvironmentStack()
         self.extraction_ctx = context
-        self._next_def_revisions: dict[str, int] = defaultdict(lambda: 0)
-        self._next_val_revisions: dict[tuple[str, int], int] = {}
-        self._val_revision_to_var: dict[
-            tuple[str, int, int], tuple[rep.Variable, bool]
-        ] = {}
+        self._next_def_revisions: _DefRevisionMap = defaultdict(lambda: 0)
+        self._next_val_revisions: _ValRevisionMap = defaultdict(lambda: 0)
+        self._value_to_var_node: _ValueToVarMap = {}
+
+    def _get_next_def_revision(self, var_name: str) -> int:
+        self._next_def_revisions[var_name] += 1
+        return self._next_def_revisions[var_name] - 1
+
+    def _get_next_val_revision(self, var_def: VariableDefinitionRecord) -> int:
+        self._next_val_revisions[var_def] += 1
+        return self._next_val_revisions[var_def] - 1
+
+    def _get_var_node_for_value(
+        self,
+        var_def: VariableDefinitionRecord,
+        val_revision: int,
+        *,
+        allow_undefined: bool = True,
+    ) -> rep.Variable:
+        var_node = self._value_to_var_node.get((var_def, val_revision))
+        assert (
+            allow_undefined or var_node is not None
+        ), "Internal error: var node undefined"
+
+        if var_node is None:
+            assert val_revision > 0, "Internal error: First variable node undefined"
+            logger.debug(f"Creating new variable node to represent value")
+            old_var_node = self._get_var_node_for_value(
+                var_def, 0, allow_undefined=False
+            )
+
+            var_node = rep.Variable(
+                name=var_def.name,
+                version=var_def.revision,
+                value_version=val_revision,
+                scope_level=old_var_node.scope_level,
+                location=old_var_node.location,
+            )
+
+            self.extraction_ctx.graph.add_node(var_node)
+            self._value_to_var_node[(var_def, val_revision)] = var_node
+            self._copy_cond_edges(old_var_node, var_node)
+        else:
+            logger.debug(f"Using existing variable node {var_node!r}")
+
+        return var_node
+
+    def _copy_cond_edges(
+        self, old_var_node: rep.Variable, new_var_node: rep.Variable
+    ) -> None:
+        # TODO: Change this once VarContext stores the conditions itself.
+        # Copy over all DEFINED_IF edges applied by the caller of this class as they should
+        # apply to any new variable value revision as well. DEFINED_IF only
+        # applies to definitions, not individual possible values. We'll
+        # retrieve these from the first variable node, as that will be the one
+        # manipulated by the caller.
+        for predecessor in self.extraction_ctx.graph.predecessors(old_var_node):
+            edge_type = self.extraction_ctx.graph[predecessor][old_var_node][0]["type"]
+            if edge_type is not rep.DEFINED_IF:
+                continue
+            self.extraction_ctx.graph.add_edge(predecessor, new_var_node, edge_type)
 
     @contextmanager
     def enter_scope(self, env_type: LocalEnvType) -> Generator[None, None, None]:
@@ -220,15 +281,12 @@ class VarContext:
         self.extraction_ctx.graph.add_node(iv)
         self.extraction_ctx.graph.add_edge(en, iv, rep.DEF)
 
-        def get_var_node_for_val_record(
-            val_record: VariableValueRecord,
-        ) -> rep.Variable:
-            return self._val_revision_to_var[
-                (val_record.name, val_record.revision, val_record.value_revision)
-            ][0]
-
         for used_value in used_values:
-            var_node = get_var_node_for_val_record(used_value)
+            var_node = self._get_var_node_for_value(
+                used_value.variable_definition,
+                used_value.value_revision,
+                allow_undefined=False,
+            )
             self.extraction_ctx.graph.add_edge(var_node, en, rep.USE)
 
         tr = TemplateRecord(iv, en, used_values, False)
@@ -245,8 +303,19 @@ class VarContext:
         self.extraction_ctx.graph.add_edge(tr.expr_node, iv, rep.DEF)
         return tr.__replace__(data_node=iv)  # type: ignore[return-value]
 
+    def _is_template(self, expr: struct.AnyValue | Sentinel) -> bool:
+        return (
+            isinstance(expr, str)
+            and (ast := TemplateExpressionAST.parse(expr)) is not None
+            and not ast.is_literal()
+        )
+
     def define_variable(
-        self, name: str, level: EnvironmentType, *, expr: Any = SENTINEL
+        self,
+        name: str,
+        level: EnvironmentType,
+        *,
+        expr: struct.AnyValue | Sentinel = SENTINEL,
     ) -> rep.Variable:
         """Declare a variable, initialized with the given expression.
 
@@ -257,12 +326,11 @@ class VarContext:
         when a template that uses this variable is evaluated.
         """
         logger.debug(
-            f"Registering variable {name} of type {type(expr).__name__} at scope level {level.name}"
+            f"Defining variable {name!r} of type {type(expr).__name__} "
+            + f"in env of type {level.name}"
         )
-        var_rev = self._next_def_revisions[name]
-        self._next_def_revisions[name] += 1
-        self._next_val_revisions[(name, var_rev)] = 0
 
+        var_rev = self._get_next_def_revision(name)
         logger.debug(f"Selected revision {var_rev} for {name}")
         var_node = rep.Variable(
             name=name,
@@ -273,18 +341,15 @@ class VarContext:
         )
         self.extraction_ctx.graph.add_node(var_node)
 
-        # Store auxiliary information about which other variables are available at the
-        # time this variable is registered, i.e. the ones that are "visible" to the current
-        # definition.
+        # Store auxiliary information about which other variables are available
+        # at the time this variable is registered, i.e. the ones that are
+        # "visible" to the current definition.
         self.extraction_ctx.visibility_information.set_info(
             name, var_rev, self._envs.get_currently_visible_definitions()
         )
 
-        if (
-            isinstance(expr, str)
-            and (ast := TemplateExpressionAST.parse(expr)) is not None
-            and not ast.is_literal()
-        ):
+        if self._is_template(expr):
+            assert isinstance(expr, str)
             template_expr: str | Sentinel = expr
         elif expr is SENTINEL:
             template_expr = SENTINEL
@@ -295,60 +360,19 @@ class VarContext:
 
         def_record = VariableDefinitionRecord(name, var_rev, template_expr)
         self._envs.set_variable_definition(name, def_record, level)
+        self._value_to_var_node[(def_record, 0)] = var_node
 
-        # Assume the value is used by the caller is constant if they don't provide an expression.
-        # Also assume the variable node we create and add here is already in use then.
-        # At the very least, the caller should link it with DEF (e.g. set_fact or register)
-        # or USE (e.g. undefined variables in evaluate_template).
-        self._val_revision_to_var[(name, var_rev, 0)] = (
-            var_node,
-            template_expr is SENTINEL,
-        )
+        # Assume the value is used by the caller is constant if they don't
+        # provide an expression. At the very least, the caller should link it
+        # with DEF (e.g. set_fact or register) or USE (e.g. undefined variables
+        # in evaluate_template).
+        # If the variable isn't a constant value, we'll only create value
+        # records whenever it's evaluated.
         if template_expr is SENTINEL:
             val_record = ConstantVariableValueRecord(def_record)
             self._envs.set_constant_variable_value(name, val_record, level)
-        # If the variable isn't a constant value, we'll only create value records whenever it's evaluated
 
         return var_node
-
-    def has_variable_at_scope(self, name: str, level: EnvironmentType) -> bool:
-        return any(
-            scope.env_type is level and scope.get_variable_definition(name) is not None
-            for scope in self._envs.precedence_chain
-        )
-
-    def _create_new_variable_node(
-        self, vval: VariableValueRecord, scope: Environment
-    ) -> rep.Variable:
-        assert (
-            vval.value_revision >= 1
-        ), f"Internal Error: Unacceptable value version provided"
-        var_node_idx = (vval.name, vval.revision, vval.value_revision)
-        old_var_node, _ = self._val_revision_to_var[(vval.name, vval.revision, 0)]
-
-        new_var_node = rep.Variable(
-            name=vval.name,
-            version=vval.revision,
-            value_version=vval.value_revision,
-            scope_level=scope.env_type.value,
-            location=self.extraction_ctx.get_location(vval.name),
-        )
-        self.extraction_ctx.graph.add_node(new_var_node)
-
-        self._val_revision_to_var[var_node_idx] = (new_var_node, True)
-
-        # Copy over all DEFINED_IF edges applied by the caller of this class as they should
-        # apply to any new variable value revision as well. DEFINED_IF only
-        # applies to definitions, not individual possible values. We'll
-        # retrieve these from the first variable node, as that will be the one
-        # manipulated by the caller.
-        for predecessor in self.extraction_ctx.graph.predecessors(old_var_node):
-            edge_type = self.extraction_ctx.graph[predecessor][old_var_node][0]["type"]
-            if edge_type is not rep.DEFINED_IF:
-                continue
-            self.extraction_ctx.graph.add_edge(predecessor, new_var_node, edge_type)
-
-        return new_var_node
 
     def _get_variable_value_record(self, name: str) -> VariableValueRecord:
         """Get a variable value record for a variable.
@@ -358,45 +382,20 @@ class VarContext:
         initializer, if necessary.
         """
         logger.debug(f"Resolving variable {name}")
-        vdef, vdef_env = self._envs.get_variable_definition(name)
+        vdef, _ = self._envs.get_variable_definition(name)
 
-        # Undefined variables: Assume lowest scope
-        if vdef is None or vdef_env is None:
-            assert not self._envs.has_variable_value(
-                name
-            ), f"Internal Error: Variable {name!r} has no definition but does have value"
-            logger.debug(
-                f"Variable {name} has not yet been defined, registering new value at lowest precedence level"
-            )
-            self.define_variable(name, EnvironmentType.CLI_VALUES)
-            vval, _ = self._envs.get_variable_value(name)
-            assert vval is not None and isinstance(
-                vval, ConstantVariableValueRecord
-            ), f"Internal Error: Expected registered variable for {name!r} to be constant"
-            return vval
+        if vdef is None:
+            return self._get_undefined_variable_value(name)
 
-        expr = vdef.template_expr
         logger.debug(f"Found existing variable {vdef!r}")
-
-        if isinstance(expr, Sentinel):
-            # No template expression, so it cannot be evaluated. There must be
-            # a constant value record for it, we'll return that.
-            vval, _ = self._envs.get_variable_value_for_constant_definition(
-                name, vdef.revision
-            )
-            assert vval is not None and isinstance(
-                vval, ConstantVariableValueRecord
-            ), f"Internal Error: Could not find constant value for variable without expression ({name!r})"
-            logger.debug(
-                f"Variable {name!r} has no initialiser, using constant value record {vval!r}"
-            )
-            return vval
+        if isinstance(vdef.template_expr, Sentinel):
+            return self._get_variable_value_without_initialiser(vdef)
 
         # Evaluate the expression, perhaps re-evaluating if necessary. If the
         # expression was already evaluated previously and still has the same
         # value, this will just return the previous record.
-        ast = ensure_not_none(TemplateExpressionAST.parse(expr))
-        template_record: TemplateRecord = self._resolve_expression(ast)
+        ast = ensure_not_none(TemplateExpressionAST.parse(vdef.template_expr))
+        template_record = self._resolve_expression(ast)
 
         # Try to find a pre-existing value record for this template record. If
         # it exists, we've already evaluated this variable before and we can
@@ -404,48 +403,72 @@ class VarContext:
         vval, _ = self._envs.get_variable_value_for_cached_expression(
             name, vdef.revision, template_record
         )
-        if vval is not None:
-            logger.debug(f"Found pre-existing value {vval!r}, reusing")
-            assert isinstance(
-                vval, ChangeableVariableValueRecord
-            ), f"Expected evaluated value to be changeable"
-            return vval
+        if vval is None:
+            return self._create_new_variable_value(vdef, template_record)
 
+        logger.debug(f"Found pre-existing value {vval!r}, reusing")
+        assert isinstance(
+            vval, ChangeableVariableValueRecord
+        ), f"Expected evaluated value to be changeable"
+        return vval
+
+    def _create_new_variable_value(
+        self, vdef: VariableDefinitionRecord, template_record: TemplateRecord
+    ) -> VariableValueRecord:
         # No variable value record exists yet, so we need to create a new one.
         # We'll also need to add a new variable node to the graph, although we
         # may be able to reuse the one added while registering the variable in
         # case it hasn't been used before.
-        value_revision = self._next_val_revisions[(name, vdef.revision)]
-        self._next_val_revisions[(name, vdef.revision)] += 1
+        value_revision = self._get_next_val_revision(vdef)
         logger.debug(
-            f"Creating new value for {name!r} with value revision {value_revision}"
+            f"Creating new value for {vdef.name!r} with value revision {value_revision}"
         )
         value_record = ChangeableVariableValueRecord(
             vdef, value_revision, template_record
         )
-        self._envs.set_changeable_variable_value(name, value_record)
+        self._envs.set_changeable_variable_value(vdef.name, value_record)
 
-        var_node: rep.Variable | None = None
-        var_node_idx = (name, vdef.revision, value_revision)
-        if var_node_idx in self._val_revision_to_var:
-            var_node, in_use = self._val_revision_to_var[var_node_idx]
-            if in_use:
-                var_node = None
-            else:
-                assert (
-                    var_node.version == vdef.revision
-                ), "Internal Error: Bad reuse of var node, revision differs"
-                assert (
-                    var_node.value_version == value_revision
-                ), "Internal Error: Bad reuse of var node, val revision differs"
-                logger.debug(f"Using existing variable node {var_node!r}")
-                # Mark as in use now.
-                self._val_revision_to_var[var_node_idx] = (var_node, True)
-
-        if var_node is None:
-            logger.debug(f"Creating new variable node to represent value")
-            var_node = self._create_new_variable_node(value_record, vdef_env)
+        var_node = self._get_var_node_for_value(vdef, value_revision)
+        assert (
+            var_node.version == vdef.revision
+        ), "Internal Error: Bad reuse of var node, revision differs"
+        assert (
+            var_node.value_version == value_revision
+        ), "Internal Error: Bad reuse of var node, val revision differs"
 
         # Link the edge
         self.extraction_ctx.graph.add_edge(template_record.data_node, var_node, rep.DEF)
         return value_record
+
+    def _get_undefined_variable_value(self, name: str) -> ConstantVariableValueRecord:
+        assert not self._envs.has_variable_value(
+            name
+        ), f"Internal Error: Variable {name!r} has no definition but does have value"
+        logger.debug(
+            f"Variable {name} has not yet been defined, "
+            + "registering new value at lowest precedence level"
+        )
+
+        # Undefined variables: Assume lowest scope
+        self.define_variable(name, EnvironmentType.CLI_VALUES)
+        vval, _ = self._envs.get_variable_value(name)
+        assert vval is not None and isinstance(
+            vval, ConstantVariableValueRecord
+        ), f"Internal Error: Expected registered variable for {name!r} to be constant"
+        return vval
+
+    def _get_variable_value_without_initialiser(
+        self, vdef: VariableDefinitionRecord
+    ) -> ConstantVariableValueRecord:
+        # No template expression, so it cannot be evaluated. There must be
+        # a constant value record for it, we'll return that.
+        vval, _ = self._envs.get_variable_value_for_constant_definition(
+            vdef.name, vdef.revision
+        )
+        assert vval is not None and isinstance(
+            vval, ConstantVariableValueRecord
+        ), f"Internal Error: Could not find constant value for variable without expression ({vdef.name!r})"
+        logger.debug(
+            f"Variable {vdef.name!r} has no initialiser, using constant value record {vval!r}"
+        )
+        return vval
