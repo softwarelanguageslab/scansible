@@ -124,17 +124,15 @@ class EnvironmentStack:
             )
         return env
 
-    def get_variable_definition(
-        self, name: str
-    ) -> tuple[VariableDefinitionRecord, Environment] | tuple[None, None]:
+    def get_variable_definition(self, name: str) -> VariableDefinitionRecord | None:
         logger.debug(f"Looking up variable definition for {name!r}")
         result = self._get_highest_precedence_variable_definition(name)
         if result is None:
             logger.debug("Miss!")
-            return (None, None)
+            return None
 
         logger.debug(f"Hit! Found {result[0]!r} in {result[1]!r}")
-        return result
+        return result[0]
 
     def set_variable_definition(
         self, name: str, rec: VariableDefinitionRecord, env_type: EnvironmentType
@@ -166,7 +164,7 @@ class EnvironmentStack:
 
     def get_variable_value_for_cached_expression(
         self, name: str, def_revision: int, template_record: TemplateRecord
-    ) -> tuple[ChangeableVariableValueRecord, Environment] | tuple[None, None]:
+    ) -> ChangeableVariableValueRecord | None:
         logger.debug(
             f"Looking up variable value for {name!r}@{def_revision}, evaluated as {template_record!r}"
         )
@@ -182,14 +180,14 @@ class EnvironmentStack:
                 continue
 
             logger.debug(f"Hit! Found {vval!r} in {env!r}")
-            return vval, env
+            return vval
 
         logger.debug("No matching value record found")
-        return None, None
+        return None
 
     def get_variable_value_for_constant_definition(
         self, name: str, def_revision: int
-    ) -> tuple[ConstantVariableValueRecord, Environment] | tuple[None, None]:
+    ) -> ConstantVariableValueRecord | None:
         logger.debug(f"Looking up constant value for {name!r}@{def_revision}")
         for vval, env in self._iter_variable_values_for_definition(name, def_revision):
             if not isinstance(vval, ConstantVariableValueRecord):
@@ -197,15 +195,15 @@ class EnvironmentStack:
                 continue
 
             logger.debug(f"Hit! Found {vval!r} in {env!r}")
-            return vval, env
+            return vval
 
         logger.debug("No matching value record found")
-        return None, None
+        return None
 
     def get_variable_value(
         self,
         name: str,
-    ) -> tuple[VariableValueRecord, Environment] | tuple[None, None]:
+    ) -> VariableValueRecord | None:
         logger.debug(f"Looking up value for {name!r}")
         candidates = list(self._iter_variable_values(name))
 
@@ -215,10 +213,10 @@ class EnvironmentStack:
 
         if candidates:
             logger.debug(f"Hit! Found {candidates[0][0]!r} in {candidates[0][1]!r}")
-            return candidates[0]
+            return candidates[0][0]
 
         logger.debug("No matching value record found")
-        return None, None
+        return None
 
     def set_constant_variable_value(
         self, name: str, rec: ConstantVariableValueRecord, env_type: EnvironmentType
@@ -322,7 +320,7 @@ class EnvironmentStack:
 
     def get_expression_evaluation_result(
         self, expr: str, used_values: list[VariableValueRecord]
-    ) -> tuple[TemplateRecord, Environment] | tuple[None, None]:
+    ) -> TemplateRecord | None:
         logger.debug(f"Searching for previous evaluation of {expr!r}")
         # TODO: Why are we using the reverse nesting order here,
         # instead of precedence order?
@@ -338,10 +336,10 @@ class EnvironmentStack:
                 continue
 
             logger.debug(f"Hit! Found {possible_tr!r} in {env!r}")
-            return possible_tr, env
+            return possible_tr
 
         logger.debug("Miss!")
-        return None, None
+        return None
 
     def set_expression_evaluation_result(self, expr: str, rec: TemplateRecord) -> None:
         env = self._get_outermost_env_for_template(rec)

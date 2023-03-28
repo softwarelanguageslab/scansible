@@ -207,7 +207,7 @@ class VarContext:
 
         used_values = list(self._resolve_expression_values(ast))
 
-        tr, _ = self._envs.get_expression_evaluation_result(ast.raw, used_values)
+        tr = self._envs.get_expression_evaluation_result(ast.raw, used_values)
         if tr is None:
             logger.debug(f"First evaluation of expression {ast.raw!r} in this context")
             return self._create_new_expression_result(ast, used_values)
@@ -382,7 +382,7 @@ class VarContext:
         initializer, if necessary.
         """
         logger.debug(f"Resolving variable {name}")
-        vdef, _ = self._envs.get_variable_definition(name)
+        vdef = self._envs.get_variable_definition(name)
 
         if vdef is None:
             return self._get_undefined_variable_value(name)
@@ -400,7 +400,7 @@ class VarContext:
         # Try to find a pre-existing value record for this template record. If
         # it exists, we've already evaluated this variable before and we can
         # just reuse the previous one.
-        vval, _ = self._envs.get_variable_value_for_cached_expression(
+        vval = self._envs.get_variable_value_for_cached_expression(
             name, vdef.revision, template_record
         )
         if vval is None:
@@ -451,7 +451,7 @@ class VarContext:
 
         # Undefined variables: Assume lowest scope
         self.define_variable(name, EnvironmentType.UNDEFINED)
-        vval, _ = self._envs.get_variable_value(name)
+        vval = self._envs.get_variable_value(name)
         assert vval is not None and isinstance(
             vval, ConstantVariableValueRecord
         ), f"Internal Error: Expected registered variable for {name!r} to be constant"
@@ -462,7 +462,7 @@ class VarContext:
     ) -> ConstantVariableValueRecord:
         # No template expression, so it cannot be evaluated. There must be
         # a constant value record for it, we'll return that.
-        vval, _ = self._envs.get_variable_value_for_constant_definition(
+        vval = self._envs.get_variable_value_for_constant_definition(
             vdef.name, vdef.revision
         )
         assert vval is not None and isinstance(
