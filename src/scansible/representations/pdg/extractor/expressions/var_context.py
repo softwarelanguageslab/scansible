@@ -450,7 +450,7 @@ class VarContext:
         )
 
         # Undefined variables: Assume lowest scope
-        self.define_variable(name, EnvironmentType.CLI_VALUES)
+        self.define_variable(name, EnvironmentType.UNDEFINED)
         vval, _ = self._envs.get_variable_value(name)
         assert vval is not None and isinstance(
             vval, ConstantVariableValueRecord

@@ -11,6 +11,7 @@ class EnvironmentType(Enum):
     Element's value is the precedence level, higher wins.
     """
 
+    UNDEFINED = -1
     CLI_VALUES = 0
     ROLE_DEFAULTS = 1
     INV_FILE_GROUP_VARS = 2
