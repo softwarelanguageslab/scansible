@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import dataclasses
 from dataclasses import dataclass, field
 from functools import partialmethod
@@ -7,6 +9,9 @@ from functools import partialmethod
 from scansible.utils import Sentinel
 
 from ... import representation as rep
+
+if TYPE_CHECKING:
+    from .environments import EnvironmentType
 
 
 @dataclass(frozen=True)
@@ -38,6 +43,7 @@ class VariableDefinitionRecord(_RecordBase):
     name: str
     revision: int
     template_expr: str | Sentinel
+    env_type: EnvironmentType
 
 
 @dataclass(frozen=True)

@@ -109,7 +109,7 @@ class VarContext:
                 name=var_def.name,
                 version=var_def.revision,
                 value_version=val_revision,
-                scope_level=old_var_node.scope_level,
+                scope_level=var_def.env_type.value,
                 location=old_var_node.location,
             )
 
@@ -313,7 +313,7 @@ class VarContext:
     def define_variable(
         self,
         name: str,
-        level: EnvironmentType,
+        env_type: EnvironmentType,
         *,
         expr: struct.AnyValue | Sentinel = SENTINEL,
     ) -> rep.Variable:
@@ -327,7 +327,7 @@ class VarContext:
         """
         logger.debug(
             f"Defining variable {name!r} of type {type(expr).__name__} "
-            + f"in env of type {level.name}"
+            + f"in env of type {env_type.name}"
         )
 
         var_rev = self._get_next_def_revision(name)
@@ -336,7 +336,7 @@ class VarContext:
             name=name,
             version=var_rev,
             value_version=0,
-            scope_level=level.value,
+            scope_level=env_type.value,
             location=self.extraction_ctx.get_location(name),
         )
         self.extraction_ctx.graph.add_node(var_node)
@@ -358,8 +358,8 @@ class VarContext:
             lit_node = self._add_literal_node(expr)
             self.extraction_ctx.graph.add_edge(lit_node, var_node, rep.DEF)
 
-        def_record = VariableDefinitionRecord(name, var_rev, template_expr)
-        self._envs.set_variable_definition(name, def_record, level)
+        def_record = VariableDefinitionRecord(name, var_rev, template_expr, env_type)
+        self._envs.set_variable_definition(name, def_record)
         self._value_to_var_node[(def_record, 0)] = var_node
 
         # Assume the value is used by the caller is constant if they don't
@@ -370,7 +370,7 @@ class VarContext:
         # records whenever it's evaluated.
         if template_expr is SENTINEL:
             val_record = ConstantVariableValueRecord(def_record)
-            self._envs.set_constant_variable_value(name, val_record, level)
+            self._envs.set_constant_variable_value(name, val_record)
 
         return var_node
 

@@ -48,7 +48,7 @@ class BlockExtractor:
             # confirmed to be a bug, so we'll handle it as if it were
             # implemented correctly.
             self.context.vars.define_variable(
-                var_name, expr=var_value, level=EnvironmentType.BLOCK_VARS
+                var_name, expr=var_value, env_type=EnvironmentType.BLOCK_VARS
             )
 
         # A block without a list of tasks should be impossible

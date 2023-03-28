@@ -134,10 +134,8 @@ class EnvironmentStack:
         logger.debug(f"Hit! Found {result[0]!r} in {result[1]!r}")
         return result[0]
 
-    def set_variable_definition(
-        self, name: str, rec: VariableDefinitionRecord, env_type: EnvironmentType
-    ) -> None:
-        self._get_topmost_environment(env_type).set_variable_definition(name, rec)
+    def set_variable_definition(self, name: str, rec: VariableDefinitionRecord) -> None:
+        self._get_topmost_environment(rec.env_type).set_variable_definition(name, rec)
 
     def _iter_variable_values(
         self, name: str
@@ -219,9 +217,11 @@ class EnvironmentStack:
         return None
 
     def set_constant_variable_value(
-        self, name: str, rec: ConstantVariableValueRecord, env_type: EnvironmentType
+        self, name: str, rec: ConstantVariableValueRecord
     ) -> None:
-        self._get_topmost_environment(env_type).set_variable_value(name, rec)
+        self._get_topmost_environment(
+            rec.variable_definition.env_type
+        ).set_variable_value(name, rec)
 
     def set_changeable_variable_value(
         self, name: str, rec: ChangeableVariableValueRecord
