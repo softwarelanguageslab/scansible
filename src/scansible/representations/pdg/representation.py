@@ -135,7 +135,16 @@ class Literal(DataNode):
     """Node representing a literal."""
 
     type: ValidTypeStr = field(validator=type_validator(), on_setattr=setters.frozen)
+
+
+@define(slots=False, hash=False)
+class ScalarLiteral(Literal):
     value: Any = field(validator=type_validator(), on_setattr=setters.frozen)
+
+
+@define(slots=False, hash=False)
+class CompositeLiteral(Literal):
+    """Node representing a literal of a composite type."""
 
 
 def _convert_to_tuple(obj: tuple[str, ...] | list[str]) -> tuple[str, ...]:
@@ -328,6 +337,8 @@ __all__ = [
     "Expression",
     "IntermediateValue",
     "Literal",
+    "CompositeLiteral",
+    "ScalarLiteral",
     "Edge",
     "DEF",
     "DEFINED_IF",

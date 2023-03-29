@@ -13,9 +13,9 @@ from scansible.representations.pdg import (
     Expression,
     Graph,
     Keyword,
-    Literal,
     Node,
     NodeLocation,
+    ScalarLiteral,
     Task,
     Variable,
 )
@@ -75,14 +75,14 @@ def describe_dump_node() -> None:
         )
 
     def should_dump_literal_string(g: Graph) -> None:
-        l = Literal(type="str", value="literal value")
+        l = ScalarLiteral(type="str", value="literal value")
         l.node_id = 0
 
         result = dump_node(l, g)
 
         assert (
             result
-            == '(n0:Literal { location: null, node_id: 0, role_name: "testrole", role_version: "v1.0.0", type: "str", value: "literal value" })'
+            == '(n0:ScalarLiteral { location: null, node_id: 0, role_name: "testrole", role_version: "v1.0.0", type: "str", value: "literal value" })'
         )
 
     @pytest.mark.parametrize(
@@ -101,14 +101,14 @@ def describe_dump_node() -> None:
     def should_dump_literal_non_string(
         g: Graph, type: LiteralT["int", "float", "bool"], value: int | float | bool
     ) -> None:
-        l = Literal(type=type, value=value)
+        l = ScalarLiteral(type=type, value=value)
         l.node_id = 0
 
         result = dump_node(l, g)
 
         assert (
             result
-            == f'(n0:Literal {{ location: null, node_id: 0, role_name: "testrole", role_version: "v1.0.0", type: "{type}", value: {str(value).lower()} }})'
+            == f'(n0:ScalarLiteral {{ location: null, node_id: 0, role_name: "testrole", role_version: "v1.0.0", type: "{type}", value: {str(value).lower()} }})'
         )
 
 

@@ -96,9 +96,7 @@ class UnnecessarySetFactRule(Rule):
                 warning_body_lines: list[str] = []
 
                 if isinstance(vorigin, Literal):
-                    warning_body_lines.append(
-                        f"Variable {v!r} is defined by the literal `{vorigin.value}`"
-                    )
+                    warning_body_lines.append(f"Variable {v!r} is defined by a literal")
                 else:
                     warning_body_lines.append(
                         f"Variable {v!r} is defined the expression `{vorigin.expr}`"

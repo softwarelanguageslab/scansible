@@ -15,7 +15,7 @@ from scansible.representations.pdg import (
     Expression,
     Graph,
     IntermediateValue,
-    Literal,
+    ScalarLiteral,
     Variable,
 )
 from scansible.representations.pdg.extractor.context import ExtractionContext
@@ -58,7 +58,7 @@ def describe_unmodified() -> None:
         ctx.build_expression(expr)
 
         assert_graphs_match(
-            g, create_graph({"lit": Literal(type="str", value=expr)}, [])
+            g, create_graph({"lit": ScalarLiteral(type="str", value=expr)}, [])
         )
 
     def should_declare_literal_variable(create_context: ContextCreator) -> None:
@@ -70,7 +70,7 @@ def describe_unmodified() -> None:
             g,
             create_graph(
                 {
-                    "lit": Literal(type="str", value="hello world"),
+                    "lit": ScalarLiteral(type="str", value="hello world"),
                     "var": Variable(
                         "test_var", 0, 0, EnvironmentType.HOST_FACTS.value
                     ),  # UNUSED!
@@ -165,8 +165,8 @@ def describe_unmodified() -> None:
             g,
             create_graph(
                 {
-                    "lit1": Literal(type="str", value="hello world"),
-                    "lit2": Literal(type="str", value="hello world"),
+                    "lit1": ScalarLiteral(type="str", value="hello world"),
+                    "lit2": ScalarLiteral(type="str", value="hello world"),
                 },
                 [],
             ),
@@ -312,7 +312,7 @@ def describe_modified() -> None:
                         value_version=0,
                         scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
-                    "l1": Literal(type="str", value="hello"),
+                    "l1": ScalarLiteral(type="str", value="hello"),
                     "e1": Expression(expr="{{ a }} world"),
                     "a2": Variable(
                         name="a",
@@ -320,7 +320,7 @@ def describe_modified() -> None:
                         value_version=0,
                         scope_level=EnvironmentType.TASK_VARS.value,
                     ),
-                    "l2": Literal(type="str", value="hi"),
+                    "l2": ScalarLiteral(type="str", value="hi"),
                     "e2": Expression(expr="{{ a }} world"),
                     "iv1": IntermediateValue(identifier=1),
                     "iv2": IntermediateValue(identifier=2),
@@ -411,7 +411,7 @@ def describe_modified() -> None:
                         value_version=0,
                         scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
-                    "l1": Literal(type="str", value="hello"),
+                    "l1": ScalarLiteral(type="str", value="hello"),
                     "b1": Variable(
                         name="b",
                         version=0,
@@ -428,7 +428,7 @@ def describe_modified() -> None:
                         value_version=0,
                         scope_level=EnvironmentType.TASK_VARS.value,
                     ),
-                    "l2": Literal(type="str", value="hi"),
+                    "l2": ScalarLiteral(type="str", value="hi"),
                     "b2": Variable(
                         name="b",
                         version=0,
@@ -476,14 +476,14 @@ def describe_modified() -> None:
                         value_version=0,
                         scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
-                    "l1": Literal(type="str", value="hello"),
+                    "l1": ScalarLiteral(type="str", value="hello"),
                     "b": Variable(
                         name="b",
                         version=0,
                         value_version=0,
                         scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
-                    "l2": Literal(type="str", value="world"),
+                    "l2": ScalarLiteral(type="str", value="world"),
                     "e1": Expression(expr="{{ a }} {{ b }}!"),
                     "i1": IntermediateValue(identifier=1),
                     "a2": Variable(
@@ -492,7 +492,7 @@ def describe_modified() -> None:
                         value_version=0,
                         scope_level=EnvironmentType.INCLUDE_VARS.value,
                     ),
-                    "l3": Literal(type="str", value="hi"),
+                    "l3": ScalarLiteral(type="str", value="hi"),
                     "e2": Expression(expr="{{ a }} {{ b }}!"),
                     "i2": IntermediateValue(identifier=2),
                 },
@@ -531,7 +531,7 @@ def describe_scoping() -> None:
                         value_version=0,
                         scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
-                    "1": Literal(type="str", value="1"),
+                    "1": ScalarLiteral(type="str", value="1"),
                     "e1": Expression(expr="1 {{ a }}"),
                     "iv1": IntermediateValue(identifier=1),
                     "ainner": Variable(
@@ -540,7 +540,7 @@ def describe_scoping() -> None:
                         value_version=0,
                         scope_level=EnvironmentType.TASK_VARS.value,
                     ),
-                    "2": Literal(type="str", value="2"),
+                    "2": ScalarLiteral(type="str", value="2"),
                     "e2": Expression(expr="2 {{ a }}"),
                     "iv2": IntermediateValue(identifier=2),
                 },
@@ -567,7 +567,7 @@ def describe_scoping() -> None:
             g,
             create_graph(
                 {
-                    "1": Literal(type="str", value="1"),
+                    "1": ScalarLiteral(type="str", value="1"),
                     "aouter": Variable(
                         name="a",
                         version=0,
@@ -580,7 +580,7 @@ def describe_scoping() -> None:
                         value_version=0,
                         scope_level=EnvironmentType.SET_FACTS_REGISTERED.value,
                     ),
-                    "2": Literal(type="str", value="2"),
+                    "2": ScalarLiteral(type="str", value="2"),
                     "e": Expression(expr="{{ a }}"),
                     "iv": IntermediateValue(identifier=1),
                 },
@@ -826,7 +826,7 @@ def describe_scoping() -> None:
                         value_version=0,
                         scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
-                    "1": Literal(type="str", value="1"),
+                    "1": ScalarLiteral(type="str", value="1"),
                     "e1": Expression(expr="1 {{ a }}"),
                     "iv1": IntermediateValue(identifier=1),
                 },
@@ -865,8 +865,8 @@ def describe_scoping() -> None:
                         value_version=0,
                         scope_level=EnvironmentType.TASK_VARS.value,
                     ),  # UNUSED!
-                    "1": Literal(type="str", value="1"),
-                    "2": Literal(type="str", value="2"),
+                    "1": ScalarLiteral(type="str", value="1"),
+                    "2": ScalarLiteral(type="str", value="2"),
                     "e1": Expression(expr="1 {{ a }}"),
                     "iv1": IntermediateValue(identifier=1),
                 },
@@ -911,9 +911,9 @@ def describe_scoping() -> None:
                         value_version=0,
                         scope_level=EnvironmentType.TASK_VARS.value,
                     ),
-                    "1": Literal(type="str", value="1"),
-                    "clit": Literal(type="str", value="c"),
-                    "2": Literal(type="str", value="2"),
+                    "1": ScalarLiteral(type="str", value="1"),
+                    "clit": ScalarLiteral(type="str", value="c"),
+                    "2": ScalarLiteral(type="str", value="2"),
                     "e1": Expression(expr="1 {{ a }}"),
                     "iv1": IntermediateValue(identifier=1),
                 },
@@ -949,7 +949,7 @@ def describe_scoping() -> None:
                         value_version=0,
                         scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
-                    "1": Literal(type="str", value="1"),
+                    "1": ScalarLiteral(type="str", value="1"),
                     "e1": Expression(expr="1 {{ a }}"),
                     "iv1": IntermediateValue(identifier=1),
                     "ainner": Variable(
@@ -958,7 +958,7 @@ def describe_scoping() -> None:
                         value_version=0,
                         scope_level=EnvironmentType.TASK_VARS.value,
                     ),
-                    "2": Literal(type="str", value="2"),
+                    "2": ScalarLiteral(type="str", value="2"),
                     "e2": Expression(expr="1 {{ a }}"),
                     "iv2": IntermediateValue(identifier=2),
                 },
@@ -1001,7 +1001,7 @@ def describe_scoping() -> None:
                         value_version=0,
                         scope_level=EnvironmentType.TASK_VARS.value,
                     ),
-                    "bil": Literal(type="str", value="1"),
+                    "bil": ScalarLiteral(type="str", value="1"),
                     "ei": Expression(expr="{{ a }}"),
                     "eiv": IntermediateValue(identifier=1),
                     "bouter": Variable(
@@ -1010,7 +1010,7 @@ def describe_scoping() -> None:
                         value_version=0,
                         scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
-                    "bol": Literal(type="str", value="2"),
+                    "bol": ScalarLiteral(type="str", value="2"),
                     "eo": Expression(expr="{{ a }}"),
                     "eov": IntermediateValue(identifier=2),
                     "ao": Variable(
@@ -1066,7 +1066,7 @@ def describe_scoping() -> None:
                         value_version=0,
                         scope_level=EnvironmentType.TASK_VARS.value,
                     ),
-                    "cl": Literal(type="str", value="world"),
+                    "cl": ScalarLiteral(type="str", value="world"),
                     "bie": Expression(expr="{{ c | reverse }}"),
                     "biv": IntermediateValue(identifier=0),
                     "binner": Variable(
@@ -1144,7 +1144,7 @@ def describe_scoping() -> None:
                         value_version=0,
                         scope_level=EnvironmentType.TASK_VARS.value,
                     ),
-                    "lb": Literal(type="str", value="1"),
+                    "lb": ScalarLiteral(type="str", value="1"),
                     "ae": Expression(expr="{{ b }}"),
                     "aei": IntermediateValue(identifier=0),
                     "te": Expression(expr="{{ a }}"),
@@ -1165,7 +1165,7 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         vn = ctx.define_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
-        ln = Literal(type="int", value=1)
+        ln = ScalarLiteral(type="int", value=1)
         g.add_node(ln)
         g.add_edge(ln, vn, DEF)
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
@@ -1176,8 +1176,8 @@ def describe_scoping() -> None:
             g,
             create_graph(
                 {
-                    "1": Literal(type="int", value=1),
-                    "2": Literal(type="str", value="2"),
+                    "1": ScalarLiteral(type="int", value=1),
+                    "2": ScalarLiteral(type="str", value="2"),
                     "bsf": Variable(
                         name="b",
                         version=0,
@@ -1210,7 +1210,7 @@ def describe_scoping() -> None:
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
             ctx.define_variable("b", EnvironmentType.TASK_VARS, expr="1")
         vn = ctx.define_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
-        ln = Literal(type="int", value=2)
+        ln = ScalarLiteral(type="int", value=2)
         g.add_node(ln)
         g.add_edge(ln, vn, DEF)
         ctx.build_expression("{{ b }}")
@@ -1219,8 +1219,8 @@ def describe_scoping() -> None:
             g,
             create_graph(
                 {
-                    "1": Literal(type="str", value="1"),
-                    "2": Literal(type="int", value=2),
+                    "1": ScalarLiteral(type="str", value="1"),
+                    "2": ScalarLiteral(type="int", value=2),
                     "binner": Variable(
                         name="b",
                         version=0,
@@ -1253,7 +1253,7 @@ def describe_scoping() -> None:
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
             ctx.define_variable("b", EnvironmentType.TASK_VARS, expr="1")
             vn = ctx.define_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
-            ln = Literal(type="int", value=2)
+            ln = ScalarLiteral(type="int", value=2)
             g.add_node(ln)
             g.add_edge(ln, vn, DEF)
             ctx.build_expression("{{ b }}")
@@ -1263,8 +1263,8 @@ def describe_scoping() -> None:
             g,
             create_graph(
                 {
-                    "1": Literal(type="str", value="1"),
-                    "2": Literal(type="int", value=2),
+                    "1": ScalarLiteral(type="str", value="1"),
+                    "2": ScalarLiteral(type="int", value=2),
                     "b1": Variable(
                         name="b",
                         version=0,

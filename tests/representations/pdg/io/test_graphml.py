@@ -26,15 +26,15 @@ def pop_g(g: rep.Graph) -> rep.Graph:
                 name="task 2",
                 location=rep.NodeLocation("x.yml", 5, 1),
             ),
-            "l1": rep.Literal(
+            "l1": rep.ScalarLiteral(
                 type="str",
                 value='echo "Hello"',
                 location=rep.NodeLocation("x.yml", 2, 5),
             ),
-            "l2": rep.Literal(
+            "l2": rep.ScalarLiteral(
                 type="bool", value=False, location=rep.NodeLocation("x.yml", 3, 5)
             ),
-            "l3": rep.Literal(
+            "l3": rep.ScalarLiteral(
                 type="int", value=0o777, location=rep.NodeLocation("x.yml", 7, 123)
             ),
             "v": rep.Variable(

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable, cast
+from typing import TYPE_CHECKING, Iterable, TypeGuard, cast
 
 from collections import defaultdict
 from collections.abc import Generator
@@ -85,6 +85,19 @@ def _is_ignored_override_of_special_variable(
         _is_likely_host_fact(name)
         and vdef.env_type.value < EnvironmentType.HOST_FACTS.value
     )
+
+
+_ANSIBLE_TYPE_NAME_TO_BUILTIN_NAME: dict[str, rep.ValidTypeStr] = {
+    "AnsibleUnicode": "str",
+    "AnsibleSequence": "list",
+    "AnsibleMapping": "dict",
+    "AnsibleUnsafeText": "str",
+}
+
+
+def _extract_type_name(value: struct.AnyValue) -> rep.ValidTypeStr:
+    type_ = value.__class__.__name__
+    return _ANSIBLE_TYPE_NAME_TO_BUILTIN_NAME.get(type_, cast(rep.ValidTypeStr, type_))
 
 
 _DefRevisionMap = dict[str, int]
@@ -202,27 +215,18 @@ class VarContext:
 
         return self._resolve_expression(ast).data_node
 
-    def _add_literal_node(self, value: object) -> rep.Literal:
+    def _add_literal_node(self, value: struct.AnyValue) -> rep.Literal:
         location = self.extraction_ctx.get_location(value)
-        type_ = cast(rep.ValidTypeStr, value.__class__.__name__)
-        type_mappings: dict[str, rep.ValidTypeStr] = {
-            "AnsibleUnicode": "str",
-            "AnsibleSequence": "list",
-            "AnsibleMapping": "dict",
-            "AnsibleUnsafeText": "str",
-        }
-        type_ = type_mappings.get(type_, type_)
+        type_ = _extract_type_name(value)
+
+        lit: rep.Literal
         if isinstance(value, (dict, list)):
             logger.warning("I am not able to handle composite literals yet")
-            lit = rep.Literal(
-                type=type_,
-                value=str(value),  # pyright: ignore
-                location=location,
-            )
+            lit = rep.CompositeLiteral(type=type_, location=location)
         elif isinstance(value, struct.VaultValue):
-            lit = rep.Literal(type=type_, value=str(value), location=location)
+            lit = rep.ScalarLiteral(type=type_, value=str(value), location=location)
         else:
-            lit = rep.Literal(type=type_, value=value, location=location)
+            lit = rep.ScalarLiteral(type=type_, value=value, location=location)
 
         self.extraction_ctx.graph.add_node(lit)
         return lit
@@ -330,7 +334,7 @@ class VarContext:
         self.extraction_ctx.graph.add_edge(tr.expr_node, iv, rep.DEF)
         return tr.__replace__(data_node=iv)  # type: ignore[return-value]
 
-    def _is_template(self, expr: struct.AnyValue | Sentinel) -> bool:
+    def _is_template(self, expr: struct.AnyValue | Sentinel) -> TypeGuard[str]:
         return (
             isinstance(expr, str)
             and (ast := TemplateExpressionAST.parse(expr)) is not None
@@ -378,7 +382,7 @@ class VarContext:
         if self._is_template(expr):
             assert isinstance(expr, str)
             template_expr: str | Sentinel = expr
-        elif expr is SENTINEL:
+        elif isinstance(expr, Sentinel):
             template_expr = SENTINEL
         else:
             template_expr = SENTINEL

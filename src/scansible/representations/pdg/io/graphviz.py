@@ -21,8 +21,11 @@ def get_node_label(n: rep.Node) -> str:
     if isinstance(n, rep.Expression):
         return n.expr
 
-    if isinstance(n, rep.Literal):
+    if isinstance(n, rep.ScalarLiteral):
         return f"{n.type}:{n.value}"
+
+    if isinstance(n, rep.Literal):
+        return f"{n.type}"
 
     if isinstance(n, rep.IntermediateValue):
         return f"${n.identifier}"

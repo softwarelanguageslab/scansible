@@ -110,21 +110,21 @@ def describe_variable() -> None:
 def describe_literal() -> None:
     @pytest.fixture()
     def factory() -> NodeFactory:
-        return lambda loc: rep.Literal(type="bool", value=True, location=loc)
+        return lambda loc: rep.ScalarLiteral(type="bool", value=True, location=loc)
 
     @pytest.mark.parametrize("type", ["bool", "str", "list"])
     def should_have_type(type: Literal["bool", "str", "list"]) -> None:
-        lit = rep.Literal(type=type, value=None)
+        lit = rep.ScalarLiteral(type=type, value=None)
 
         assert lit.type == type
 
     def should_reject_invalid_types() -> None:
         with pytest.raises(ValueError):
-            rep.Literal(type="not_a_type", value=None)  # type: ignore[arg-type]
+            rep.ScalarLiteral(type="not_a_type", value=None)  # type: ignore[arg-type]
 
     @pytest.mark.parametrize("value", [None, 1, ["values"], "value"])
     def should_have_value(value: object) -> None:
-        _ = rep.Literal(type="str", value=value)
+        _ = rep.ScalarLiteral(type="str", value=value)
 
 
 @behaves_like(a_node)
@@ -351,7 +351,7 @@ def describe_order_edge() -> None:
     t2 = rep.Task(action="command")
     v = rep.Variable(name="test", version=1, value_version=1, scope_level=1)
     e = rep.Expression(expr="{{ test }}")
-    l = rep.Literal(type="str", value="test")
+    l = rep.ScalarLiteral(type="str", value="test")
 
     for idx, n in enumerate((t1, t2, v, e, l)):
         n.node_id = idx
@@ -377,7 +377,7 @@ def describe_use_edge() -> None:
     t = rep.Task(action="file")
     v = rep.Variable(name="test", version=1, value_version=1, scope_level=1)
     e = rep.Expression(expr="{{ test }}")
-    l = rep.Literal(type="str", value="test")
+    l = rep.ScalarLiteral(type="str", value="test")
 
     for idx, n in enumerate((t, v, e, l)):
         n.node_id = idx
@@ -402,7 +402,7 @@ def describe_def_edge() -> None:
     t = rep.Task(action="file")
     v = rep.Variable(name="test", version=1, value_version=1, scope_level=1)
     e = rep.Expression(expr="{{ test }}")
-    l = rep.Literal(type="str", value="test")
+    l = rep.ScalarLiteral(type="str", value="test")
 
     for idx, n in enumerate((t, v, e, l)):
         n.node_id = idx
@@ -429,7 +429,7 @@ def describe_kw_edge() -> None:
     t = rep.Task(action="file")
     v = rep.Variable(name="test", version=1, value_version=1, scope_level=1)
     e = rep.Expression(expr="{{ test }}")
-    l = rep.Literal(type="str", value="test")
+    l = rep.ScalarLiteral(type="str", value="test")
 
     for idx, n in enumerate((t, v, e, l)):
         n.node_id = idx

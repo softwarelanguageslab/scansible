@@ -521,7 +521,7 @@ def _find_predecessors(
 def _resolve_expr_to_value(g: rep.Graph, expr: rep.Expression) -> str:
     # Should only use one data node
     used_data = next(_find_predecessors(g, expr, rep.USE))
-    if isinstance(used_data, rep.Literal):
+    if isinstance(used_data, rep.ScalarLiteral):
         data = used_data.value
     elif isinstance(used_data, rep.IntermediateValue):
         data = _resolve_iv_to_value(g, used_data)
@@ -552,7 +552,7 @@ def _resolve_var_to_value(g: rep.Graph, v: rep.Variable) -> str | None:
     assert len(def_nodes) == 1, "Multiple defs should not happen here!"
     def_node = def_nodes[0]
     assert isinstance(
-        def_node, (rep.IntermediateValue, rep.Literal)
+        def_node, (rep.IntermediateValue, rep.ScalarLiteral)
     ), f"unexpected DEF node: {def_node}"
     if isinstance(def_node, rep.IntermediateValue):
         return _resolve_iv_to_value(g, def_node)
