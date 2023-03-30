@@ -3,9 +3,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import dataclasses
-from dataclasses import dataclass, field
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from functools import partialmethod
 
+from scansible.representations import structural as struct
 from scansible.utils import Sentinel
 
 from ... import representation as rep
@@ -13,27 +15,62 @@ from ... import representation as rep
 if TYPE_CHECKING:
     from .environments import EnvironmentType
 
+TemplatableType = (
+    str | Mapping["struct.Scalar", "struct.AnyValue"] | Sequence["struct.AnyValue"]
+)
+
 
 @dataclass(frozen=True)
 class _RecordBase:
     __replace__ = partialmethod(dataclasses.replace)
 
 
-@dataclass(frozen=True)
 class TemplateRecord(_RecordBase):
-    """State of a template expression."""
+    """Result of a template expression evaluation."""
 
     data_node: rep.DataNode
-    expr_node: rep.Expression
     used_variables: list[VariableValueRecord]
-    is_literal: bool = field(repr=False)
 
     @property
     def may_be_impure(self) -> bool:
-        return not self.expr_node.is_pure
+        ...
 
-    def __repr__(self) -> str:
-        return f"TemplateRecord(expr={self.expr_node.expr!r}, data_node={self.data_node.node_id}, expr_node={self.expr_node.node_id})"
+    @property
+    def is_literal(self) -> bool:
+        ...
+
+
+@dataclass(frozen=True)
+class LiteralEvaluationResult(TemplateRecord):
+    """Result of a literal expression."""
+
+    data_node: rep.DataNode
+    used_variables = []
+
+    @property
+    def is_literal(self) -> bool:
+        return True
+
+    @property
+    def may_be_impure(self) -> bool:
+        return False
+
+
+@dataclass(frozen=True)
+class TemplateEvaluationResult(TemplateRecord):
+    """Result of a template expression evaluation."""
+
+    data_node: rep.DataNode
+    expr_node: rep.Expression | rep.CompositeLiteral
+    used_variables: list[VariableValueRecord]
+
+    @property
+    def is_literal(self) -> bool:
+        return False
+
+    @property
+    def may_be_impure(self) -> bool:
+        return isinstance(self.expr_node, rep.Expression) and not self.expr_node.is_pure
 
 
 @dataclass(frozen=True)
@@ -42,7 +79,7 @@ class VariableDefinitionRecord(_RecordBase):
 
     name: str
     revision: int
-    template_expr: str | Sentinel
+    template_expr: TemplatableType | Sentinel
     env_type: EnvironmentType
 
 

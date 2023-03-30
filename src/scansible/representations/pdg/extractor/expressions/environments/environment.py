@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from ..records import TemplateRecord, VariableDefinitionRecord, VariableValueRecord
+from scansible.representations.pdg.representation import Expression
+
+from ..records import (
+    TemplateEvaluationResult,
+    VariableDefinitionRecord,
+    VariableValueRecord,
+)
 from .types import EnvironmentType
 
 
@@ -12,7 +18,7 @@ class Environment:
         self.is_cached = is_cached
         self.cached_results: dict[str, VariableValueRecord] = {}
         # Values of expressions valid in this scope.
-        self._expr_store: dict[str, TemplateRecord] = {}
+        self._expr_store: dict[str, TemplateEvaluationResult] = {}
         # Variables defined in this scope.
         self._var_def_store: dict[str, VariableDefinitionRecord] = {}
         # Values of variables in this scope. Variable itself can come from an
@@ -51,10 +57,14 @@ class Environment:
     def get_all_variable_definitions(self) -> dict[str, VariableDefinitionRecord]:
         return dict(self._var_def_store)
 
-    def get_expression_evaluation_result(self, expr: str) -> TemplateRecord | None:
+    def get_expression_evaluation_result(
+        self, expr: str
+    ) -> TemplateEvaluationResult | None:
         return self._expr_store.get(expr)
 
-    def set_expression_evaluation_result(self, expr: str, rec: TemplateRecord) -> None:
+    def set_expression_evaluation_result(
+        self, expr: str, rec: TemplateEvaluationResult
+    ) -> None:
         self._expr_store[expr] = rec
 
     def has_expression_evaluation_result(self, expr: str) -> bool:
@@ -77,7 +87,7 @@ class Environment:
         exprs_str = join_strings(
             expr.expr_node.expr + (" (impure)" if expr.may_be_impure else "")
             for expr in self._expr_store.values()
-            if not expr.is_literal
+            if not expr.is_literal and isinstance(expr.expr_node, Expression)
         )
 
         return f"{header} (locals: {locals_str}, values: {values_str}, expressions: {exprs_str})"

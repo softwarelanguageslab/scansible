@@ -9,12 +9,13 @@ from itertools import chain
 
 from loguru import logger
 
-from scansible.utils import Sentinel, first, first_where
+from scansible.utils import first, first_where
 from scansible.utils.type_validators import ensure_not_none
 
 from ..records import (
     ChangeableVariableValueRecord,
     ConstantVariableValueRecord,
+    TemplateEvaluationResult,
     TemplateRecord,
     VariableDefinitionRecord,
     VariableValueRecord,
@@ -26,7 +27,7 @@ _ElType = TypeVar("_ElType")
 
 
 def _values_have_changed(
-    tr: TemplateRecord, used_values: list[VariableValueRecord]
+    tr: TemplateEvaluationResult, used_values: list[VariableValueRecord]
 ) -> bool:
     logger.debug(f"Checking whether dependences of {tr!r} match desired state")
     prev_used = sorted(tr.used_variables, key=operator.attrgetter("name"))
@@ -110,8 +111,8 @@ class EnvironmentStack:
     def _get_highest_precedence_expression(
         self,
         key: str,
-        predicate: Callable[[TemplateRecord], bool] = lambda _: True,
-    ) -> tuple[TemplateRecord, Environment] | None:
+        predicate: Callable[[TemplateEvaluationResult], bool] = lambda _: True,
+    ) -> tuple[TemplateEvaluationResult, Environment] | None:
         return self._get_highest_precedence_element(
             operator.methodcaller("get_expression", key), predicate
         )
@@ -302,7 +303,7 @@ class EnvironmentStack:
 
     def get_expression_evaluation_result(
         self, expr: str, used_values: list[VariableValueRecord]
-    ) -> TemplateRecord | None:
+    ) -> TemplateEvaluationResult | None:
         logger.debug(f"Searching for previous evaluation of {expr!r}")
         # TODO: Why are we using the reverse nesting order here,
         # instead of precedence order?
@@ -323,7 +324,9 @@ class EnvironmentStack:
         logger.debug("Miss!")
         return None
 
-    def set_expression_evaluation_result(self, expr: str, rec: TemplateRecord) -> None:
+    def set_expression_evaluation_result(
+        self, expr: str, rec: TemplateEvaluationResult
+    ) -> None:
         env = self._get_outermost_env_for_template(rec)
         if env is None:
             # TODO: Can this even happen?
@@ -352,7 +355,7 @@ class EnvironmentStack:
         return {
             vdef.name: vdef.template_expr
             for vdef in all_vars.values()
-            if not isinstance(vdef.template_expr, Sentinel)
+            if isinstance(vdef.template_expr, str)
         }
 
     def get_currently_visible_definitions(self) -> set[tuple[str, int]]:

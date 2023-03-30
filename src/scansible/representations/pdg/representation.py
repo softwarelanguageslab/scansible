@@ -234,8 +234,10 @@ class Keyword(Use):
         if not isinstance(source, DataNode):
             raise TypeError("Keyword edge must start at a data node")
 
-        if not isinstance(target, Task):
-            raise TypeError("Keyword edges must only be used with tasks as target")
+        if not isinstance(target, (Task, CompositeLiteral)):
+            raise TypeError(
+                "Keyword edges must only be used with tasks or composite literals as target"
+            )
 
 
 class Def(DataFlowEdge):

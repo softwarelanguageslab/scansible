@@ -3,14 +3,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Iterable, TypeGuard, cast
 
 from collections import defaultdict
-from collections.abc import Generator
+from collections.abc import Generator, Mapping, Sequence
 from contextlib import contextmanager
 
 from loguru import logger
 
 from scansible.representations import structural as struct
-from scansible.utils import SENTINEL, Sentinel, first
-from scansible.utils.type_validators import ensure_not_none
+from scansible.representations.structural import ansible_types as ans
+from scansible.utils import SENTINEL, FrozenDict, Sentinel, first
 
 from ... import representation as rep
 from .constants import (
@@ -25,6 +25,9 @@ from .environments.types import LocalEnvType
 from .records import (
     ChangeableVariableValueRecord,
     ConstantVariableValueRecord,
+    LiteralEvaluationResult,
+    TemplatableType,
+    TemplateEvaluationResult,
     TemplateRecord,
     VariableDefinitionRecord,
     VariableValueRecord,
@@ -92,12 +95,23 @@ _ANSIBLE_TYPE_NAME_TO_BUILTIN_NAME: dict[str, rep.ValidTypeStr] = {
     "AnsibleSequence": "list",
     "AnsibleMapping": "dict",
     "AnsibleUnsafeText": "str",
+    "FrozenDict": "dict",
+    "tuple": "list",
 }
 
 
 def _extract_type_name(value: struct.AnyValue) -> rep.ValidTypeStr:
     type_ = value.__class__.__name__
     return _ANSIBLE_TYPE_NAME_TO_BUILTIN_NAME.get(type_, cast(rep.ValidTypeStr, type_))
+
+
+def _make_immutable(obj: TemplatableType) -> TemplatableType:
+    if isinstance(obj, dict):
+        return FrozenDict(obj)
+    elif isinstance(obj, list):
+        return tuple(obj)
+
+    return obj
 
 
 _DefRevisionMap = dict[str, int]
@@ -189,16 +203,26 @@ class VarContext:
         self._envs.exit_scope()
 
     def build_expression(self, expr: struct.AnyValue) -> rep.DataNode:
-        return self._build_expression(expr, is_conditional=False)
+        return self._build_expression(expr, is_conditional=False).data_node
 
     def build_conditional_expression(self, expr: struct.AnyValue) -> rep.DataNode:
-        return self._build_expression(expr, is_conditional=True)
+        return self._build_expression(expr, is_conditional=True).data_node
 
     def _build_expression(
         self, expr: struct.AnyValue, is_conditional: bool
-    ) -> rep.DataNode:
-        if not isinstance(expr, str):
+    ) -> TemplateRecord:
+        if not self._is_template(expr) and not (
+            is_conditional and isinstance(expr, str)
+        ):
+            logger.debug(f"{expr!r} does not contain a template expression")
             return self._add_literal_node(expr)
+
+        if not isinstance(expr, str):
+            if is_conditional:
+                logger.warning(
+                    "Composite expressions in conditionals are not supported"
+                )
+            return self._build_composite_expression(expr)
 
         if is_conditional:
             ast = TemplateExpressionAST.parse_conditional(
@@ -213,25 +237,61 @@ class VarContext:
             logger.debug(f"{expr!r} is a literal or malformed expression")
             return self._add_literal_node(expr)
 
-        return self._resolve_expression(ast).data_node
+        return self._resolve_expression(ast)
 
-    def _add_literal_node(self, value: struct.AnyValue) -> rep.Literal:
+    def _build_composite_expression(
+        self,
+        expr: Sequence[struct.AnyValue] | Mapping[struct.Scalar, struct.AnyValue],
+    ) -> TemplateEvaluationResult:
+        key_vals = expr.items() if isinstance(expr, Mapping) else enumerate(expr)
+        parent_node = rep.CompositeLiteral(_extract_type_name(expr))
+        self.extraction_ctx.graph.add_node(parent_node)
+
+        all_used_vars: list[VariableValueRecord] = []
+        for k, v in key_vals:
+            val_tr = self._build_expression(v, False)
+            all_used_vars.extend(val_tr.used_variables)
+
+            if self._is_template(k):
+                logger.warning("Templated keys are not supported yet!")
+
+            self.extraction_ctx.graph.add_edge(
+                val_tr.data_node, parent_node, rep.Keyword(str(k))
+            )
+
+        return TemplateEvaluationResult(parent_node, parent_node, all_used_vars)
+
+    def _add_literal_node(self, value: struct.AnyValue) -> TemplateRecord:
         location = self.extraction_ctx.get_location(value)
         type_ = _extract_type_name(value)
 
         lit: rep.Literal
-        if isinstance(value, (dict, list)):
-            logger.warning("I am not able to handle composite literals yet")
+        if isinstance(value, (Mapping, tuple, list)):
             lit = rep.CompositeLiteral(type=type_, location=location)
+            self.extraction_ctx.graph.add_node(lit)
+            key_vals = value.items() if isinstance(value, Mapping) else enumerate(value)
+            for k, v in key_vals:
+                self._add_composite_literal_component(lit, k, v)
         elif isinstance(value, struct.VaultValue):
             lit = rep.ScalarLiteral(type=type_, value=str(value), location=location)
         else:
             lit = rep.ScalarLiteral(type=type_, value=value, location=location)
 
         self.extraction_ctx.graph.add_node(lit)
-        return lit
+        return LiteralEvaluationResult(lit)
 
-    def _resolve_expression(self, ast: TemplateExpressionAST) -> TemplateRecord:
+    def _add_composite_literal_component(
+        self, parent: rep.CompositeLiteral, key: struct.Scalar, value: struct.AnyValue
+    ) -> None:
+        child = self._add_literal_node(value).data_node
+        assert not isinstance(
+            key, (tuple, list, Mapping)  # type: ignore[unreachable]
+        ), "Internal error: Unexpected composite keys"
+        self.extraction_ctx.graph.add_edge(child, parent, rep.Keyword(str(key)))
+
+    def _resolve_expression(
+        self, ast: TemplateExpressionAST
+    ) -> TemplateEvaluationResult:
         """Parse a template, add required nodes to the graph, and return the record."""
         logger.debug(f"Building expression {ast.raw!r}")
         assert not ast.is_literal(), f"Expected an expression, got literal {ast.raw!r}"
@@ -300,7 +360,7 @@ class VarContext:
 
     def _create_new_expression_result(
         self, ast: TemplateExpressionAST, used_values: list[VariableValueRecord]
-    ) -> TemplateRecord:
+    ) -> TemplateEvaluationResult:
         en = rep.Expression(
             expr=ast.raw,
             impure_components=tuple(_get_impure_components(ast)),
@@ -320,13 +380,13 @@ class VarContext:
             )
             self.extraction_ctx.graph.add_edge(var_node, en, rep.USE)
 
-        tr = TemplateRecord(iv, en, used_values, False)
+        tr = TemplateEvaluationResult(iv, en, used_values)
         self._envs.set_expression_evaluation_result(ast.raw, tr)
         return tr
 
     def _create_reevaluated_impure_expression_result(
-        self, tr: TemplateRecord
-    ) -> TemplateRecord:
+        self, tr: TemplateEvaluationResult
+    ) -> TemplateEvaluationResult:
         iv = rep.IntermediateValue(identifier=self.extraction_ctx.next_iv_id())
         logger.debug(f"Using IV {iv!r}")
 
@@ -334,12 +394,11 @@ class VarContext:
         self.extraction_ctx.graph.add_edge(tr.expr_node, iv, rep.DEF)
         return tr.__replace__(data_node=iv)  # type: ignore[return-value]
 
-    def _is_template(self, expr: struct.AnyValue | Sentinel) -> TypeGuard[str]:
-        return (
-            isinstance(expr, str)
-            and (ast := TemplateExpressionAST.parse(expr)) is not None
-            and not ast.is_literal()
-        )
+    def _is_template(
+        self, expr: struct.AnyValue | Sentinel
+    ) -> TypeGuard[TemplatableType]:
+        templar = ans.Templar(ans.DataLoader())
+        return templar.is_template(expr)
 
     def define_variable(
         self,
@@ -380,13 +439,12 @@ class VarContext:
         )
 
         if self._is_template(expr):
-            assert isinstance(expr, str)
-            template_expr: str | Sentinel = expr
+            template_expr: TemplatableType | Sentinel = _make_immutable(expr)
         elif isinstance(expr, Sentinel):
             template_expr = SENTINEL
         else:
             template_expr = SENTINEL
-            lit_node = self._add_literal_node(expr)
+            lit_node = self._add_literal_node(expr).data_node
             self.extraction_ctx.graph.add_edge(lit_node, var_node, rep.DEF)
 
         def_record = VariableDefinitionRecord(name, var_rev, template_expr, env_type)
@@ -433,8 +491,9 @@ class VarContext:
         # Evaluate the expression, perhaps re-evaluating if necessary. If the
         # expression was already evaluated previously and still has the same
         # value, this will just return the previous record.
-        ast = ensure_not_none(TemplateExpressionAST.parse(vdef.template_expr))
-        template_record = self._resolve_expression(ast)
+        template_record = self._build_expression(
+            vdef.template_expr, is_conditional=False
+        )
 
         # Try to find a pre-existing value record for this template record. If
         # it exists, we've already evaluated this variable before and we can
