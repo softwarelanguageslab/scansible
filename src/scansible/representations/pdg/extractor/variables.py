@@ -22,12 +22,8 @@ class VariablesExtractor:
     def extract_variables(self, scope_level: EnvironmentType) -> ExtractionResult:
         added_vars: list[rep.Variable] = []
         for var_name, var_init in self.variables.items():
-            added_vars.append(self.extract_variable(var_name, var_init, scope_level))
+            var_node = self.context.vars.define_initialised_variable(
+                var_name, scope_level, var_init
+            )
+            added_vars.append(var_node)
         return ExtractionResult([], added_vars, [])
-
-    def extract_variable(
-        self, var_name: str, var_init: struct.AnyValue, scope_level: EnvironmentType
-    ) -> rep.Variable:
-        if not isinstance(var_init, (str, bool, int, float)):
-            logger.warning("I am not able to properly handle non-atomic values yet")
-        return self.context.vars.define_variable(var_name, scope_level, expr=var_init)

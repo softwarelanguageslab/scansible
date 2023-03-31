@@ -64,7 +64,9 @@ def describe_unmodified() -> None:
     def should_declare_literal_variable(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.define_variable("test_var", EnvironmentType.HOST_FACTS, expr="hello world")
+        ctx.define_initialised_variable(
+            "test_var", EnvironmentType.HOST_FACTS, "hello world"
+        )
 
         assert_graphs_match(
             g,
@@ -199,8 +201,8 @@ def describe_unmodified() -> None:
     def should_extract_variable_definition(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.define_variable(
-            "msg", EnvironmentType.HOST_FACTS, expr="hello {{ target }}"
+        ctx.define_initialised_variable(
+            "msg", EnvironmentType.HOST_FACTS, "hello {{ target }}"
         )
         ctx.build_expression("{{ msg }}")
 
@@ -296,10 +298,10 @@ def describe_modified() -> None:
     def should_reevaluate_when_variable_changed(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="hello")
+        ctx.define_initialised_variable("a", EnvironmentType.HOST_FACTS, "hello")
         ctx.build_expression("{{ a }} world")
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_variable("a", EnvironmentType.TASK_VARS, expr="hi")
+            ctx.define_initialised_variable("a", EnvironmentType.TASK_VARS, "hi")
             ctx.build_expression("{{ a }} world")
 
         assert_graphs_match(
@@ -339,7 +341,9 @@ def describe_modified() -> None:
     def should_reevaluate_when_variable_dynamic(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.define_variable("when", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
+        ctx.define_initialised_variable(
+            "when", EnvironmentType.HOST_FACTS, "{{ now() }}"
+        )
         ctx.build_expression("The time is {{ when }}")
         ctx.build_expression("The time is {{ when }}")
 
@@ -394,11 +398,13 @@ def describe_modified() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="hello")
-        ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ a }} world")
+        ctx.define_initialised_variable("a", EnvironmentType.HOST_FACTS, "hello")
+        ctx.define_initialised_variable(
+            "b", EnvironmentType.HOST_FACTS, "{{ a }} world"
+        )
         ctx.build_expression("{{ b }}!")
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_variable("a", EnvironmentType.TASK_VARS, expr="hi")
+            ctx.define_initialised_variable("a", EnvironmentType.TASK_VARS, "hi")
             ctx.build_expression("{{ b }}!")
 
         assert_graphs_match(
@@ -460,10 +466,10 @@ def describe_modified() -> None:
     def should_reevaluate_only_one_var(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="hello")
-        ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="world")
+        ctx.define_initialised_variable("a", EnvironmentType.HOST_FACTS, "hello")
+        ctx.define_initialised_variable("b", EnvironmentType.HOST_FACTS, "world")
         ctx.build_expression("{{ a }} {{ b }}!")
-        ctx.define_variable("a", EnvironmentType.INCLUDE_VARS, expr="hi")
+        ctx.define_initialised_variable("a", EnvironmentType.INCLUDE_VARS, "hi")
         ctx.build_expression("{{ a }} {{ b }}!")
 
         assert_graphs_match(
@@ -515,10 +521,10 @@ def describe_scoping() -> None:
     def should_use_most_specific_scope(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="1")
+        ctx.define_initialised_variable("a", EnvironmentType.HOST_FACTS, "1")
         ctx.build_expression("1 {{ a }}")
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_variable("a", EnvironmentType.TASK_VARS, expr="2")
+            ctx.define_initialised_variable("a", EnvironmentType.TASK_VARS, "2")
             ctx.build_expression("2 {{ a }}")
 
         assert_graphs_match(
@@ -558,9 +564,11 @@ def describe_scoping() -> None:
     def should_override_root_scope_variables(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="1")
+        ctx.define_initialised_variable("a", EnvironmentType.HOST_FACTS, "1")
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_variable("a", EnvironmentType.SET_FACTS_REGISTERED, expr="2")
+            ctx.define_initialised_variable(
+                "a", EnvironmentType.SET_FACTS_REGISTERED, "2"
+            )
         ctx.build_expression("{{ a }}")
 
         assert_graphs_match(
@@ -597,13 +605,16 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.INCLUDE_PARAMS):
-            ctx.define_variable("ansible_version", EnvironmentType.INCLUDE_PARAMS)
+            ctx.define_initialised_variable(
+                "ansible_version", EnvironmentType.INCLUDE_PARAMS, "123"
+            )
             ctx.build_expression("{{ ansible_version }}")
 
         assert_graphs_match(
             g,
             create_graph(
                 {
+                    "l123": ScalarLiteral("str", "123"),
                     "unused": Variable(
                         name="ansible_version",
                         version=0,
@@ -620,6 +631,7 @@ def describe_scoping() -> None:
                     "iv": IntermediateValue(identifier=1),
                 },
                 [
+                    ("l123", "unused", DEF),
                     ("actual", "e", USE),
                     ("e", "iv", DEF),
                 ],
@@ -630,7 +642,9 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.INCLUDE_PARAMS):
-            ctx.define_variable("ansible_version", EnvironmentType.INCLUDE_PARAMS)
+            ctx.define_initialised_variable(
+                "ansible_version", EnvironmentType.INCLUDE_PARAMS, "123"
+            )
             ctx.build_expression("1: {{ ansible_version }}")
             ctx.build_expression("2: {{ ansible_version }}")
 
@@ -638,6 +652,7 @@ def describe_scoping() -> None:
             g,
             create_graph(
                 {
+                    "l123": ScalarLiteral("str", "123"),
                     "unused": Variable(
                         name="ansible_version",
                         version=0,
@@ -656,6 +671,7 @@ def describe_scoping() -> None:
                     "iv2": IntermediateValue(identifier=2),
                 },
                 [
+                    ("l123", "unused", DEF),
                     ("actual", "e1", USE),
                     ("actual", "e2", USE),
                     ("e1", "iv1", DEF),
@@ -670,13 +686,16 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.INCLUDE_PARAMS):
-            ctx.define_variable("ansible_os_family", EnvironmentType.INCLUDE_PARAMS)
+            ctx.define_initialised_variable(
+                "ansible_os_family", EnvironmentType.INCLUDE_PARAMS, "123"
+            )
             ctx.build_expression("{{ ansible_os_family }}")
 
         assert_graphs_match(
             g,
             create_graph(
                 {
+                    "l123": ScalarLiteral("str", "123"),
                     "actual": Variable(
                         name="ansible_os_family",
                         version=0,
@@ -687,6 +706,7 @@ def describe_scoping() -> None:
                     "iv": IntermediateValue(identifier=1),
                 },
                 [
+                    ("l123", "actual", DEF),
                     ("actual", "e", USE),
                     ("e", "iv", DEF),
                 ],
@@ -699,13 +719,16 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.ROLE_DEFAULTS):
-            ctx.define_variable("ansible_os_family", EnvironmentType.ROLE_DEFAULTS)
+            ctx.define_initialised_variable(
+                "ansible_os_family", EnvironmentType.ROLE_DEFAULTS, "123"
+            )
             ctx.build_expression("{{ ansible_os_family }}")
 
         assert_graphs_match(
             g,
             create_graph(
                 {
+                    "l123": ScalarLiteral("str", "123"),
                     "unused": Variable(
                         name="ansible_os_family",
                         version=0,
@@ -722,6 +745,7 @@ def describe_scoping() -> None:
                     "iv": IntermediateValue(identifier=1),
                 },
                 [
+                    ("l123", "unused", DEF),
                     ("actual", "e", USE),
                     ("e", "iv", DEF),
                 ],
@@ -734,16 +758,22 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.ROLE_DEFAULTS):
-            ctx.define_variable("ansible_os_family", EnvironmentType.ROLE_DEFAULTS)
+            ctx.define_initialised_variable(
+                "ansible_os_family", EnvironmentType.ROLE_DEFAULTS, "123"
+            )
             ctx.build_expression("{{ ansible_os_family }}")
             with ctx.enter_scope(EnvironmentType.ROLE_VARS):
-                ctx.define_variable("ansible_os_family", EnvironmentType.ROLE_VARS)
+                ctx.define_initialised_variable(
+                    "ansible_os_family", EnvironmentType.ROLE_VARS, "456"
+                )
                 ctx.build_expression("{{ ansible_os_family }}")
 
         assert_graphs_match(
             g,
             create_graph(
                 {
+                    "l123": ScalarLiteral("str", "123"),
+                    "l456": ScalarLiteral("str", "456"),
                     "unused": Variable(
                         name="ansible_os_family",
                         version=0,
@@ -768,6 +798,8 @@ def describe_scoping() -> None:
                     "iv_role_var": IntermediateValue(identifier=2),
                 },
                 [
+                    ("l123", "unused", DEF),
+                    ("l456", "actual_role_var", DEF),
                     ("actual_host_fact", "e_host_fact", USE),
                     ("e_host_fact", "iv_host_fact", DEF),
                     ("actual_role_var", "e_role_var", USE),
@@ -811,7 +843,7 @@ def describe_scoping() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="1")
+        ctx.define_initialised_variable("a", EnvironmentType.HOST_FACTS, "1")
         ctx.build_expression("1 {{ a }}")
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
             ctx.build_expression("1 {{ a }}")
@@ -843,10 +875,10 @@ def describe_scoping() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="1")
+        ctx.define_initialised_variable("a", EnvironmentType.HOST_FACTS, "1")
         ctx.build_expression("1 {{ a }}")
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_variable("a", EnvironmentType.TASK_VARS, expr="2")
+            ctx.define_initialised_variable("a", EnvironmentType.TASK_VARS, "2")
         ctx.build_expression("1 {{ a }}")
 
         assert_graphs_match(
@@ -882,11 +914,11 @@ def describe_scoping() -> None:
     def should_hoist_template(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="1")
+        ctx.define_initialised_variable("a", EnvironmentType.HOST_FACTS, "1")
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_variable("c", EnvironmentType.TASK_VARS, expr="c")
+            ctx.define_initialised_variable("c", EnvironmentType.TASK_VARS, "c")
             ctx.build_expression("1 {{ a }}")
-            ctx.define_variable("a", EnvironmentType.TASK_VARS, expr="2")
+            ctx.define_initialised_variable("a", EnvironmentType.TASK_VARS, "2")
         ctx.build_expression("1 {{ a }}")
 
         assert_graphs_match(
@@ -932,10 +964,10 @@ def describe_scoping() -> None:
 
         # Difference to 'should_use_most_specific_scope': Same template here,
         # different template there
-        ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="1")
+        ctx.define_initialised_variable("a", EnvironmentType.HOST_FACTS, "1")
         ctx.build_expression("1 {{ a }}")
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_variable("a", EnvironmentType.TASK_VARS, expr="2")
+            ctx.define_initialised_variable("a", EnvironmentType.TASK_VARS, "2")
             ctx.build_expression("1 {{ a }}")
         ctx.build_expression("1 {{ a }}")
 
@@ -976,11 +1008,11 @@ def describe_scoping() -> None:
     def should_evaluate_var_into_template_scope(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="{{ b }}")
+        ctx.define_initialised_variable("a", EnvironmentType.HOST_FACTS, "{{ b }}")
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_variable("b", EnvironmentType.TASK_VARS, expr="1")
+            ctx.define_initialised_variable("b", EnvironmentType.TASK_VARS, "1")
             ctx.build_expression("{{ a }}")
-        ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="2")
+        ctx.define_initialised_variable("b", EnvironmentType.HOST_FACTS, "2")
         ctx.build_expression("{{ a }}")
 
         assert_graphs_match(
@@ -1043,16 +1075,16 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_variable(
-                "a", EnvironmentType.TASK_VARS, expr='{{ "hello" | reverse }}'
+            ctx.define_initialised_variable(
+                "a", EnvironmentType.TASK_VARS, "{{ 'hello' | reverse }}"
             )
-            ctx.define_variable(
-                "b", EnvironmentType.TASK_VARS, expr="{{ c | reverse }}"
+            ctx.define_initialised_variable(
+                "b", EnvironmentType.TASK_VARS, "{{ c | reverse }}"
             )
-            ctx.define_variable("c", EnvironmentType.TASK_VARS, expr="world")
+            ctx.define_initialised_variable("c", EnvironmentType.TASK_VARS, "world")
             ctx.build_expression("{{ b }} {{ a }}")
-        ctx.define_variable(
-            "a", EnvironmentType.HOST_FACTS, expr='{{ "hello" | reverse }}'
+        ctx.define_initialised_variable(
+            "a", EnvironmentType.HOST_FACTS, "{{ 'hello' | reverse }}"
         )
         ctx.build_expression("{{ b }} {{ a }}")
 
@@ -1075,7 +1107,7 @@ def describe_scoping() -> None:
                         value_version=0,
                         scope_level=EnvironmentType.TASK_VARS.value,
                     ),
-                    "ae": Expression(expr='{{ "hello" | reverse }}'),
+                    "ae": Expression(expr="{{ 'hello' | reverse }}"),
                     "aiv": IntermediateValue(identifier=1),
                     "ai": Variable(
                         name="a",
@@ -1121,9 +1153,9 @@ def describe_scoping() -> None:
     def should_hoist_variable_binding(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="{{ b }}")
+        ctx.define_initialised_variable("a", EnvironmentType.HOST_FACTS, "{{ b }}")
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_variable("b", EnvironmentType.TASK_VARS, expr="1")
+            ctx.define_initialised_variable("b", EnvironmentType.TASK_VARS, "1")
             with ctx.enter_scope(EnvironmentType.TASK_VARS):
                 ctx.build_expression("{{ a }}")
             ctx.build_expression("{{ a }}")  # Should reuse above expr
@@ -1164,12 +1196,12 @@ def describe_scoping() -> None:
     def should_respect_precedence(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        vn = ctx.define_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
         ln = ScalarLiteral(type="int", value=1)
         g.add_node(ln)
-        g.add_edge(ln, vn, DEF)
+        _ = ctx.define_fact("b", EnvironmentType.SET_FACTS_REGISTERED, 1, ln)
+
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_variable("b", EnvironmentType.TASK_VARS, expr="2")
+            ctx.define_initialised_variable("b", EnvironmentType.TASK_VARS, "2")
             ctx.build_expression("{{ b }}")
 
         assert_graphs_match(
@@ -1208,11 +1240,10 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_variable("b", EnvironmentType.TASK_VARS, expr="1")
-        vn = ctx.define_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
+            ctx.define_initialised_variable("b", EnvironmentType.TASK_VARS, "1")
         ln = ScalarLiteral(type="int", value=2)
         g.add_node(ln)
-        g.add_edge(ln, vn, DEF)
+        _ = ctx.define_fact("b", EnvironmentType.SET_FACTS_REGISTERED, 2, ln)
         ctx.build_expression("{{ b }}")
 
         assert_graphs_match(
@@ -1251,11 +1282,10 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_variable("b", EnvironmentType.TASK_VARS, expr="1")
-            vn = ctx.define_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
+            ctx.define_initialised_variable("b", EnvironmentType.TASK_VARS, "1")
             ln = ScalarLiteral(type="int", value=2)
             g.add_node(ln)
-            g.add_edge(ln, vn, DEF)
+            _ = ctx.define_fact("b", EnvironmentType.SET_FACTS_REGISTERED, 2, ln)
             ctx.build_expression("{{ b }}")
         ctx.build_expression("{{ b }}")  # Should reuse above expr
 
@@ -1295,7 +1325,7 @@ def _describe_caching() -> None:
     def should_cache_dynamic_template_variables(create_context: ContextCreator) -> None:
         ctx, _ = create_context()
 
-        ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
+        ctx.define_initialised_variable("b", EnvironmentType.HOST_FACTS, "{{ now() }}")
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
             d1 = ctx.build_expression("{{ b }}")
             d2 = ctx.build_expression("{{ b }}")  # Should reuse above
@@ -1305,7 +1335,7 @@ def _describe_caching() -> None:
     def should_discard_after_leaving_scope(create_context: ContextCreator) -> None:
         ctx, _ = create_context()
 
-        ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
+        ctx.define_initialised_variable("b", EnvironmentType.HOST_FACTS, "{{ now() }}")
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
             d1 = ctx.build_expression("{{ b }}")
             d2 = ctx.build_expression("{{ b }}")  # Should reuse above
@@ -1319,7 +1349,7 @@ def _describe_caching() -> None:
     ) -> None:
         ctx, _ = create_context()
 
-        ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
+        ctx.define_initialised_variable("b", EnvironmentType.HOST_FACTS, "{{ now() }}")
         d1 = ctx.build_expression("{{ b }}")
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
             d2 = ctx.build_expression("{{ b }}")
@@ -1341,7 +1371,7 @@ def _describe_caching() -> None:
     def should_not_reuse_outer_cache(create_context: ContextCreator) -> None:
         ctx, _ = create_context()
 
-        ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
+        ctx.define_initialised_variable("b", EnvironmentType.HOST_FACTS, "{{ now() }}")
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
             do1 = ctx.build_expression("{{ b }}")
             with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
@@ -1356,8 +1386,8 @@ def _describe_caching() -> None:
     def should_cache_nested_variables(create_context: ContextCreator) -> None:
         ctx, _ = create_context()
 
-        ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
-        ctx.define_variable("a", EnvironmentType.HOST_FACTS, expr="{{ b }}")
+        ctx.define_initialised_variable("b", EnvironmentType.HOST_FACTS, "{{ now() }}")
+        ctx.define_initialised_variable("a", EnvironmentType.HOST_FACTS, "{{ b }}")
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
             d1 = ctx.build_expression("{{ a }}")
             d2 = ctx.build_expression("{{ a }}")
@@ -1369,7 +1399,7 @@ def _describe_caching() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        ctx.define_variable("b", EnvironmentType.HOST_FACTS, expr="{{ now() }}")
+        ctx.define_initialised_variable("b", EnvironmentType.HOST_FACTS, "{{ now() }}")
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
             ctx.build_expression("{{ b + 1 }}")
             ctx.build_expression("{{ b + 2 }}")

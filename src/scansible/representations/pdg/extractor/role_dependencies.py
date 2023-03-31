@@ -20,8 +20,8 @@ def extract_role_dependency(
 ) -> ExtractionResult:
     with context.vars.enter_scope(EnvironmentType.INCLUDE_PARAMS):
         for var_name, var_init in dep.params.items():
-            context.vars.define_variable(
-                var_name, EnvironmentType.INCLUDE_PARAMS, expr=var_init
+            context.vars.define_initialised_variable(
+                var_name, EnvironmentType.INCLUDE_PARAMS, var_init
             )
 
         # TODO: Conditionals

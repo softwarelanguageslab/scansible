@@ -402,13 +402,36 @@ class VarContext:
         templar = ans.Templar(ans.DataLoader())
         return templar.is_template(expr)
 
-    def define_variable(
+    def define_initialised_variable(
+        self, name: str, env_type: EnvironmentType, initialiser: struct.AnyValue
+    ) -> rep.Variable:
+        """Define a variable with an initialiser which is lazily evaluated."""
+        return self._define_variable(name, env_type, initialiser, False)
+
+    def define_fact(
         self,
         name: str,
         env_type: EnvironmentType,
-        *,
-        expr: struct.AnyValue | Sentinel = SENTINEL,
-        eager: bool = False,
+        initialiser_expr: struct.AnyValue,
+        initialiser_node: rep.DataNode,
+    ) -> rep.Variable:
+        """Define a fact initialised with an eagerly-evaluated expression."""
+        var_node = self._define_variable(name, env_type, initialiser_expr, True)
+        self.extraction_ctx.graph.add_edge(initialiser_node, var_node, rep.DEF)
+        return var_node
+
+    def define_injected_variable(
+        self, name: str, env_type: EnvironmentType
+    ) -> rep.Variable:
+        """Define a variable injected by the Ansible runtime, i.e., without an explicit initialiser."""
+        return self._define_variable(name, env_type, SENTINEL, True)
+
+    def _define_variable(
+        self,
+        name: str,
+        env_type: EnvironmentType,
+        initialiser: struct.AnyValue | Sentinel,
+        eager: bool,
     ) -> rep.Variable:
         """Declare a variable, initialized with the given expression.
 
@@ -419,7 +442,7 @@ class VarContext:
         when a template that uses this variable is evaluated.
         """
         logger.debug(
-            f"Defining variable {name!r} of type {type(expr).__name__} "
+            f"Defining variable {name!r} of type {type(initialiser).__name__} "
             + f"in env of type {env_type.name}"
         )
 
@@ -444,14 +467,14 @@ class VarContext:
         def_record = VariableDefinitionRecord(
             name,
             var_rev,
-            _make_immutable(expr),
-            eager or not self._is_template(expr),
+            _make_immutable(initialiser),
+            eager or not self._is_template(initialiser),
             env_type,
         )
         self._envs.set_variable_definition(name, def_record)
         self._value_to_var_node[(def_record, 0)] = var_node
 
-        if eager or not self._is_template(expr):
+        if eager or not self._is_template(initialiser):
             # Assume the value is used by the caller is constant if they don't
             # provide an expression. At the very least, the caller should link it
             # with DEF (e.g. set_fact or register) or USE (e.g. undefined variables
@@ -461,8 +484,8 @@ class VarContext:
             val_record = ConstantVariableValueRecord(def_record)
             self._envs.set_constant_variable_value(name, val_record)
 
-            if not eager and not isinstance(expr, Sentinel):
-                lit_node = self._add_literal_node(expr).data_node
+            if not eager and not isinstance(initialiser, Sentinel):
+                lit_node = self._add_literal_node(initialiser).data_node
                 self.extraction_ctx.graph.add_edge(lit_node, var_node, rep.DEF)
 
         return var_node
@@ -560,7 +583,7 @@ class VarContext:
             )
             env_type = EnvironmentType.UNDEFINED
 
-        self.define_variable(name, env_type)
+        self.define_injected_variable(name, env_type)
         # Retrieve the value record that should've been created
         vval = self._envs.get_variable_value_for_constant_definition(
             name, self._next_def_revisions[name] - 1

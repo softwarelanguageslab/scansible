@@ -39,16 +39,13 @@ class SetFactTaskExtractor(TaskExtractor):
         added_vars: list[rep.Variable] = []
 
         for var_name, value_node in name_to_value.items():
-            var_node = self.context.vars.define_variable(
+            var_node = self.context.vars.define_fact(
                 var_name,
                 EnvironmentType.SET_FACTS_REGISTERED,
-                expr=self.task.args[var_name],
-                eager=True,
+                self.task.args[var_name],
+                value_node,
             )
             added_vars.append(var_node)
-
-            self.context.graph.add_node(var_node)
-            self.context.graph.add_edge(value_node, var_node, rep.DEF)
             for condition_node in condition_nodes:
                 self.context.graph.add_edge(condition_node, var_node, rep.DEFINED_IF)
 
@@ -63,7 +60,7 @@ class SetFactTaskExtractor(TaskExtractor):
 
         loop_source_var, loop_var_name = source_and_name
         with self.context.vars.enter_scope(EnvironmentType.INCLUDE_PARAMS):
-            loop_target_var = self.context.vars.define_variable(
+            loop_target_var = self.context.vars.define_injected_variable(
                 loop_var_name, EnvironmentType.INCLUDE_PARAMS
             )
             self.context.graph.add_edge(

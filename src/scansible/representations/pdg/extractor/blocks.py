@@ -47,8 +47,8 @@ class BlockExtractor:
             # shadow variables registered in an outer block. However, it's
             # confirmed to be a bug, so we'll handle it as if it were
             # implemented correctly.
-            self.context.vars.define_variable(
-                var_name, expr=var_value, env_type=EnvironmentType.BLOCK_VARS
+            self.context.vars.define_initialised_variable(
+                var_name, EnvironmentType.BLOCK_VARS, var_value
             )
 
         # A block without a list of tasks should be impossible
