@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TypeVar
 
-from collections.abc import Callable, Iterable, Iterator, Mapping
+from collections.abc import Callable, Iterable
 
 
 class Sentinel:

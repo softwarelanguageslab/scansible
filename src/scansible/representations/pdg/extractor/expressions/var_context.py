@@ -119,7 +119,6 @@ _ValRevisionMap = dict[VariableDefinitionRecord, int]
 _ValueToVarMap = dict[tuple[VariableDefinitionRecord, int], rep.Variable]
 
 
-# TODO: Composite literals
 # TODO: Maybe simplify single-variable templates ("{{ var }}") to bypass
 # intermediate values?
 class VarContext:
@@ -256,7 +255,7 @@ class VarContext:
                 logger.warning("Templated keys are not supported yet!")
 
             self.extraction_ctx.graph.add_edge(
-                val_tr.data_node, parent_node, rep.Keyword(str(k))
+                val_tr.data_node, parent_node, rep.Composition(str(k))
             )
 
         return TemplateEvaluationResult(parent_node, parent_node, all_used_vars)
@@ -287,7 +286,7 @@ class VarContext:
         assert not isinstance(
             key, (tuple, list, Mapping)  # type: ignore[unreachable]
         ), "Internal error: Unexpected composite keys"
-        self.extraction_ctx.graph.add_edge(child, parent, rep.Keyword(str(key)))
+        self.extraction_ctx.graph.add_edge(child, parent, rep.Composition(str(key)))
 
     def _resolve_expression(
         self, ast: TemplateExpressionAST

@@ -56,6 +56,8 @@ def dump_edge(e: rep.Edge, source: rep.Node, target: rep.Node, dot: gv.Digraph) 
     edge_label = e.__class__.__name__.upper()
     if isinstance(e, rep.Keyword):
         edge_label = e.keyword
+    elif isinstance(e, rep.Composition):
+        edge_label = e.index
 
     dot.edge(source_id, target_id, label=edge_label)
 

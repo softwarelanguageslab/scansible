@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import dataclasses
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import partialmethod
 
 from scansible.representations import structural as struct
@@ -45,7 +45,9 @@ class LiteralEvaluationResult(TemplateRecord):
     """Result of a literal expression."""
 
     data_node: rep.DataNode
-    used_variables = []
+    used_variables: list[VariableValueRecord] = field(
+        init=False, default_factory=list, repr=False
+    )
 
     @property
     def is_literal(self) -> bool:

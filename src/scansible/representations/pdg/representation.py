@@ -234,9 +234,24 @@ class Keyword(Use):
         if not isinstance(source, DataNode):
             raise TypeError("Keyword edge must start at a data node")
 
-        if not isinstance(target, (Task, CompositeLiteral)):
+        if not isinstance(target, Task):
+            raise TypeError("Keyword edges must only be used with tasks as target")
+
+
+@frozen
+class Composition(Use):
+    """Edges representing data composition in composite values."""
+
+    index: str = field(validator=type_validator())
+
+    @classmethod
+    def raise_if_disallowed(cls, source: Node, target: Node) -> None:
+        if not isinstance(source, DataNode):
+            raise TypeError("Composition edge must start at a data node")
+
+        if not isinstance(target, CompositeLiteral):
             raise TypeError(
-                "Keyword edges must only be used with tasks or composite literals as target"
+                "Keyword edges must only be used with composite literals as target"
             )
 
 
@@ -349,5 +364,6 @@ __all__ = [
     "ORDER_TRANS",
     "ORDER_BACK",
     "Keyword",
+    "Composition",
     "NodeLocation",
 ]
