@@ -81,7 +81,8 @@ class VariableDefinitionRecord(_RecordBase):
 
     name: str
     revision: int
-    template_expr: TemplatableType | Sentinel
+    initialiser: struct.AnyValue | Sentinel
+    eagerly_evaluated: bool
     env_type: EnvironmentType
 
 

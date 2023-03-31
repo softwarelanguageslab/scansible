@@ -40,7 +40,10 @@ class SetFactTaskExtractor(TaskExtractor):
 
         for var_name, value_node in name_to_value.items():
             var_node = self.context.vars.define_variable(
-                var_name, EnvironmentType.SET_FACTS_REGISTERED
+                var_name,
+                EnvironmentType.SET_FACTS_REGISTERED,
+                expr=self.task.args[var_name],
+                eager=True,
             )
             added_vars.append(var_node)
 

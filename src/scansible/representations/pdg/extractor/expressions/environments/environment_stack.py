@@ -353,9 +353,9 @@ class EnvironmentStack:
         # instead of while iterating, because a var without an initialiser may
         # override a var with an initialiser.
         return {
-            vdef.name: vdef.template_expr
+            vdef.name: vdef.initialiser
             for vdef in all_vars.values()
-            if isinstance(vdef.template_expr, str)
+            if isinstance(vdef.initialiser, str)
         }
 
     def get_currently_visible_definitions(self) -> set[tuple[str, int]]:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable, TypeGuard, cast
+from typing import TYPE_CHECKING, Iterable, TypeGuard, TypeVar, cast
 
 from collections import defaultdict
 from collections.abc import Generator, Mapping, Sequence
@@ -105,11 +105,14 @@ def _extract_type_name(value: struct.AnyValue) -> rep.ValidTypeStr:
     return _ANSIBLE_TYPE_NAME_TO_BUILTIN_NAME.get(type_, cast(rep.ValidTypeStr, type_))
 
 
-def _make_immutable(obj: TemplatableType) -> TemplatableType:
+_T = TypeVar("_T")
+
+
+def _make_immutable(obj: _T) -> _T:
     if isinstance(obj, dict):
-        return FrozenDict(obj)
+        return FrozenDict(obj)  # type: ignore
     elif isinstance(obj, list):
-        return tuple(obj)
+        return tuple(obj)  # type: ignore
 
     return obj
 
@@ -405,6 +408,7 @@ class VarContext:
         env_type: EnvironmentType,
         *,
         expr: struct.AnyValue | Sentinel = SENTINEL,
+        eager: bool = False,
     ) -> rep.Variable:
         """Declare a variable, initialized with the given expression.
 
@@ -437,28 +441,29 @@ class VarContext:
             name, var_rev, self._envs.get_currently_visible_definitions()
         )
 
-        if self._is_template(expr):
-            template_expr: TemplatableType | Sentinel = _make_immutable(expr)
-        elif isinstance(expr, Sentinel):
-            template_expr = SENTINEL
-        else:
-            template_expr = SENTINEL
-            lit_node = self._add_literal_node(expr).data_node
-            self.extraction_ctx.graph.add_edge(lit_node, var_node, rep.DEF)
-
-        def_record = VariableDefinitionRecord(name, var_rev, template_expr, env_type)
+        def_record = VariableDefinitionRecord(
+            name,
+            var_rev,
+            _make_immutable(expr),
+            eager or not self._is_template(expr),
+            env_type,
+        )
         self._envs.set_variable_definition(name, def_record)
         self._value_to_var_node[(def_record, 0)] = var_node
 
-        # Assume the value is used by the caller is constant if they don't
-        # provide an expression. At the very least, the caller should link it
-        # with DEF (e.g. set_fact or register) or USE (e.g. undefined variables
-        # in evaluate_template).
-        # If the variable isn't a constant value, we'll only create value
-        # records whenever it's evaluated.
-        if template_expr is SENTINEL:
+        if eager or not self._is_template(expr):
+            # Assume the value is used by the caller is constant if they don't
+            # provide an expression. At the very least, the caller should link it
+            # with DEF (e.g. set_fact or register) or USE (e.g. undefined variables
+            # in evaluate_template).
+            # If the variable isn't a constant value, we'll only create value
+            # records whenever it's evaluated.
             val_record = ConstantVariableValueRecord(def_record)
             self._envs.set_constant_variable_value(name, val_record)
+
+            if not eager and not isinstance(expr, Sentinel):
+                lit_node = self._add_literal_node(expr).data_node
+                self.extraction_ctx.graph.add_edge(lit_node, var_node, rep.DEF)
 
         return var_node
 
@@ -484,15 +489,14 @@ class VarContext:
                 f"Wrong definition for special variable {name!r}, defining new one."
             )
             return self._define_constant_and_get_value(name)
-        if isinstance(vdef.template_expr, Sentinel):
+        if vdef.eagerly_evaluated:
             return self._get_variable_value_without_initialiser(vdef)
 
         # Evaluate the expression, perhaps re-evaluating if necessary. If the
         # expression was already evaluated previously and still has the same
         # value, this will just return the previous record.
-        template_record = self._build_expression(
-            vdef.template_expr, is_conditional=False
-        )
+        assert not isinstance(vdef.initialiser, Sentinel)
+        template_record = self._build_expression(vdef.initialiser, is_conditional=False)
 
         # Try to find a pre-existing value record for this template record. If
         # it exists, we've already evaluated this variable before and we can
