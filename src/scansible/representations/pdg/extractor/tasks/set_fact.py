@@ -26,11 +26,17 @@ class SetFactTaskExtractor(TaskExtractor):
         # really part of the control flow.
         condition_nodes = self.extract_condition([]).added_control_nodes
 
+        args = dict(self.task.args)
+        # `cacheable` is a module parameter, not a fact.
+        # TODO: Cacheable facts may have different precedence under certain
+        # circumstances.
+        args.pop("cacheable", False)
+
         # Evaluate all values before defining the variables. Ansible does
         # the same. We need to do this as one variable may be defined in
         # terms of another variable that's `set_fact`ed
         name_to_value: dict[str, rep.DataNode] = {}
-        for var_name, var_value in self.task.args.items():
+        for var_name, var_value in args.items():
             try:
                 name_to_value[var_name] = self.context.vars.build_expression(var_value)
             except RecursiveDefinitionError as e:
@@ -42,7 +48,7 @@ class SetFactTaskExtractor(TaskExtractor):
             var_node = self.context.vars.define_fact(
                 var_name,
                 EnvironmentType.SET_FACTS_REGISTERED,
-                self.task.args[var_name],
+                args[var_name],
                 value_node,
             )
             added_vars.append(var_node)
