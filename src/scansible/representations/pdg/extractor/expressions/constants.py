@@ -281,3 +281,10 @@ UNQUALIFIED_HOST_FACT_NAMES = frozenset(
         "inventory_file",
     }
 )
+
+
+# Known possible values for host facts
+HOST_FACTS_OPTIONS = {
+    "ansible_os_family": ...,
+    "ansible_distribution": ...,
+}

@@ -3,8 +3,10 @@ from __future__ import annotations
 from typing import Generator, Sequence, TypeAlias, cast
 
 import json
+import re
 import textwrap
 from collections import defaultdict
+from collections.abc import Iterable
 from contextlib import contextmanager
 from os.path import normpath
 from pathlib import Path
@@ -15,6 +17,7 @@ from scansible.representations import structural as struct_rep
 from scansible.representations.structural.helpers import (
     ProjectPath,
     capture_output,
+    find_all_files,
     find_file,
     prevent_undesired_operations,
 )
@@ -211,41 +214,61 @@ class IncludeContext:
         with self._enter_file(real_path, includer_location):
             yield var_file
 
+    def find_matching_roles(self, name_patterns: set[str]) -> set[str]:
+        patterns = [re.compile(p + "$") for p in name_patterns]
+
+        def walk_dir(path: Path, root_path: Path) -> Iterable[str]:
+            for child in path.iterdir():
+                if not child.is_dir():
+                    continue
+                role_name = str(path.relative_to(root_path))
+                if any(p.match(role_name) for p in patterns):
+                    yield role_name
+                else:
+                    yield from walk_dir(child, root_path)
+
+        results: set[str] = set()
+        for search_dir in self._get_role_search_dirs():
+            if not search_dir.is_dir():
+                continue
+            results |= set(walk_dir(search_dir, search_dir))
+
+        return results
+
+    def find_matching_task_files(self, name_patterns: set[str]) -> set[str]:
+        return self._find_matching_files(name_patterns, "tasks")
+
+    def find_matching_var_files(self, name_patterns: set[str]) -> set[str]:
+        return self._find_matching_files(name_patterns, "vars")
+
+    def _find_matching_files(self, name_patterns: set[str], base_dir: str) -> set[str]:
+        patterns = [re.compile(p + "(\\.yml|\\.yaml)?$") for p in name_patterns]
+
+        # Use a set so that paths get deduplicated. Paths are relative to the
+        # search dir, such that when we attempt to include it, we'll always take
+        # the higher precedence one.
+        results: set[str] = set()
+        for search_dir in self._get_file_search_dirs(base_dir):
+            if not search_dir.absolute.is_dir():
+                continue
+            files = [
+                str(f.absolute.relative_to(search_dir.absolute))
+                for f in find_all_files(search_dir)
+            ]
+
+            results |= set(f for f in files if any(p.match(f) for p in patterns))
+
+        return results
+
     def _find_file(self, short_path: str, base_dir: str) -> ProjectPath | None:
-        # Ansible's file resolution order:
-        # <current role root>/{base_dir}/{path}
-        # <current role root>/{path}
-        # <current task file dir>/{base_dir}/{path}
-        # <current task file dir>/{path}
-        # <playbook dir>/{base_dir}/{path}
-        # <playbook dir>/{path}
-        #
-        # We should also take care not to allow for path traversal outside of
+        # We should take care not to allow for path traversal outside of
         # controlled project directories through relative paths.
         base_file_path = Path(short_path).expanduser()
         if base_file_path.is_absolute():
             logger.error(f"Cannot handle absolute paths: {short_path}")
             return None
 
-        base_search_dirs: list[ProjectPath] = []
-        if self._role_base_path is not None:
-            base_search_dirs.extend(
-                [self._role_base_path.join(base_dir), self._role_base_path]
-            )
-
-        assert (
-            self._last_included_file_path is not None
-        ), "Someone forgot to initialise the includes"
-        lifp_pp = ProjectPath(
-            self._last_included_file_path.root,
-            self._last_included_file_path.absolute.parent,
-        )
-        base_search_dirs.extend([lifp_pp.join(base_dir), lifp_pp])
-
-        if self._playbook_base_path is not None:
-            base_search_dirs.extend(
-                [self._playbook_base_path.join(base_dir), self._playbook_base_path]
-            )
+        base_search_dirs = self._get_file_search_dirs(base_dir)
 
         for search_path in base_search_dirs:
             logger.debug(f"Checking whether {short_path} exists in {search_path}")
@@ -262,25 +285,34 @@ class IncludeContext:
 
         return None
 
-    def _find_role(self, role_name: str) -> ProjectPath | None:
-        # Ansible's role resolution order:
-        # - collections (skipped)
-        # - <playbook dir>/roles/{name}
-        # - <default role dir>/{name}
-        # - <current role's parent dir>/{name}
-        # - <playbook dir>/{name}
-
-        base_search_dirs: list[Path] = []
-        if self._playbook_base_path is not None:
-            base_search_dirs.append(self._playbook_base_path.join("roles").absolute)
-
-        base_search_dirs.extend(self._role_search_paths)
-
+    def _get_file_search_dirs(self, base_dir: str) -> Iterable[ProjectPath]:
+        # Ansible's file resolution order:
+        # <current role root>/{base_dir}/{path}
+        # <current role root>/{path}
+        # <current task file dir>/{base_dir}/{path}
+        # <current task file dir>/{path}
+        # <playbook dir>/{base_dir}/{path}
+        # <playbook dir>/{path}
         if self._role_base_path is not None:
-            base_search_dirs.append(self._role_base_path.absolute)
+            yield self._role_base_path.join(base_dir)
+            yield self._role_base_path
+
+        assert (
+            self._last_included_file_path is not None
+        ), "Someone forgot to initialise the includes"
+        lifp_pp = ProjectPath(
+            self._last_included_file_path.root,
+            self._last_included_file_path.absolute.parent,
+        )
+        yield lifp_pp.join(base_dir)
+        yield lifp_pp
 
         if self._playbook_base_path is not None:
-            base_search_dirs.append(self._playbook_base_path.absolute)
+            yield self._playbook_base_path.join(base_dir)
+            yield self._playbook_base_path
+
+    def _find_role(self, role_name: str) -> ProjectPath | None:
+        base_search_dirs = self._get_role_search_dirs()
 
         for search_path in base_search_dirs:
             logger.debug(f"Checking whether role {role_name} exists in {search_path}")
@@ -296,6 +328,24 @@ class IncludeContext:
                 return ProjectPath.from_root(candidate_path)
 
         return None
+
+    def _get_role_search_dirs(self) -> Iterable[Path]:
+        # Ansible's role resolution order:
+        # - collections (skipped)
+        # - <playbook dir>/roles/{name}
+        # - <default role dir>/{name}
+        # - <current role's parent dir>/{name}
+        # - <playbook dir>/{name}
+        if self._playbook_base_path is not None:
+            yield self._playbook_base_path.join("roles").absolute
+
+        yield from self._role_search_paths
+
+        if self._role_base_path is not None:
+            yield self._role_base_path.absolute
+
+        if self._playbook_base_path is not None:
+            yield self._playbook_base_path.absolute
 
     def _is_in_project(self, path: Path) -> bool:
         # normalize path: resolve .. to parent and . to self, etc.

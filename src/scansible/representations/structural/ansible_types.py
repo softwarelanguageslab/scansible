@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from ansible import constants
 from ansible.errors import AnsibleError as AnsibleError
 from ansible.errors import AnsibleParserError as AnsibleParserError
+from ansible.module_utils.facts.system.distribution import Distribution as Distribution
 from ansible.module_utils.parsing.convert_bool import boolean
 from ansible.parsing.dataloader import DataLoader as DataLoader
 from ansible.parsing.mod_args import ModuleArgsParser as ModuleArgsParser

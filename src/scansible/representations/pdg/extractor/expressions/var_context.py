@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable, TypeGuard, TypeVar, cast
+from typing import TYPE_CHECKING, TypeGuard, TypeVar, cast
 
 from collections import defaultdict
-from collections.abc import Generator, Mapping, Sequence
+from collections.abc import Generator, Iterable, Mapping, Sequence
 from contextlib import contextmanager
 
 from loguru import logger
@@ -213,7 +213,7 @@ class VarContext:
     def _build_expression(
         self, expr: struct.AnyValue, is_conditional: bool
     ) -> TemplateRecord:
-        if not self._is_template(expr) and not (
+        if not self.is_template(expr) and not (
             is_conditional and isinstance(expr, str)
         ):
             logger.debug(f"{expr!r} does not contain a template expression")
@@ -254,7 +254,7 @@ class VarContext:
             val_tr = self._build_expression(v, False)
             all_used_vars.extend(val_tr.used_variables)
 
-            if self._is_template(k):
+            if self.is_template(k):
                 logger.warning("Templated keys are not supported yet!")
 
             self.extraction_ctx.graph.add_edge(
@@ -396,7 +396,7 @@ class VarContext:
         self.extraction_ctx.graph.add_edge(tr.expr_node, iv, rep.DEF)
         return tr.__replace__(data_node=iv)  # type: ignore[return-value]
 
-    def _is_template(
+    def is_template(
         self, expr: struct.AnyValue | Sentinel
     ) -> TypeGuard[TemplatableType]:
         templar = ans.Templar(ans.DataLoader())
@@ -468,13 +468,13 @@ class VarContext:
             name,
             var_rev,
             _make_immutable(initialiser),
-            eager or not self._is_template(initialiser),
+            eager or not self.is_template(initialiser),
             env_type,
         )
         self._envs.set_variable_definition(name, def_record)
         self._value_to_var_node[(def_record, 0)] = var_node
 
-        if eager or not self._is_template(initialiser):
+        if eager or not self.is_template(initialiser):
             # Assume the value is used by the caller is constant if they don't
             # provide an expression. At the very least, the caller should link it
             # with DEF (e.g. set_fact or register) or USE (e.g. undefined variables
@@ -606,3 +606,39 @@ class VarContext:
             f"Variable {vdef.name!r} has no initialiser, using constant value record {vval!r}"
         )
         return vval
+
+    def get_initialisers(
+        self, name: str, constraints: Mapping[str, str]
+    ) -> Sequence[tuple[struct.AnyValue, dict[str, str]]]:
+        """Get possible initialisers for `name`, adhering to any prior
+        initialiser constraints.
+        Returns tuples of initialisers and new constraints."""
+        # TODO: Conditional definitions.
+        vdef = self._envs.get_variable_definition(name)
+
+        if vdef is None or _is_ignored_override_of_special_variable(name, vdef):
+            return [
+                (init, {name: init})
+                for init in self._get_constrained_magic_initialisers(name, constraints)
+            ]
+
+        if not isinstance(vdef.initialiser, Sentinel):
+            return [(vdef.initialiser, {})]
+
+        return []
+
+    def _get_constrained_magic_initialisers(
+        self, name: str, constraints: Mapping[str, str]
+    ) -> Sequence[str]:
+        if name == "ansible_os_family":
+            distribution = constraints.get("ansible_distribution")
+            if distribution:
+                return [ans.Distribution.OS_FAMILY[distribution]]
+            return list(ans.Distribution.OS_FAMILY_MAP.keys())
+        if name == "ansible_distribution":
+            os_family = constraints.get("ansible_os_family")
+            if os_family:
+                return ans.Distribution.OS_FAMILY_MAP[os_family]
+            return list(ans.Distribution.OS_FAMILY.keys())
+
+        return []

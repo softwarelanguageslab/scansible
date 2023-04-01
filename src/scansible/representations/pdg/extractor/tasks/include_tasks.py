@@ -28,6 +28,14 @@ class IncludeTaskExtractor(DynamicIncludesExtractor[TaskFile]):
             included_name, self.location
         )
 
+    def _get_filename_candidates(
+        self,
+        included_name_candidates: set[str],
+    ) -> set[str]:
+        return self.context.include_ctx.find_matching_task_files(
+            included_name_candidates
+        )
+
     def extract_condition(
         self, predecessors: Sequence[rep.ControlNode]
     ) -> ExtractionResult:

@@ -25,6 +25,14 @@ class IncludeVarsTaskExtractor(DynamicIncludesExtractor[VariableFile]):
             included_name, self.location
         )
 
+    def _get_filename_candidates(
+        self,
+        included_name_candidates: set[str],
+    ) -> set[str]:
+        return self.context.include_ctx.find_matching_var_files(
+            included_name_candidates
+        )
+
     def _extract_included_content(
         self, included_content: VariableFile, predecessors: Sequence[rep.ControlNode]
     ) -> ExtractionResult:

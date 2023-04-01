@@ -3,16 +3,26 @@ from __future__ import annotations
 from typing import ClassVar, ContextManager, Generic, TypeVar
 
 import abc
+import re
 from collections.abc import Sequence
+from functools import reduce
+
+from jinja2 import nodes
+from loguru import logger
 
 from scansible.representations.structural.representation import AnyValue
 
 from ... import representation as rep
-from ..expressions import EnvironmentType
+from ..expressions import EnvironmentType, TemplateExpressionAST, simplify_expression
 from ..result import ExtractionResult
 from .base import TaskExtractor, TaskVarsScopeLevel
 
 _IncludedContent = TypeVar("_IncludedContent")
+
+
+def _is_too_general_filename_pattern(pattern: str) -> bool:
+    parts = pattern.split(re.escape("."))
+    return len(parts) <= 2 and parts[0] == ".+"
 
 
 class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]):
@@ -39,6 +49,13 @@ class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]
     ) -> ExtractionResult:
         raise NotImplementedError()
 
+    @abc.abstractmethod
+    def _get_filename_candidates(
+        self,
+        included_name_candidates: set[str],
+    ) -> set[str]:
+        raise NotImplementedError()
+
     def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
         with self.setup_task_vars_scope(self.TASK_VARS_SCOPE_LEVEL):
             return self._do_extract(predecessors)
@@ -47,7 +64,7 @@ class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]
         args = dict(self.task.args)
         current_predecessors = predecessors
 
-        included_name = self._extract_included_name(args)
+        included_name_expr = self._extract_included_name(args)
         if args:
             # Still arguments left?
             self.logger.warning(
@@ -55,7 +72,7 @@ class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]
             )
             self.logger.debug(args)
 
-        self.logger.debug(included_name)
+        self.logger.debug(included_name_expr)
 
         conditional_nodes: Sequence[rep.ControlNode]
         if self.task.when:
@@ -67,21 +84,14 @@ class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]
         else:
             conditional_nodes = []
 
-        if not included_name or not isinstance(included_name, str):
+        if not included_name_expr or not isinstance(included_name_expr, str):
             self.logger.error(f"Unknown included file name!")
-            included_result = self._create_placeholder_task(included_name, predecessors)
-        elif "{{" in included_name:
-            # TODO: When we do handle expressions here, we should make sure
-            # to check whether these expressions can or cannot use the include
-            # parameters. If they cannot, we should extract the included
-            # name before registering the variables.
-            self.logger.warning(
-                f"Cannot handle dynamic file name on {self.task.action} yet!"
+            included_result = self._create_placeholder_task(
+                included_name_expr, predecessors
             )
-            included_result = self._create_placeholder_task(included_name, predecessors)
         else:
-            included_result = self._load_and_extract_content(
-                included_name, predecessors
+            included_result = self._process_include_expr(
+                included_name_expr, predecessors
             )
 
         # If there was a condition, make sure to link up any global variables
@@ -134,3 +144,41 @@ class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]
         return included_result.add_control_nodes(
             added_conditional_nodes
         ).add_next_predecessors(added_conditional_nodes)
+
+    def _build_included_name_patterns(self, name_expr: str) -> set[str]:
+        """Turn expressions into regular expressions for name selection."""
+        ast = TemplateExpressionAST.parse(name_expr)
+        if ast is None or ast.is_literal():
+            return {re.escape(name_expr)}
+
+        assert isinstance(ast.ast_root, nodes.Template)
+        candidate_asts = simplify_expression(ast.ast_root, self.context.vars)
+        patterns = [cand.to_regex() for cand in candidate_asts]
+        return {p for p in patterns if not _is_too_general_filename_pattern(p)}
+
+    def _process_include_expr(
+        self, name_expr: str, predecessors: Sequence[rep.ControlNode]
+    ) -> ExtractionResult:
+        included_name_candidates = self._build_included_name_patterns(name_expr)
+        if not included_name_candidates:
+            logger.warning(
+                f"Expression {name_expr!r} cannot be statically approximated, "
+                + f"cannot follow {self.CONTENT_TYPE} inclusion"
+            )
+            return self._create_placeholder_task(name_expr, predecessors)
+
+        included_names = list(self._get_filename_candidates(included_name_candidates))
+        if not included_names:
+            logger.warning(
+                f"Found no matching files for {name_expr!r}, "
+                + f"cannot follow {self.CONTENT_TYPE} inclusion"
+            )
+            return self._create_placeholder_task(name_expr, predecessors)
+
+        inner_results: list[ExtractionResult] = []
+        for included_name in included_names:
+            inner_results.append(
+                self._load_and_extract_content(included_name, predecessors)
+            )
+
+        return reduce(lambda r1, r2: r1.merge(r2), inner_results)

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from loguru import logger
-
 from scansible.representations import structural as struct
 
 from .. import representation as rep
