@@ -22,7 +22,7 @@ _IncludedContent = TypeVar("_IncludedContent")
 
 def _is_too_general_filename_pattern(pattern: str) -> bool:
     parts = pattern.split(re.escape("."))
-    return len(parts) <= 2 and parts[0] == ".+"
+    return len(parts) <= 2 and parts[0] in (".+", "(.+)")
 
 
 class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]):

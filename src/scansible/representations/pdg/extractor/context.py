@@ -242,7 +242,12 @@ class IncludeContext:
         return self._find_matching_files(name_patterns, "vars")
 
     def _find_matching_files(self, name_patterns: set[str], base_dir: str) -> set[str]:
-        patterns = [re.compile(p + "(\\.yml|\\.yaml)?$") for p in name_patterns]
+        def _insert_extension(p: str) -> str:
+            if p.endswith(("\\.yml", "\\.yaml")):
+                return p
+            return p + "(\\.yml|\\.yaml)?"
+
+        patterns = [re.compile(_insert_extension(p) + "$") for p in name_patterns]
 
         # Use a set so that paths get deduplicated. Paths are relative to the
         # search dir, such that when we attempt to include it, we'll always take
