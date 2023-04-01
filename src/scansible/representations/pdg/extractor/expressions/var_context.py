@@ -109,10 +109,12 @@ _T = TypeVar("_T")
 
 
 def _make_immutable(obj: _T) -> _T:
-    if isinstance(obj, dict):
-        return FrozenDict(obj)  # type: ignore
-    elif isinstance(obj, list):
-        return tuple(obj)  # type: ignore
+    if isinstance(obj, str):
+        return obj  # type: ignore[return-value]
+    if isinstance(obj, Mapping):
+        return FrozenDict({_make_immutable(k): _make_immutable(v) for k, v in obj.items()})  # type: ignore
+    if isinstance(obj, Sequence):
+        return tuple([_make_immutable(e) for e in obj])  # type: ignore
 
     return obj
 
