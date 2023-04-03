@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -8,7 +10,7 @@ from jinja2 import nodes
 from loguru import logger
 
 from scansible.representations import structural as struct
-from scansible.utils import FrozenDict, first
+from scansible.utils import FrozenDict, first, join_sequences
 
 from .templates import TemplateExpressionAST
 from .var_context import VarContext
@@ -18,7 +20,7 @@ from .var_context import VarContext
 class SimplifiedExpression:
     ast: nodes.Output
     var_mappings: Mapping[str, struct.AnyValue]
-    conditions: Sequence[object]  # TODO!
+    conditions: Sequence[str]
     skip_nodes: int = 0  # Used to prevent infinitely retrying non-inlinable nodes.
 
     @classmethod
@@ -26,7 +28,7 @@ class SimplifiedExpression:
         assert len(ast.body) == 1 and isinstance(ast.body[0], nodes.Output)
         return cls(ast.body[0], FrozenDict({}), tuple())
 
-    def to_regex(self) -> str:
+    def as_regex(self) -> str:
         re_str = ""
         prev_is_wildcard = False
         for node in self.ast.nodes:
@@ -39,6 +41,14 @@ class SimplifiedExpression:
                 re_str += "(.+)"
 
         return re_str
+
+    @property
+    def is_literal(self) -> bool:
+        return all(isinstance(child, nodes.TemplateData) for child in self.ast.nodes)
+
+    def as_literal(self) -> str:
+        assert self.is_literal
+        return "".join(cast(nodes.TemplateData, child).data for child in self.ast.nodes)
 
 
 def simplify_expression(
@@ -121,7 +131,7 @@ def _get_inlined_candidates(
         yield None
         return
 
-    for var_init, new_var_mappings in var_inits:
+    for var_init, new_var_mappings, new_conditions in var_inits:
         if not var_ctx.is_template(var_init) or not isinstance(var_init, str):
             if isinstance(var_init, (list, tuple, Mapping)):
                 logger.debug(
@@ -133,7 +143,7 @@ def _get_inlined_candidates(
                 yield SimplifiedExpression(
                     nodes.Output([nodes.TemplateData(str(var_init))]),
                     FrozenDict(expr.var_mappings | new_var_mappings),
-                    expr.conditions,
+                    join_sequences(expr.conditions, new_conditions),
                 )
             continue
 
@@ -150,5 +160,5 @@ def _get_inlined_candidates(
         yield SimplifiedExpression(
             ref_ast.ast_root.body[0],
             FrozenDict(expr.var_mappings | new_var_mappings),
-            expr.conditions,
+            join_sequences(expr.conditions, new_conditions),
         )

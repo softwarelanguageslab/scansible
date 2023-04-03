@@ -30,11 +30,12 @@ class IncludeTaskExtractor(DynamicIncludesExtractor[TaskFile]):
 
     def _get_filename_candidates(
         self,
-        included_name_candidates: set[str],
+        included_name_pattern: str,
     ) -> set[str]:
-        return self.context.include_ctx.find_matching_task_files(
-            included_name_candidates
-        )
+        return self.context.include_ctx.find_matching_task_files(included_name_pattern)
+
+    def _file_exists(self, name: str) -> bool:
+        return self.context.include_ctx.find_task_file(name) is not None
 
     def extract_condition(
         self, predecessors: Sequence[rep.ControlNode]

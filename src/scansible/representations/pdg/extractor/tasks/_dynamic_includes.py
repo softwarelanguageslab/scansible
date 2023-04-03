@@ -4,12 +4,15 @@ from typing import ClassVar, ContextManager, Generic, TypeVar
 
 import abc
 import re
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from functools import reduce
 
 from jinja2 import nodes
 from loguru import logger
 
+from scansible.representations.pdg.extractor.expressions.simplification import (
+    SimplifiedExpression,
+)
 from scansible.representations.structural.representation import AnyValue
 
 from ... import representation as rep
@@ -52,8 +55,12 @@ class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]
     @abc.abstractmethod
     def _get_filename_candidates(
         self,
-        included_name_candidates: set[str],
+        included_name_pattern: str,
     ) -> set[str]:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def _file_exists(self, name: str) -> bool:
         raise NotImplementedError()
 
     def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
@@ -145,29 +152,40 @@ class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]
             added_conditional_nodes
         ).add_next_predecessors(added_conditional_nodes)
 
-    def _build_included_name_patterns(self, name_expr: str) -> set[str]:
+    def _simplify_included_name_asts(self, name_expr: str) -> set[SimplifiedExpression]:
         """Turn expressions into regular expressions for name selection."""
         ast = TemplateExpressionAST.parse(name_expr)
         if ast is None or ast.is_literal():
-            return {re.escape(name_expr)}
+            return set()
 
         assert isinstance(ast.ast_root, nodes.Template)
-        candidate_asts = simplify_expression(ast.ast_root, self.context.vars)
-        patterns = [cand.to_regex() for cand in candidate_asts]
-        return {p for p in patterns if not _is_too_general_filename_pattern(p)}
+        return simplify_expression(ast.ast_root, self.context.vars)
 
     def _process_include_expr(
         self, name_expr: str, predecessors: Sequence[rep.ControlNode]
     ) -> ExtractionResult:
-        included_name_candidates = self._build_included_name_patterns(name_expr)
-        if not included_name_candidates:
+        if not self.context.vars.is_template(name_expr):
+            # Literal
+            return self._process_literal_include(name_expr, predecessors)
+
+        assert isinstance(name_expr, str)
+        candidate_asts = self._simplify_included_name_asts(name_expr)
+        if not candidate_asts:
             logger.warning(
                 f"Expression {name_expr!r} cannot be statically approximated, "
                 + f"cannot follow {self.CONTENT_TYPE} inclusion"
             )
             return self._create_placeholder_task(name_expr, predecessors)
 
-        included_names = list(self._get_filename_candidates(included_name_candidates))
+        return self._process_include_candidates(name_expr, candidate_asts, predecessors)
+
+    def _process_include_candidates(
+        self,
+        name_expr: str,
+        candidates: set[SimplifiedExpression],
+        predecessors: Sequence[rep.ControlNode],
+    ) -> ExtractionResult:
+        included_names = set(self._find_filename_candidates(candidates))
         if not included_names:
             logger.warning(
                 f"Found no matching files for {name_expr!r}, "
@@ -176,9 +194,34 @@ class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]
             return self._create_placeholder_task(name_expr, predecessors)
 
         inner_results: list[ExtractionResult] = []
-        for included_name in included_names:
+        for included_name, _ in included_names:
+            # TODO: Link up conditions
             inner_results.append(
                 self._load_and_extract_content(included_name, predecessors)
             )
 
         return reduce(lambda r1, r2: r1.merge(r2), inner_results)
+
+    def _find_filename_candidates(
+        self, candidates: set[SimplifiedExpression]
+    ) -> Iterable[tuple[str, Sequence[str]]]:
+        # TODO: This may return the same candidate expression for different
+        # conditions, leading to the same code path being added multiple times.
+        # How should we handle this?
+        for expr in candidates:
+            if expr.is_literal:
+                if self._file_exists(expr.as_literal()):
+                    yield expr.as_literal(), expr.conditions
+            else:
+                pattern = expr.as_regex()
+                if _is_too_general_filename_pattern(pattern):
+                    continue
+                yield from (
+                    (cand, expr.conditions)
+                    for cand in self._get_filename_candidates(expr.as_regex())
+                )
+
+    def _process_literal_include(
+        self, name_expr: str, predecessors: Sequence[rep.ControlNode]
+    ) -> ExtractionResult:
+        return self._load_and_extract_content(name_expr, predecessors)

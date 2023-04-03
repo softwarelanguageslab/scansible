@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TypeVar
+from typing import TypeVar, cast
 
-from collections.abc import Callable, Iterable
+import itertools
+from collections.abc import Callable, Iterable, Sequence
 
 
 class Sentinel:
@@ -36,3 +37,15 @@ class FrozenDict(dict[_K, _V]):
 
     def __hash__(self) -> int:  # type: ignore[override]
         return hash(frozenset(self.items()))
+
+
+def join_sequences(seq1: Sequence[_T], seq2: Sequence[_T]) -> Sequence[_T]:
+    return tuple(itertools.chain(seq1, seq2))
+
+
+def ensure_sequence(obj: _T | Sequence[_T] | None) -> Sequence[_T]:
+    if obj is None:
+        return []
+    if isinstance(obj, Sequence):
+        return cast(Sequence[_T], obj)
+    return [obj]

@@ -611,41 +611,49 @@ class VarContext:
 
     def get_initialisers(
         self, name: str, constraints: Mapping[str, struct.AnyValue]
-    ) -> Sequence[tuple[struct.AnyValue, dict[str, struct.AnyValue]]]:
+    ) -> Sequence[tuple[struct.AnyValue, dict[str, struct.AnyValue], list[str]]]:
         """Get possible initialisers for `name`, adhering to any prior
         initialiser constraints.
-        Returns tuples of initialisers and new constraints."""
+        Returns tuples of initialisers, new constraints, and new conditions."""
         # If we already resolved this var to an initialiser before, reuse the
         # same initialiser.
         if name in constraints:
-            return [(constraints[name], {})]
+            return [(constraints[name], {}, [])]
 
         # TODO: Conditional definitions.
         vdef = self._envs.get_variable_definition(name)
 
         if vdef is None or _is_ignored_override_of_special_variable(name, vdef):
             return [
-                (init, {name: init})
-                for init in self._get_constrained_magic_initialisers(name, constraints)
+                (init, {name: init}, conditions)
+                for init, conditions in self._get_constrained_magic_initialisers(
+                    name, constraints
+                )
             ]
 
         if not isinstance(vdef.initialiser, Sentinel):
-            return [(vdef.initialiser, {name: vdef.initialiser})]
+            return [(vdef.initialiser, {name: vdef.initialiser}, [])]
 
         return []
 
     def _get_constrained_magic_initialisers(
         self, name: str, constraints: Mapping[str, struct.AnyValue]
-    ) -> Sequence[str]:
+    ) -> Sequence[tuple[str, list[str]]]:
+        if name not in ("ansible_os_family", "ansible_distribution"):
+            return []
+
+        values: Iterable[str]
         if name == "ansible_os_family":
             distribution = constraints.get("ansible_distribution")
             if distribution and isinstance(distribution, str):
-                return [ans.Distribution.OS_FAMILY[distribution]]
-            return list(ans.Distribution.OS_FAMILY_MAP.keys())
-        if name == "ansible_distribution":
+                values = [ans.Distribution.OS_FAMILY[distribution]]
+            else:
+                values = ans.Distribution.OS_FAMILY_MAP.keys()
+        elif name == "ansible_distribution":
             os_family = constraints.get("ansible_os_family")
             if os_family and isinstance(os_family, str):
-                return ans.Distribution.OS_FAMILY_MAP[os_family]
-            return list(ans.Distribution.OS_FAMILY.keys())
+                values = ans.Distribution.OS_FAMILY_MAP[os_family]
+            else:
+                values = ans.Distribution.OS_FAMILY.keys()
 
-        return []
+        return [(value, [f'{name} == "{value}"']) for value in values]

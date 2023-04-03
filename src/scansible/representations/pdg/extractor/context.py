@@ -151,7 +151,7 @@ class IncludeContext:
     def load_and_enter_role(
         self, role_name: str, includer_location: rep.NodeLocation
     ) -> Generator[struct_rep.Role | None, None, None]:
-        real_path = self._find_role(role_name)
+        real_path = self.find_role(role_name)
         if not real_path:
             yield None
             return
@@ -214,15 +214,15 @@ class IncludeContext:
         with self._enter_file(real_path, includer_location):
             yield var_file
 
-    def find_matching_roles(self, name_patterns: set[str]) -> set[str]:
-        patterns = [re.compile(p + "$") for p in name_patterns]
+    def find_matching_roles(self, name_pattern: str) -> set[str]:
+        pattern = re.compile(name_pattern + "$")
 
         def walk_dir(path: Path, root_path: Path) -> Iterable[str]:
             for child in path.iterdir():
                 if not child.is_dir():
                     continue
                 role_name = str(path.relative_to(root_path))
-                if any(p.match(role_name) for p in patterns):
+                if pattern.match(role_name):
                     yield role_name
                 else:
                     yield from walk_dir(child, root_path)
@@ -235,19 +235,19 @@ class IncludeContext:
 
         return results
 
-    def find_matching_task_files(self, name_patterns: set[str]) -> set[str]:
-        return self._find_matching_files(name_patterns, "tasks")
+    def find_matching_task_files(self, name_pattern: str) -> set[str]:
+        return self._find_matching_files(name_pattern, "tasks")
 
-    def find_matching_var_files(self, name_patterns: set[str]) -> set[str]:
-        return self._find_matching_files(name_patterns, "vars")
+    def find_matching_var_files(self, name_pattern: str) -> set[str]:
+        return self._find_matching_files(name_pattern, "vars")
 
-    def _find_matching_files(self, name_patterns: set[str], base_dir: str) -> set[str]:
+    def _find_matching_files(self, name_pattern: str, base_dir: str) -> set[str]:
         def _insert_extension(p: str) -> str:
             if p.endswith(("\\.yml", "\\.yaml")):
                 return p
             return p + "(\\.yml|\\.yaml)?"
 
-        patterns = [re.compile(_insert_extension(p) + "$") for p in name_patterns]
+        pattern = re.compile(_insert_extension(name_pattern) + "$")
 
         # Use a set so that paths get deduplicated. Paths are relative to the
         # search dir, such that when we attempt to include it, we'll always take
@@ -261,9 +261,15 @@ class IncludeContext:
                 for f in find_all_files(search_dir)
             ]
 
-            results |= set(f for f in files if any(p.match(f) for p in patterns))
+            results |= set(f for f in files if pattern.match(f))
 
         return results
+
+    def find_task_file(self, name: str) -> ProjectPath | None:
+        return self._find_file(name, "tasks")
+
+    def find_var_file(self, name: str) -> ProjectPath | None:
+        return self._find_file(name, "vars")
 
     def _find_file(self, short_path: str, base_dir: str) -> ProjectPath | None:
         # We should take care not to allow for path traversal outside of
@@ -316,7 +322,7 @@ class IncludeContext:
             yield self._playbook_base_path.join(base_dir)
             yield self._playbook_base_path
 
-    def _find_role(self, role_name: str) -> ProjectPath | None:
+    def find_role(self, role_name: str) -> ProjectPath | None:
         base_search_dirs = self._get_role_search_dirs()
 
         for search_path in base_search_dirs:

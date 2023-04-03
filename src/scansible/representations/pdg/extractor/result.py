@@ -1,27 +1,12 @@
 from __future__ import annotations
 
-from typing import TypeVar, cast
-
-import itertools
 from collections.abc import Sequence
 
 from attrs import frozen
 
+from scansible.utils import ensure_sequence, join_sequences
+
 from ..representation import ControlNode, Variable
-
-_T = TypeVar("_T")
-
-
-def _join_sequences(seq1: Sequence[_T], seq2: Sequence[_T]) -> Sequence[_T]:
-    return list(itertools.chain(seq1, seq2))
-
-
-def _ensure_sequence(obj: _T | Sequence[_T] | None) -> Sequence[_T]:
-    if obj is None:
-        return []
-    if isinstance(obj, Sequence):
-        return cast(Sequence[_T], obj)
-    return [obj]
 
 
 @frozen
@@ -60,8 +45,8 @@ class ExtractionResult:
     ) -> ExtractionResult:
         """Add new next predecessors to result, keeping the pre-existing ones."""
         return self._extend(
-            next_predecessors=_join_sequences(
-                self.next_predecessors, _ensure_sequence(nodes)
+            next_predecessors=join_sequences(
+                self.next_predecessors, ensure_sequence(nodes)
             )
         )
 
@@ -78,7 +63,7 @@ class ExtractionResult:
         return self._extend(
             added_control_nodes=other.added_control_nodes,
             added_variable_nodes=other.added_variable_nodes,
-            next_predecessors=_join_sequences(
+            next_predecessors=join_sequences(
                 self.next_predecessors, other.next_predecessors
             ),
         )
@@ -106,13 +91,13 @@ class ExtractionResult:
         next_predecessors: ControlNode | Sequence[ControlNode] | None = None,
     ) -> ExtractionResult:
         return ExtractionResult(
-            _join_sequences(
-                self.added_control_nodes, _ensure_sequence(added_control_nodes)
+            join_sequences(
+                self.added_control_nodes, ensure_sequence(added_control_nodes)
             ),
-            _join_sequences(
-                self.added_variable_nodes, _ensure_sequence(added_variable_nodes)
+            join_sequences(
+                self.added_variable_nodes, ensure_sequence(added_variable_nodes)
             ),
             self.next_predecessors
             if next_predecessors is None
-            else _ensure_sequence(next_predecessors),
+            else ensure_sequence(next_predecessors),
         )

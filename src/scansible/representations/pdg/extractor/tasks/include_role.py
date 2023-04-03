@@ -30,9 +30,12 @@ class IncludeRoleExtractor(DynamicIncludesExtractor[Role]):
 
     def _get_filename_candidates(
         self,
-        included_name_candidates: set[str],
+        included_name_pattern: str,
     ) -> set[str]:
-        return self.context.include_ctx.find_matching_roles(included_name_candidates)
+        return self.context.include_ctx.find_matching_roles(included_name_pattern)
+
+    def _file_exists(self, name: str) -> bool:
+        return self.context.include_ctx.find_role(name) is not None
 
     def _extract_included_content(
         self, included_content: Role, predecessors: Sequence[rep.ControlNode]
