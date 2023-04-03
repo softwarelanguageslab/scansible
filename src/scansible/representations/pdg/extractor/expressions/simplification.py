@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from jinja2 import nodes
 from loguru import logger
 
+from scansible.representations import structural as struct
 from scansible.utils import FrozenDict, first
 
 from .templates import TemplateExpressionAST
@@ -16,7 +17,7 @@ from .var_context import VarContext
 @dataclass(frozen=True)
 class SimplifiedExpression:
     ast: nodes.Output
-    var_mappings: Mapping[str, str]
+    var_mappings: Mapping[str, struct.AnyValue]
     conditions: Sequence[object]  # TODO!
     skip_nodes: int = 0  # Used to prevent infinitely retrying non-inlinable nodes.
 

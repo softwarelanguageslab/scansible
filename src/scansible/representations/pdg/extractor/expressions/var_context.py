@@ -610,11 +610,16 @@ class VarContext:
         return vval
 
     def get_initialisers(
-        self, name: str, constraints: Mapping[str, str]
-    ) -> Sequence[tuple[struct.AnyValue, dict[str, str]]]:
+        self, name: str, constraints: Mapping[str, struct.AnyValue]
+    ) -> Sequence[tuple[struct.AnyValue, dict[str, struct.AnyValue]]]:
         """Get possible initialisers for `name`, adhering to any prior
         initialiser constraints.
         Returns tuples of initialisers and new constraints."""
+        # If we already resolved this var to an initialiser before, reuse the
+        # same initialiser.
+        if name in constraints:
+            return [(constraints[name], {})]
+
         # TODO: Conditional definitions.
         vdef = self._envs.get_variable_definition(name)
 
@@ -625,21 +630,21 @@ class VarContext:
             ]
 
         if not isinstance(vdef.initialiser, Sentinel):
-            return [(vdef.initialiser, {})]
+            return [(vdef.initialiser, {name: vdef.initialiser})]
 
         return []
 
     def _get_constrained_magic_initialisers(
-        self, name: str, constraints: Mapping[str, str]
+        self, name: str, constraints: Mapping[str, struct.AnyValue]
     ) -> Sequence[str]:
         if name == "ansible_os_family":
             distribution = constraints.get("ansible_distribution")
-            if distribution:
+            if distribution and isinstance(distribution, str):
                 return [ans.Distribution.OS_FAMILY[distribution]]
             return list(ans.Distribution.OS_FAMILY_MAP.keys())
         if name == "ansible_distribution":
             os_family = constraints.get("ansible_os_family")
-            if os_family:
+            if os_family and isinstance(os_family, str):
                 return ans.Distribution.OS_FAMILY_MAP[os_family]
             return list(ans.Distribution.OS_FAMILY.keys())
 
