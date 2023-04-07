@@ -10,6 +10,179 @@ from loguru import logger
 
 ANSIBLE_GLOBALS = frozenset({"lookup", "query", "q", "now", "finalize", "omit"})
 
+OPERAND_TO_STR = {
+    "eq": "==",
+    "ne": "!=",
+    "gt": ">",
+    "lt": "<",
+    "gteq": ">=",
+    "lteq": "<=",
+    "notin": "not in",
+}
+
+
+class ASTStringifier(NodeVisitor):
+    def generic_visit(self, node: nodes.Node, *args: object, **kwargs: object) -> str:
+        if isinstance(node, nodes.BinExpr):
+            return self.visit_BinExpr(node)
+        if isinstance(node, nodes.UnaryExpr):
+            return self.visit_UnaryExpr(node)
+        raise ValueError(f"Unsupported node: {node}")
+
+    def visit(self, node: nodes.Node, *args: object, **kwargs: object) -> str:
+        return super().visit(node)  # type: ignore[no-any-return]
+
+    def visit_Name(self, node: nodes.Name) -> str:
+        return node.name
+
+    def visit_Template(self, node: nodes.Template) -> str:
+        return "".join(self.visit(child) for child in node.body)
+
+    def visit_Output(self, node: nodes.Output) -> str:
+        result = ""
+        for child in node.nodes:
+            if isinstance(child, nodes.TemplateData):
+                result += self.visit(child)
+            else:
+                result += "{{ " + self.visit(child) + " }}"
+
+        return result
+
+    def visit_TemplateData(self, node: nodes.TemplateData) -> str:
+        return node.data
+
+    def visit_Compare(self, node: nodes.Compare) -> str:
+        if len(node.ops) != 1:
+            raise ValueError(f"Unsupported node: {node}")
+        return f"{self.visit(node.expr)} {self.visit(node.ops[0])}"
+
+    def visit_Operand(self, node: nodes.Operand) -> str:
+        return f"{OPERAND_TO_STR.get(node.op, node.op)} {self.visit(node.expr)}"
+
+    def visit_Const(self, node: nodes.Const) -> str:
+        return repr(node.value)
+
+    def visit_List(self, node: nodes.List) -> str:
+        return "[" + ", ".join(self.visit(item) for item in node.items) + "]"
+
+    def visit_Not(self, node: nodes.Not) -> str:
+        if isinstance(node.node, nodes.Test):
+            return self.visit_Test(node.node, negate=True)
+        return f"not {self.visit(node.node)}"
+
+    def visit_BinExpr(self, node: nodes.BinExpr) -> str:
+        return f"{self.visit(node.left)} {node.operator} {self.visit(node.right)}"
+
+    def visit_UnaryExpr(self, node: nodes.UnaryExpr) -> str:
+        return f"{node.operator} {self.visit(node.node)}"
+
+    def visit_Concat(self, node: nodes.Concat) -> str:
+        return " ~ ".join(self.visit(child) for child in node.nodes)
+
+    def visit_CondExpr(self, node: nodes.CondExpr) -> str:
+        base = f"{self.visit(node.expr1)} if {self.visit(node.test)}"
+        if node.expr2 is None:
+            return base
+        else:
+            return f"{base} else {self.visit(node.expr2)}"
+
+    def visit_If(self, node: nodes.If) -> str:
+        if len(node.body) != 1 or len(node.else_) > 1:
+            raise ValueError(f"Unsupported node: {node}")
+
+        head = "{% if " + self.visit(node.test) + " %}" + self.visit(node.body[0])
+
+        elifs: list[str] = []
+        for elif_ in node.elif_:
+            assert not elif_.else_ and not elif_.elif_
+            if len(elif_.body) != 1:
+                raise ValueError(f"Unsupported node: {elif_}")
+            elifs.append(
+                "{% elif " + self.visit(elif_.test) + " %}" + self.visit(elif_.body[0])
+            )
+
+        if node.else_:
+            tail = "{% else %}" + self.visit(node.else_[0]) + "{% endif %}"
+        else:
+            tail = "{% endif %}"
+
+        return f"{head}{''.join(elifs)}{tail}"
+
+    def visit_Test(self, node: nodes.Test, negate: bool = False) -> str:
+        lhs = self.visit(node.node)
+        rhs = self._stringify_call(
+            node.name, node.args, node.kwargs, node.dyn_args, node.dyn_kwargs
+        )
+        if negate:
+            return f"{lhs} is not {rhs}"
+        else:
+            return f"{lhs} is {rhs}"
+
+    def visit_Filter(self, node: nodes.Filter) -> str:
+        if node.node is None:
+            raise ValueError(f"Unsupported node: {node}")
+        return f"{self.visit(node.node)} | {self._stringify_call(node.name, node.args, node.kwargs, node.dyn_args, node.dyn_kwargs)}"
+
+    def visit_Call(self, node: nodes.Call) -> str:
+        return self._stringify_call(
+            self.visit(node.node),
+            node.args,
+            node.kwargs,
+            node.dyn_args,
+            node.dyn_kwargs,
+            force_parens=True,
+        )
+
+    def visit_Getitem(self, node: nodes.Getitem) -> str:
+        return f"{self.visit(node.node)}[{self.visit(node.arg)}]"
+
+    def visit_Getattr(self, node: nodes.Getattr) -> str:
+        return f"{self.visit(node.node)}.{node.attr}"
+
+    def visit_Keyword(self, node: nodes.Keyword) -> str:
+        return f"{node.key}={self.visit(node.value)}"
+
+    def _stringify_call(
+        self,
+        name: str,
+        args: list[nodes.Expr],
+        kwargs: list[nodes.Pair] | list[nodes.Keyword],
+        dyn_args: nodes.Expr | None,
+        dyn_kwargs: nodes.Expr | None,
+        *,
+        force_parens: bool = False,
+    ) -> str:
+        if dyn_args is not None or dyn_kwargs is not None:
+            raise ValueError(
+                f"Unsupported expression: {name}(args={args}, kwargs={kwargs}, dyn_args={dyn_args}, dyn_kwargs={dyn_kwargs})"
+            )
+        if not args and not kwargs and not force_parens:
+            return name
+
+        args_list = ", ".join(self.visit(arg) for arg in args)
+        kwargs_list = ", ".join(self.visit(kwarg) for kwarg in kwargs)
+        args_str = ", ".join(part for part in (args_list, kwargs_list) if part)
+        return f"{name}({args_str})"
+
+
+def generify_var_references(ast: nodes.Node) -> tuple[nodes.Node, dict[str, int]]:
+    param_indices: dict[str, int] = {}
+    next_idx = 1
+
+    class Visitor(NodeVisitor):
+        def visit_Name(self, node: nodes.Name) -> None:
+            if node.ctx != "load" or node.name in ANSIBLE_GLOBALS:
+                return
+            if node.name not in param_indices:
+                nonlocal next_idx
+                param_indices[node.name] = next_idx
+                next_idx += 1
+
+            node.name = f"_{param_indices[node.name]}"
+
+    Visitor().visit(ast)
+    return ast, param_indices
+
 
 class LookupTarget:
     pass

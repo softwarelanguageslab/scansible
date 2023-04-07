@@ -160,6 +160,9 @@ class Expression(DataNode):
     expr: str = field(
         validator=[type_validator(), non_empty_validator], on_setattr=setters.frozen
     )
+    orig_expr: str = field(
+        validator=type_validator(), on_setattr=setters.frozen, default=""
+    )
 
     impure_components: tuple[str, ...] = field(
         validator=type_validator(),
@@ -221,6 +224,19 @@ class Use(DataFlowEdge):
             raise TypeError(
                 "Bare use edges must only be used with expressions as target"
             )
+
+
+@frozen
+class Input(Use):
+    param_idx: int
+
+    @classmethod
+    def raise_if_disallowed(cls, source: Node, target: Node) -> None:
+        if not isinstance(source, DataNode):
+            raise TypeError("Input edge must start at a data node")
+
+        if not isinstance(target, Expression):
+            raise TypeError("Input edges must only be used with expressions as target")
 
 
 @frozen
@@ -366,4 +382,5 @@ __all__ = [
     "Keyword",
     "Composition",
     "NodeLocation",
+    "Input",
 ]

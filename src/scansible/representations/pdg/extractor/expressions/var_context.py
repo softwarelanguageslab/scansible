@@ -36,7 +36,12 @@ from .records import (
 if TYPE_CHECKING:
     from ..context import ExtractionContext
 
-from .templates import LookupTargetLiteral, TemplateExpressionAST
+from .templates import (
+    ASTStringifier,
+    LookupTargetLiteral,
+    TemplateExpressionAST,
+    generify_var_references,
+)
 
 
 class RecursiveDefinitionError(Exception):
@@ -365,8 +370,10 @@ class VarContext:
     def _create_new_expression_result(
         self, ast: TemplateExpressionAST, used_values: list[VariableValueRecord]
     ) -> TemplateEvaluationResult:
+        generified_ast, param_indices = generify_var_references(ast.ast_root)
         en = rep.Expression(
-            expr=ast.raw,
+            expr=ASTStringifier().visit(generified_ast),
+            orig_expr=ast.raw,
             impure_components=tuple(_get_impure_components(ast)),
             location=self.extraction_ctx.get_location(ast.raw),
         )
@@ -382,7 +389,9 @@ class VarContext:
                 used_value.value_revision,
                 allow_undefined=False,
             )
-            self.extraction_ctx.graph.add_edge(var_node, en, rep.USE)
+            self.extraction_ctx.graph.add_edge(
+                var_node, en, rep.Input(param_idx=param_indices.get(used_value.name, 0))
+            )
 
         tr = TemplateEvaluationResult(iv, en, used_values)
         self._envs.set_expression_evaluation_result(ast.raw, tr)
