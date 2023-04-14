@@ -118,7 +118,9 @@ class EnvironmentStack:
         )
 
     def _get_topmost_environment(self, env_type: EnvironmentType) -> Environment:
-        env = first_where(self.environment_stack, lambda env: env.env_type == env_type)
+        env = first_where(
+            self.environment_stack[::-1], lambda env: env.env_type == env_type
+        )
         if env is None:
             raise RuntimeError(
                 "Attempting to access an environment which has not been entered"
