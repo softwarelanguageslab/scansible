@@ -196,11 +196,26 @@ class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]
             return self._create_placeholder_task(name_expr, predecessors)
 
         inner_results: list[ExtractionResult] = []
-        for included_name, _ in included_names:
-            # TODO: Link up conditions
-            inner_results.append(
-                self._load_and_extract_content(included_name, predecessors)
-            )
+        for included_name, extra_conditions in included_names:
+            conditional_nodes: Sequence[rep.ControlNode]
+            if extra_conditions:
+                condition_result = self.extract_condition(
+                    predecessors, extra_conditions
+                )
+                # Conditional execution leads to new predecessors
+                predecessors = condition_result.next_predecessors
+                # Save so we can conditionally define variables later
+                conditional_nodes = condition_result.added_control_nodes
+            else:
+                conditional_nodes = []
+
+            inner_result = self._load_and_extract_content(included_name, predecessors)
+            inner_results.append(inner_result)
+            for added_var_node in inner_result.added_variable_nodes:
+                for condition in conditional_nodes:
+                    self.context.graph.add_edge(
+                        condition, added_var_node, rep.DEFINED_IF
+                    )
 
         return reduce(lambda r1, r2: r1.merge(r2), inner_results)
 

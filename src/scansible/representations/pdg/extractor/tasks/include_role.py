@@ -4,6 +4,8 @@ from typing import ContextManager
 
 from collections.abc import Sequence
 
+from loguru import logger
+
 from scansible.representations.structural.representation import AnyValue, Role
 
 from ... import representation as rep
@@ -32,6 +34,7 @@ class IncludeRoleExtractor(DynamicIncludesExtractor[Role]):
         self,
         included_name_pattern: str,
     ) -> set[str]:
+        logger.warning("Conditions for include_role not set yet!")
         return self.context.include_ctx.find_matching_roles(included_name_pattern)
 
     def _file_exists(self, name: str) -> bool:

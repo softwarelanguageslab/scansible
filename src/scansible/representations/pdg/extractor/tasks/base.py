@@ -35,11 +35,15 @@ class TaskExtractor(abc.ABC):
         raise NotImplementedError("To be implemented by subclass")
 
     def extract_condition(
-        self, predecessors: Sequence[rep.ControlNode]
+        self,
+        predecessors: Sequence[rep.ControlNode],
+        conditions: Sequence[str | bool] | None = None,
     ) -> ExtractionResult:
         result = ExtractionResult.empty(predecessors)
+        if conditions is None:
+            conditions = self.task.when
 
-        for condition in self.task.when:
+        for condition in conditions:
             # Create an IV for each condition and link it to the conditional node.
             try:
                 condition_value_node = self.context.vars.build_conditional_expression(

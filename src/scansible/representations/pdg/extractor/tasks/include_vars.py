@@ -4,6 +4,8 @@ from typing import ContextManager
 
 from collections.abc import Sequence
 
+from loguru import logger
+
 from scansible.representations.structural.representation import AnyValue, VariableFile
 
 from ... import representation as rep
@@ -29,6 +31,7 @@ class IncludeVarsTaskExtractor(DynamicIncludesExtractor[VariableFile]):
         self,
         included_name_pattern: str,
     ) -> set[str]:
+        logger.warning("Conditions for include_vars not set yet!")
         return self.context.include_ctx.find_matching_var_files(included_name_pattern)
 
     def _file_exists(self, name: str) -> bool:
@@ -42,11 +45,13 @@ class IncludeVarsTaskExtractor(DynamicIncludesExtractor[VariableFile]):
         ).extract_variables(EnvironmentType.INCLUDE_VARS)
 
     def extract_condition(
-        self, predecessors: Sequence[rep.ControlNode]
+        self,
+        predecessors: Sequence[rep.ControlNode],
+        conditions: Sequence[str | bool] | None = None,
     ) -> ExtractionResult:
         # Don't include these condition nodes into the CFG, see SetFactExtractor.
         # Therefore, we won't provide any predecessors when extracting the conditions.
-        return super().extract_condition([])
+        return super().extract_condition([], conditions)
 
     def _create_result(
         self,

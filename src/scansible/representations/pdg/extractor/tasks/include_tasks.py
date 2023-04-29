@@ -4,6 +4,8 @@ from typing import ContextManager, cast
 
 from collections.abc import Sequence
 
+from loguru import logger
+
 from scansible.representations.structural.representation import (
     AnyValue,
     Block,
@@ -32,20 +34,23 @@ class IncludeTaskExtractor(DynamicIncludesExtractor[TaskFile]):
         self,
         included_name_pattern: str,
     ) -> set[str]:
+        logger.warning("Conditions for include_tasks not fully set yet!")
         return self.context.include_ctx.find_matching_task_files(included_name_pattern)
 
     def _file_exists(self, name: str) -> bool:
         return self.context.include_ctx.find_task_file(name) is not None
 
     def extract_condition(
-        self, predecessors: Sequence[rep.ControlNode]
+        self,
+        predecessors: Sequence[rep.ControlNode],
+        conditions: Sequence[str | bool] | None = None,
     ) -> ExtractionResult:
         if actions.is_import_tasks(self.task.action):
             self.logger.warning("Not sure how to handle conditional on static import")
             # Ignore these.
             return ExtractionResult.empty(predecessors)
 
-        return super().extract_condition(predecessors)
+        return super().extract_condition(predecessors, conditions)
 
     def _extract_included_content(
         self, included_content: TaskFile, predecessors: Sequence[rep.ControlNode]
