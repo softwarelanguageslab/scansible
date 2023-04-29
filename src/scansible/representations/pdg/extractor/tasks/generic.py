@@ -24,6 +24,7 @@ class GenericTaskExtractor(TaskExtractor):
                     "become",
                     "become_user",
                     "become_method",
+                    "notify",
                 }
             )
         )
@@ -119,6 +120,8 @@ class GenericTaskExtractor(TaskExtractor):
             )
 
         registered_vars = self._define_registered_var(tn)
+        for notified_handler in self.task.notify or []:
+            self.context.handler_notifications[notified_handler].add(tn)
 
         misc_kws = {"check_mode", "become", "become_user", "become_method"}
         for misc_kw in misc_kws:

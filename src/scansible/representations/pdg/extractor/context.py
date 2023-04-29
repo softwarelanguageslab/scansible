@@ -419,6 +419,8 @@ class ExtractionContext:
     errors: list[tuple[str, LocTuple | None]]
     _next_iv_id: int
 
+    handler_notifications: dict[str, set[rep.Task]] = defaultdict(set)
+
     def __init__(
         self,
         graph: rep.Graph,

@@ -7,6 +7,7 @@ from networkx._types import EdgeAttrT, GraphAttrT, NodeT
 from .digraph import DiGraph
 from .multigraph import MultiGraph
 
+
 class MultiDiGraph(
     MultiGraph[NodeT, GraphAttrT, EdgeAttrT], DiGraph[NodeT, GraphAttrT, EdgeAttrT]
 ):
@@ -36,6 +37,17 @@ class MultiDiGraph(
     def edges(
         self, *, data: Literal[True], keys: Literal[True]
     ) -> Sequence[tuple[NodeT, NodeT, int, Mapping[str, EdgeAttrT]]]: ...
+    @overload
     def in_edges(
         self, node: NodeT, data: str
     ) -> Sequence[tuple[NodeT, NodeT, EdgeAttrT]]: ...
+    @overload
+    def in_edges(self, node: NodeT) -> Sequence[tuple[NodeT, NodeT]]: ...
+    @overload
+    def out_edges(
+        self, node: NodeT, data: str
+    ) -> Sequence[tuple[NodeT, NodeT, EdgeAttrT]]: ...
+    @overload
+    def out_edges(self, node: NodeT) -> Sequence[tuple[NodeT, NodeT]]: ...
+    def remove_node(self, node: NodeT) -> None: ...
+    def remove_edge(self, n1: NodeT, n2: NodeT, key: int | None = ...) -> None: ...

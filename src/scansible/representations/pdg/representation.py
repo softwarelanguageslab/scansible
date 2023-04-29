@@ -160,6 +160,9 @@ class Expression(DataNode):
     expr: str = field(
         validator=[type_validator(), non_empty_validator], on_setattr=setters.frozen
     )
+    is_conditional: bool = field(
+        validator=type_validator(), on_setattr=setters.frozen, default=False
+    )
     orig_expr: str = field(
         validator=type_validator(), on_setattr=setters.frozen, default=""
     )
@@ -203,6 +206,11 @@ class Order(ControlFlowEdge):
 
     transitive: bool = field(validator=type_validator(), default=False)
     back: bool = field(validator=type_validator(), default=False)
+
+
+@frozen
+class Notifies(ControlFlowEdge):
+    """Edges representing notification from task to handler."""
 
 
 class Use(DataFlowEdge):
@@ -276,8 +284,9 @@ class Def(DataFlowEdge):
 
     @classmethod
     def raise_if_disallowed(cls, source: Node, target: Node) -> None:
-        if not isinstance(target, (Variable, IntermediateValue)):
-            raise TypeError("Def edges can only define variables")
+        if not isinstance(target, DataNode):
+            print(target)
+            raise TypeError("Def edges can only define data")
 
 
 class DefinedIf(DataFlowEdge):
@@ -285,8 +294,8 @@ class DefinedIf(DataFlowEdge):
 
     @classmethod
     def raise_if_disallowed(cls, source: Node, target: Node) -> None:
-        if not isinstance(target, Variable):
-            raise TypeError("DefinedIf edges can only target variables")
+        if not isinstance(target, DataNode):
+            raise TypeError("DefinedIf edges can only target data nodes")
         if not isinstance(source, Conditional):
             raise TypeError("DefinedIf edges must originate from conditionals")
 
@@ -303,6 +312,7 @@ class DefLoopItem(Def):
 ORDER = Order()
 ORDER_TRANS = Order(transitive=True)
 ORDER_BACK = Order(back=True)
+NOTIFIES = Notifies()
 USE = Use()
 DEF = Def()
 DEF_LOOP_ITEM = DefLoopItem()
@@ -319,6 +329,7 @@ class Graph(BaseGraph):
     def __init__(self, role_name: str, role_version: str) -> None:
         super().__init__(role_name=role_name, role_version=role_version)
         self._last_node_id = -1
+        self._dirty = False
 
     def _get_next_node_id(self) -> int:
         self._last_node_id += 1
@@ -338,6 +349,7 @@ class Graph(BaseGraph):
 
         if node.node_id < 0:
             node.node_id = self._get_next_node_id()
+        self._dirty = True
         super().add_node(node)
 
     def add_nodes_from(self, nodes: Iterable[Node]) -> None:  # type: ignore[override]
@@ -355,7 +367,26 @@ class Graph(BaseGraph):
             if edge_data["type"] == type:
                 return edge_idx
 
+        self._dirty = True
         return super().add_edge(n1, n2, type=type)
+
+    def remove_edge(self, n1: Node, n2: Node, key: int | None = None) -> None:
+        self._dirty = True
+        return super().remove_edge(n1, n2, key)
+
+    def remove_node(self, node: Node) -> None:
+        self._dirty = True
+        return super().remove_node(node)
+
+    @property
+    def is_dirty(self) -> bool:
+        return self._dirty
+
+    def reset_dirty(self) -> None:
+        self._dirty = False
+
+    def set_dirty(self) -> None:
+        self._dirty = True
 
 
 __all__ = [

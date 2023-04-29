@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TypeVar, cast
 
 import itertools
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 
 
 class Sentinel:
@@ -37,6 +37,17 @@ class FrozenDict(dict[_K, _V]):
 
     def __hash__(self) -> int:  # type: ignore[override]
         return hash(frozenset(self.items()))
+
+
+def make_immutable(obj: _T) -> _T:
+    if isinstance(obj, str):
+        return obj  # type: ignore[return-value]
+    if isinstance(obj, Mapping):
+        return FrozenDict({make_immutable(k): make_immutable(v) for k, v in obj.items()})  # type: ignore
+    if isinstance(obj, Sequence):
+        return tuple([make_immutable(e) for e in obj])  # type: ignore
+
+    return obj
 
 
 def join_sequences(seq1: Sequence[_T], seq2: Sequence[_T]) -> Sequence[_T]:

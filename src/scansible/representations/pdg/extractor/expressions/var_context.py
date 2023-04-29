@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeGuard, TypeVar, cast
+from typing import TYPE_CHECKING, TypeGuard, cast
 
 from collections import defaultdict
 from collections.abc import Generator, Iterable, Mapping, Sequence
@@ -10,7 +10,7 @@ from loguru import logger
 
 from scansible.representations import structural as struct
 from scansible.representations.structural import ansible_types as ans
-from scansible.utils import SENTINEL, FrozenDict, Sentinel, first
+from scansible.utils import SENTINEL, Sentinel, first, make_immutable
 
 from ... import representation as rep
 from .constants import (
@@ -105,23 +105,9 @@ _ANSIBLE_TYPE_NAME_TO_BUILTIN_NAME: dict[str, rep.ValidTypeStr] = {
 }
 
 
-def _extract_type_name(value: struct.AnyValue) -> rep.ValidTypeStr:
+def extract_type_name(value: struct.AnyValue) -> rep.ValidTypeStr:
     type_ = value.__class__.__name__
     return _ANSIBLE_TYPE_NAME_TO_BUILTIN_NAME.get(type_, cast(rep.ValidTypeStr, type_))
-
-
-_T = TypeVar("_T")
-
-
-def _make_immutable(obj: _T) -> _T:
-    if isinstance(obj, str):
-        return obj  # type: ignore[return-value]
-    if isinstance(obj, Mapping):
-        return FrozenDict({_make_immutable(k): _make_immutable(v) for k, v in obj.items()})  # type: ignore
-    if isinstance(obj, Sequence):
-        return tuple([_make_immutable(e) for e in obj])  # type: ignore
-
-    return obj
 
 
 _DefRevisionMap = dict[str, int]
@@ -253,7 +239,7 @@ class VarContext:
         expr: Sequence[struct.AnyValue] | Mapping[struct.Scalar, struct.AnyValue],
     ) -> TemplateEvaluationResult:
         key_vals = expr.items() if isinstance(expr, Mapping) else enumerate(expr)
-        parent_node = rep.CompositeLiteral(_extract_type_name(expr))
+        parent_node = rep.CompositeLiteral(extract_type_name(expr))
         self.extraction_ctx.graph.add_node(parent_node)
 
         all_used_vars: list[VariableValueRecord] = []
@@ -272,7 +258,7 @@ class VarContext:
 
     def _add_literal_node(self, value: struct.AnyValue) -> TemplateRecord:
         location = self.extraction_ctx.get_location(value)
-        type_ = _extract_type_name(value)
+        type_ = extract_type_name(value)
 
         lit: rep.Literal
         if isinstance(value, (Mapping, tuple, list)):
@@ -372,7 +358,8 @@ class VarContext:
     ) -> TemplateEvaluationResult:
         generified_ast, param_indices = generify_var_references(ast.ast_root)
         en = rep.Expression(
-            expr=ASTStringifier().visit(generified_ast),
+            expr=ASTStringifier().stringify(generified_ast, ast.is_conditional),
+            is_conditional=ast.is_conditional,
             orig_expr=ast.raw,
             impure_components=tuple(_get_impure_components(ast)),
             location=self.extraction_ctx.get_location(ast.raw),
@@ -478,7 +465,7 @@ class VarContext:
         def_record = VariableDefinitionRecord(
             name,
             var_rev,
-            _make_immutable(initialiser),
+            make_immutable(initialiser),
             eager or not self.is_template(initialiser),
             env_type,
         )

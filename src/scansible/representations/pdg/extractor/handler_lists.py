@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Sequence
 
+from loguru import logger
+
 from scansible.representations.structural import Block, Handler
 
 from .. import representation as rep
@@ -33,22 +35,36 @@ class HandlerListExtractor:
         # TODO: Link the conditions to the tasks that notify the handlers.
 
         for child in self.handlers:
-            cond = rep.Conditional()
-            self.context.graph.add_node(cond)
-            for pred in result.next_predecessors:
-                self.context.graph.add_edge(pred, cond, rep.ORDER)
-
             if isinstance(child, Block):
-                child_result = BlockExtractor(self.context, child).extract_block([cond])
+                child_result = BlockExtractor(self.context, child).extract_block(
+                    predecessors
+                )
             else:
                 child_result = task_extractor_factory(self.context, child).extract_task(
-                    [cond]
+                    predecessors
                 )
+
+            topics = set(child.listen if isinstance(child, Handler) else [])
+            if child.name is not None:
+                topics.add(child.name)
+            notifiers: set[rep.Task] = set()
+            for topic in topics:
+                notifiers |= self.context.handler_notifications[topic]
+
+            if not topics:
+                logger.warning(f"Handler {child} is not listening to anything")
+
+            if not notifiers:
+                logger.warning(f"Handler {child.name or child} is never notified")
+
+            for handler_node in child_result.added_control_nodes:
+                if not isinstance(handler_node, rep.Task):
+                    continue
+                for notifier in notifiers:
+                    self.context.graph.add_edge(notifier, handler_node, rep.NOTIFIES)
 
             # next predecessors are either the condition (in case the handler is skipped)
             # or the next predecessors of the handler itself.
-            result = result.chain(child_result).merge(
-                ExtractionResult([cond], [], [cond])
-            )
+            result = result.chain(child_result)
 
         return result

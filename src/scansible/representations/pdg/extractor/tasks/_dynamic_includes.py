@@ -135,7 +135,9 @@ class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]
         task_node = rep.Task(self.task.action, self.task.name, location=self.location)
         included_name_node = self.context.vars.build_expression(included_name)
         self.context.graph.add_node(task_node)
-        self.context.graph.add_edge(included_name_node, task_node, rep.Keyword("arg"))
+        self.context.graph.add_edge(
+            included_name_node, task_node, rep.Keyword("_raw_params")
+        )
 
         for predecessor in predecessors:
             self.context.graph.add_edge(predecessor, task_node, rep.ORDER)

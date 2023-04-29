@@ -78,7 +78,10 @@ class UnconditionalOverrideRule(Rule):
                 # v2 cannot override v1 as v1 has higher precedence, nothing to check here
                 # We have a separate check for variables defined when a higher-precedence alternative is in scope.
                 continue
-            if v1.scope_level == 0 or v2.scope_level == 0:
+            if (
+                v1.scope_level == EnvironmentType.UNDEFINED.value
+                or v2.scope_level == EnvironmentType.UNDEFINED.value
+            ):
                 # v1 or v2 are undefined, so skip this
                 continue
 

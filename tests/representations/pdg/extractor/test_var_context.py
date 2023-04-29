@@ -11,7 +11,6 @@ from pytest_mock import MockerFixture
 
 from scansible.representations.pdg import (
     DEF,
-    USE,
     Expression,
     Graph,
     Input,

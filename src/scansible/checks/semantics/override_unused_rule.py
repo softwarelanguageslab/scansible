@@ -69,6 +69,12 @@ class UnusedOverriddenRule(Rule):
                 # Covered by other rule
                 continue
 
+            if v2.scope_level == EnvironmentType.ROLE_DEFAULTS.value:
+                # Likely meant to be overridden by client.
+                # TODO: This skip will lead to false negatives if the default
+                # is overridden by the role itself.
+                continue
+
             v2_ever_used = any(
                 find_variable_usages(graph, v2_val) for v2_val in vals_v2
             )

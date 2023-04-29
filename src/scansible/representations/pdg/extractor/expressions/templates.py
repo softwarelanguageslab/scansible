@@ -1,6 +1,10 @@
 """Extract information from template expressions."""
 from __future__ import annotations
 
+from typing import Any, cast
+
+from collections.abc import Callable
+
 from attrs import frozen
 from jinja2 import Environment, nodes
 from jinja2.compiler import DependencyFinderVisitor
@@ -29,16 +33,23 @@ class ASTStringifier(NodeVisitor):
             return self.visit_UnaryExpr(node)
         raise ValueError(f"Unsupported node: {node}")
 
-    def visit(self, node: nodes.Node, *args: object, **kwargs: object) -> str:
-        return super().visit(node)  # type: ignore[no-any-return]
+    def stringify(self, node: nodes.Node, is_conditional: bool) -> str:
+        generated = self.visit(node)
+        reparsed = (
+            Environment().parse(generated)
+            if not is_conditional
+            else parse_conditional(generated, Environment(), {})[0]
+        )
+        assert reparsed == node, f"{reparsed}\nvs\n{node}"
+        return generated  # type: ignore[no-any-return]
 
-    def visit_Name(self, node: nodes.Name) -> str:
+    def visit_Name(self, node: nodes.Name, **kwargs: Any) -> str:
         return node.name
 
-    def visit_Template(self, node: nodes.Template) -> str:
+    def visit_Template(self, node: nodes.Template, **kwargs: Any) -> str:
         return "".join(self.visit(child) for child in node.body)
 
-    def visit_Output(self, node: nodes.Output) -> str:
+    def visit_Output(self, node: nodes.Output, **kwargs: Any) -> str:
         result = ""
         for child in node.nodes:
             if isinstance(child, nodes.TemplateData):
@@ -48,45 +59,45 @@ class ASTStringifier(NodeVisitor):
 
         return result
 
-    def visit_TemplateData(self, node: nodes.TemplateData) -> str:
+    def visit_TemplateData(self, node: nodes.TemplateData, **kwargs: Any) -> str:
         return node.data
 
-    def visit_Compare(self, node: nodes.Compare) -> str:
+    def visit_Compare(self, node: nodes.Compare, **kwargs: Any) -> str:
         if len(node.ops) != 1:
             raise ValueError(f"Unsupported node: {node}")
         return f"{self.visit(node.expr)} {self.visit(node.ops[0])}"
 
-    def visit_Operand(self, node: nodes.Operand) -> str:
+    def visit_Operand(self, node: nodes.Operand, **kwargs: Any) -> str:
         return f"{OPERAND_TO_STR.get(node.op, node.op)} {self.visit(node.expr)}"
 
-    def visit_Const(self, node: nodes.Const) -> str:
+    def visit_Const(self, node: nodes.Const, **kwargs: Any) -> str:
         return repr(node.value)
 
-    def visit_List(self, node: nodes.List) -> str:
+    def visit_List(self, node: nodes.List, **kwargs: Any) -> str:
         return "[" + ", ".join(self.visit(item) for item in node.items) + "]"
 
-    def visit_Not(self, node: nodes.Not) -> str:
+    def visit_Not(self, node: nodes.Not, **kwargs: Any) -> str:
         if isinstance(node.node, nodes.Test):
             return self.visit_Test(node.node, negate=True)
         return f"not {self.visit(node.node)}"
 
-    def visit_BinExpr(self, node: nodes.BinExpr) -> str:
+    def visit_BinExpr(self, node: nodes.BinExpr, **kwargs: Any) -> str:
         return f"{self.visit(node.left)} {node.operator} {self.visit(node.right)}"
 
-    def visit_UnaryExpr(self, node: nodes.UnaryExpr) -> str:
+    def visit_UnaryExpr(self, node: nodes.UnaryExpr, **kwargs: Any) -> str:
         return f"{node.operator} {self.visit(node.node)}"
 
-    def visit_Concat(self, node: nodes.Concat) -> str:
+    def visit_Concat(self, node: nodes.Concat, **kwargs: Any) -> str:
         return " ~ ".join(self.visit(child) for child in node.nodes)
 
-    def visit_CondExpr(self, node: nodes.CondExpr) -> str:
+    def visit_CondExpr(self, node: nodes.CondExpr, **kwargs: Any) -> str:
         base = f"{self.visit(node.expr1)} if {self.visit(node.test)}"
         if node.expr2 is None:
             return base
         else:
             return f"{base} else {self.visit(node.expr2)}"
 
-    def visit_If(self, node: nodes.If) -> str:
+    def visit_If(self, node: nodes.If, **kwargs: Any) -> str:
         if len(node.body) != 1 or len(node.else_) > 1:
             raise ValueError(f"Unsupported node: {node}")
 
@@ -108,7 +119,7 @@ class ASTStringifier(NodeVisitor):
 
         return f"{head}{''.join(elifs)}{tail}"
 
-    def visit_Test(self, node: nodes.Test, negate: bool = False) -> str:
+    def visit_Test(self, node: nodes.Test, negate: bool = False, **kwargs: Any) -> str:
         lhs = self.visit(node.node)
         rhs = self._stringify_call(
             node.name, node.args, node.kwargs, node.dyn_args, node.dyn_kwargs
@@ -118,12 +129,15 @@ class ASTStringifier(NodeVisitor):
         else:
             return f"{lhs} is {rhs}"
 
-    def visit_Filter(self, node: nodes.Filter) -> str:
+    def visit_Filter(self, node: nodes.Filter, **kwargs: Any) -> str:
         if node.node is None:
             raise ValueError(f"Unsupported node: {node}")
-        return f"{self.visit(node.node)} | {self._stringify_call(node.name, node.args, node.kwargs, node.dyn_args, node.dyn_kwargs)}"
+        rendered = f"{self.visit(node.node)} | {self._stringify_call(node.name, node.args, node.kwargs, node.dyn_args, node.dyn_kwargs)}"
+        if kwargs.get("parenthesize"):
+            return f"({rendered})"
+        return rendered
 
-    def visit_Call(self, node: nodes.Call) -> str:
+    def visit_Call(self, node: nodes.Call, **kwargs: Any) -> str:
         return self._stringify_call(
             self.visit(node.node),
             node.args,
@@ -133,13 +147,13 @@ class ASTStringifier(NodeVisitor):
             force_parens=True,
         )
 
-    def visit_Getitem(self, node: nodes.Getitem) -> str:
-        return f"{self.visit(node.node)}[{self.visit(node.arg)}]"
+    def visit_Getitem(self, node: nodes.Getitem, **kwargs: Any) -> str:
+        return f"{self.visit(node.node, parenthesize=True)}[{self.visit(node.arg)}]"
 
-    def visit_Getattr(self, node: nodes.Getattr) -> str:
-        return f"{self.visit(node.node)}.{node.attr}"
+    def visit_Getattr(self, node: nodes.Getattr, **kwargs: Any) -> str:
+        return f"{self.visit(node.node, parenthesize=True)}.{node.attr}"
 
-    def visit_Keyword(self, node: nodes.Keyword) -> str:
+    def visit_Keyword(self, node: nodes.Keyword, **kwargs: Any) -> str:
         return f"{node.key}={self.visit(node.value)}"
 
     def _stringify_call(
@@ -163,6 +177,119 @@ class ASTStringifier(NodeVisitor):
         kwargs_list = ", ".join(self.visit(kwarg) for kwarg in kwargs)
         args_str = ", ".join(part for part in (args_list, kwargs_list) if part)
         return f"{name}({args_str})"
+
+
+class NodeReplacerVisitor(NodeVisitor):
+    def __init__(
+        self,
+        matcher: Callable[[nodes.Node], bool],
+        replacer: Callable[[nodes.Node], Any],
+    ) -> None:
+        self.match = matcher
+        self.replace = replacer
+
+    def generic_visit(self, node: nodes.Node, *args: object, **kwargs: object) -> None:
+        if isinstance(node, nodes.BinExpr):
+            self.visit_BinExpr(node)
+            return
+        if isinstance(node, nodes.UnaryExpr):
+            self.visit_UnaryExpr(node)
+            return
+
+        if list(node.iter_child_nodes()):
+            raise ValueError(f"Unsupported node: {node}")
+
+    def visit(self, node: nodes.Node, *args: object, **kwargs: object) -> nodes.Node:
+        if self.match(node):
+            return self.replace(node)  # type: ignore[no-any-return]
+        super().visit(node)
+        return node
+
+    def _match_and_replace(self, node: nodes.Node) -> Any:
+        if self.match(node):
+            return self.replace(node)
+        else:
+            self.visit(node)
+            return node
+
+    def _match_and_replace_list(self, nodes: list[nodes.Node] | None) -> None:
+        if nodes is None:
+            return
+        for idx in range(len(nodes)):
+            nodes[idx] = self._match_and_replace(nodes[idx])
+
+    def visit_Template(self, node: nodes.Template) -> None:
+        self._match_and_replace_list(node.body)
+
+    def visit_Output(self, node: nodes.Output) -> None:
+        self._match_and_replace_list(cast(list[nodes.Node], node.nodes))
+
+    def visit_Compare(self, node: nodes.Compare) -> None:
+        node.expr = self._match_and_replace(node.expr)
+        self._match_and_replace_list(cast(list[nodes.Node], node.ops))
+
+    def visit_Operand(self, node: nodes.Operand) -> None:
+        node.expr = self._match_and_replace(node.expr)
+
+    def visit_List(self, node: nodes.List) -> None:
+        self._match_and_replace_list(cast(list[nodes.Node], node.items))
+
+    def visit_Not(self, node: nodes.Not) -> None:
+        node.node = self._match_and_replace(node.node)
+
+    def visit_BinExpr(self, node: nodes.BinExpr) -> None:
+        node.left = self._match_and_replace(node.left)
+        node.right = self._match_and_replace(node.right)
+
+    def visit_UnaryExpr(self, node: nodes.UnaryExpr) -> None:
+        node.node = self._match_and_replace(node.node)
+
+    def visit_Concat(self, node: nodes.Concat) -> None:
+        self._match_and_replace_list(cast(list[nodes.Node], node.nodes))
+
+    def visit_CondExpr(self, node: nodes.CondExpr) -> None:
+        node.expr1 = self._match_and_replace(node.expr1)
+        node.test = self._match_and_replace(node.test)
+        if node.expr2 is not None:
+            node.expr2 = self._match_and_replace(node.expr2)
+
+    def visit_If(self, node: nodes.If) -> None:
+        node.test = self._match_and_replace(node.test)
+        self._match_and_replace_list(node.body)
+        self._match_and_replace_list(cast(list[nodes.Node], node.elif_))
+        self._match_and_replace_list(node.else_)
+
+    def visit_Test(self, node: nodes.Test) -> None:
+        node.node = self._match_and_replace(node.node)
+        self._match_and_replace_list(cast(list[nodes.Node], node.args))
+        self._match_and_replace_list(cast(list[nodes.Node], node.kwargs))
+        self._match_and_replace_list(cast(list[nodes.Node], node.dyn_args))
+        self._match_and_replace_list(cast(list[nodes.Node], node.dyn_kwargs))
+
+    def visit_Filter(self, node: nodes.Filter) -> None:
+        if node.node is not None:
+            node.node = self._match_and_replace(node.node)
+        self._match_and_replace_list(cast(list[nodes.Node], node.args))
+        self._match_and_replace_list(cast(list[nodes.Node], node.kwargs))
+        self._match_and_replace_list(cast(list[nodes.Node], node.dyn_args))
+        self._match_and_replace_list(cast(list[nodes.Node], node.dyn_kwargs))
+
+    def visit_Call(self, node: nodes.Call) -> None:
+        node.node = self._match_and_replace(node.node)
+        self._match_and_replace_list(cast(list[nodes.Node], node.args))
+        self._match_and_replace_list(cast(list[nodes.Node], node.kwargs))
+        self._match_and_replace_list(cast(list[nodes.Node], node.dyn_args))
+        self._match_and_replace_list(cast(list[nodes.Node], node.dyn_kwargs))
+
+    def visit_Getitem(self, node: nodes.Getitem) -> None:
+        node.node = self._match_and_replace(node.node)
+        node.arg = self._match_and_replace(node.arg)
+
+    def visit_Getattr(self, node: nodes.Getattr) -> None:
+        node.node = self._match_and_replace(node.node)
+
+    def visit_Keyword(self, node: nodes.Keyword) -> None:
+        node.value = self._match_and_replace(node.value)
 
 
 def generify_var_references(ast: nodes.Node) -> tuple[nodes.Node, dict[str, int]]:
@@ -295,10 +422,15 @@ class FindUndeclaredVariablesVisitor(NodeVisitor):
 
 class TemplateExpressionAST:
     def __init__(
-        self, ast_root: nodes.Node, raw: str, extra_references: set[str] | None = None
+        self,
+        ast_root: nodes.Node,
+        raw: str,
+        extra_references: set[str] | None = None,
+        is_conditional: bool = False,
     ) -> None:
         self.ast_root = ast_root
         self.raw = raw
+        self.is_conditional = is_conditional
 
         var_visitor = FindUndeclaredVariablesVisitor(ANSIBLE_GLOBALS)
         var_visitor.visit(ast_root)
@@ -378,7 +510,7 @@ class TemplateExpressionAST:
             ast, extra_references = parse_conditional(
                 expression, env, variable_mappings
             )
-            return cls(ast, expression, extra_references)
+            return cls(ast, expression, extra_references, True)
         except TemplateSyntaxError as tse:
             logger.error("Template syntax error: " + str(tse))
             return None
