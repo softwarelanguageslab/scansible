@@ -22,7 +22,7 @@ TaskVarsScopeLevel = Literal[EnvironmentType.TASK_VARS, EnvironmentType.INCLUDE_
 class TaskExtractor(abc.ABC):
     @classmethod
     def SUPPORTED_TASK_ATTRIBUTES(cls) -> frozenset[str]:
-        return frozenset({"name", "action", "args", "when", "vars"})
+        return frozenset({"name", "action", "args", "when", "vars", "loop_with"})
 
     def __init__(self, context: ExtractionContext, task: TaskBase) -> None:
         self.context = context
@@ -62,7 +62,7 @@ class TaskExtractor(abc.ABC):
 
         return result
 
-    def extract_looping_value_and_name(self) -> tuple[rep.DataNode, str] | None:
+    def extract_looping_info(self) -> tuple[rep.DataNode, str, str | None] | None:
         loop_expr = self.task.loop
         if not loop_expr:
             return None
@@ -75,11 +75,6 @@ class TaskExtractor(abc.ABC):
                 return None
             else:
                 raise
-
-        if self.task.loop_with:
-            self.logger.warning(
-                f"I cannot handle looping style {self.task.loop_with!r} yet!"
-            )
 
         if self.task.loop_control:
             loop_var_name = self.task.loop_control.loop_var or "item"
@@ -96,7 +91,7 @@ class TaskExtractor(abc.ABC):
         else:
             loop_var_name = "item"
 
-        return loop_source_var, loop_var_name
+        return loop_source_var, loop_var_name, self.task.loop_with
 
     @contextmanager
     def setup_task_vars_scope(

@@ -61,10 +61,10 @@ class SetFactTaskExtractor(TaskExtractor):
     def _extract_looping_task(
         self, predecessors: Sequence[rep.ControlNode]
     ) -> ExtractionResult:
-        source_and_name = self.extract_looping_value_and_name()
+        source_and_name = self.extract_looping_info()
         assert source_and_name is not None, "Internal error"
 
-        loop_source_var, loop_var_name = source_and_name
+        loop_source_var, loop_var_name, loop_with = source_and_name
         with self.context.vars.enter_scope(EnvironmentType.INCLUDE_PARAMS):
             loop_target_var = self.context.vars.define_injected_variable(
                 loop_var_name, EnvironmentType.INCLUDE_PARAMS
@@ -74,7 +74,8 @@ class SetFactTaskExtractor(TaskExtractor):
             )
 
             loop_node = rep.Loop(
-                location=self.context.get_location(self.task.loop) or self.location
+                loop_with=loop_with,
+                location=self.context.get_location(self.task.loop) or self.location,
             )
             self.context.graph.add_node(loop_node)
             self.context.graph.add_edge(loop_source_var, loop_node, rep.USE)

@@ -36,6 +36,9 @@ def get_node_label(n: rep.Node) -> str:
     if isinstance(n, rep.Task):
         return n.action
 
+    if isinstance(n, rep.Loop) and n.loop_with:
+        return f"LOOP: {n.loop_with}"
+
     return n.__class__.__name__
 
 

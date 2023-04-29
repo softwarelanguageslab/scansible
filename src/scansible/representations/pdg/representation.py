@@ -103,8 +103,11 @@ class Task(ControlNode):
     )
 
 
+@define(slots=False, hash=False)
 class Loop(ControlNode):
     """Node representing start of loop."""
+
+    loop_with: str | None = field(validator=type_validator(), on_setattr=setters.frozen)
 
 
 class Conditional(ControlNode):
