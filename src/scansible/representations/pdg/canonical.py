@@ -395,6 +395,17 @@ def _squash_templatedatas(ast: jnodes.Output) -> None:
         else:
             new_nodes[-1].data += child.data
 
+    # HACK: Jinja2 strips trailing newlines, but we may have propagated some
+    # E.g. "blabla{{ '\n' }}" which people use to force trailing newlines.
+    # Restore those.
+    if isinstance(new_nodes[-1], jnodes.TemplateData) and new_nodes[-1].data.endswith(
+        "\n"
+    ):
+        new_nodes[-1].data = new_nodes[-1].data[:-1]
+        if not new_nodes[-1].data:
+            new_nodes = new_nodes[:-1]
+        new_nodes.append(jnodes.Const("\n"))
+
     ast.nodes = new_nodes
 
 
