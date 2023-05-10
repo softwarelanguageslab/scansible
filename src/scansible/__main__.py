@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from typing import TextIO
 
+import csv
 import sys
 from collections.abc import Sequence
 from pathlib import Path
 
 import click
+import rich.console
+import rich.progress
 from ansible import constants as ans_constants
 from loguru import logger
 
@@ -232,6 +235,100 @@ def prepare_module_kb(
     kb = ModuleKnowledgeBase.init_from_ansible_docs(str(ansible_doc_path))
     output_path.parent.mkdir(exist_ok=True, parents=True)
     kb.dump_to_file(output_path, slim=not full)
+
+
+@cli.command()
+@click.argument("input_file", type=click.File())
+@click.argument(
+    "repo_dir",
+    type=click.Path(resolve_path=True, path_type=Path, exists=True, file_okay=False),
+)
+@click.argument(
+    "output_path", type=click.Path(resolve_path=True, path_type=Path, file_okay=False)
+)
+@click.option(
+    "--role-search-path",
+    type=click.Path(file_okay=False, path_type=Path),
+    envvar="ROLE_SEARCH_PATH",
+    multiple=True,
+    help='Additional search paths to find role dependencies. Can be specified as environment variable "ROLE_SEARCH_PATH" (multiple paths can be separated with ":"). Provided directories are prepended to Ansible defaults.',
+)
+@click.option(
+    "--canonicalize/--no-canonicalize",
+    default=False,
+    help="Whether to canonicalize the resulting graph",
+)
+@click.option(
+    "--module-kb-path",
+    type=click.Path(resolve_path=True, path_type=Path, dir_okay=False, exists=True),
+    help="Path to the module knowledge base (only required when --canonicalize is set)",
+)
+def bulk_build(
+    input_file: TextIO,
+    repo_dir: Path,
+    output_path: Path,
+    role_search_path: Sequence[Path],
+    canonicalize: bool,
+    module_kb_path: Path | None,
+) -> None:
+    """Build a collection of PDGs in bulk.
+
+    Input entrypoint paths are read from INPUT_FILE, which should be a CSV containing
+    fields `repo`, `relative_path`, `type`.
+    Resulting PDGs are stored in GraphML format in OUTPUT_PATH, which should be
+    a directory and will be created if it does not exist. Each entrypoint will
+    be extracted separately.
+    """
+
+    if canonicalize and not module_kb_path:
+        raise ValueError("--module-kb-path is required when --canonicalize is set")
+
+    entrypoints = list(csv.DictReader(input_file))
+    output_path.mkdir(exist_ok=True, parents=True)
+
+    if canonicalize:
+        assert module_kb_path
+        module_kb = ModuleKnowledgeBase.load_from_file(module_kb_path)
+
+    from .representations.pdg import dump_graph, extract_pdg
+
+    for entrypoint in rich.progress.track(
+        entrypoints, description=f"Building PDGs for {len(entrypoints)} entrypoints"
+    ):
+        repo_path = repo_dir / entrypoint["repo"]
+        entrypoint_path = repo_path / entrypoint["relative_path"]
+        output_base = output_path / f"{repo_path.parent.name}"
+        output_name = "-".join(entrypoint_path.relative_to(repo_path.parent).parts)
+
+        logger.remove()
+        logger.add(output_base / f"{output_name}.log", level="INFO")
+        try:
+            ctx = extract_pdg(
+                entrypoint_path,
+                entrypoint_path.name,
+                "latest",
+                role_search_paths=role_search_path,
+                lenient=True,
+                as_pb=entrypoint["type"] == "playbook",
+            )
+            pdg = ctx.graph
+            logger.info(
+                f"Extracted PDG of {len(pdg)} nodes and {len(pdg.edges())} edges"
+            )
+
+            if canonicalize:
+                pdg = canonicalize_pdg(pdg, module_kb)  # pyright: ignore
+                logger.info(
+                    f"Reduced size to {len(pdg)} nodes and {len(pdg.edges())} edges"
+                )
+        except Exception as exc:
+            if isinstance(exc, KeyboardInterrupt):
+                raise
+            rich.console.Console().print_exception(max_frames=5)
+            rich.print(entrypoint)
+            continue
+
+        (output_base / f"{output_name}.xml").write_text(dump_graph("graphml", pdg))
 
 
 if __name__ == "__main__":
