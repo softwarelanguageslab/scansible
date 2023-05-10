@@ -22,7 +22,10 @@ TaskVarsScopeLevel = Literal[EnvironmentType.TASK_VARS, EnvironmentType.INCLUDE_
 class TaskExtractor(abc.ABC):
     @classmethod
     def SUPPORTED_TASK_ATTRIBUTES(cls) -> frozenset[str]:
-        return frozenset({"name", "action", "args", "when", "vars", "loop_with"})
+        # tags are ignored
+        return frozenset(
+            {"name", "action", "args", "when", "vars", "loop_with", "tags"}
+        )
 
     def __init__(self, context: ExtractionContext, task: TaskBase) -> None:
         self.context = context
