@@ -352,6 +352,9 @@ def _shift_input_indices(pdg: Graph, expr_node: Expression) -> None:
 
     class RenamerVisitor(NodeVisitor):
         def visit_Name(self, node: jnodes.Name) -> None:
+            if node.ctx != "load":
+                return
+
             try:
                 var_idx = int(node.name.removeprefix("_"))
             except ValueError:
