@@ -40,7 +40,9 @@ class ASTStringifier(NodeVisitor):
             if not is_conditional
             else parse_conditional(generated, Environment(), {})[0]
         )
-        assert reparsed == node, f"{reparsed}\nvs\n{node}"
+        assert (
+            reparsed == node
+        ), f"{reparsed}\nvs\n{node}\n\nConditional: {is_conditional}, {generated}"
         return generated  # type: ignore[no-any-return]
 
     def visit_Name(self, node: nodes.Name, **kwargs: Any) -> str:
@@ -65,7 +67,7 @@ class ASTStringifier(NodeVisitor):
     def visit_Compare(self, node: nodes.Compare, **kwargs: Any) -> str:
         if len(node.ops) != 1:
             raise ValueError(f"Unsupported node: {node}")
-        return f"{self.visit(node.expr)} {self.visit(node.ops[0])}"
+        return f"({self.visit(node.expr)} {self.visit(node.ops[0])})"
 
     def visit_Operand(self, node: nodes.Operand, **kwargs: Any) -> str:
         return f"{OPERAND_TO_STR.get(node.op, node.op)} {self.visit(node.expr)}"
@@ -76,13 +78,19 @@ class ASTStringifier(NodeVisitor):
     def visit_List(self, node: nodes.List, **kwargs: Any) -> str:
         return "[" + ", ".join(self.visit(item) for item in node.items) + "]"
 
+    def visit_Dict(self, node: nodes.Dict, **kwargs: Any) -> str:
+        return "{" + ", ".join(self.visit(item) for item in node.items) + "}"
+
+    def visit_Pair(self, node: nodes.Pair, **kwargs: Any) -> str:
+        return f"{self.visit(node.key)}: {self.visit(node.value)}"
+
     def visit_Not(self, node: nodes.Not, **kwargs: Any) -> str:
         if isinstance(node.node, nodes.Test):
             return self.visit_Test(node.node, negate=True)
         return f"not {self.visit(node.node)}"
 
     def visit_BinExpr(self, node: nodes.BinExpr, **kwargs: Any) -> str:
-        return f"{self.visit(node.left)} {node.operator} {self.visit(node.right)}"
+        return f"({self.visit(node.left)} {node.operator} {self.visit(node.right)})"
 
     def visit_UnaryExpr(self, node: nodes.UnaryExpr, **kwargs: Any) -> str:
         return f"{node.operator} {self.visit(node.node)}"
@@ -118,6 +126,26 @@ class ASTStringifier(NodeVisitor):
             tail = "{% endif %}"
 
         return f"{head}{''.join(elifs)}{tail}"
+
+    def visit_For(self, node: nodes.For, **kwargs: Any) -> str:
+        if len(node.body) != 1 or len(node.else_) > 1 or node.recursive:
+            raise ValueError(f"Unsupported node: {node}")
+
+        head = "{% for " + self.visit(node.target) + " in " + self.visit(node.iter)
+        if node.test:
+            head += " if " + self.visit(node.test)
+        head += " %}"
+        body = self.visit(node.body[0])
+        if node.else_:
+            else_ = "{% else %}" + self.visit(node.else_[0])
+        else:
+            else_ = ""
+        end = "{% endfor %}"
+
+        return f"{head}{body}{else_}{end}"
+
+    def visit_Tuple(self, node: nodes.Tuple, **kwargs: Any) -> str:
+        return f'({", ".join(self.visit(child) for child in node.items)})'
 
     def visit_Test(self, node: nodes.Test, negate: bool = False, **kwargs: Any) -> str:
         lhs = self.visit(node.node)
@@ -155,6 +183,14 @@ class ASTStringifier(NodeVisitor):
 
     def visit_Keyword(self, node: nodes.Keyword, **kwargs: Any) -> str:
         return f"{node.key}={self.visit(node.value)}"
+
+    def visit_Slice(self, node: nodes.Slice, **kwargs: Any) -> str:
+        start = self.visit(node.start) if node.start else ""
+        stop = self.visit(node.stop) if node.stop else ""
+        if node.step:
+            return f"{start}:{stop}:{self.visit(node.step)}"
+        else:
+            return f"{start}:{stop}"
 
     def _stringify_call(
         self,
@@ -258,6 +294,15 @@ class NodeReplacerVisitor(NodeVisitor):
         self._match_and_replace_list(node.body)
         self._match_and_replace_list(cast(list[nodes.Node], node.elif_))
         self._match_and_replace_list(node.else_)
+
+    def visit_For(self, node: nodes.For) -> None:
+        node.target = self._match_and_replace(node.target)
+        node.iter = self._match_and_replace(node.iter)
+        self._match_and_replace_list(node.body)
+        self._match_and_replace_list(node.else_)
+
+    def visit_Tuple(self, node: nodes.Tuple) -> None:
+        self._match_and_replace_list(cast(list[nodes.Node], node.items))
 
     def visit_Test(self, node: nodes.Test) -> None:
         node.node = self._match_and_replace(node.node)
