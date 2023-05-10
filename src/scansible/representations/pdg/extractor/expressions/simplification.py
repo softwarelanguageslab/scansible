@@ -156,7 +156,10 @@ def _get_inlined_candidates(
             continue
 
         assert isinstance(ref_ast.ast_root, nodes.Template)
-        assert isinstance(ref_ast.ast_root.body[0], nodes.Output)
+        if not isinstance(ref_ast.ast_root.body[0], nodes.Output):
+            yield None
+            continue
+
         yield SimplifiedExpression(
             ref_ast.ast_root.body[0],
             FrozenDict(expr.var_mappings | new_var_mappings),
