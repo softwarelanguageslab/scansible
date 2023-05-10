@@ -419,7 +419,7 @@ class ExtractionContext:
     errors: list[tuple[str, LocTuple | None]]
     _next_iv_id: int
 
-    handler_notifications: dict[str, set[rep.Task]] = defaultdict(set)
+    handler_notifications: dict[str, set[rep.Task]]
 
     def __init__(
         self,
@@ -436,6 +436,7 @@ class ExtractionContext:
         self.visibility_information = VisibilityInformation()
         self._next_iv_id = 0
         self.errors = []
+        self.handler_notifications = defaultdict(set)
 
     def next_iv_id(self) -> int:
         self._next_iv_id += 1
