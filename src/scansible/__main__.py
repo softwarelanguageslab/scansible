@@ -292,43 +292,59 @@ def bulk_build(
 
     from .representations.pdg import dump_graph, extract_pdg
 
-    for entrypoint in rich.progress.track(
-        entrypoints, description=f"Building PDGs for {len(entrypoints)} entrypoints"
-    ):
-        repo_path = repo_dir / entrypoint["repo"]
-        entrypoint_path = repo_path / entrypoint["relative_path"]
-        output_base = output_path / f"{repo_path.parent.name}"
-        output_name = "-".join(entrypoint_path.relative_to(repo_path.parent).parts)
+    with (output_path / "failed.csv").open("wt") as failed_out_f, (
+        output_path / "errors.log"
+    ).open("wt") as error_log_f:
+        failed_out_csv = csv.DictWriter(
+            failed_out_f, fieldnames=["repo", "relative_path", "type"]
+        )
+        failed_out_csv.writeheader()
+        error_console = rich.console.Console(file=error_log_f)
 
-        logger.remove()
-        logger.add(output_base / f"{output_name}.log", level="INFO")
-        try:
-            ctx = extract_pdg(
-                entrypoint_path,
-                entrypoint_path.name,
-                "latest",
-                role_search_paths=role_search_path,
-                lenient=True,
-                as_pb=entrypoint["type"] == "playbook",
-            )
-            pdg = ctx.graph
-            logger.info(
-                f"Extracted PDG of {len(pdg)} nodes and {len(pdg.edges())} edges"
-            )
+        for entrypoint in rich.progress.track(
+            entrypoints, description=f"Building PDGs for {len(entrypoints)} entrypoints"
+        ):
+            repo_path = repo_dir / entrypoint["repo"]
+            entrypoint_path = repo_path / entrypoint["relative_path"]
+            output_base = output_path / f"{repo_path.parent.name}"
+            output_name = "-".join(entrypoint_path.relative_to(repo_path.parent).parts)
 
-            if canonicalize:
-                pdg = canonicalize_pdg(pdg, module_kb)  # pyright: ignore
-                logger.info(
-                    f"Reduced size to {len(pdg)} nodes and {len(pdg.edges())} edges"
+            log_path = output_base / f"{output_name}.log"
+            log_path.unlink(missing_ok=True)
+            logger.remove()
+            logger.add(log_path, level="INFO")
+            try:
+                ctx = extract_pdg(
+                    entrypoint_path,
+                    entrypoint_path.name,
+                    "latest",
+                    role_search_paths=role_search_path,
+                    lenient=True,
+                    as_pb=entrypoint["type"] == "playbook",
                 )
-        except Exception as exc:
-            if isinstance(exc, KeyboardInterrupt):
-                raise
-            rich.console.Console().print_exception(max_frames=5)
-            rich.print(entrypoint)
-            continue
+                pdg = ctx.graph
+                logger.info(
+                    f"Extracted PDG of {len(pdg)} nodes and {len(pdg.edges())} edges"
+                )
 
-        (output_base / f"{output_name}.xml").write_text(dump_graph("graphml", pdg))
+                if canonicalize:
+                    pdg = canonicalize_pdg(pdg, module_kb)  # pyright: ignore
+                    logger.info(
+                        f"Reduced size to {len(pdg)} nodes and {len(pdg.edges())} edges"
+                    )
+            except Exception as exc:
+                if isinstance(exc, KeyboardInterrupt):
+                    raise
+
+                error_console.rule(str(exc))
+                error_console.print_exception(max_frames=5)
+                error_console.print(entrypoint_path)
+                failed_out_csv.writerow(entrypoint)
+                failed_out_f.flush()
+
+                continue
+
+            (output_base / f"{output_name}.xml").write_text(dump_graph("graphml", pdg))
 
 
 if __name__ == "__main__":
