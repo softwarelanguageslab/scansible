@@ -35,26 +35,49 @@ class ASTStringifier(NodeVisitor):
 
     def stringify(self, node: nodes.Node, is_conditional: bool) -> str:
         generated = self.visit(node)
-        # Add additional trailing newline, Jinja2's parser consumes one.
-        if generated.endswith("\n"):
-            generated += "\n"
+        self._check_correctness(node, generated, is_conditional)
+        return generated  # type: ignore[no-any-return]
+
+    def _check_correctness(
+        self, node: nodes.Node, generated: str, is_conditional: bool
+    ) -> None:
         reparsed = (
             Environment().parse(generated)
             if not is_conditional
             else parse_conditional(generated, Environment(), {})[0]
         )
-        assert (
-            # Allow changing of bad conditionals which contain braces
-            reparsed == node
-            or (is_conditional and isinstance(node, nodes.Template))
-        ), f"{reparsed}\nvs\n{node}\n\nConditional: {is_conditional}, {generated}"
-        return generated  # type: ignore[no-any-return]
+
+        if reparsed == merge_consecutive_templatedata(node):
+            return
+
+        # Allow changing of bad conditionals which contain braces
+        if is_conditional and isinstance(node, nodes.Template):
+            return
+
+        raise RuntimeError(
+            f"""
+                Bad stringification!
+                {reparsed}
+                vs
+                {node}
+
+                {self.visit(reparsed)}
+                vs
+                {generated}
+
+                Conditional: {is_conditional}
+                """
+        )
 
     def visit_Name(self, node: nodes.Name, **kwargs: Any) -> str:
         return node.name
 
     def visit_Template(self, node: nodes.Template, **kwargs: Any) -> str:
-        return "".join(self.visit(child) for child in node.body)
+        rendered = "".join(self.visit(child) for child in node.body)
+        # Add additional trailing newline, Jinja2's parser consumes one.
+        if rendered.endswith("\n"):
+            rendered += "\n"
+        return rendered
 
     def visit_Output(self, node: nodes.Output, **kwargs: Any) -> str:
         result = ""
@@ -405,6 +428,41 @@ class NodeReplacerVisitor(NodeVisitor):
 
     def visit_Keyword(self, node: nodes.Keyword) -> None:
         node.value = self._match_and_replace(node.value)
+
+
+def merge_consecutive_templatedata(ast: nodes.Node) -> nodes.Node:
+    if not isinstance(ast, nodes.Template):
+        return ast
+
+    new_children: list[nodes.Node] = []
+    for child in ast.body:
+        if not isinstance(child, nodes.Output):
+            new_children.append(child)
+            continue
+
+        new_nodes: list[nodes.Expr] = []
+        for child in child.nodes:
+            if (
+                not new_nodes
+                or not isinstance(child, nodes.TemplateData)
+                or not isinstance(new_nodes[-1], nodes.TemplateData)
+            ):
+                new_nodes.append(child)
+            else:
+                new_nodes[-1].data += child.data
+
+        # Remove any empty template data. This doesn't functionally change anything
+        # in the expression, but it leads to a difference in the stringifier.
+        if len(new_nodes) > 1:
+            new_nodes = [
+                node
+                for node in new_nodes
+                if not (isinstance(node, nodes.TemplateData) and not node.data)
+            ]
+
+        new_children.append(nodes.Output(new_nodes))
+
+    return nodes.Template(new_children)
 
 
 def generify_var_references(ast: nodes.Node) -> tuple[nodes.Node, dict[str, int]]:
