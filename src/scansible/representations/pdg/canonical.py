@@ -438,6 +438,15 @@ def _squash_templatedatas(ast: jnodes.Output) -> None:
             new_nodes = new_nodes[:-1]
         new_nodes.append(jnodes.Const("\n"))
 
+    # Remove any empty template data. This doesn't functionally change anything
+    # in the expression, but it leads to a difference in the stringifier.
+    if len(new_nodes) > 1:
+        new_nodes = [
+            node
+            for node in new_nodes
+            if not (isinstance(node, jnodes.TemplateData) and not node.data)
+        ]
+
     ast.nodes = new_nodes
 
 

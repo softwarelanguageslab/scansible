@@ -35,6 +35,9 @@ class ASTStringifier(NodeVisitor):
 
     def stringify(self, node: nodes.Node, is_conditional: bool) -> str:
         generated = self.visit(node)
+        # Add additional trailing newline, Jinja2's parser consumes one.
+        if generated.endswith("\n"):
+            generated += "\n"
         reparsed = (
             Environment().parse(generated)
             if not is_conditional
@@ -483,9 +486,7 @@ def parse_conditional(
         )
         return ast, set()
 
-    if len(ast.body[0].nodes) == 1 and isinstance(
-        ast.body[0].nodes[0], nodes.TemplateData
-    ):
+    if all(isinstance(child, nodes.TemplateData) for child in ast.body[0].nodes):
         # The condition is not a template expression. Wrap it as a condition
         return parse_wrapped_conditional(expr, env), set()
 
