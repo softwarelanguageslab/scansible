@@ -78,6 +78,9 @@ class ASTStringifier(NodeVisitor):
     def visit_Name(self, node: nodes.Name, **kwargs: Any) -> str:
         return node.name
 
+    def visit_NSRef(self, node: nodes.NSRef, **kwargs: Any) -> str:
+        return f"{node.name}.{node.attr}"
+
     def visit_Template(self, node: nodes.Template, **kwargs: Any) -> str:
         parts = [self.visit(child) for child in node.body]
 
