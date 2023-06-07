@@ -6,7 +6,7 @@ import re
 from collections import defaultdict
 
 from ansible.module_utils.common.parameters import DEFAULT_TYPE_VALIDATORS
-from jinja2 import Environment
+from jinja2 import Environment, TemplateSyntaxError
 from jinja2 import nodes as jnodes
 from jinja2.visitor import NodeVisitor
 from loguru import logger
@@ -178,7 +178,10 @@ def _inline_constants_into_expressions(pdg: Graph) -> None:
         if not isinstance(node, Expression):
             continue
 
-        _inline_constants_into_expression(pdg, node)
+        try:
+            _inline_constants_into_expression(pdg, node)
+        except TemplateSyntaxError:
+            continue
 
 
 def _is_simple_reference(ast: jnodes.Node) -> TypeGuard[jnodes.Name | jnodes.Template]:
