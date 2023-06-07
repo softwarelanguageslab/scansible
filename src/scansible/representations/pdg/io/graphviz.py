@@ -2,19 +2,42 @@
 
 from __future__ import annotations
 
+from posix import chown, chroot
+
 import graphviz as gv
 
 from .. import representation as rep
 
 
-def get_node_shape(n: rep.Node) -> str:
-    if isinstance(n, rep.Expression):
-        return "box"
-
-    if isinstance(n, (rep.Literal, rep.IntermediateValue, rep.Variable)):
-        return "ellipse"
-
-    return "diamond"
+def get_node_attributes(n: rep.Node) -> dict[str, str]:
+    match n:
+        case rep.ControlNode():
+            return {
+                "style": "filled",
+                "shape": "ellipse",
+                "fillcolor": "lightgrey",
+                "fontsize": "30",
+            }
+        case rep.Literal():
+            return {
+                "style": "dotted, filled",
+                "fillcolor": "lightgrey",
+            }
+        case rep.IntermediateValue():
+            return {
+                "shape": "circle",
+                "fontsize": "8",
+            }
+        case rep.Expression():
+            return {
+                "style": "dashed",
+            }
+        case rep.Variable():
+            return {
+                "style": "dotted",
+            }
+        case _:
+            return {}
 
 
 def get_node_label(n: rep.Node) -> str:
@@ -34,17 +57,18 @@ def get_node_label(n: rep.Node) -> str:
         return f"{n.name}@{n.version},{n.value_version}"
 
     if isinstance(n, rep.Task):
-        return n.action
+        return f"<<B>{n.action}</B>>"
 
     return n.__class__.__name__
 
 
 def dump_node(n: rep.Node, dot: gv.Digraph) -> None:
     node_id = str(n.node_id)
-    shape = get_node_shape(n)
+    default_attrs = {"shape": "box"}
+    attrs = get_node_attributes(n)
     label = get_node_label(n)
 
-    dot.node(str(node_id), label=label, shape=shape)
+    dot.node(str(node_id), label=label, **(default_attrs | attrs))
 
 
 def dump_edge(e: rep.Edge, source: rep.Node, target: rep.Node, dot: gv.Digraph) -> None:
@@ -63,11 +87,19 @@ def dump_edge(e: rep.Edge, source: rep.Node, target: rep.Node, dot: gv.Digraph) 
     elif isinstance(e, rep.DefLoopItem) and e.loop_with is not None:
         edge_label = f"DEFLOOPITEM: {e.loop_with}"
 
-    dot.edge(source_id, target_id, label=edge_label)
+    dot.edge(
+        source_id,
+        target_id,
+        label=edge_label,
+        weight="100" if isinstance(e, rep.Order) else "1",
+        penwidth="2.5" if isinstance(e, rep.Order) else "1",
+        splines="ortho" if isinstance(e, rep.Order) else "spline",
+    )
 
 
 def dump_graph(g: rep.Graph) -> gv.Digraph:
     dot = gv.Digraph()
+    dot.attr("node", fontname="Courier")
 
     for n in g:
         dump_node(n, dot)
