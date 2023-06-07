@@ -3,7 +3,9 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from collections.abc import Callable
+import os
+import re
+from collections.abc import Callable, Iterable
 
 from attrs import frozen
 from jinja2 import Environment, nodes
@@ -54,6 +56,8 @@ class ASTStringifier(NodeVisitor):
         if is_conditional and isinstance(node, nodes.Template):
             return
 
+        diffs = _find_ast_differences(reparsed, node)
+
         raise RuntimeError(
             f"""
                 Bad stringification!
@@ -65,6 +69,8 @@ class ASTStringifier(NodeVisitor):
                 vs
                 {generated}
 
+                Diffs: {os.linesep.join(diffs)}
+
                 Conditional: {is_conditional}
                 """
         )
@@ -73,7 +79,28 @@ class ASTStringifier(NodeVisitor):
         return node.name
 
     def visit_Template(self, node: nodes.Template, **kwargs: Any) -> str:
-        rendered = "".join(self.visit(child) for child in node.body)
+        parts = [self.visit(child) for child in node.body]
+
+        # Escape TemplateData ending with { followed by expression/statement,
+        # otherwise subsequent parsing will fail. Similarly for TD starting with }
+        # preceded by expression/statement.
+        for idx, part in enumerate(parts):
+            if (
+                part.endswith("{")
+                and len(parts) > (idx + 1)
+                and parts[idx + 1].startswith(("{{ ", "{% "))
+            ):
+                # Turn "{{% if" into "{ {%- if" etc., which parses correctly.
+                parts[idx + 1] = re.sub(r"(\{[\{%])", r" \1-", parts[idx + 1])
+            if (
+                part.startswith("}")
+                and idx > 0
+                and parts[idx - 1].endswith((" }}", " %}"))
+            ):
+                # Turn "endif %}}" into "endif -%} }" etc., which parses correctly.
+                parts[idx - 1] = re.sub(r"([\}%]})", r"-\1 ", parts[idx - 1])
+
+        rendered = "".join(parts)
         # Add additional trailing newline, Jinja2's parser consumes one.
         if rendered.endswith("\n"):
             rendered += "\n"
@@ -430,18 +457,36 @@ class NodeReplacerVisitor(NodeVisitor):
         node.value = self._match_and_replace(node.value)
 
 
-def merge_consecutive_templatedata(ast: nodes.Node) -> nodes.Node:
-    if not isinstance(ast, nodes.Template):
-        return ast
-
-    new_children: list[nodes.Node] = []
-    for child in ast.body:
-        if not isinstance(child, nodes.Output):
-            new_children.append(child)
+def _fix_escaped_templatedata(children: list[nodes.Expr]) -> list[nodes.Expr]:
+    # Re-escape double braces which may have been propagated from constants.
+    # E.g. "blabla {{ '{{' }}" which otherwise would get interpreted as a Jinja
+    # template.
+    # Alternatively we could ignore these in the Const -> TemplateData conversion,
+    # but we'd like to also canonicalize "blabla {{ '{{ abc'}}" to "blabla {{ "{{" }} abc"\
+    new_nodes: list[nodes.Expr] = []
+    for node in children:
+        if not isinstance(node, nodes.TemplateData) or (
+            "{{" not in node.data and "}}" not in node.data
+        ):
+            new_nodes.append(node)
             continue
 
+        new_data = re.sub(r"([\{\}]{3,}|[%\{]{2,}|[%\}]{2,})", r'{{ "\1" }}', node.data)
+        new_body = Environment().parse(new_data).body
+        assert len(new_body) == 1 and isinstance(new_body[0], nodes.Output)
+        new_nodes.extend(new_body[0].nodes)
+
+    return new_nodes
+
+
+def merge_consecutive_templatedata(ast: nodes.Node) -> nodes.Node:
+    def _check_node(node: nodes.Node) -> bool:
+        return isinstance(node, nodes.Output)
+
+    def _replace_node(node: nodes.Node) -> nodes.Node:
+        assert isinstance(node, nodes.Output)
         new_nodes: list[nodes.Expr] = []
-        for child in child.nodes:
+        for child in node.nodes:
             if (
                 not new_nodes
                 or not isinstance(child, nodes.TemplateData)
@@ -450,6 +495,8 @@ def merge_consecutive_templatedata(ast: nodes.Node) -> nodes.Node:
                 new_nodes.append(child)
             else:
                 new_nodes[-1].data += child.data
+
+        new_nodes = _fix_escaped_templatedata(new_nodes)
 
         # Remove any empty template data. This doesn't functionally change anything
         # in the expression, but it leads to a difference in the stringifier.
@@ -460,9 +507,32 @@ def merge_consecutive_templatedata(ast: nodes.Node) -> nodes.Node:
                 if not (isinstance(node, nodes.TemplateData) and not node.data)
             ]
 
-        new_children.append(nodes.Output(new_nodes))
+        return nodes.Output(new_nodes)
 
-    return nodes.Template(new_children)
+    return NodeReplacerVisitor(_check_node, _replace_node).visit(ast)
+
+
+def _find_ast_differences(a: nodes.Node, b: nodes.Node) -> Iterable[str]:
+    if a == b:
+        return
+
+    if type(a) != type(b):
+        yield f"{type(a)} vs {type(b)}"
+        return
+
+    a_children = list(a.iter_child_nodes())
+    b_children = list(b.iter_child_nodes())
+
+    if a_children == b_children:
+        yield f"{type(a)}: Attributes differ: {list(a.iter_fields())} vs {list(b.iter_fields())}"
+        return
+
+    if len(a_children) != len(b_children):
+        yield f"{type(a)}: {len(a_children)} vs {len(b_children)} children: {a} vs {b}"
+        return
+
+    for a_child, b_child in zip(a_children, b_children):
+        yield from _find_ast_differences(a_child, b_child)
 
 
 def generify_var_references(ast: nodes.Node) -> tuple[nodes.Node, dict[str, int]]:
