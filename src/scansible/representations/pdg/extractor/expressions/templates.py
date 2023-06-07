@@ -293,16 +293,24 @@ class ASTStringifier(NodeVisitor):
         *,
         force_parens: bool = False,
     ) -> str:
-        if dyn_args is not None or dyn_kwargs is not None:
-            raise ValueError(
-                f"Unsupported expression: {name}(args={args}, kwargs={kwargs}, dyn_args={dyn_args}, dyn_kwargs={dyn_kwargs})"
-            )
-        if not args and not kwargs and not force_parens:
+        if (
+            not args
+            and not kwargs
+            and not dyn_args
+            and not dyn_kwargs
+            and not force_parens
+        ):
             return name
 
         args_list = ", ".join(self.visit(arg) for arg in args)
         kwargs_list = ", ".join(self.visit(kwarg) for kwarg in kwargs)
-        args_str = ", ".join(part for part in (args_list, kwargs_list) if part)
+        dyn_args_str = f"*{self.visit(dyn_args)}" if dyn_args is not None else ""
+        dyn_kwargs_str = f"**{self.visit(dyn_kwargs)}" if dyn_kwargs is not None else ""
+        args_str = ", ".join(
+            part
+            for part in (args_list, kwargs_list, dyn_args_str, dyn_kwargs_str)
+            if part
+        )
         return f"{name}({args_str})"
 
 
@@ -428,23 +436,29 @@ class NodeReplacerVisitor(NodeVisitor):
         node.node = self._match_and_replace(node.node)
         self._match_and_replace_list(cast(list[nodes.Node], node.args))
         self._match_and_replace_list(cast(list[nodes.Node], node.kwargs))
-        self._match_and_replace_list(cast(list[nodes.Node], node.dyn_args))
-        self._match_and_replace_list(cast(list[nodes.Node], node.dyn_kwargs))
+        if node.dyn_args is not None:
+            node.dyn_args = self._match_and_replace(node.dyn_args)
+        if node.dyn_kwargs is not None:
+            node.dyn_kwargs = self._match_and_replace(node.dyn_kwargs)
 
     def visit_Filter(self, node: nodes.Filter) -> None:
         if node.node is not None:
             node.node = self._match_and_replace(node.node)
         self._match_and_replace_list(cast(list[nodes.Node], node.args))
         self._match_and_replace_list(cast(list[nodes.Node], node.kwargs))
-        self._match_and_replace_list(cast(list[nodes.Node], node.dyn_args))
-        self._match_and_replace_list(cast(list[nodes.Node], node.dyn_kwargs))
+        if node.dyn_args is not None:
+            node.dyn_args = self._match_and_replace(node.dyn_args)
+        if node.dyn_kwargs is not None:
+            node.dyn_kwargs = self._match_and_replace(node.dyn_kwargs)
 
     def visit_Call(self, node: nodes.Call) -> None:
         node.node = self._match_and_replace(node.node)
         self._match_and_replace_list(cast(list[nodes.Node], node.args))
         self._match_and_replace_list(cast(list[nodes.Node], node.kwargs))
-        self._match_and_replace_list(cast(list[nodes.Node], node.dyn_args))
-        self._match_and_replace_list(cast(list[nodes.Node], node.dyn_kwargs))
+        if node.dyn_args is not None:
+            node.dyn_args = self._match_and_replace(node.dyn_args)
+        if node.dyn_kwargs is not None:
+            node.dyn_kwargs = self._match_and_replace(node.dyn_kwargs)
 
     def visit_Getitem(self, node: nodes.Getitem) -> None:
         node.node = self._match_and_replace(node.node)
