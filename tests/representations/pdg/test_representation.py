@@ -407,7 +407,7 @@ def describe_def_edge() -> None:
     for idx, n in enumerate((t, v, e, l)):
         n.node_id = idx
 
-    valid = set(product([e, l, t, v], [v]))
+    valid = set(product([e, l, t, v], [v, e]))
 
     @pytest.fixture(params=valid)
     def valid_source_and_target(request: FixtureRequest) -> tuple[rep.Node, rep.Node]:

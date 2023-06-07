@@ -6,7 +6,7 @@ import json
 import re
 import textwrap
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from os.path import normpath
 from pathlib import Path
@@ -21,6 +21,7 @@ from scansible.representations.structural.helpers import (
     find_file,
     prevent_undesired_operations,
 )
+from scansible.utils import join_sequences
 
 from .. import representation as rep
 from .expressions import VarContext
@@ -420,6 +421,8 @@ class ExtractionContext:
     _next_iv_id: int
 
     handler_notifications: dict[str, set[rep.Task]]
+    active_conditions: Sequence[rep.DataNode]
+    active_loops: Sequence[rep.DataNode]
 
     def __init__(
         self,
@@ -437,6 +440,26 @@ class ExtractionContext:
         self._next_iv_id = 0
         self.errors = []
         self.handler_notifications = defaultdict(set)
+        self.active_conditions = []
+        self.active_loops = []
+
+    @contextmanager
+    def activate_conditions(self, conditions: list[rep.DataNode]) -> Iterator[None]:
+        old_conditions = self.active_conditions
+        self.active_conditions = join_sequences(old_conditions, conditions)
+        try:
+            yield
+        finally:
+            self.active_conditions = old_conditions
+
+    @contextmanager
+    def activate_loop(self, loop_data_node: rep.DataNode) -> Iterator[None]:
+        old_loops = self.active_loops
+        self.active_loops = join_sequences(old_loops, [loop_data_node])
+        try:
+            yield
+        finally:
+            self.active_loops = old_loops
 
     def next_iv_id(self) -> int:
         self._next_iv_id += 1

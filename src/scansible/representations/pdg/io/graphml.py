@@ -145,7 +145,6 @@ class CustomGraphMLReader(ReaderBase):
 
 edge_type_to_name = {
     "DEFLOOPITEM": "DEF_LOOP_ITEM",
-    "DEFINEDIF": "DEFINED_IF",
 }
 
 

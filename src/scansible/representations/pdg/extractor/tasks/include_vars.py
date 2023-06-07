@@ -40,44 +40,8 @@ class IncludeVarsTaskExtractor(DynamicIncludesExtractor[VariableFile]):
     def _extract_included_content(
         self, included_content: VariableFile, predecessors: Sequence[rep.ControlNode]
     ) -> ExtractionResult:
-        return VariablesExtractor(
-            self.context, included_content.variables
-        ).extract_variables(EnvironmentType.INCLUDE_VARS)
-
-    def extract_condition(
-        self,
-        predecessors: Sequence[rep.ControlNode],
-        conditions: Sequence[str | bool] | None = None,
-    ) -> ExtractionResult:
-        # Don't include these condition nodes into the CFG, see SetFactExtractor.
-        # Therefore, we won't provide any predecessors when extracting the conditions.
-        return super().extract_condition([], conditions)
-
-    def _create_result(
-        self,
-        included_result: ExtractionResult,
-        current_predecessors: Sequence[rep.ControlNode],
-        added_conditional_nodes: Sequence[rep.ControlNode],
-    ) -> ExtractionResult:
-        # HACK: If the placeholder task was created because of an error, we need
-        # to properly instantiate the CFG since there is now a control node that
-        # was added.
-        if included_result.added_control_nodes:
-            if added_conditional_nodes:
-                first_conditional = added_conditional_nodes[0]
-                for pred in current_predecessors:
-                    self.context.graph.add_edge(pred, first_conditional, rep.ORDER)
-
-            return super()._create_result(
-                included_result, current_predecessors, added_conditional_nodes
-            )
-
-        # See above, we don't want the conditional nodes to be included in the CFG,
-        # so we don't provide them as next predecessors.
         return (
-            super()
-            ._create_result(
-                included_result, current_predecessors, added_conditional_nodes
-            )
-            .replace_next_predecessors(current_predecessors)
+            VariablesExtractor(self.context, included_content.variables)
+            .extract_variables(EnvironmentType.INCLUDE_VARS)
+            .replace_next_predecessors(predecessors)
         )

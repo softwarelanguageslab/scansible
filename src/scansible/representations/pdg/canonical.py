@@ -24,7 +24,7 @@ from .extractor.expressions.var_context import extract_type_name
 from .representation import (
     CompositeLiteral,
     Composition,
-    Conditional,
+    ControlFlowEdge,
     Def,
     DefLoopItem,
     Edge,
@@ -33,7 +33,6 @@ from .representation import (
     Input,
     IntermediateValue,
     Keyword,
-    Loop,
     Node,
     ScalarLiteral,
     Task,
@@ -152,9 +151,7 @@ def _propagate_constant(pdg: Graph, lit: ScalarLiteral | CompositeLiteral) -> No
         if isinstance(edge, Composition):
             assert isinstance(target_node, CompositeLiteral)
             continue
-        if isinstance(target_node, (Conditional, Loop)):
-            continue
-        if isinstance(edge, DefLoopItem):
+        if isinstance(edge, (DefLoopItem, ControlFlowEdge)):
             continue
         if isinstance(edge, Input):
             assert isinstance(target_node, Expression)

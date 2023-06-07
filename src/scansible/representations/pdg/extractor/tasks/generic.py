@@ -55,14 +55,6 @@ class GenericTaskExtractor(TaskExtractor):
         assert source_and_name is not None, "Internal error"
 
         loop_source_var, loop_var_name, loop_with = source_and_name
-        loop_node = rep.Loop(
-            loop_with=loop_with,
-            location=self.context.get_location(self.task.loop) or self.location,
-        )
-        self.context.graph.add_node(loop_node)
-        self.context.graph.add_edge(loop_source_var, loop_node, rep.USE)
-        for pred in predecessors:
-            self.context.graph.add_edge(pred, loop_node, rep.ORDER)
 
         # For some reason, loop vars have the same precedence as include params.
         with self.context.vars.enter_scope(EnvironmentType.INCLUDE_PARAMS):
@@ -70,21 +62,20 @@ class GenericTaskExtractor(TaskExtractor):
                 loop_var_name, EnvironmentType.INCLUDE_PARAMS
             )
             self.context.graph.add_edge(
-                loop_source_var, loop_target_var, rep.DEF_LOOP_ITEM
+                loop_source_var, loop_target_var, rep.DefLoopItem(loop_with)
             )
 
-            inner_result = self._extract_bare_task([loop_node])
-            # Add back edges to represent looping. The forward edges are already
-            # added by the bare task extractor. Any of the sink nodes need to
-            # link back to the loop for the potential next iteration.
-            for pred in inner_result.next_predecessors:
-                self.context.graph.add_edge(pred, loop_node, rep.ORDER_BACK)
+            with self.context.activate_loop(loop_source_var):
+                inner_result = self._extract_bare_task(predecessors)
+            # Add a loop edge to indicate single-task loop.
+            assert len(inner_result.added_control_nodes) == 1
+            self.context.graph.add_edge(
+                inner_result.added_control_nodes[0],
+                inner_result.added_control_nodes[0],
+                rep.ORDER_BACK,
+            )
 
-        # Sink node of a looping task is always the loop itself.
-        # If the source list is empty, the task and its conditions will be skipped
-        # entirely, so the loop would be followed by the next control node.
-        # If it isn't empty, it'll always need to go back to the loop too.
-        return inner_result.chain(ExtractionResult([loop_node], [], [loop_node]))
+        return inner_result
 
     def _extract_bare_task(
         self, predecessors: Sequence[rep.ControlNode]
@@ -94,20 +85,18 @@ class GenericTaskExtractor(TaskExtractor):
         )
         self.context.graph.add_node(tn)
 
-        # If there's a condition: preds -> first condition -> ... last condition -> task
-        # Otherwise: preds -> task -> rest
-        condition_result = self.extract_condition(predecessors)
-        first_node = (
-            condition_result.added_control_nodes[0]
-            if condition_result.added_control_nodes
-            else tn
-        )
-
-        for condition_node in condition_result.next_predecessors:
-            self.context.graph.add_edge(condition_node, tn, rep.ORDER)
-
         for pred in predecessors:
-            self.context.graph.add_edge(pred, first_node, rep.ORDER)
+            self.context.graph.add_edge(pred, tn, rep.ORDER)
+
+        # Link conditions
+        condition_nodes = self.extract_conditions()
+        with self.context.activate_conditions(condition_nodes):
+            for condition_node in self.context.active_conditions:
+                self.context.graph.add_edge(condition_node, tn, rep.WHEN)
+
+        # Link loops
+        for loop_node in self.context.active_loops:
+            self.context.graph.add_edge(loop_node, tn, rep.LOOP)
 
         # Link data flow
         for arg_name, arg_value in self.task.args.items():
@@ -120,7 +109,10 @@ class GenericTaskExtractor(TaskExtractor):
                 arg_node, tn, rep.Keyword(keyword=f"args.{arg_name}")
             )
 
-        registered_vars = self._define_registered_var(tn)
+        # Definition of the registered var doesn't depend on the condition of this
+        # task, so do it when the conditions have already been deactivated.
+        self._define_registered_var(tn)
+
         for notified_handler in self.task.notify or []:
             self.context.handler_notifications[notified_handler].add(tn)
 
@@ -136,16 +128,20 @@ class GenericTaskExtractor(TaskExtractor):
                     continue
                 self.context.graph.add_edge(val_node, tn, rep.Keyword(keyword=misc_kw))
 
-        # Next predecessors are either any of the condition nodes, or the task node if all conditions passed.
-        control_nodes = [tn] + [cn for cn in condition_result.added_control_nodes]
-        return ExtractionResult(control_nodes, registered_vars, control_nodes)
+        result = ExtractionResult.single(tn)
+        # If the task is executed conditionally, the next predecessor may also
+        # be any of the previous ones if the task was skipped.
+        if condition_nodes:
+            result = result.add_next_predecessors(predecessors)
+        return result
 
-    def _define_registered_var(self, task: rep.Task) -> Sequence[rep.Variable]:
+    def _define_registered_var(self, task: rep.Task) -> None:
         if not self.task.register:
-            return []
+            return
 
         vn = self.context.vars.define_injected_variable(
             self.task.register, EnvironmentType.SET_FACTS_REGISTERED
         )
         self.context.graph.add_edge(task, vn, rep.DEF)
-        return [vn]
+        for condition in self.context.active_conditions:
+            self.context.graph.add_edge(condition, vn, rep.WHEN)

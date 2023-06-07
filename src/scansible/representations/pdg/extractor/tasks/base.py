@@ -37,15 +37,14 @@ class TaskExtractor(abc.ABC):
     def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
         raise NotImplementedError("To be implemented by subclass")
 
-    def extract_condition(
+    def extract_conditions(
         self,
-        predecessors: Sequence[rep.ControlNode],
         conditions: Sequence[str | bool] | None = None,
-    ) -> ExtractionResult:
-        result = ExtractionResult.empty(predecessors)
+    ) -> list[rep.DataNode]:
         if conditions is None:
             conditions = self.task.when
 
+        condition_value_nodes: list[rep.DataNode] = []
         for condition in conditions:
             # Create an IV for each condition and link it to the conditional node.
             try:
@@ -55,19 +54,10 @@ class TaskExtractor(abc.ABC):
             except RecursiveDefinitionError as e:
                 self.logger.error(e)
                 continue
-            condition_node = rep.Conditional(
-                location=self.context.get_location(condition) or self.location
-            )
-            self.context.graph.add_node(condition_node)
-            self.context.graph.add_edge(condition_value_node, condition_node, rep.USE)
-            # Link previous predecessors to this condition node
-            for pred in result.next_predecessors:
-                self.context.graph.add_edge(pred, condition_node, rep.ORDER)
-            result = result.add_control_nodes(condition_node).replace_next_predecessors(
-                condition_node
-            )
 
-        return result
+            condition_value_nodes.append(condition_value_node)
+
+        return condition_value_nodes
 
     def extract_looping_info(self) -> tuple[rep.DataNode, str, str | None] | None:
         loop_expr = self.task.loop

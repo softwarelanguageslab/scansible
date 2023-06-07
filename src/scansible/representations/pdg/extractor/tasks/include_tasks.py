@@ -40,17 +40,11 @@ class IncludeTaskExtractor(DynamicIncludesExtractor[TaskFile]):
     def _file_exists(self, name: str) -> bool:
         return self.context.include_ctx.find_task_file(name) is not None
 
-    def extract_condition(
-        self,
-        predecessors: Sequence[rep.ControlNode],
-        conditions: Sequence[str | bool] | None = None,
-    ) -> ExtractionResult:
-        if actions.is_import_tasks(self.task.action):
-            self.logger.warning("Not sure how to handle conditional on static import")
-            # Ignore these.
-            return ExtractionResult.empty(predecessors)
-
-        return super().extract_condition(predecessors, conditions)
+    def _check_conditions(self) -> None:
+        if actions.is_import_tasks(self.task.action) and self.context.active_conditions:
+            self.logger.warning(
+                "Conditions active during static include, semantics unknown!"
+            )
 
     def _extract_included_content(
         self, included_content: TaskFile, predecessors: Sequence[rep.ControlNode]

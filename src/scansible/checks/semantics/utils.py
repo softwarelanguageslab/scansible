@@ -6,12 +6,9 @@ from enum import Enum
 
 from scansible.representations.pdg.extractor.expressions import EnvironmentType
 from scansible.representations.pdg.representation import (
-    Conditional,
-    ControlFlowEdge,
     ControlNode,
     DataFlowEdge,
     Def,
-    DefinedIf,
     Edge,
     Expression,
     Graph,
@@ -21,6 +18,7 @@ from scansible.representations.pdg.representation import (
     Task,
     Use,
     Variable,
+    When,
 )
 
 NodeT = TypeVar("NodeT", bound=Node)
@@ -106,17 +104,9 @@ def get_def_expression(
 
 
 def get_def_conditions(graph: Graph, v: Variable) -> list[Expression]:
-    conditionals = get_node_predecessors(graph, v, node_type=Node, edge_type=DefinedIf)
-    conditional_data_nodes: list[Node] = []
-    for cnode in conditionals:
-        assert isinstance(
-            cnode, Conditional
-        ), f"Internal Error: Expected {v!r} to be conditionally defined by Conditional, found {cnode!r}"
-        cond_uses = get_node_predecessors(graph, cnode, node_type=Node, edge_type=Use)
-        assert (
-            cond_uses
-        ), f"Internal Error: {v!r} is conditionally defined but condition {cnode!r} uses no data"
-        conditional_data_nodes.extend(cond_uses)
+    conditional_data_nodes = get_node_predecessors(
+        graph, v, node_type=Node, edge_type=When
+    )
 
     cond_exprs: list[Expression] = []
     for civ in conditional_data_nodes:
@@ -192,11 +182,7 @@ def register_task_has_conditions(graph: Graph, var: Variable) -> bool:
     ), f"Internal Error: Expected one task node found for registered variable {var!r}, found {len(task_nodes)}"
     task_node = task_nodes[0]
 
-    return bool(
-        get_node_predecessors(
-            graph, task_node, node_type=Conditional, edge_type=ControlFlowEdge
-        )
-    )
+    return bool(get_node_predecessors(graph, task_node, node_type=Node, edge_type=When))
 
 
 class ValueChangeReason(Enum):

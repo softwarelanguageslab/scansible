@@ -104,17 +104,6 @@ class Task(ControlNode):
 
 
 @define(slots=False, hash=False)
-class Loop(ControlNode):
-    """Node representing start of loop."""
-
-    loop_with: str | None = field(validator=type_validator(), on_setattr=setters.frozen)
-
-
-class Conditional(ControlNode):
-    """Node representing a condition."""
-
-
-@define(slots=False, hash=False)
 class Variable(DataNode):
     """Node representing variables."""
 
@@ -211,9 +200,31 @@ class Order(ControlFlowEdge):
     back: bool = field(validator=type_validator(), default=False)
 
 
-@frozen
 class Notifies(ControlFlowEdge):
     """Edges representing notification from task to handler."""
+
+
+class When(ControlFlowEdge):
+    """Edges representing conditional execution from data node to task."""
+
+    @classmethod
+    def raise_if_disallowed(cls, source: Node, target: Node) -> None:
+        # Can end in both data nodes (conditional definition) or control nodes (conditional execution)
+        if not isinstance(source, DataNode):
+            raise TypeError("Conditional edges are only allowed from data node")
+
+
+@frozen
+class Loop(ControlFlowEdge):
+    """Edges representing looping execution from data node (over which we iterate)
+    to task."""
+
+    @classmethod
+    def raise_if_disallowed(cls, source: Node, target: Node) -> None:
+        if not (isinstance(source, DataNode) and isinstance(target, ControlNode)):
+            raise TypeError(
+                "Loop edges are only allowed from data node to control nodes"
+            )
 
 
 class Use(DataFlowEdge):
@@ -221,11 +232,6 @@ class Use(DataFlowEdge):
 
     @classmethod
     def raise_if_disallowed(cls, source: Node, target: Node) -> None:
-        if isinstance(target, (Loop, Conditional)) and isinstance(
-            source, (Variable, IntermediateValue, Literal)
-        ):
-            return
-
         if not isinstance(source, Variable):
             raise TypeError(
                 f"Bare use edge must start at a variable, not at {type(source).__name__}"
@@ -288,23 +294,16 @@ class Def(DataFlowEdge):
     @classmethod
     def raise_if_disallowed(cls, source: Node, target: Node) -> None:
         if not isinstance(target, DataNode):
-            print(target)
             raise TypeError("Def edges can only define data")
+        if isinstance(target, Literal):
+            raise TypeError("Def edges cannot define literals")
 
 
-class DefinedIf(DataFlowEdge):
-    """Edges representing conditional definitions."""
-
-    @classmethod
-    def raise_if_disallowed(cls, source: Node, target: Node) -> None:
-        if not isinstance(target, DataNode):
-            raise TypeError("DefinedIf edges can only target data nodes")
-        if not isinstance(source, Conditional):
-            raise TypeError("DefinedIf edges must originate from conditionals")
-
-
+@frozen
 class DefLoopItem(Def):
     """Edges representing data definitions for single loop items."""
+
+    loop_with: str | None = field(validator=type_validator())
 
     @classmethod
     def raise_if_disallowed(cls, source: Node, target: Node) -> None:
@@ -318,8 +317,8 @@ ORDER_BACK = Order(back=True)
 NOTIFIES = Notifies()
 USE = Use()
 DEF = Def()
-DEF_LOOP_ITEM = DefLoopItem()
-DEFINED_IF = DefinedIf()
+WHEN = When()
+LOOP = Loop()
 
 
 if TYPE_CHECKING:
@@ -398,7 +397,7 @@ __all__ = [
     "ControlNode",
     "DataNode",
     "Loop",
-    "Conditional",
+    "LOOP",
     "Task",
     "Variable",
     "Expression",
@@ -408,11 +407,12 @@ __all__ = [
     "ScalarLiteral",
     "Edge",
     "DEF",
-    "DEFINED_IF",
     "USE",
     "ORDER",
     "ORDER_TRANS",
     "ORDER_BACK",
+    "When",
+    "WHEN",
     "Keyword",
     "Composition",
     "NodeLocation",

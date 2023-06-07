@@ -36,9 +36,6 @@ def get_node_label(n: rep.Node) -> str:
     if isinstance(n, rep.Task):
         return n.action
 
-    if isinstance(n, rep.Loop) and n.loop_with:
-        return f"LOOP: {n.loop_with}"
-
     return n.__class__.__name__
 
 
@@ -63,6 +60,8 @@ def dump_edge(e: rep.Edge, source: rep.Node, target: rep.Node, dot: gv.Digraph) 
         edge_label = e.index
     elif isinstance(e, rep.Input):
         edge_label = f"_{e.param_idx}"
+    elif isinstance(e, rep.DefLoopItem) and e.loop_with is not None:
+        edge_label = f"DEFLOOPITEM: {e.loop_with}"
 
     dot.edge(source_id, target_id, label=edge_label)
 

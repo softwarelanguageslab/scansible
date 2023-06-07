@@ -174,14 +174,14 @@ class VarContext:
         self, old_var_node: rep.Variable, new_var_node: rep.Variable
     ) -> None:
         # TODO: Change this once VarContext stores the conditions itself.
-        # Copy over all DEFINED_IF edges applied by the caller of this class as they should
-        # apply to any new variable value revision as well. DEFINED_IF only
+        # Copy over all WHEN edges applied by the caller of this class as they should
+        # apply to any new variable value revision as well. WHEN only
         # applies to definitions, not individual possible values. We'll
         # retrieve these from the first variable node, as that will be the one
         # manipulated by the caller.
         for predecessor in self.extraction_ctx.graph.predecessors(old_var_node):
             edge_type = self.extraction_ctx.graph[predecessor][old_var_node][0]["type"]
-            if edge_type is not rep.DEFINED_IF:
+            if edge_type is not rep.WHEN:
                 continue
             self.extraction_ctx.graph.add_edge(predecessor, new_var_node, edge_type)
 
