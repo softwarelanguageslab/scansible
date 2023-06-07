@@ -173,6 +173,14 @@ class ASTStringifier(NodeVisitor):
         assign = f"set {self.visit(node.target)} = {self.visit(node.node)}"
         return "{% " + assign + " %}"
 
+    def visit_AssignBlock(self, node: nodes.AssignBlock, **kwargs: Any) -> str:
+        if node.filter is not None:
+            raise ValueError(f"Unsupported node: {node}")
+        head = "{% set " + self.visit(node.target) + "%}"
+        body = "".join(self.visit(child) for child in node.body)
+        tail = "{% endset %}"
+        return "".join((head, body, tail))
+
     def visit_Test(self, node: nodes.Test, negate: bool = False, **kwargs: Any) -> str:
         lhs = self.visit(node.node)
         rhs = self._stringify_call(
@@ -348,6 +356,12 @@ class NodeReplacerVisitor(NodeVisitor):
     def visit_Assign(self, node: nodes.Assign) -> None:
         node.node = self._match_and_replace(node.node)
         node.target = self._match_and_replace(node.target)
+
+    def visit_AssignBlock(self, node: nodes.AssignBlock) -> None:
+        self._match_and_replace_list(node.body)
+        node.target = self._match_and_replace(node.target)
+        if node.filter is not None:
+            node.filter = self._match_and_replace(node.filter)
 
     def visit_Slice(self, node: nodes.Slice) -> None:
         if node.start:
