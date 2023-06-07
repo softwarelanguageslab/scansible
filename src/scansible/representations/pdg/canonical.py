@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from typing import Any, TypeGuard, TypeVar, cast
 
+import re
 from collections import defaultdict
 
 from ansible.module_utils.common.parameters import DEFAULT_TYPE_VALIDATORS
+from jinja2 import Environment
 from jinja2 import nodes as jnodes
 from jinja2.visitor import NodeVisitor
 from loguru import logger
@@ -186,6 +188,7 @@ def _is_simple_reference(ast: jnodes.Node) -> TypeGuard[jnodes.Name | jnodes.Tem
         and isinstance(ast.body[0], jnodes.Output)
         and len(ast.body[0].nodes) == 1
         and isinstance(ast.body[0].nodes[0], jnodes.Name)
+        and re.match(r"_\d+$", ast.body[0].nodes[0].name) is not None
     )
 
 
@@ -286,6 +289,11 @@ def _inline_constant_into_expression(
         )
 
     def replace_node(_: jnodes.Node) -> jnodes.Node:
+        # Jinja2 parses '{{ -1 }}' as Neg(Const(1)) instead of Const(-1). This
+        # doesn't make a difference in a functional sense, but it will lead to
+        # an error in the sanity checking during stringification of the expression.
+        if isinstance(value, (int, float)) and value < 0:
+            return jnodes.Neg(jnodes.Const(-value))
         return jnodes.Const(value)
 
     new_ast = NodeReplacerVisitor(check_node, replace_node).visit(ast)
@@ -383,6 +391,28 @@ def _convert_top_level_const_to_templatedata(ast: jnodes.Output) -> None:
             ast.nodes[idx] = jnodes.TemplateData(str(child.value))
 
 
+def _fix_escaped_templatedata(nodes: list[jnodes.Expr]) -> list[jnodes.Expr]:
+    # Re-escape double braces which may have been propagated from constants.
+    # E.g. "blabla {{ '{{' }}" which otherwise would get interpreted as a Jinja
+    # template.
+    # Alternatively we could ignore these in the Const -> TemplateData conversion,
+    # but we'd like to also canonicalize "blabla {{ '{{ abc'}}" to "blabla {{ "{{" }} abc"\
+    new_nodes: list[jnodes.Expr] = []
+    for node in nodes:
+        if not isinstance(node, jnodes.TemplateData) or (
+            "{{" not in node.data and "}}" not in node.data
+        ):
+            new_nodes.append(node)
+            continue
+
+        new_data = re.sub(r"([\{\}]{3,}|[%\{]{2,}|[%\}]{2,})", r'{{ "\1" }}', node.data)
+        new_body = Environment().parse(new_data).body
+        assert len(new_body) == 1 and isinstance(new_body[0], jnodes.Output)
+        new_nodes.extend(new_body[0].nodes)
+
+    return new_nodes
+
+
 def _squash_templatedatas(ast: jnodes.Output) -> None:
     new_nodes: list[jnodes.Expr] = []
     for child in ast.nodes:
@@ -394,6 +424,8 @@ def _squash_templatedatas(ast: jnodes.Output) -> None:
             new_nodes.append(child)
         else:
             new_nodes[-1].data += child.data
+
+    new_nodes = _fix_escaped_templatedata(new_nodes)
 
     # HACK: Jinja2 strips trailing newlines, but we may have propagated some
     # E.g. "blabla{{ '\n' }}" which people use to force trailing newlines.
