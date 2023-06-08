@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from posix import chown, chroot
-
 import graphviz as gv
 
 from .. import representation as rep
@@ -87,14 +85,19 @@ def dump_edge(e: rep.Edge, source: rep.Node, target: rep.Node, dot: gv.Digraph) 
     elif isinstance(e, rep.DefLoopItem) and e.loop_with is not None:
         edge_label = f"DEFLOOPITEM: {e.loop_with}"
 
-    dot.edge(
-        source_id,
-        target_id,
-        label=edge_label,
-        weight="100" if isinstance(e, rep.Order) else "1",
-        penwidth="2.5" if isinstance(e, rep.Order) else "1",
-        splines="ortho" if isinstance(e, rep.Order) else "spline",
-    )
+    if isinstance(e, rep.Order) and e.transitive:
+        dot.edge(
+            source_id,
+            target_id,
+            label=edge_label,
+            penwidth="2.5",
+            style="dotted",
+            color="grey",
+        )
+    elif isinstance(e, rep.Order):
+        dot.edge(source_id, target_id, label=edge_label, weight="100", penwidth="2.5")
+    else:
+        dot.edge(source_id, target_id, label=edge_label)
 
 
 def dump_graph(g: rep.Graph) -> gv.Digraph:

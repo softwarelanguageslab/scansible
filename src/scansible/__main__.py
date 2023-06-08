@@ -98,6 +98,11 @@ def cli(verbose: bool, quiet: bool) -> None:
     type=click.Path(resolve_path=True, path_type=Path, dir_okay=False, exists=True),
     help="Path to the module knowledge base (only required when --canonicalize is set)",
 )
+@click.option(
+    "--transitive-cfg/--no-transitive-cfg",
+    default=False,
+    help="Whether to construct a transitive closure over the CFG.",
+)
 def build_pdg(
     project_path: Path,
     name: str | None,
@@ -111,6 +116,7 @@ def build_pdg(
     strict: bool,
     canonicalize: bool,
     module_kb_path: Path | None,
+    transitive_cfg: bool,
 ) -> None:
     """Build a PDG for a project residing at PROJECT_PATH."""
     if name is None:
@@ -126,7 +132,13 @@ def build_pdg(
     from .representations.pdg import dump_graph, extract_pdg
 
     ctx = extract_pdg(
-        project_path, name, version, role_search_paths, as_pb=as_pb, lenient=not strict
+        project_path,
+        name,
+        version,
+        role_search_paths,
+        as_pb=as_pb,
+        lenient=not strict,
+        construct_transitive_cfg=transitive_cfg,
     )
     pdg = ctx.graph
     logger.info(f"Extracted PDG of {len(pdg)} nodes and {len(pdg.edges())} edges")
@@ -263,6 +275,11 @@ def prepare_module_kb(
     type=click.Path(resolve_path=True, path_type=Path, dir_okay=False, exists=True),
     help="Path to the module knowledge base (only required when --canonicalize is set)",
 )
+@click.option(
+    "--transitive-cfg/--no-transitive-cfg",
+    default=False,
+    help="Whether to construct a transitive closure over the CFG.",
+)
 def bulk_build(
     input_file: TextIO,
     repo_dir: Path,
@@ -270,6 +287,7 @@ def bulk_build(
     role_search_path: Sequence[Path],
     canonicalize: bool,
     module_kb_path: Path | None,
+    transitive_cfg: bool,
 ) -> None:
     """Build a collection of PDGs in bulk.
 
@@ -321,6 +339,7 @@ def bulk_build(
                     role_search_paths=role_search_path,
                     lenient=True,
                     as_pb=entrypoint["type"] == "playbook",
+                    construct_transitive_cfg=transitive_cfg,
                 )
                 pdg = ctx.graph
                 logger.info(

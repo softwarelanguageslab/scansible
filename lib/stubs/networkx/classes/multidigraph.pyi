@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Literal, Mapping, Sequence, overload
 
+from collections.abc import Iterable
+
 from networkx._types import EdgeAttrT, GraphAttrT, NodeT
 
 from .digraph import DiGraph
@@ -27,6 +29,14 @@ class MultiDiGraph(
         key: int | None = ...,
         **attr: EdgeAttrT,
     ) -> int: ...
+    def add_edges_from(
+        self,
+        ebunch_to_add: Iterable[tuple[NodeT, NodeT]]
+        | Iterable[tuple[NodeT, NodeT, dict[str, EdgeAttrT]]]
+        | Iterable[tuple[NodeT, NodeT, int]]
+        | Iterable[tuple[NodeT, NodeT, int, dict[str, EdgeAttrT]]],
+        **attr: EdgeAttrT,
+    ) -> list[int]: ...
     @overload
     def edges(self) -> Sequence[tuple[NodeT, NodeT]]: ...
     @overload

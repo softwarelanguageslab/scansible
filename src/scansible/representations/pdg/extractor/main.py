@@ -23,22 +23,31 @@ def extract_pdg(
     *,
     as_pb: bool | None = None,
     lenient: bool = True,
+    construct_transitive_cfg: bool = False,
 ) -> ExtractionContext:
     """
     Extract a PDG for a project at a given path.
 
-    :param      path:         The path to the project.
-    :type       path:         Path
-    :param      project_id:   The project identifier.
-    :type       project_id:   str
-    :param      project_rev:  The project revision.
-    :type       project_rev:  str
-    :param      as_pb:        Whether the project should be extracted as a
-                              playbook (if True), a role (if False), or
-                              autodetection (default).
-    :type       as_pb:        bool | None
-    :param      lenient:      Whether the extraction should be lenient.
-    :type       lenient:      bool
+    :param      path:                      The path to the project.
+    :type       path:                      Path
+    :param      project_id:                The project identifier.
+    :type       project_id:                str
+    :param      project_rev:               The project revision.
+    :type       project_rev:               str
+    :param      role_search_paths:         The role search paths.
+    :type       role_search_paths:         { type_description }
+    :param      as_pb:                     Whether the project should be
+                                           extracted as a playbook (if True), a
+                                           role (if False), or autodetection
+                                           (default).
+    :type       as_pb:                     bool | None
+    :param      lenient:                   Whether the extraction should be
+                                           lenient.
+    :type       lenient:                   bool
+    :param      construct_transitive_cfg:  Whether to construct a transitive
+                                           closure of the CFG and add it to the
+                                           graph.
+    :type       construct_transitive_cfg:  bool
 
     :returns:   The extraction context resulting from extraction.
     :rtype:     ExtractionContext
@@ -53,7 +62,9 @@ def extract_pdg(
             path, project_id, project_rev, lenient=lenient, extract_all=False
         )
 
-    return StructuralGraphExtractor(model, role_search_paths, lenient).extract()
+    return StructuralGraphExtractor(
+        model, role_search_paths, lenient, construct_transitive_cfg
+    ).extract()
 
 
 def _project_is_role(path: Path) -> bool:
@@ -75,8 +86,10 @@ class StructuralGraphExtractor:
         model: struct.StructuralModel,
         role_search_paths: Sequence[Path],
         lenient: bool,
+        construct_cfg_closure: bool = False,
     ) -> None:
         self.model = model
+        self.construct_cfg_closure = construct_cfg_closure
         graph = rep.Graph(model.id, model.version)
         for logstr in model.logs:
             logger.debug(logstr)
@@ -104,8 +117,8 @@ class StructuralGraphExtractor:
 
         logger.remove(log_handle)
 
-        # logger.info('Finished extraction, now adding transitive edges')
-        # self.add_transitive_edges()
+        if self.construct_cfg_closure:
+            self.context.graph.construct_cfg_closure()
 
         return self.context
 
@@ -127,27 +140,3 @@ class StructuralGraphExtractor:
             self.context,
             self.model.root,  # type: ignore[arg-type]
         ).extract()
-
-    def add_transitive_edges(self) -> None:
-        prev_num_edges = 0
-        while prev_num_edges != self.context.graph.number_of_edges():
-            print(prev_num_edges)
-            prev_num_edges = self.context.graph.number_of_edges()
-            for node in self.context.graph:
-                if not isinstance(node, rep.Task):
-                    continue
-                for succ, succ_edges in list(self.context.graph[node].items()):
-                    if not any(
-                        isinstance(e["type"], rep.Order) for e in succ_edges.values()
-                    ):
-                        continue
-
-                    for trans_succ, succ_succ_edges in self.context.graph[succ].items():
-                        if not any(
-                            isinstance(e["type"], rep.Order)
-                            for e in succ_succ_edges.values()
-                        ):
-                            continue
-
-                        # print(f'add {node} -> {trans_succ}')
-                        self.context.graph.add_edge(node, trans_succ, rep.ORDER_TRANS)

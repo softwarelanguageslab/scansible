@@ -3,13 +3,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Iterable
 from typing import Literal as LiteralT
-from typing import cast
+from typing import cast, overload
 
 from collections.abc import Callable
 
 import attrs
 from attrs import define, field, frozen, setters
+from networkx.algorithms.dag import transitive_closure
 from networkx.classes import MultiDiGraph
+from networkx.classes.graphviews import subgraph_view
 
 from scansible.utils.type_validators import type_validator
 
@@ -328,7 +330,7 @@ else:
 
 
 class Graph(BaseGraph):
-    def __init__(self, role_name: str, role_version: str) -> None:
+    def __init__(self, role_name: str = "", role_version: str = "") -> None:
         super().__init__(role_name=role_name, role_version=role_version)
         self._last_node_id = -1
         self._dirty = False
@@ -347,30 +349,51 @@ class Graph(BaseGraph):
 
     def add_node(self, node: Node) -> None:  # type: ignore[override]
         if not isinstance(node, Node):  # pyright: ignore
-            raise TypeError("Can only add Nodes to the graph")
+            raise TypeError(f"Can only add Nodes to the graph, given {node}")
 
         if node.node_id < 0:
             node.node_id = self._get_next_node_id()
         self._dirty = True
         super().add_node(node)
 
-    def add_nodes_from(self, nodes: Iterable[Node]) -> None:  # type: ignore[override]
+    def add_nodes_from(self, nodes: Iterable[Node] | Iterable[tuple[Node, dict[str, str]]]) -> None:  # type: ignore[override]
         # Adding one-by-one to reuse the checks above
         for node in nodes:
-            self.add_node(node)
+            if isinstance(node, tuple):
+                self.add_node(node[0])
+            else:
+                self.add_node(node)
 
-    def add_edge(self, n1: Node, n2: Node, type: Edge) -> int:  # type: ignore[override]
-        type.raise_if_disallowed(n1, n2)
+    @overload  # type: ignore[override]
+    def add_edge(self, n1: Node, n2: Node, type: Edge) -> int:
+        ...
+
+    @overload
+    def add_edge(self, n1: Node, n2: Node, *, key: int | None) -> int:
+        ...
+
+    def add_edge(  # type: ignore[misc]  # pyright: ignore
+        self,
+        n1: Node,
+        n2: Node,
+        edge_or_key: Edge | int | None,
+    ) -> int:
+        if edge_or_key is None or isinstance(edge_or_key, int):
+            # Original signature, called from add_edges_from
+            return super().add_edge(n1, n2, edge_or_key)
+
+        edge = edge_or_key
+        edge.raise_if_disallowed(n1, n2)
         if n1 not in self or n2 not in self:
             raise ValueError("Both nodes must already be added to the graph")
 
         existing_edges = self.get_edge_data(n1, n2)
         for edge_idx, edge_data in (existing_edges or {}).items():
-            if edge_data["type"] == type:
+            if edge_data["type"] == edge:
                 return edge_idx
 
         self._dirty = True
-        return super().add_edge(n1, n2, type=type)
+        return super().add_edge(n1, n2, type=edge)
 
     def remove_edge(self, n1: Node, n2: Node, key: int | None = None) -> None:
         self._dirty = True
@@ -389,6 +412,27 @@ class Graph(BaseGraph):
 
     def set_dirty(self) -> None:
         self._dirty = True
+
+    @property
+    def cfg(self) -> Graph:
+        def filter_node(node: Node) -> bool:
+            return isinstance(node, ControlNode)
+
+        def filter_edge(source: Node, target: Node, edge_key: int) -> bool:
+            edge = self[source][target][edge_key]["type"]
+            return isinstance(edge, ControlFlowEdge) and not (
+                isinstance(edge, Order) and edge.back
+            )
+
+        return subgraph_view(self, filter_node, filter_edge)
+
+    def construct_cfg_closure(self) -> None:
+        """Construct transitive closure of control-flow graph portion of the PDG."""
+        closure = transitive_closure(self.cfg, reflexive=None)
+        for edge in closure.edges():
+            if edge not in self.cfg.edges():
+                source, trans_target = edge
+                self.add_edge(source, trans_target, ORDER_TRANS)
 
 
 __all__ = [

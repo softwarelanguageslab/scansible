@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Generic, Iterator, Literal, Sequence, overload
+from typing import Generic, Iterable, Iterator, Literal, Sequence, overload
 
 from networkx._types import EdgeAttrT, GraphAttrT, NodeT
+
 
 class Graph(Generic[NodeT, GraphAttrT, EdgeAttrT]):
     graph: dict[str, GraphAttrT]
@@ -12,7 +13,9 @@ class Graph(Generic[NodeT, GraphAttrT, EdgeAttrT]):
     def __len__(self) -> int: ...
     def add_node(self, node_for_adding: NodeT, **attr: str) -> None: ...
     def add_nodes_from(
-        self, nodes_for_adding: Sequence[NodeT], **attr: str
+        self,
+        nodes_for_adding: Iterable[NodeT] | Iterable[tuple[NodeT, dict[str, str]]],
+        **attr: str,
     ) -> None: ...
     @overload
     def nodes(self) -> Iterator[NodeT]: ...
