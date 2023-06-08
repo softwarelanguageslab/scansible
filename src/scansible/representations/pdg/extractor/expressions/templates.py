@@ -43,13 +43,14 @@ class ASTStringifier(NodeVisitor):
     def _check_correctness(
         self, node: nodes.Node, generated: str, is_conditional: bool
     ) -> None:
-        reparsed = (
+        reparsed = merge_consecutive_templatedata(
             Environment().parse(generated)
             if not is_conditional
             else parse_conditional(generated, Environment(), {})[0]
         )
+        node = merge_consecutive_templatedata(node)
 
-        if reparsed == merge_consecutive_templatedata(node):
+        if reparsed == node:
             return
 
         # Allow changing of bad conditionals which contain braces
@@ -474,28 +475,6 @@ class NodeReplacerVisitor(NodeVisitor):
         node.value = self._match_and_replace(node.value)
 
 
-def _fix_escaped_templatedata(children: list[nodes.Expr]) -> list[nodes.Expr]:
-    # Re-escape double braces which may have been propagated from constants.
-    # E.g. "blabla {{ '{{' }}" which otherwise would get interpreted as a Jinja
-    # template.
-    # Alternatively we could ignore these in the Const -> TemplateData conversion,
-    # but we'd like to also canonicalize "blabla {{ '{{ abc'}}" to "blabla {{ "{{" }} abc"\
-    new_nodes: list[nodes.Expr] = []
-    for node in children:
-        if not isinstance(node, nodes.TemplateData) or (
-            "{{" not in node.data and "}}" not in node.data
-        ):
-            new_nodes.append(node)
-            continue
-
-        new_data = re.sub(r"([\{\}]{3,}|[%\{]{2,}|[%\}]{2,})", r'{{ "\1" }}', node.data)
-        new_body = Environment().parse(new_data).body
-        assert len(new_body) == 1 and isinstance(new_body[0], nodes.Output)
-        new_nodes.extend(new_body[0].nodes)
-
-    return new_nodes
-
-
 def merge_consecutive_templatedata(ast: nodes.Node) -> nodes.Node:
     def _check_node(node: nodes.Node) -> bool:
         return isinstance(node, nodes.Output)
@@ -512,8 +491,6 @@ def merge_consecutive_templatedata(ast: nodes.Node) -> nodes.Node:
                 new_nodes.append(child)
             else:
                 new_nodes[-1].data += child.data
-
-        new_nodes = _fix_escaped_templatedata(new_nodes)
 
         # Remove any empty template data. This doesn't functionally change anything
         # in the expression, but it leads to a difference in the stringifier.

@@ -19,6 +19,7 @@ from .extractor.expressions.templates import (
     ASTStringifier,
     NodeReplacerVisitor,
     TemplateExpressionAST,
+    merge_consecutive_templatedata,
 )
 from .extractor.expressions.var_context import extract_type_name
 from .representation import (
@@ -320,7 +321,7 @@ def _simplify_expressions(pdg: Graph) -> None:
         if _is_simple_expression(ast):
             assert isinstance(ast.body[0], jnodes.Output)
             _convert_top_level_const_to_templatedata(ast.body[0])
-            _squash_templatedatas(ast.body[0])
+            merge_consecutive_templatedata(ast)
 
         new_expr = ASTStringifier().stringify(ast, node.is_conditional)
 
@@ -411,43 +412,6 @@ def _fix_escaped_templatedata(nodes: list[jnodes.Expr]) -> list[jnodes.Expr]:
         new_nodes.extend(new_body[0].nodes)
 
     return new_nodes
-
-
-def _squash_templatedatas(ast: jnodes.Output) -> None:
-    new_nodes: list[jnodes.Expr] = []
-    for child in ast.nodes:
-        if (
-            not new_nodes
-            or not isinstance(child, jnodes.TemplateData)
-            or not isinstance(new_nodes[-1], jnodes.TemplateData)
-        ):
-            new_nodes.append(child)
-        else:
-            new_nodes[-1].data += child.data
-
-    new_nodes = _fix_escaped_templatedata(new_nodes)
-
-    # HACK: Jinja2 strips trailing newlines, but we may have propagated some
-    # E.g. "blabla{{ '\n' }}" which people use to force trailing newlines.
-    # Restore those.
-    if isinstance(new_nodes[-1], jnodes.TemplateData) and new_nodes[-1].data.endswith(
-        "\n"
-    ):
-        new_nodes[-1].data = new_nodes[-1].data[:-1]
-        if not new_nodes[-1].data:
-            new_nodes = new_nodes[:-1]
-        new_nodes.append(jnodes.Const("\n"))
-
-    # Remove any empty template data. This doesn't functionally change anything
-    # in the expression, but it leads to a difference in the stringifier.
-    if len(new_nodes) > 1:
-        new_nodes = [
-            node
-            for node in new_nodes
-            if not (isinstance(node, jnodes.TemplateData) and not node.data)
-        ]
-
-    ast.nodes = new_nodes
 
 
 def _replace_constant_expressions(pdg: Graph) -> None:
