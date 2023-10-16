@@ -42,12 +42,12 @@ class HardcodedSecretRule(Rule):
         return f"""
             {self._construct_query("[arg:KEYWORD]->(sink:Task)", "arg.keyword")}
             UNION
-            {self._construct_query("[:DEF|DEFLOOPITEM]->(sink:Variable)-[:DEF|DEFLOOPITEM|USE*0..]->()-[arg:KEYWORD]->(:Task)", "sink.name")}
+            {self._construct_query("[:DEF|DEFLOOPITEM]->(sink:Variable)-[:DEF|DEFLOOPITEM|INPUT*0..]->()-[arg:KEYWORD]->(:Task)", "sink.name")}
         """
 
     def _construct_query(self, chain_tail: str, key_getter: str) -> str:
         return f"""
-            MATCH chain = (source:Literal)-[:DEF|USE|DEFLOOPITEM*0..]->()-{chain_tail}
+            MATCH chain = (source:ScalarLiteral)-[:DEF|INPUT|DEFLOOPITEM*0..]->()-{chain_tail}
             WHERE {self.create_secret_test(key_getter)}
                 AND {self.create_secret_whitelist_test(key_getter)}
                 AND source.value <> ''

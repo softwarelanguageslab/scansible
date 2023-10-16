@@ -1136,5 +1136,4 @@ def describe_glitch_test_cases() -> None:
 
         assert results == [
             RuleResult("WeakCryptoAlgorithm", f"{pb_path}:6:38", f"{pb_path}:8:19", 2),
-            RuleResult("WeakCryptoAlgorithm", f"{pb_path}:8:19", f"{pb_path}:8:19", 1),
         ]

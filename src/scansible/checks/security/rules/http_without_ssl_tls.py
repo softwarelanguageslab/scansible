@@ -23,7 +23,7 @@ class HTTPWithoutSSLTLSRule(Rule):
     @property
     def query(self) -> str:
         return f"""
-            {self._create_query("Literal", "source.value", "source.type")}
+            {self._create_query("ScalarLiteral", "source.value", "source.type")}
             UNION
             {self._create_query("Expression", "source.expr", "")}
         """
@@ -32,10 +32,10 @@ class HTTPWithoutSSLTLSRule(Rule):
         self, source_type: str, value_getter: str, type_getter: str
     ) -> str:
         return f"""
-            MATCH chain = (source:{source_type}) -[:DEF|USE|DEFLOOPITEM*0..]->()-[:KEYWORD*0..1]->(sink)
+            MATCH chain = (source:{source_type}) -[:DEF|INPUT|DEFLOOPITEM*0..]->()-[:KEYWORD*0..1]->(sink)
             WHERE {self.create_http_test(value_getter, type_getter)}
                 AND (NOT ({self.create_localhost_test(value_getter, type_getter)}))
-                AND (sink:Task OR (sink:Variable AND NOT (sink)-[:USE|KEYWORD]->()))
+                AND (sink:Task OR (sink:Variable AND NOT (sink)-[:INPUT|KEYWORD]->()))
             {self._create_query_returns(["source"], [])}
         """
 
@@ -51,7 +51,7 @@ class HTTPWithoutSSLTLSRule(Rule):
 
             subresult = db.query(
                 f"""
-                MATCH (server_source:Literal) -[:DEF|USE|DEFLOOPITEM*0..]->({{ node_id: {source.properties["node_id"] }}})
+                MATCH (server_source:ScalarLiteral) -[:DEF|INPUT|DEFLOOPITEM*0..]->({{ node_id: {source.properties["node_id"] }}})
                 WHERE {self.create_localhost_test('server_source.value', 'server_source.type')}
                 RETURN server_source
             """

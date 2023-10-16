@@ -19,7 +19,7 @@ class AdminByDefaultRule(Rule):
     @property
     def query(self) -> str:
         return f"""
-            MATCH chain = (source:Literal)-[:DEF|USE|DEFLOOPITEM*0..]->()-[arg:KEYWORD]->(sink:Task)
+            MATCH chain = (source:ScalarLiteral)-[:DEF|INPUT|DEFLOOPITEM*0..]->()-[arg:KEYWORD]->(sink:Task)
             WHERE
                 {self.username_test}
                 AND

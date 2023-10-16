@@ -15,7 +15,7 @@ class WeakCryptoAlgorithmRule(Rule):
     @property
     def query(self) -> str:
         return f"""
-            {self._create_query("Literal", "value", "")}
+            {self._create_query("ScalarLiteral", "value", "")}
             UNION
             {self._create_query("Expression", "expr")}
         """
@@ -26,8 +26,8 @@ class WeakCryptoAlgorithmRule(Rule):
         value_accessor = f"source.{value_prop}"
         type_accessor = f"source.{type_prop}" if type_prop else ""
         return f"""
-            MATCH chain = (source:{source_type}) -[:DEF|USE|DEFLOOPITEM*0..]->()-[:KEYWORD*0..1]->(sink)
+            MATCH chain = (source:{source_type}) -[:DEF|INPUT|DEFLOOPITEM*0..]->()-[:KEYWORD*0..1]->(sink)
             WHERE {self.create_bad_algo_test(value_accessor, type_accessor)}
-                AND (sink:Task OR (sink:Variable AND NOT (sink)-[:USE|KEYWORD]->()))
+                AND (sink:Task OR (sink:Variable AND NOT (sink)-[:INPUT|KEYWORD]->()))
             {self._query_returns}
         """

@@ -56,11 +56,11 @@ class MissingIntegrityCheckRule(Rule):
     def query(self) -> str:
         # Repeated similar queries for the flags are due to some Neo4j weirdness.
         return f"""
-            {self._create_query("Literal", "value", "type")}
+            {self._create_query("ScalarLiteral", "value", "type")}
             UNION
             {self._create_query("Expression", "expr")}
             UNION
-            MATCH chain = (source:Literal) -[:DEF|USE|DEFLOOPITEM*0..]->()-[check_key:KEYWORD]->(sink:Task)
+            MATCH chain = (source:ScalarLiteral) -[:DEF|INPUT|DEFLOOPITEM*0..]->()-[check_key:KEYWORD]->(sink:Task)
             WHERE
                 ({self.create_check_integrity_flags_test("check_key.keyword")} AND {self._create_literal_bool_false_test("source")})
                 OR
@@ -75,7 +75,7 @@ class MissingIntegrityCheckRule(Rule):
             type_prop = f"source.{type_prop}"
         value_prop = f"source.{value_prop}"
         return f"""
-            MATCH chain = (source:{source_type}) -[:DEF|USE|DEFLOOPITEM*0..]->()-[:KEYWORD]->(sink:Task)
+            MATCH chain = (source:{source_type}) -[:DEF|INPUT|DEFLOOPITEM*0..]->()-[:KEYWORD]->(sink:Task)
             WHERE {self.create_download_test(value_prop, type_prop)}
                 AND {" AND ".join(f'(NOT ()-[:KEYWORD {{ keyword: "args.{check_kw}" }}]->(sink))' for check_kw in self.CHECKSUM_TOKENS)}
             {self._query_returns}
