@@ -5,6 +5,8 @@ from .base import Rule
 
 class UnrestrictedIPAddressRule(Rule):
 
+    name = 'Do not bind to the 0.0.0.0 address, as this exposes the service to the entire Internet'
+
     BAD_IPS = ("0.0.0.0",)
 
     def create_unrestricted_ip_address_check(

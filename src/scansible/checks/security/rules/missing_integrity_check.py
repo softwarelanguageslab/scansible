@@ -5,6 +5,8 @@ from .base import Rule
 
 class MissingIntegrityCheckRule(Rule):
 
+    name = 'The integrity of source code needs to be checked with cryptographic hashes after downloading'
+
     SOURCE_EXTS = (
         "dmg",
         "rpm",

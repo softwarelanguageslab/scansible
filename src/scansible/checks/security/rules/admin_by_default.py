@@ -5,6 +5,8 @@ from .base import Rule
 
 class AdminByDefaultRule(Rule):
 
+    name = 'Avoid using admin accounts, as this violates the principle of least privileges'
+
     USER_ROLE_TOKENS = ("user", "role", "uname", "login", "root", "admin")
     ADMIN_NAMES = ("admin", "root")
 

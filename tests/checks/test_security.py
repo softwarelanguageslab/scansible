@@ -61,7 +61,12 @@ def describe_hardcoded_secret_rule() -> None:
             results = rules.HardcodedSecretRule().run(graph_db)
 
         assert results == [
-            RuleResult("HardcodedSecret", f"{pb_path}:7:31", f"{pb_path}:4:19", 0)
+            RuleResult(
+                "Hardcoded secrets can compromise security when the source code falls into the wrong hands",
+                f"{pb_path}:7:31",
+                f"{pb_path}:4:19",
+                0,
+            )
         ]
 
     def matches_variable_on_task(
@@ -85,7 +90,12 @@ def describe_hardcoded_secret_rule() -> None:
             results = rules.HardcodedSecretRule().run(graph_db)
 
         assert results == [
-            RuleResult("HardcodedSecret", f"{pb_path}:4:24", f"{pb_path}:6:19", 1)
+            RuleResult(
+                "Hardcoded secrets can compromise security when the source code falls into the wrong hands",
+                f"{pb_path}:4:24",
+                f"{pb_path}:6:19",
+                1,
+            )
         ]
 
     def matches_2_chain_variable_on_task(
@@ -110,7 +120,12 @@ def describe_hardcoded_secret_rule() -> None:
             results = rules.HardcodedSecretRule().run(graph_db)
 
         assert results == [
-            RuleResult("HardcodedSecret", f"{pb_path}:4:24", f"{pb_path}:7:19", 2)
+            RuleResult(
+                "Hardcoded secrets can compromise security when the source code falls into the wrong hands",
+                f"{pb_path}:4:24",
+                f"{pb_path}:7:19",
+                2,
+            )
         ]
 
     def matches_variable_name_with_literal(
@@ -131,7 +146,12 @@ def describe_hardcoded_secret_rule() -> None:
             results = rules.HardcodedSecretRule().run(graph_db)
 
         assert results == [
-            RuleResult("HardcodedSecret", f"{pb_path}:4:34", f"{pb_path}:4:17", 1)
+            RuleResult(
+                "Hardcoded secrets can compromise security when the source code falls into the wrong hands",
+                f"{pb_path}:4:34",
+                f"{pb_path}:4:17",
+                1,
+            )
         ]
 
     def matches_indirect_variable_name(
@@ -153,7 +173,12 @@ def describe_hardcoded_secret_rule() -> None:
             results = rules.HardcodedSecretRule().run(graph_db)
 
         assert results == [
-            RuleResult("HardcodedSecret", f"{pb_path}:4:24", f"{pb_path}:5:17", 2)
+            RuleResult(
+                "Hardcoded secrets can compromise security when the source code falls into the wrong hands",
+                f"{pb_path}:4:24",
+                f"{pb_path}:5:17",
+                2,
+            )
         ]
 
     def does_not_match_update_password_flag_as_literal(
@@ -275,7 +300,12 @@ def describe_empty_password_rule() -> None:
             results = rules.EmptyPasswordRule().run(graph_db)
 
         assert results == [
-            RuleResult("EmptyPassword", f"{pb_path}:7:31", f"{pb_path}:4:19", 0)
+            RuleResult(
+                "Never use empty passwords, these are easy to crack",
+                f"{pb_path}:7:31",
+                f"{pb_path}:4:19",
+                0,
+            )
         ]
 
     def matches_null_literal_on_task(
@@ -297,7 +327,12 @@ def describe_empty_password_rule() -> None:
             results = rules.EmptyPasswordRule().run(graph_db)
 
         assert results == [
-            RuleResult("EmptyPassword", f"{pb_path}:4:19", f"{pb_path}:4:19", 0)
+            RuleResult(
+                "Never use empty passwords, these are easy to crack",
+                f"{pb_path}:4:19",
+                f"{pb_path}:4:19",
+                0,
+            )
         ]
 
     def matches_variable_on_task(
@@ -321,7 +356,12 @@ def describe_empty_password_rule() -> None:
             results = rules.EmptyPasswordRule().run(graph_db)
 
         assert results == [
-            RuleResult("EmptyPassword", f"{pb_path}:4:24", f"{pb_path}:6:19", 1)
+            RuleResult(
+                "Never use empty passwords, these are easy to crack",
+                f"{pb_path}:4:24",
+                f"{pb_path}:6:19",
+                1,
+            )
         ]
 
     def matches_2_chain_variable_on_task(
@@ -346,7 +386,12 @@ def describe_empty_password_rule() -> None:
             results = rules.EmptyPasswordRule().run(graph_db)
 
         assert results == [
-            RuleResult("EmptyPassword", f"{pb_path}:4:24", f"{pb_path}:7:19", 2)
+            RuleResult(
+                "Never use empty passwords, these are easy to crack",
+                f"{pb_path}:4:24",
+                f"{pb_path}:7:19",
+                2,
+            )
         ]
 
     def matches_variable_name_with_literal(
@@ -367,7 +412,12 @@ def describe_empty_password_rule() -> None:
             results = rules.EmptyPasswordRule().run(graph_db)
 
         assert results == [
-            RuleResult("EmptyPassword", f"{pb_path}:4:34", f"{pb_path}:4:17", 1)
+            RuleResult(
+                "Never use empty passwords, these are easy to crack",
+                f"{pb_path}:4:34",
+                f"{pb_path}:4:17",
+                1,
+            )
         ]
 
     def matches_indirect_variable_name(
@@ -389,7 +439,12 @@ def describe_empty_password_rule() -> None:
             results = rules.EmptyPasswordRule().run(graph_db)
 
         assert results == [
-            RuleResult("EmptyPassword", f"{pb_path}:4:24", f"{pb_path}:5:17", 2)
+            RuleResult(
+                "Never use empty passwords, these are easy to crack",
+                f"{pb_path}:4:24",
+                f"{pb_path}:5:17",
+                2,
+            )
         ]
 
 
@@ -411,7 +466,12 @@ def describe_admin_by_default_rule() -> None:
             results = rules.AdminByDefaultRule().run(graph_db)
 
         assert results == [
-            RuleResult("AdminByDefault", f"{pb_path}:5:32", f"{pb_path}:4:19", 0)
+            RuleResult(
+                "Avoid using admin accounts, as this violates the principle of least privileges",
+                f"{pb_path}:5:32",
+                f"{pb_path}:4:19",
+                0,
+            )
         ]
 
     def matches_variable_on_task(
@@ -433,7 +493,12 @@ def describe_admin_by_default_rule() -> None:
             results = rules.AdminByDefaultRule().run(graph_db)
 
         assert results == [
-            RuleResult("AdminByDefault", f"{pb_path}:4:28", f"{pb_path}:6:19", 1)
+            RuleResult(
+                "Avoid using admin accounts, as this violates the principle of least privileges",
+                f"{pb_path}:4:28",
+                f"{pb_path}:6:19",
+                1,
+            )
         ]
 
 
@@ -455,7 +520,12 @@ def describe_http_without_tls_or_ssl_rule() -> None:
             results = rules.HTTPWithoutSSLTLSRule().run(graph_db)
 
         assert results == [
-            RuleResult("HTTPWithoutSSLTLS", f"{pb_path}:5:26", f"{pb_path}:4:19", 0)
+            RuleResult(
+                "Always use SSL/TLS to connect over HTTP, i.e., use HTTPS",
+                f"{pb_path}:5:26",
+                f"{pb_path}:4:19",
+                0,
+            )
         ]
 
     def matches_variable_on_task(
@@ -477,7 +547,12 @@ def describe_http_without_tls_or_ssl_rule() -> None:
             results = rules.HTTPWithoutSSLTLSRule().run(graph_db)
 
         assert results == [
-            RuleResult("HTTPWithoutSSLTLS", f"{pb_path}:4:27", f"{pb_path}:6:19", 1)
+            RuleResult(
+                "Always use SSL/TLS to connect over HTTP, i.e., use HTTPS",
+                f"{pb_path}:4:27",
+                f"{pb_path}:6:19",
+                1,
+            )
         ]
 
     def matches_expression_creating_url(
@@ -499,7 +574,12 @@ def describe_http_without_tls_or_ssl_rule() -> None:
             results = rules.HTTPWithoutSSLTLSRule().run(graph_db)
 
         assert results == [
-            RuleResult("HTTPWithoutSSLTLS", f"{pb_path}:7:26", f"{pb_path}:6:19", 1)
+            RuleResult(
+                "Always use SSL/TLS to connect over HTTP, i.e., use HTTPS",
+                f"{pb_path}:7:26",
+                f"{pb_path}:6:19",
+                1,
+            )
         ]
 
     def matches_transitive_expression_creating_url(
@@ -522,7 +602,12 @@ def describe_http_without_tls_or_ssl_rule() -> None:
             results = rules.HTTPWithoutSSLTLSRule().run(graph_db)
 
         assert results == [
-            RuleResult("HTTPWithoutSSLTLS", f"{pb_path}:5:22", f"{pb_path}:7:19", 2)
+            RuleResult(
+                "Always use SSL/TLS to connect over HTTP, i.e., use HTTPS",
+                f"{pb_path}:5:22",
+                f"{pb_path}:7:19",
+                2,
+            )
         ]
 
     def does_not_match_localhost(
@@ -641,7 +726,12 @@ def describe_http_without_tls_or_ssl_rule() -> None:
             results = rules.HTTPWithoutSSLTLSRule().run(graph_db)
 
         assert results == [
-            RuleResult("HTTPWithoutSSLTLS", f"{pb_path}:4:22", f"{pb_path}:10:19", 2)
+            RuleResult(
+                "Always use SSL/TLS to connect over HTTP, i.e., use HTTPS",
+                f"{pb_path}:4:22",
+                f"{pb_path}:10:19",
+                2,
+            )
         ]
 
 
@@ -663,7 +753,12 @@ def describe_missing_integrity_check_rule() -> None:
             results = rules.MissingIntegrityCheckRule().run(graph_db)
 
         assert results == [
-            RuleResult("MissingIntegrityCheck", f"{pb_path}:5:26", f"{pb_path}:4:19", 0)
+            RuleResult(
+                "The integrity of source code needs to be checked with cryptographic hashes after downloading",
+                f"{pb_path}:5:26",
+                f"{pb_path}:4:19",
+                0,
+            )
         ]
 
     def matches_variable_on_task(
@@ -685,7 +780,12 @@ def describe_missing_integrity_check_rule() -> None:
             results = rules.MissingIntegrityCheckRule().run(graph_db)
 
         assert results == [
-            RuleResult("MissingIntegrityCheck", f"{pb_path}:4:27", f"{pb_path}:6:19", 1)
+            RuleResult(
+                "The integrity of source code needs to be checked with cryptographic hashes after downloading",
+                f"{pb_path}:4:27",
+                f"{pb_path}:6:19",
+                1,
+            )
         ]
 
     def matches_expression_creating_url(
@@ -707,7 +807,12 @@ def describe_missing_integrity_check_rule() -> None:
             results = rules.MissingIntegrityCheckRule().run(graph_db)
 
         assert results == [
-            RuleResult("MissingIntegrityCheck", f"{pb_path}:7:26", f"{pb_path}:6:19", 1)
+            RuleResult(
+                "The integrity of source code needs to be checked with cryptographic hashes after downloading",
+                f"{pb_path}:7:26",
+                f"{pb_path}:6:19",
+                1,
+            )
         ]
 
     def matches_disabled_gpgcheck(
@@ -728,7 +833,12 @@ def describe_missing_integrity_check_rule() -> None:
             results = rules.MissingIntegrityCheckRule().run(graph_db)
 
         assert results == [
-            RuleResult("MissingIntegrityCheck", f"{pb_path}:4:19", f"{pb_path}:4:19", 0)
+            RuleResult(
+                "The integrity of source code needs to be checked with cryptographic hashes after downloading",
+                f"{pb_path}:4:19",
+                f"{pb_path}:4:19",
+                0,
+            )
         ]
 
     def matches_inverted_disabled_gpgcheck(
@@ -749,7 +859,12 @@ def describe_missing_integrity_check_rule() -> None:
             results = rules.MissingIntegrityCheckRule().run(graph_db)
 
         assert results == [
-            RuleResult("MissingIntegrityCheck", f"{pb_path}:4:19", f"{pb_path}:4:19", 0)
+            RuleResult(
+                "The integrity of source code needs to be checked with cryptographic hashes after downloading",
+                f"{pb_path}:4:19",
+                f"{pb_path}:4:19",
+                0,
+            )
         ]
 
     def matches_disabled_gpgcheck_indirectly(
@@ -772,7 +887,12 @@ def describe_missing_integrity_check_rule() -> None:
             results = rules.MissingIntegrityCheckRule().run(graph_db)
 
         assert results == [
-            RuleResult("MissingIntegrityCheck", f"{pb_path}:4:17", f"{pb_path}:6:19", 1)
+            RuleResult(
+                "The integrity of source code needs to be checked with cryptographic hashes after downloading",
+                f"{pb_path}:4:17",
+                f"{pb_path}:6:19",
+                1,
+            )
         ]
 
     def does_not_match_enabled_gpgcheck(
@@ -850,7 +970,12 @@ def describe_unrestricted_ip_address_rule() -> None:
             results = rules.UnrestrictedIPAddressRule().run(graph_db)
 
         assert results == [
-            RuleResult("UnrestrictedIPAddress", f"{pb_path}:5:27", f"{pb_path}:4:19", 0)
+            RuleResult(
+                "Do not bind to the 0.0.0.0 address, as this exposes the service to the entire Internet",
+                f"{pb_path}:5:27",
+                f"{pb_path}:4:19",
+                0,
+            )
         ]
 
     def matches_indirect_literal_on_task(
@@ -872,7 +997,12 @@ def describe_unrestricted_ip_address_rule() -> None:
             results = rules.UnrestrictedIPAddressRule().run(graph_db)
 
         assert results == [
-            RuleResult("UnrestrictedIPAddress", f"{pb_path}:4:31", f"{pb_path}:6:19", 1)
+            RuleResult(
+                "Do not bind to the 0.0.0.0 address, as this exposes the service to the entire Internet",
+                f"{pb_path}:4:31",
+                f"{pb_path}:6:19",
+                1,
+            )
         ]
 
 
@@ -895,7 +1025,12 @@ def describe_weak_crypto_rule() -> None:
             results = rules.WeakCryptoAlgorithmRule().run(graph_db)
 
         assert results == [
-            RuleResult("WeakCryptoAlgorithm", f"{pb_path}:6:31", f"{pb_path}:4:19", 0)
+            RuleResult(
+                "Do not use weak cryptographic algorithms like CRC32, MD5, or SHA-1. Use SHA-256 or stronger instead.",
+                f"{pb_path}:6:31",
+                f"{pb_path}:4:19",
+                0,
+            )
         ]
 
     def matches_indirect_literal_on_task(
@@ -918,7 +1053,12 @@ def describe_weak_crypto_rule() -> None:
             results = rules.WeakCryptoAlgorithmRule().run(graph_db)
 
         assert results == [
-            RuleResult("WeakCryptoAlgorithm", f"{pb_path}:4:32", f"{pb_path}:6:19", 1)
+            RuleResult(
+                "Do not use weak cryptographic algorithms like CRC32, MD5, or SHA-1. Use SHA-256 or stronger instead.",
+                f"{pb_path}:4:32",
+                f"{pb_path}:6:19",
+                1,
+            )
         ]
 
     def matches_usage_in_expressions(
@@ -939,7 +1079,12 @@ def describe_weak_crypto_rule() -> None:
             results = rules.WeakCryptoAlgorithmRule().run(graph_db)
 
         assert results == [
-            RuleResult("WeakCryptoAlgorithm", f"{pb_path}:6:31", f"{pb_path}:4:19", 1)
+            RuleResult(
+                "Do not use weak cryptographic algorithms like CRC32, MD5, or SHA-1. Use SHA-256 or stronger instead.",
+                f"{pb_path}:6:31",
+                f"{pb_path}:4:19",
+                1,
+            )
         ]
 
 
@@ -961,7 +1106,12 @@ def describe_glitch_test_cases() -> None:
             results = run_all_checks(graph_db)
 
         assert results == [
-            RuleResult("AdminByDefault", f"{pb_path}:5:32", f"{pb_path}:4:19", 0)
+            RuleResult(
+                "Avoid using admin accounts, as this violates the principle of least privileges",
+                f"{pb_path}:5:32",
+                f"{pb_path}:4:19",
+                0,
+            )
         ]
 
     @pytest.mark.xfail(reason="nested key in dict literal")
@@ -992,7 +1142,12 @@ def describe_glitch_test_cases() -> None:
             results = run_all_checks(graph_db)
 
         assert results == [
-            RuleResult("EmptyPassword", f"{pb_path}:4:19", f"{pb_path}:4:19", 0)
+            RuleResult(
+                "Never use empty passwords, these are easy to crack",
+                f"{pb_path}:4:19",
+                f"{pb_path}:4:19",
+                0,
+            )
         ]
 
     @pytest.mark.xfail(reason="nested key in dict literal")
@@ -1023,7 +1178,12 @@ def describe_glitch_test_cases() -> None:
             results = run_all_checks(graph_db)
 
         assert results == [
-            RuleResult("HardcodedSecret", f"{pb_path}:10:33", f"{pb_path}:4:19", 0)
+            RuleResult(
+                "Hardcoded secrets can compromise security when the source code falls into the wrong hands",
+                f"{pb_path}:10:33",
+                f"{pb_path}:4:19",
+                0,
+            )
         ]
 
     def http_without_tls_ssl(db_instance: RedisGraphDatabase, tmp_path: Path) -> None:
@@ -1054,7 +1214,12 @@ def describe_glitch_test_cases() -> None:
             results = run_all_checks(graph_db)
 
         assert results == [
-            RuleResult("HTTPWithoutSSLTLS", f"{pb_path}:6:26", f"{pb_path}:4:19", 1)
+            RuleResult(
+                "Always use SSL/TLS to connect over HTTP, i.e., use HTTPS",
+                f"{pb_path}:6:26",
+                f"{pb_path}:4:19",
+                1,
+            )
         ]
 
     def no_integrity_check(db_instance: RedisGraphDatabase, tmp_path: Path) -> None:
@@ -1106,7 +1271,12 @@ def describe_glitch_test_cases() -> None:
             results = run_all_checks(graph_db)
 
         assert results == [
-            RuleResult("UnrestrictedIPAddress", f"{pb_path}:6:39", f"{pb_path}:4:19", 1)
+            RuleResult(
+                "Do not bind to the 0.0.0.0 address, as this exposes the service to the entire Internet",
+                f"{pb_path}:6:39",
+                f"{pb_path}:4:19",
+                1,
+            )
         ]
 
     def weak_crypto(db_instance: RedisGraphDatabase, tmp_path: Path) -> None:
@@ -1135,5 +1305,10 @@ def describe_glitch_test_cases() -> None:
             results = run_all_checks(graph_db)
 
         assert results == [
-            RuleResult("WeakCryptoAlgorithm", f"{pb_path}:6:38", f"{pb_path}:8:19", 2),
+            RuleResult(
+                "Do not use weak cryptographic algorithms like CRC32, MD5, or SHA-1. Use SHA-256 or stronger instead.",
+                f"{pb_path}:6:38",
+                f"{pb_path}:8:19",
+                2,
+            ),
         ]

@@ -6,6 +6,9 @@ from .base import Rule
 
 
 class HTTPWithoutSSLTLSRule(Rule):
+
+    name = 'Always use SSL/TLS to connect over HTTP, i.e., use HTTPS'
+
     IP_WHITELIST = ("localhost", "127.0.0.1")
 
     def create_http_test(self, key_getter: str, type_getter: str) -> str:

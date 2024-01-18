@@ -4,6 +4,8 @@ from .base import Rule
 
 
 class HardcodedSecretRule(Rule):
+
+    name = 'Hardcoded secrets can compromise security when the source code falls into the wrong hands'
     PASSWORD_TOKENS = (
         ("pass",),
         ("pwd",),

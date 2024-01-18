@@ -5,6 +5,8 @@ from .base import Rule
 
 class EmptyPasswordRule(Rule):
 
+    name = 'Never use empty passwords, these are easy to crack'
+
     PASSWORD_TOKENS = ("pass", "pwd")
 
     def create_password_test(self, key_getter: str) -> str:
