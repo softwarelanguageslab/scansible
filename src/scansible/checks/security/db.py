@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 from contextlib import contextmanager
+from pathlib import Path
+import time
 
 import redis
 
@@ -18,4 +20,7 @@ class RedisGraphDatabase:
         try:
             yield g
         finally:
-            g.delete()
+            try:
+                g.delete()
+            except:
+                pass

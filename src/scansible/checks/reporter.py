@@ -12,19 +12,20 @@ if TYPE_CHECKING:
 
 class TerminalReporter:
     def report_results(self, results: list[CheckResult]) -> None:
+        console = rich.console.Console(width=999)
         if not results:
-            rich.print("[green]No warnings found, keep it up!")
+            console.print("[green]No warnings found, keep it up!")
         for name, loc in sorted(set(results), key=lambda p: str(p[1])):
             if isinstance(loc, str):
-                rich.print(f"[gray]{loc}[/gray] - [bold red]{name}[/bold red]")
+                console.print(f"[gray]{loc}[/gray] - [bold red]{name}[/bold red]", width=999)
             else:
-                rich.print(
-                    f"[gray]{loc.file}:{loc.line}:{loc.column}[/gray] - [bold red]{name}[/bold red]"
+                console.print(
+                    f"[gray]{loc.file}:{loc.line}:{loc.column}[/gray] - [bold red]{name}[/bold red]", width=999
                 )
                 if loc.includer_location is not None:
-                    self.print_includer_loc(loc.includer_location)
+                    self.print_includer_loc(loc.includer_location, console)
 
-    def print_includer_loc(self, loc: NodeLocation) -> None:
-        rich.print(f"\t[gray]via {loc.file}:{loc.line}:{loc.column}")
+    def print_includer_loc(self, loc: NodeLocation, console: rich.console.Console) -> None:
+        console.print(f"\t[gray]via {loc.file}:{loc.line}:{loc.column}")
         if loc.includer_location is not None:
-            self.print_includer_loc(loc.includer_location)
+            self.print_includer_loc(loc.includer_location, console)

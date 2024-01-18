@@ -224,6 +224,88 @@ def check(
     reporter.report_results(results)
 
 
+@cli.command
+@click.argument(
+    "project_path", type=click.Path(exists=True, resolve_path=True, path_type=Path)
+)
+@click.argument(
+    "file_path", type=click.Path(exists=True, resolve_path=True, path_type=Path)
+)
+@click.option(
+    "-t",
+    "--type",
+    "project_type",
+    type=click.Choice(["playbook", "role"]),
+    help="Type of the provided project (default: autodetect)",
+)
+@click.option("--db-host", help="DB host", envvar="DB_HOST")
+@click.option(
+    "--role-search-path",
+    type=click.Path(file_okay=False, path_type=Path),
+    envvar="ROLE_SEARCH_PATH",
+    multiple=True,
+    help='Additional search paths to find role dependencies. Can be specified as environment variable "ROLE_SEARCH_PATH" (multiple paths can be separated with ":"). Provided directories are prepended to Ansible defaults.',
+)
+@click.option(
+    "--strict/--lenient",
+    default=False,
+    help="Whether extraction and building should be strict. This aborts processing files if a single task in that file is malformed. (default: lenient)",
+)
+@click.option(
+    "--enable-security/--skip-security",
+    default=True,
+    help="Whether to enable security smells",
+)
+@click.option(
+    "--enable-semantics/--skip-semantics",
+    default=True,
+    help="Whether to enable semantic smells",
+)
+def check_all(
+    project_path: Path,
+    file_path: Path,
+    role_search_path: Sequence[Path],
+    project_type: str | None,
+    strict: bool,
+    enable_security: bool,
+    enable_semantics: bool,
+    db_host: str,
+) -> None:
+    """Check the project residing at PROJECT_PATH for smells in all files."""
+    name = project_path.name
+    role_search_paths = list(role_search_path) + [
+        Path(p) for p in ans_constants.DEFAULT_ROLES_PATH
+    ]
+
+    from .representations.pdg import extract_pdg
+    from .utils.entrypoints import find_entrypoints
+    entrypoints = find_entrypoints(project_path)
+    results = []
+    logger.remove()
+
+    for entrypoint, project_type in entrypoints:
+        as_pb = None if project_type is None else project_type == "playbook"
+        ctx = extract_pdg(
+            entrypoint, name, "latest", role_search_paths, as_pb=as_pb, lenient=not strict
+        )
+
+        from .checks import TerminalReporter, run_all_checks
+
+        results.extend(run_all_checks(
+            ctx,
+            db_host,
+            enable_security=enable_security,
+            enable_semantics=enable_semantics,
+        ))
+
+    reporter = TerminalReporter()
+    reporter.report_results([
+        result
+        for result in results
+        if result.location.split(':')[0] == str(file_path)
+    ])
+
+
 @cli.command()
 @click.argument("output_path", type=click.Path(resolve_path=True, path_type=Path))
 @click.argument(
