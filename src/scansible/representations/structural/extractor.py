@@ -1,6 +1,7 @@
 """Extraction logic for structural model."""
 from __future__ import annotations
 
+from io import StringIO
 from typing import Any, Callable, Literal, TypeVar, overload
 
 from collections.abc import Iterable
@@ -324,27 +325,7 @@ def extract_playbook_child(
         return extract_play(ds, ctx)
 
 
-def extract_playbook(
-    path: Path, id: str, version: str, lenient: bool = True
-) -> rep.StructuralModel:
-    """
-    Extract a structural model from a playbook.
-
-    :param      path:     The path to the playbook.
-    :type       path:     Path
-    :param      id:       The identifier for the playbook.
-    :type       id:       str
-    :param      version:  The version of the playbook.
-    :type       version:  str
-    :param      lenient:  Whether extraction should be lenient, i.e. ignoring
-                          broken tasks/blocks.
-    :type       lenient:  bool
-
-    :returns:   Extracted structural model.
-    :rtype:     StructuralModel
-    """
-
-    pb_path = ProjectPath.from_root(path)
+def extract_playbook_file(pb_path: ProjectPath, lenient: bool) -> tuple[rep.Playbook, str]:
     ctx = ExtractionContext(lenient)
 
     with capture_output() as output, prevent_undesired_operations():
@@ -367,8 +348,34 @@ def extract_playbook(
     pb = rep.Playbook(plays=plays, raw=ds, broken_tasks=ctx.broken_tasks)
     for play in plays:
         play.parent = pb
+    return pb, output.getvalue()
+
+
+def extract_playbook(
+    path: Path, id: str, version: str, lenient: bool = True
+) -> rep.StructuralModel:
+    """
+    Extract a structural model from a playbook.
+
+    :param      path:     The path to the playbook.
+    :type       path:     Path
+    :param      id:       The identifier for the playbook.
+    :type       id:       str
+    :param      version:  The version of the playbook.
+    :type       version:  str
+    :param      lenient:  Whether extraction should be lenient, i.e. ignoring
+                          broken tasks/blocks.
+    :type       lenient:  bool
+
+    :returns:   Extracted structural model.
+    :rtype:     StructuralModel
+    """
+
+    pb_path = ProjectPath.from_root(path)
+    pb, logs = extract_playbook_file(pb_path, lenient=lenient)
+
     return rep.StructuralModel(
-        root=pb, path=path, id=id, version=version, logs=output.getvalue()
+        root=pb, path=path, id=id, version=version, logs=logs
     )
 
 

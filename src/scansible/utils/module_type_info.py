@@ -125,8 +125,13 @@ class ModuleInfo:
         cls,
         module_qualified_name: str,
         ansible_doc_bin_path: str = "ansible-doc",
+        module_path: Path | None = None,
     ) -> ModuleInfo:
-        cmd = [ansible_doc_bin_path, "-j", "-t", "module", module_qualified_name]
+        cmd = [ansible_doc_bin_path, "-j", "-t", "module"]
+        if module_path is not None:
+            cmd.extend(['-M', str(module_path)])
+        cmd.append(module_qualified_name)
+
         info_proc = subprocess.run(cmd, capture_output=True)
         response = json.loads(info_proc.stdout)
         info = response[module_qualified_name]
@@ -165,18 +170,20 @@ class ModuleKnowledgeBase:
 
     @classmethod
     def init_from_ansible_docs(
-        cls, ansible_doc_bin_path: str = "ansible-doc"
+        cls, ansible_doc_bin_path: str = "ansible-doc", module_path: Path | None = None
     ) -> ModuleKnowledgeBase:
-        all_modules_resp = subprocess.run(
-            [ansible_doc_bin_path, "-j", "-l", "-t", "module"], capture_output=True
-        ).stdout
+        run_args = [ansible_doc_bin_path, "-j", "-l", "-t", "module"]
+        if module_path is not None:
+            run_args.extend(['-M', str(module_path)])
+
+        all_modules_resp = subprocess.run(run_args, capture_output=True).stdout
         all_module_names = json.loads(all_modules_resp).keys()
 
         modules: dict[str, ModuleInfo] = {}
         for mod in rich.progress.track(
             all_module_names, description=f"Scanning {len(all_module_names)} modules"
         ):
-            modules[mod] = ModuleInfo.parse_from_ansible(mod, ansible_doc_bin_path)
+            modules[mod] = ModuleInfo.parse_from_ansible(mod, ansible_doc_bin_path, module_path)
 
         return cls(modules)
 

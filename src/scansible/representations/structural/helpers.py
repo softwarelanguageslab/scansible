@@ -140,7 +140,7 @@ def find_file(dir_path: ProjectPath, file_name: str) -> ProjectPath | None:
         return None
 
     found_path = found_paths[0]
-    return dir_path.join(found_path.decode("utf-8"))
+    return dir_path.join(found_path.decode("utf-8") if isinstance(found_path, bytes) else found_path)
 
 
 def find_all_files(dir_path: ProjectPath) -> list[ProjectPath]:
