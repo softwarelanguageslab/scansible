@@ -16,16 +16,14 @@ COLLECTION_PATHS = [
     if (coll_path := search_path / "ansible_collections").is_dir()
 ]
 
-_ROOT = Path.home() / "Work" / "Research" / "IaC" / "AnsibleCollectionsEcosystem"
 COLLECTION_CONTENT_PATH = Path("cache") / "collection_content.json"
 
 MODULE_SCA_PATH = (
-    _ROOT
-    / "DependencyPatternMatcher"
+    Path("DependencyPatternMatcher")
     / "target"
     / "scala-3.3.1"
     / "matcher.DependencyPatternMatcher-assembly-0.1.0-SNAPSHOT.jar"
-)
+).resolve()
 
 MODULE_SCA_PROJECT_TIMEOUT = 60 * 60 * 60  # 1 hour
 MODULE_SCA_JAVA_MAX_HEAP_SIZE = "64G"

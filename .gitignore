@@ -9,3 +9,4 @@ dist
 cache/*
 # TODO: Below should be generated automatically and not included in git repo.
 !cache/collection_content.json
+.metals
