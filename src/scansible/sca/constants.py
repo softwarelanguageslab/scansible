@@ -50,6 +50,8 @@ DEBIAN_NAME_MAPPINGS = {
     "python": "python3.12",
 }
 
+ECOSYSTEMS_SEVERITY_MAPPING = {"MODERATE": "MEDIUM"}
+
 HTML_CLASS_SEVERITY = {
     "critical": "dark",
     "high": "danger",

@@ -7,7 +7,7 @@ from typing import Any
 import requests
 
 from scansible.sca import CONSOLE
-from scansible.sca.constants import DEBIAN_NAME_MAPPINGS
+from scansible.sca.constants import DEBIAN_NAME_MAPPINGS, ECOSYSTEMS_SEVERITY_MAPPING
 from scansible.sca.types import Vulnerability
 
 CACHE_PATH = Path("cache")
@@ -120,7 +120,7 @@ def _build_vuln_from_ecosystems(
         package_name,
         _get_ecosystems_id(adv),
         adv.get("title", ""),
-        adv["severity"].lower(),
+        ECOSYSTEMS_SEVERITY_MAPPING.get(adv["severity"], adv["severity"]).lower(),
         adv["description"],
     )
 
