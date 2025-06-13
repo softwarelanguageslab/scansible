@@ -5,9 +5,7 @@ htmlcov
 out
 __pycache__
 dist
-module_info.json
 .ipynb_checkpoints
-debian_advisories.json
-dep_cache.json
-ghsa_cache.json
-smells_cache.json
+cache/*
+# TODO: Below should be generated automatically and not included in git repo.
+!cache/collection_content.json
