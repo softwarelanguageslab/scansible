@@ -1,0 +1,19 @@
+# Example playbook
+
+- hosts: all
+  name: Example
+  tasks:
+    - name: Configure user
+      user:
+        name: Ruben
+        password: Secret!!! # hardcoded password
+
+    - name: get info on an instance
+      # Requires a Python package which has some security advisories.
+      gcp_compute_instance_info:
+        zone: us-central1-a
+        filters:
+          - name = test_object
+        project: test_project
+        auth_kind: serviceaccount
+        service_account_file: "/tmp/auth.pem"

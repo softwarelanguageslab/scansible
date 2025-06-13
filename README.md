@@ -63,7 +63,17 @@ python -m scansible sca /path/to/project /path/to/output
 ```
 
 This will print information on the project dependencies to the console, and
-generate a HTML report in `/path/to/output`.
+generate an HTML report in `/path/to/output`.
+
+To run on a concrete example, use the `examples/example.yaml` playbook:
+
+```
+python -m scansible sca examples/ /path/to/output
+```
+
+This should produce a report containing a hardcoded secret security weakness,
+as well as several OS binary and Python package dependencies. One of the Python
+packages, `requests`, should contain a number of security advisories.
 
 ## Running tests
 
