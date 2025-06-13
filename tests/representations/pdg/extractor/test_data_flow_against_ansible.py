@@ -551,9 +551,9 @@ def _resolve_var_to_value(g: rep.Graph, v: rep.Variable) -> str | None:
         return None
     assert len(def_nodes) == 1, "Multiple defs should not happen here!"
     def_node = def_nodes[0]
-    assert isinstance(
-        def_node, (rep.IntermediateValue, rep.ScalarLiteral)
-    ), f"unexpected DEF node: {def_node}"
+    assert isinstance(def_node, (rep.IntermediateValue, rep.ScalarLiteral)), (
+        f"unexpected DEF node: {def_node}"
+    )
     if isinstance(def_node, rep.IntermediateValue):
         return _resolve_iv_to_value(g, def_node)
     return str(def_node.value)

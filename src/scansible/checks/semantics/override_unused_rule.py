@@ -83,9 +83,9 @@ class UnusedOverriddenRule(Rule):
                 # that the included file includes a variable/sets a fact with
                 # the same name as a parameter. This new variable can be used
                 # when the included file is left. Example: jkupferer.openshift_aws_cleanup
-                assert (
-                    v1.scope_level == EnvironmentType.INCLUDE_PARAMS.value
-                ), f"Determined that variable {v2!r} should be unusable because it is shadowed by a higher precedence one, but there appear to be usages either way"
+                assert v1.scope_level == EnvironmentType.INCLUDE_PARAMS.value, (
+                    f"Determined that variable {v2!r} should be unusable because it is shadowed by a higher precedence one, but there appear to be usages either way"
+                )
                 continue
 
             warning_header = f'Unused variable "{name}@{v2.version}" because it is already defined at higher precedence.'

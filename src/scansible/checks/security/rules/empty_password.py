@@ -4,8 +4,7 @@ from .base import Rule
 
 
 class EmptyPasswordRule(Rule):
-
-    name = 'Never use empty passwords, these are easy to crack'
+    name = "Never use empty passwords, these are easy to crack"
 
     PASSWORD_TOKENS = ("pass", "pwd")
 

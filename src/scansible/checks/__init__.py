@@ -13,7 +13,9 @@ class CheckResult(NamedTuple):
     #: The rule that was triggered.
     rule_name: str
     #: Location in the code of the smell (file:line:column)
-    location: NodeLocation | str  # TODO: NodeLocation only, needs changes in security smells
+    location: (
+        NodeLocation | str
+    )  # TODO: NodeLocation only, needs changes in security smells
 
 
 def run_all_checks(

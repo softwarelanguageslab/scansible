@@ -39,9 +39,10 @@ class RoleExtractor:
                         )
                     )
 
-        with self.context.vars.enter_scope(
-            EnvironmentType.ROLE_DEFAULTS
-        ), self.context.vars.enter_scope(EnvironmentType.ROLE_VARS):
+        with (
+            self.context.vars.enter_scope(EnvironmentType.ROLE_DEFAULTS),
+            self.context.vars.enter_scope(EnvironmentType.ROLE_VARS),
+        ):
             if (df := self.role.main_defaults_file) is not None:
                 with self.context.include_ctx.enter_role_file(df.file_path):
                     df_result = VariablesExtractor(
@@ -75,7 +76,8 @@ class RoleExtractor:
                 with self.context.include_ctx.enter_role_file(hf.file_path):
                     result = result.chain(
                         HandlerListExtractor(
-                            self.context, hf.tasks  # type: ignore[arg-type]
+                            self.context,
+                            hf.tasks,  # type: ignore[arg-type]
                         ).extract_handlers(result.next_predecessors)
                     )
 

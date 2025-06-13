@@ -57,9 +57,9 @@ def find_index(
 class ConflictingVariables:
     def __init__(self) -> None:
         self.roles: set[str] = set()
-        self.roles_to_variables_and_scope: dict[
-            str, set[tuple[str, int]]
-        ] = defaultdict(set)
+        self.roles_to_variables_and_scope: dict[str, set[tuple[str, int]]] = (
+            defaultdict(set)
+        )
         self.names_to_roles_and_scope: dict[str, set[tuple[str, int]]] = defaultdict(
             set
         )

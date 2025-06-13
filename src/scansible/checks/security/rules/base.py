@@ -45,7 +45,7 @@ class Rule(abc.ABC):
             self._create_single_string_contains_test(token, value_accessor)
             for token in tokens
         ]
-        token_query = f'({" OR ".join(token_queries)})'
+        token_query = f"({' OR '.join(token_queries)})"
 
         if not type_accessor:
             return token_query
@@ -132,7 +132,7 @@ class Rule(abc.ABC):
             ]
         )
 
-        return f'WITH {", ".join(with_clauses)} RETURN {", ".join(returns)}'
+        return f"WITH {', '.join(with_clauses)} RETURN {', '.join(returns)}"
 
     @abc.abstractproperty
     def query(self) -> str:

@@ -503,14 +503,14 @@ def _create_literal_node(pdg: Graph, value: Any) -> ScalarLiteral | CompositeLit
         node = CompositeLiteral(extract_type_name(value))  # pyright: ignore
         pdg.add_node(node)
         children = (  # pyright: ignore
-            value.items()
-            if isinstance(value, dict)
-            else enumerate(value)  # pyright: ignore
+            value.items() if isinstance(value, dict) else enumerate(value)  # pyright: ignore
         )
         for child_key, child in children:  # pyright: ignore
             child_node = _create_literal_node(pdg, child)
             pdg.add_edge(
-                child_node, node, Composition(str(child_key))  # pyright: ignore
+                child_node,
+                node,
+                Composition(str(child_key)),  # pyright: ignore
             )
         return node
 

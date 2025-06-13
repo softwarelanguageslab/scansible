@@ -6,8 +6,7 @@ from .base import Rule
 
 
 class HTTPWithoutSSLTLSRule(Rule):
-
-    name = 'Always use SSL/TLS to connect over HTTP, i.e., use HTTPS'
+    name = "Always use SSL/TLS to connect over HTTP, i.e., use HTTPS"
 
     IP_WHITELIST = ("localhost", "127.0.0.1")
 
@@ -54,8 +53,8 @@ class HTTPWithoutSSLTLSRule(Rule):
 
             subresult = db.query(
                 f"""
-                MATCH (server_source:ScalarLiteral) -[:DEF|INPUT|DEFLOOPITEM*0..]->({{ node_id: {source.properties["node_id"] }}})
-                WHERE {self.create_localhost_test('server_source.value', 'server_source.type')}
+                MATCH (server_source:ScalarLiteral) -[:DEF|INPUT|DEFLOOPITEM*0..]->({{ node_id: {source.properties["node_id"]}}})
+                WHERE {self.create_localhost_test("server_source.value", "server_source.type")}
                 RETURN server_source
             """
             )

@@ -4,7 +4,6 @@ from ..rules.base import Rule
 
 
 class MissingIntegrityCheckRule(Rule):
-
     SOURCE_EXTS = [
         "iso",
         "tar",

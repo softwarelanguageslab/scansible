@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Type
-
 from functools import partial
 from itertools import chain
 from pathlib import Path
 from textwrap import dedent
+from typing import Any, Callable, Type
 
 import ansible.parsing.dataloader
 import pytest
@@ -170,7 +169,7 @@ def describe_extracting_metadata_file() -> None:
                 ext.ProjectPath(tmp_path, "main.yml"), ext.ExtractionContext(False)
             )
 
-    @pytest.mark.parametrize("content", ["- hello\n- world" "test"])  # list  # string
+    @pytest.mark.parametrize("content", ["- hello\n- world"])  # list  # string
     def rejects_invalid_files(tmp_path: Path, content: str) -> None:
         (tmp_path / "main.yml").write_text(content)
 
@@ -328,7 +327,7 @@ def describe_extracting_variables() -> None:
             file_path=Path("main.yml"), variables={}, raw=None
         )
 
-    @pytest.mark.parametrize("content", ["- hello\n- world" "test"])  # list  # string
+    @pytest.mark.parametrize("content", ["- hello\n- world"])  # list  # string
     def rejects_invalid_files(tmp_path: Path, content: str) -> None:
         (tmp_path / "main.yml").write_text(content)
 
@@ -1167,7 +1166,7 @@ def describe_extracting_tasks_file() -> None:
 
         assert result == rep.TaskFile(file_path=Path("main.yml"), tasks=[])
 
-    @pytest.mark.parametrize("content", ["hello: world" "test"])  # dict  # string
+    @pytest.mark.parametrize("content", ["hello: world"])  # dict  # string
     def rejects_invalid_files(tmp_path: Path, content: str) -> None:
         (tmp_path / "main.yml").write_text(content)
 

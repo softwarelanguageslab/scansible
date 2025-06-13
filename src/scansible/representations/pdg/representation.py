@@ -1,4 +1,5 @@
 """Program Dependence Graph representation."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Iterable
@@ -84,13 +85,11 @@ class Node:
 
 
 @define(slots=False, hash=False)
-class ControlNode(Node):
-    ...
+class ControlNode(Node): ...
 
 
 @define(slots=False, hash=False)
-class DataNode(Node):
-    ...
+class DataNode(Node): ...
 
 
 @define(slots=False, hash=False)
@@ -356,7 +355,9 @@ class Graph(BaseGraph):
         self._dirty = True
         super().add_node(node)
 
-    def add_nodes_from(self, nodes: Iterable[Node] | Iterable[tuple[Node, dict[str, str]]]) -> None:  # type: ignore[override]
+    def add_nodes_from(
+        self, nodes: Iterable[Node] | Iterable[tuple[Node, dict[str, str]]]
+    ) -> None:  # type: ignore[override]
         # Adding one-by-one to reuse the checks above
         for node in nodes:
             if isinstance(node, tuple):
@@ -365,12 +366,10 @@ class Graph(BaseGraph):
                 self.add_node(node)
 
     @overload  # type: ignore[override]
-    def add_edge(self, n1: Node, n2: Node, type: Edge) -> int:
-        ...
+    def add_edge(self, n1: Node, n2: Node, type: Edge) -> int: ...
 
     @overload
-    def add_edge(self, n1: Node, n2: Node, *, key: int | None) -> int:
-        ...
+    def add_edge(self, n1: Node, n2: Node, *, key: int | None) -> int: ...
 
     def add_edge(  # type: ignore[misc]  # pyright: ignore
         self,

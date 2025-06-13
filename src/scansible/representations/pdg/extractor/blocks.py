@@ -65,7 +65,9 @@ class BlockExtractor:
             # `rescue` is sort of a branch, so merge the two results so we have
             # two potential predecessors: The last task of the block, and the
             # last task of the rescue.
-            result = result.merge(self._extract_children(self.block.rescue, result.added_control_nodes))  # type: ignore[arg-type]
+            result = result.merge(
+                self._extract_children(self.block.rescue, result.added_control_nodes)
+            )  # type: ignore[arg-type]
 
         # Predecessors of the always block is either the last main block task,
         # or the last rescue block task if it was called.
@@ -76,7 +78,9 @@ class BlockExtractor:
         if self.block.always:
             # If there's an always block, the next predecessors of the next element
             # will always be the last task of the always block, so use `chain`.
-            result = result.chain(self._extract_children(self.block.always, result.next_predecessors))  # type: ignore[arg-type]
+            result = result.chain(
+                self._extract_children(self.block.always, result.next_predecessors)
+            )  # type: ignore[arg-type]
 
         for misc_kw in ("become", "become_user", "become_method"):
             kw_val = getattr(self.block, misc_kw)

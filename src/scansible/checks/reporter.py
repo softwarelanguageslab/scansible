@@ -17,15 +17,20 @@ class TerminalReporter:
             console.print("[green]No warnings found, keep it up!")
         for name, loc in sorted(set(results), key=lambda p: str(p[1])):
             if isinstance(loc, str):
-                console.print(f"[gray]{loc}[/gray] - [bold red]{name}[/bold red]", width=999)
+                console.print(
+                    f"[gray]{loc}[/gray] - [bold red]{name}[/bold red]", width=999
+                )
             else:
                 console.print(
-                    f"[gray]{loc.file}:{loc.line}:{loc.column}[/gray] - [bold red]{name}[/bold red]", width=999
+                    f"[gray]{loc.file}:{loc.line}:{loc.column}[/gray] - [bold red]{name}[/bold red]",
+                    width=999,
                 )
                 if loc.includer_location is not None:
                     self.print_includer_loc(loc.includer_location, console)
 
-    def print_includer_loc(self, loc: NodeLocation, console: rich.console.Console) -> None:
+    def print_includer_loc(
+        self, loc: NodeLocation, console: rich.console.Console
+    ) -> None:
         console.print(f"\t[gray]via {loc.file}:{loc.line}:{loc.column}")
         if loc.includer_location is not None:
             self.print_includer_loc(loc.includer_location, console)

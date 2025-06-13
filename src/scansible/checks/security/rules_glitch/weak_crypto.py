@@ -4,7 +4,6 @@ from ..rules.base import Rule
 
 
 class WeakCryptoAlgorithmRule(Rule):
-
     BAD_ALGOS = ("md5", "sha1", "arcfour")
     WEAK_CRYPTO_WHITELIST = ("checksum",)
 

@@ -32,12 +32,10 @@ class PlaybookExtractor:
         # for all hosts, whereas the other files are for specific hosts.
 
         for play in self.playbook.plays:
-            with self.context.vars.enter_scope(
-                EnvironmentType.PLAY_VARS
-            ), self.context.vars.enter_scope(
-                EnvironmentType.PLAY_VARS_PROMPT
-            ), self.context.vars.enter_scope(
-                EnvironmentType.PLAY_VARS_FILES
+            with (
+                self.context.vars.enter_scope(EnvironmentType.PLAY_VARS),
+                self.context.vars.enter_scope(EnvironmentType.PLAY_VARS_PROMPT),
+                self.context.vars.enter_scope(EnvironmentType.PLAY_VARS_FILES),
             ):
                 # Extract variables first. Order doesn't really matter.
 

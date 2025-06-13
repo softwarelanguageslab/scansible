@@ -17,10 +17,12 @@ class CollectionContent:
     name: str
     modules: Mapping[str, ModuleInfo]
 
+
 @define
 class ModuleUsage:
     name: str
     usages: list[str]
+
 
 @define
 class RoleUsage:
@@ -29,10 +31,12 @@ class RoleUsage:
     used_collections: set[str]
     used_modules: set[str]
 
+
 @define
 class ModuleDependency:
     name: str
     type: str
+
 
 @define
 class ModuleDependencies:

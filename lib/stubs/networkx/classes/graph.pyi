@@ -4,7 +4,6 @@ from typing import Generic, Iterable, Iterator, Literal, Sequence, overload
 
 from networkx._types import EdgeAttrT, GraphAttrT, NodeT
 
-
 class Graph(Generic[NodeT, GraphAttrT, EdgeAttrT]):
     graph: dict[str, GraphAttrT]
 

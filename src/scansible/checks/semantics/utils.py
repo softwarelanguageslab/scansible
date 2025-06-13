@@ -79,12 +79,12 @@ def get_def_expression(
                 graph, node, node_type=IntermediateValue, edge_type=Edge
             )
         )
-        assert (
-            num_succ_ivs <= 1
-        ), f"Expected {node!r} to define at most one intermediate value, but found {num_succ_ivs}"
-        assert (
-            num_pred_ivs <= 1
-        ), f"Expected {node!r} to be defined by at most one intermediate value, but found {num_pred_ivs}"
+        assert num_succ_ivs <= 1, (
+            f"Expected {node!r} to define at most one intermediate value, but found {num_succ_ivs}"
+        )
+        assert num_pred_ivs <= 1, (
+            f"Expected {node!r} to be defined by at most one intermediate value, but found {num_pred_ivs}"
+        )
 
         if not pred_ivs:
             # No defining expression, maybe this variable is supplied by the client of a role
@@ -97,9 +97,9 @@ def get_def_expression(
         graph, def_iv, node_type=Expression, edge_type=Def
     )
     num_def_exprs = len(def_exprs)
-    assert (
-        num_def_exprs == 1
-    ), f"Expected intermediate value defining {def_iv!r} to be defined by exactly one expression, but found {num_def_exprs}"
+    assert num_def_exprs == 1, (
+        f"Expected intermediate value defining {def_iv!r} to be defined by exactly one expression, but found {num_def_exprs}"
+    )
     return def_exprs[0]
 
 
@@ -112,13 +112,13 @@ def get_def_conditions(graph: Graph, v: Variable) -> list[Expression]:
     for civ in conditional_data_nodes:
         if isinstance(civ, Literal):
             continue
-        assert isinstance(
-            civ, IntermediateValue
-        ), f"Internal Error: Expected {v!r} to be conditionally defined by literal or intermediate value, found {civ!r}"
+        assert isinstance(civ, IntermediateValue), (
+            f"Internal Error: Expected {v!r} to be conditionally defined by literal or intermediate value, found {civ!r}"
+        )
         expr = get_def_expression(graph, civ)
-        assert isinstance(
-            expr, Expression
-        ), f"Internal Error: {v!r} is conditionally defined without condition expression"
+        assert isinstance(expr, Expression), (
+            f"Internal Error: {v!r} is conditionally defined without condition expression"
+        )
         cond_exprs.append(expr)
 
     return cond_exprs
@@ -128,9 +128,9 @@ def get_used_variables(graph: Graph, expr: Expression) -> list[Variable]:
     usages = get_node_predecessors(graph, expr, node_type=Node, edge_type=Use)
     usages_cleaned: list[Variable] = []
     for usage in usages:
-        assert isinstance(
-            usage, Variable
-        ), f"Internal Error: Expression {expr!r} uses a non-variable: {usage!r}"
+        assert isinstance(usage, Variable), (
+            f"Internal Error: Expression {expr!r} uses a non-variable: {usage!r}"
+        )
         usages_cleaned.append(usage)
     return usages_cleaned
 
@@ -177,9 +177,9 @@ def is_registered_variable(graph: Graph, var: Variable) -> bool:
 
 def register_task_has_conditions(graph: Graph, var: Variable) -> bool:
     task_nodes = get_node_predecessors(graph, var, node_type=Task, edge_type=Def)
-    assert (
-        len(task_nodes) == 1
-    ), f"Internal Error: Expected one task node found for registered variable {var!r}, found {len(task_nodes)}"
+    assert len(task_nodes) == 1, (
+        f"Internal Error: Expected one task node found for registered variable {var!r}, found {len(task_nodes)}"
+    )
     task_node = task_nodes[0]
 
     return bool(get_node_predecessors(graph, task_node, node_type=Node, edge_type=When))
@@ -196,25 +196,25 @@ def determine_value_version_change_reason(
 ) -> tuple[ValueChangeReason, Expression | tuple[Variable, Variable] | None]:
     e1 = get_def_expression(graph, v1)
     e2 = get_def_expression(graph, v2)
-    assert (
-        e1 is not None and e2 is not None
-    ), f"It should not be possible for variables {v1!r} and {v2!r} to not have been defined!"
-    assert (
-        e1.expr == e2.expr and e1.is_pure == e2.is_pure
-    ), f"Variables {v1!r} and {v2!r} use different expressions"
+    assert e1 is not None and e2 is not None, (
+        f"It should not be possible for variables {v1!r} and {v2!r} to not have been defined!"
+    )
+    assert e1.expr == e2.expr and e1.is_pure == e2.is_pure, (
+        f"Variables {v1!r} and {v2!r} use different expressions"
+    )
 
     if not e1.is_pure:
         return ValueChangeReason.EXPRESSION_IMPURE, e1
 
     e1_uses = set(get_used_variables(graph, e1))
     e2_uses = set(get_used_variables(graph, e2))
-    assert len(e1_uses) == len(
-        e2_uses
-    ), f"Expressions used by {v1!r} and {v2!r} use different number of values"
+    assert len(e1_uses) == len(e2_uses), (
+        f"Expressions used by {v1!r} and {v2!r} use different number of values"
+    )
     common_uses = e1_uses & e2_uses
-    assert len(common_uses) < len(
-        e1_uses
-    ), f"Expressions used by {v1!r} and {v2!r} share all variable uses and are pure, yet still have different value versions"
+    assert len(common_uses) < len(e1_uses), (
+        f"Expressions used by {v1!r} and {v2!r} share all variable uses and are pure, yet still have different value versions"
+    )
 
     unique_e1_uses = sorted(e1_uses - common_uses, key=lambda v: v.name)
     unique_e2_uses = sorted(e2_uses - common_uses, key=lambda v: v.name)
@@ -225,9 +225,9 @@ def determine_value_version_change_reason(
     redefined_context: tuple[Variable, Variable] | None = None
     diff_value_version = False
     for e1_use, e2_use in diff_uses:
-        assert (
-            e1_use.name == e2_use.name
-        ), f"Expressions used by {v1!r} and {v2!r} should be identical, but use variables with different names: The former uses {e1_use.name}, the latter uses {e2_use.name}"
+        assert e1_use.name == e2_use.name, (
+            f"Expressions used by {v1!r} and {v2!r} should be identical, but use variables with different names: The former uses {e1_use.name}, the latter uses {e2_use.name}"
+        )
         this_redefined = e1_use.version != e2_use.version
         this_diff_value_version = (
             not redefined and e1_use.value_version != e2_use.value_version
@@ -239,9 +239,9 @@ def determine_value_version_change_reason(
         if redefined:
             redefined_context = (e1_use, e2_use)
 
-    assert (
-        redefined or diff_value_version
-    ), f"Could not find any difference between {v1!r} and {v2!r}"
+    assert redefined or diff_value_version, (
+        f"Could not find any difference between {v1!r} and {v2!r}"
+    )
     if redefined:
         assert redefined_context is not None
         return ValueChangeReason.DEPENDENCY_REDEFINED, redefined_context
@@ -254,18 +254,18 @@ def find_variable_usages(
 ) -> set[str]:
     usages = get_node_successors(graph, variable, node_type=Expression, edge_type=Use)
     if not usages:
-        assert not list(
-            graph.successors(variable)
-        ), f"Variable {variable!r} has successors but is not used in any expression"
+        assert not list(graph.successors(variable)), (
+            f"Variable {variable!r} has successors but is not used in any expression"
+        )
 
     usage_descriptions: set[str] = set()
     for usage in usages:
         expr_ivs = get_node_successors(
             graph, usage, node_type=IntermediateValue, edge_type=Def
         )
-        assert (
-            len(expr_ivs) >= 1
-        ), f"Variable {variable!r} is used in expression without defined intermediate values"
+        assert len(expr_ivs) >= 1, (
+            f"Variable {variable!r} is used in expression without defined intermediate values"
+        )
         for iv in expr_ivs:
             control_usages = get_node_successors(
                 graph, iv, node_type=ControlNode, edge_type=DataFlowEdge

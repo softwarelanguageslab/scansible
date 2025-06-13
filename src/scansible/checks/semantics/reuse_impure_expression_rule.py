@@ -33,9 +33,9 @@ class ReuseImpureExpressionRule(Rule):
     def scan_vars(
         self, graph: Graph, nodes: Collection[Variable]
     ) -> Iterable[RuleResult]:
-        assert len({node.value_version for node in nodes}) == len(
-            nodes
-        ), "Somehow different nodes with same value version?!"
+        assert len({node.value_version for node in nodes}) == len(nodes), (
+            "Somehow different nodes with same value version?!"
+        )
         # If there's only one value for this variable version, we don't need to
         # check anything.
         if len(nodes) <= 1:
@@ -55,9 +55,9 @@ class ReuseImpureExpressionRule(Rule):
             ) = determine_value_version_change_reason(graph, v1, v2)
             if value_version_change_reason != ValueChangeReason.EXPRESSION_IMPURE:
                 continue
-            assert isinstance(
-                value_change_context, Expression
-            ), "Internal Error: Unexpected value change context type"
+            assert isinstance(value_change_context, Expression), (
+                "Internal Error: Unexpected value change context type"
+            )
 
             warning_header = f'Potentially unsafe reuse of variable "{v2.name}@{v2.version}" due to potential impure expression.'
             warning_expl_lines = [

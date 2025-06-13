@@ -4,8 +4,7 @@ from .base import Rule
 
 
 class HardcodedSecretRule(Rule):
-
-    name = 'Hardcoded secrets can compromise security when the source code falls into the wrong hands'
+    name = "Hardcoded secrets can compromise security when the source code falls into the wrong hands"
     PASSWORD_TOKENS = (
         ("pass",),
         ("pwd",),
@@ -22,10 +21,10 @@ class HardcodedSecretRule(Rule):
 
     def create_secret_test(self, key_getter: str) -> str:
         password_test_parts = [
-            f'({" AND ".join(self._create_single_string_contains_test(token, key_getter) for token in token_sequences)})'
+            f"({' AND '.join(self._create_single_string_contains_test(token, key_getter) for token in token_sequences)})"
             for token_sequences in self.PASSWORD_TOKENS
         ]
-        password_test = f'({" OR ".join(password_test_parts)})'
+        password_test = f"({' OR '.join(password_test_parts)})"
         priv_key_suffixes_test = self._create_string_contains_test(
             self.PRIV_KEY_SUFFIXES, key_getter
         )

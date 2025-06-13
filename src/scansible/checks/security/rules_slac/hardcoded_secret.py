@@ -4,7 +4,6 @@ from ..rules.base import Rule
 
 
 class HardcodedSecretRule(Rule):
-
     PASSWORD_TOKENS = ["pass", "pwd", "password"]
     PRIV_KEY_PREFIXES = ("pvt", "priv")
     PRIV_KEY_SUFFIXES = ("cert", "key", "rsa", "secret", "ssl")

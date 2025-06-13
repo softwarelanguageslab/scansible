@@ -1,4 +1,5 @@
 """Extraction logic for structural model."""
+
 from __future__ import annotations
 
 from io import StringIO
@@ -123,7 +124,7 @@ def extract_variable_file(path: ProjectPath) -> rep.VariableFile:
 
 
 def extract_list_of_variables(
-    ds: dict[str, ans.AnsibleValue]
+    ds: dict[str, ans.AnsibleValue],
 ) -> dict[str, rep.AnyValue]:
     return {k: convert_ansible_values(v) for k, v in ds.items()}
 
@@ -151,8 +152,7 @@ def extract_list_of_tasks_or_blocks(
     ds: list[dict[str, ans.AnsibleValue]],
     ctx: ExtractionContext,
     handlers: Literal[True],
-) -> list[rep.Handler | rep.Block]:
-    ...
+) -> list[rep.Handler | rep.Block]: ...
 
 
 @overload
@@ -160,8 +160,7 @@ def extract_list_of_tasks_or_blocks(
     ds: list[dict[str, ans.AnsibleValue]],
     ctx: ExtractionContext,
     handlers: Literal[False] = ...,
-) -> list[rep.Task | rep.Block]:
-    ...
+) -> list[rep.Task | rep.Block]: ...
 
 
 def extract_list_of_tasks_or_blocks(
@@ -196,15 +195,13 @@ def _extract_block_list(
 @overload
 def extract_task_or_block(
     ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext, handlers: Literal[False]
-) -> rep.Task | rep.Block | None:
-    ...
+) -> rep.Task | rep.Block | None: ...
 
 
 @overload
 def extract_task_or_block(
     ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext, handlers: Literal[True]
-) -> rep.Handler | rep.Block | None:
-    ...
+) -> rep.Handler | rep.Block | None: ...
 
 
 def extract_task_or_block(
@@ -234,13 +231,19 @@ def extract_block(
     attrs = _ansible_to_dict(raw_block)
 
     attrs["block"] = extract_list_of_tasks_or_blocks(
-        raw_block.block, ctx, handlers=handlers  # pyright: ignore
+        raw_block.block,
+        ctx,
+        handlers=handlers,  # pyright: ignore
     )
     attrs["rescue"] = extract_list_of_tasks_or_blocks(
-        raw_block.rescue, ctx, handlers=handlers  # pyright: ignore
+        raw_block.rescue,
+        ctx,
+        handlers=handlers,  # pyright: ignore
     )
     attrs["always"] = extract_list_of_tasks_or_blocks(
-        raw_block.always, ctx, handlers=handlers  # pyright: ignore
+        raw_block.always,
+        ctx,
+        handlers=handlers,  # pyright: ignore
     )
     attrs["vars"] = extract_list_of_variables(raw_block.vars)
 
@@ -325,7 +328,9 @@ def extract_playbook_child(
         return extract_play(ds, ctx)
 
 
-def extract_playbook_file(pb_path: ProjectPath, lenient: bool) -> tuple[rep.Playbook, str]:
+def extract_playbook_file(
+    pb_path: ProjectPath, lenient: bool
+) -> tuple[rep.Playbook, str]:
     ctx = ExtractionContext(lenient)
 
     with capture_output() as output, prevent_undesired_operations():
@@ -374,9 +379,7 @@ def extract_playbook(
     pb_path = ProjectPath.from_root(path)
     pb, logs = extract_playbook_file(pb_path, lenient=lenient)
 
-    return rep.StructuralModel(
-        root=pb, path=path, id=id, version=version, logs=logs
-    )
+    return rep.StructuralModel(root=pb, path=path, id=id, version=version, logs=logs)
 
 
 def extract_role(

@@ -185,9 +185,9 @@ class IncludeContext:
 
     @contextmanager
     def enter_role_file(self, role_file_path: Path) -> Generator[None, None, None]:
-        assert (
-            self._role_base_path is not None
-        ), "Should not attempt to enter role file without having entered role"
+        assert self._role_base_path is not None, (
+            "Should not attempt to enter role file without having entered role"
+        )
         with self._enter_file(
             self._role_base_path.join(role_file_path), self.last_include_location
         ):
@@ -309,9 +309,9 @@ class IncludeContext:
             yield self._role_base_path.join(base_dir)
             yield self._role_base_path
 
-        assert (
-            self._last_included_file_path is not None
-        ), "Someone forgot to initialise the includes"
+        assert self._last_included_file_path is not None, (
+            "Someone forgot to initialise the includes"
+        )
         lifp_pp = ProjectPath(
             self._last_included_file_path.root,
             self._last_included_file_path.absolute.parent,
@@ -381,14 +381,18 @@ class VisibilityInformation:
         assert (
             var_name,
             def_version,
-        ) not in self._store, f"Internal Error: Visibility information already set for {var_name}@{def_version}"
+        ) not in self._store, (
+            f"Internal Error: Visibility information already set for {var_name}@{def_version}"
+        )
         self._store[(var_name, def_version)] = visible_definitions
 
     def get_info(self, var_name: str, def_version: int) -> set[tuple[str, int]]:
         assert (
             var_name,
             def_version,
-        ) in self._store, f"Internal Error: Visibility information not stored for {var_name}@{def_version}"
+        ) in self._store, (
+            f"Internal Error: Visibility information not stored for {var_name}@{def_version}"
+        )
         return self._store[(var_name, def_version)]
 
     def dump(self) -> str:

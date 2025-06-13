@@ -30,9 +30,9 @@ def get_var_origin(graph: Graph, node: Variable) -> Expression | Literal | Task 
 
     def_literal = get_node_predecessors(graph, node, node_type=Literal, edge_type=Def)
     if def_literal:
-        assert (
-            len(def_literal) == 1
-        ), f"Expected {node!r} to be defined by one literal, found {len(def_literal)}"
+        assert len(def_literal) == 1, (
+            f"Expected {node!r} to be defined by one literal, found {len(def_literal)}"
+        )
         return def_literal[0]
 
     return get_def_expression(graph, node)
@@ -75,9 +75,9 @@ class UnnecessarySetFactRule(Rule):
         results: list[RuleResult] = []
         for v in set_facted_vars:
             vorigin = get_var_origin(graph, v)
-            assert (
-                vorigin is not None
-            ), f"Internal Error: {v!r} was defined with set_fact but has no definition"
+            assert vorigin is not None, (
+                f"Internal Error: {v!r} was defined with set_fact but has no definition"
+            )
 
             if isinstance(vorigin, Task):
                 # register, not set_fact

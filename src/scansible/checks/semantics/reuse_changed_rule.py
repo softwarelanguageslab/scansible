@@ -33,9 +33,9 @@ class ReuseChangedVariableRule(Rule):
     def scan_vars(
         self, graph: Graph, nodes: Collection[Variable]
     ) -> Iterable[RuleResult]:
-        assert len({node.value_version for node in nodes}) == len(
-            nodes
-        ), "Somehow different nodes with same value version?!"
+        assert len({node.value_version for node in nodes}) == len(nodes), (
+            "Somehow different nodes with same value version?!"
+        )
         # If there's only one value for this variable version, we don't need to
         # check anything.
         if len(nodes) <= 1:

@@ -14,8 +14,7 @@ from scansible.representations.pdg import representation as rep
 
 
 class NodeFactory(Protocol):
-    def __call__(self, loc: rep.NodeLocation) -> rep.Node:
-        ...
+    def __call__(self, loc: rep.NodeLocation) -> rep.Node: ...
 
 
 # Shared behaviour for nodes
@@ -201,9 +200,10 @@ def describe_add_node() -> None:
         assert n in g
 
     def should_add_two_equivalent_nodes_with_different_locations(g: rep.Graph) -> None:
-        n1, n2 = rep.Task(
-            action="file", location=rep.NodeLocation("test.yml", 1, 1)
-        ), rep.Task(action="file", location=rep.NodeLocation("test.yml", 5, 1))
+        n1, n2 = (
+            rep.Task(action="file", location=rep.NodeLocation("test.yml", 1, 1)),
+            rep.Task(action="file", location=rep.NodeLocation("test.yml", 5, 1)),
+        )
         g.add_node(n1)
         g.add_node(n2)
 
@@ -248,9 +248,10 @@ def describe_add_nodes_from() -> None:
         assert n in g
 
     def should_add_two_equivalent_nodes_with_different_location(g: rep.Graph) -> None:
-        n1, n2 = rep.Task(
-            action="file", location=rep.NodeLocation("test.yml", 1, 1)
-        ), rep.Task(action="file", location=rep.NodeLocation("test.yml", 5, 1))
+        n1, n2 = (
+            rep.Task(action="file", location=rep.NodeLocation("test.yml", 1, 1)),
+            rep.Task(action="file", location=rep.NodeLocation("test.yml", 5, 1)),
+        )
         g.add_nodes_from([n1, n2])
 
         assert len(g) == 2

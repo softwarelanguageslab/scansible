@@ -4,7 +4,6 @@ from ..rules.base import Rule
 
 
 class MissingIntegrityCheckRule(Rule):
-
     SOURCE_EXTS = ["dmg", "rpm", "tar.gz", "tgz", "zip", "tar"]
     DOWNLOAD_PREFIXES = "http"
     CHECKSUM_TOKENS = ("gpgcheck", "checksum", "check_sha", "checksha")

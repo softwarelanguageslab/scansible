@@ -4,7 +4,6 @@ from ..rules.base import Rule
 
 
 class HardcodedSecretRule(Rule):
-
     PASSWORD_TOKENS = [
         "pass",
         "pwd",

@@ -140,7 +140,9 @@ def find_file(dir_path: ProjectPath, file_name: str) -> ProjectPath | None:
         return None
 
     found_path = found_paths[0]
-    return dir_path.join(found_path.decode("utf-8") if isinstance(found_path, bytes) else found_path)
+    return dir_path.join(
+        found_path.decode("utf-8") if isinstance(found_path, bytes) else found_path
+    )
 
 
 def find_all_files(dir_path: ProjectPath) -> list[ProjectPath]:
@@ -224,7 +226,9 @@ def convert_ansible_values(obj: Any) -> Any:
             [convert_ansible_values(el) for el in obj]  # pyright: ignore
         )
         seq.ansible_pos = getattr(
-            obj, "ansible_pos", ("unknown file", -1, -1)  # pyright: ignore
+            obj,
+            "ansible_pos",
+            ("unknown file", -1, -1),  # pyright: ignore
         )
         return seq
     if isinstance(obj, dict):
@@ -232,7 +236,9 @@ def convert_ansible_values(obj: Any) -> Any:
             {k: convert_ansible_values(v) for k, v in obj.items()}  # pyright: ignore
         )
         dct.ansible_pos = getattr(
-            obj, "ansible_pos", ("unknown file", -1, -1)  # pyright: ignore
+            obj,
+            "ansible_pos",
+            ("unknown file", -1, -1),  # pyright: ignore
         )
         return dct
     return obj

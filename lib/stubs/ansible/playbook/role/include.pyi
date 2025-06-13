@@ -18,5 +18,13 @@ class RoleInclude(RoleDefinition):
     _role_params: dict[str, Value] = ...
 
     @staticmethod
-    def load(data: Union[str, Mapping[object, object]], play: Play, current_role_path: Optional[str] = ..., parent_role: Optional[Role] = ..., variable_manager: Optional[VariableManager] = ..., loader: Optional[DataLoader] = ..., collection_list: Optional[object] = ...) -> RoleInclude: ...  # type: ignore[override]
+    def load(
+        data: Union[str, Mapping[object, object]],
+        play: Play,
+        current_role_path: Optional[str] = ...,
+        parent_role: Optional[Role] = ...,
+        variable_manager: Optional[VariableManager] = ...,
+        loader: Optional[DataLoader] = ...,
+        collection_list: Optional[object] = ...,
+    ) -> RoleInclude: ...  # type: ignore[override]
     def load_data(self, data: str | dict[str, Value]) -> RoleInclude: ...  # type: ignore[override]

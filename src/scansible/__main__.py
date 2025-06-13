@@ -279,6 +279,7 @@ def check_all(
 
     from .representations.pdg import extract_pdg
     from .utils.entrypoints import find_entrypoints
+
     entrypoints = find_entrypoints(project_path)
     results = []
     logger.remove()
@@ -286,24 +287,33 @@ def check_all(
     for entrypoint, project_type in entrypoints:
         as_pb = None if project_type is None else project_type == "playbook"
         ctx = extract_pdg(
-            entrypoint, name, "latest", role_search_paths, as_pb=as_pb, lenient=not strict
+            entrypoint,
+            name,
+            "latest",
+            role_search_paths,
+            as_pb=as_pb,
+            lenient=not strict,
         )
 
         from .checks import TerminalReporter, run_all_checks
 
-        results.extend(run_all_checks(
-            ctx,
-            db_host,
-            enable_security=enable_security,
-            enable_semantics=enable_semantics,
-        ))
+        results.extend(
+            run_all_checks(
+                ctx,
+                db_host,
+                enable_security=enable_security,
+                enable_semantics=enable_semantics,
+            )
+        )
 
     reporter = TerminalReporter()
-    reporter.report_results([
-        result
-        for result in results
-        if result.location.split(':')[0] == str(file_path)
-    ])
+    reporter.report_results(
+        [
+            result
+            for result in results
+            if result.location.split(":")[0] == str(file_path)
+        ]
+    )
 
 
 @cli.command()
@@ -330,6 +340,7 @@ def prepare_module_kb(
     output_path.parent.mkdir(exist_ok=True, parents=True)
     kb.dump_to_file(output_path, slim=not full)
 
+
 @cli.command()
 @click.argument(
     "input_project",
@@ -346,9 +357,12 @@ def prepare_module_kb(
     multiple=True,
     help='Additional search paths to find role dependencies. Can be specified as environment variable "ROLE_SEARCH_PATH" (multiple paths can be separated with ":"). Provided directories are prepended to Ansible defaults.',
 )
-def sca(input_project: Path, output_dir: Path, role_search_path: Sequence[Path]) -> None:
+def sca(
+    input_project: Path, output_dir: Path, role_search_path: Sequence[Path]
+) -> None:
     """Run Software Composition Analysis on project."""
     from .sca import scan_project
+
     scan_project(input_project, output_dir, list(role_search_path))
 
 
@@ -413,9 +427,10 @@ def bulk_build(
 
     from .representations.pdg import dump_graph, extract_pdg
 
-    with (output_path / "failed.csv").open("wt") as failed_out_f, (
-        output_path / "errors.log"
-    ).open("wt") as error_log_f:
+    with (
+        (output_path / "failed.csv").open("wt") as failed_out_f,
+        (output_path / "errors.log").open("wt") as error_log_f,
+    ):
         failed_out_csv = csv.DictWriter(
             failed_out_f, fieldnames=["repo", "relative_path", "type"]
         )

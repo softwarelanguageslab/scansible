@@ -11,12 +11,13 @@ from .types import CollectionContent, ModuleInfo
 
 def get_module_match_score(module: ModuleInfo, args: list[str]) -> int:
     extra_score = 0
-    if module.collection.startswith('ansible.'):
+    if module.collection.startswith("ansible."):
         extra_score = 2
-    elif module.collection.startswith('community.'):
+    elif module.collection.startswith("community."):
         extra_score = 1
 
     return len(set(args) & set(module.params)) + extra_score
+
 
 class CollectionIndex:
     collections: Mapping[str, CollectionContent]
@@ -35,9 +36,9 @@ class CollectionIndex:
         return [c.modules[name] for c in colls]
 
     def get_module(self, name: str, args: Collection[str]) -> ModuleInfo | None:
-        if '.' in name:
-            [namespace, coll_name, module_name] = name.split('.')
-            fqn = f'{namespace}.{coll_name}'
+        if "." in name:
+            [namespace, coll_name, module_name] = name.split(".")
+            fqn = f"{namespace}.{coll_name}"
             try:
                 return self.collections[fqn].modules[module_name]
             except KeyError:
@@ -49,30 +50,33 @@ class CollectionIndex:
         if len(cands) == 1:
             return cands[0]
 
-        return sorted(cands, reverse=True, key=lambda cand: get_module_match_score(cand, args))[0]
+        return sorted(
+            cands, reverse=True, key=lambda cand: get_module_match_score(cand, args)
+        )[0]
 
 
 def get_collection_index() -> CollectionIndex:
-    with COLLECTION_CONTENT_PATH.open('rt') as f:
+    with COLLECTION_CONTENT_PATH.open("rt") as f:
         collection_content = json.load(f)
 
     collections: list[CollectionContent] = []
     for c in collection_content:
-        name = c['name']
-        namespace = c['namespace']
-        fqn = f'{namespace}.{name}'
+        name = c["name"]
+        namespace = c["namespace"]
+        fqn = f"{namespace}.{name}"
         modules: list[ModuleInfo] = []
 
-        for content in c['contents']:
+        for content in c["contents"]:
             match content:
                 case {"name": cname, "type": "module", "parameters": cparams}:
-                    simple_name = cname.removeprefix(f'{fqn}.')
+                    simple_name = cname.removeprefix(f"{fqn}.")
                     all_params: list[str] = []
                     for p in cparams:
-                        all_params.append(p['name'])
-                        all_params.extend(p['aliases'])
+                        all_params.append(p["name"])
+                        all_params.extend(p["aliases"])
                     modules.append(ModuleInfo(simple_name, fqn, all_params))
-                case _: pass
+                case _:
+                    pass
 
         collections.append(CollectionContent(fqn, {mod.name: mod for mod in modules}))
 

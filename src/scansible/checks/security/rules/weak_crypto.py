@@ -4,8 +4,7 @@ from .base import Rule
 
 
 class WeakCryptoAlgorithmRule(Rule):
-
-    name = 'Do not use weak cryptographic algorithms like CRC32, MD5, or SHA-1. Use SHA-256 or stronger instead.'
+    name = "Do not use weak cryptographic algorithms like CRC32, MD5, or SHA-1. Use SHA-256 or stronger instead."
 
     BAD_ALGOS = ("md5", "sha1", "crc32", "crc16", "arcfour")
 

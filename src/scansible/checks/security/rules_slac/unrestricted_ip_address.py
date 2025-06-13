@@ -4,7 +4,6 @@ from ..rules.base import Rule
 
 
 class UnrestrictedIPAddressRule(Rule):
-
     BAD_IPS = ("0.0.0.0",)
 
     def create_unrestricted_ip_address_check(

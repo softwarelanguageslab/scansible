@@ -1,4 +1,5 @@
 """Facilitate access to Ansible playbook types."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

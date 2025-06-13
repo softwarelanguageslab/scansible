@@ -22,5 +22,6 @@ class RuleResult(BaseModel):
 
 
 class Rule:
-    def scan(self, graph: Graph, visinfo: VisibilityInformation) -> list[RuleResult]:
-        ...
+    def scan(
+        self, graph: Graph, visinfo: VisibilityInformation
+    ) -> list[RuleResult]: ...

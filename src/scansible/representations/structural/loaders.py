@@ -226,7 +226,11 @@ def _patch_modargs_parser() -> Generator[None, None, None]:
     # Patch the ModuleArgsParser so that it doesn't verify whether the action exist.
     # Otherwise it'll complain on non-builtin actions
     old_mod_args_parse = ans.ModuleArgsParser.parse
-    ans.ModuleArgsParser.parse = lambda self, skip_action_validation=False: old_mod_args_parse(self, skip_action_validation=True)  # type: ignore[assignment]
+    ans.ModuleArgsParser.parse = (
+        lambda self, skip_action_validation=False: old_mod_args_parse(
+            self, skip_action_validation=True
+        )
+    )  # type: ignore[assignment]
 
     try:
         yield
@@ -350,15 +354,13 @@ def _transform_old_always_run(ds: dict[str, ans.AnsibleValue]) -> None:
 @overload
 def load_task(
     original_ds: dict[str, ans.AnsibleValue] | None, as_handler: Literal[True]
-) -> tuple[ans.Handler, Any]:
-    ...
+) -> tuple[ans.Handler, Any]: ...
 
 
 @overload
 def load_task(
     original_ds: dict[str, ans.AnsibleValue] | None, as_handler: Literal[False]
-) -> tuple[ans.Task, Any]:
-    ...
+) -> tuple[ans.Task, Any]: ...
 
 
 def load_task(
@@ -543,15 +545,13 @@ def load_role_dependency(
 
 
 def _load_old_style_role_dependency(
-    original_ds: str | dict[str, ans.AnsibleValue]
+    original_ds: str | dict[str, ans.AnsibleValue],
 ) -> _PatchedRoleInclude:
     ds = deepcopy(original_ds)
 
     # Validation from original RoleInclude, can't use the method because it
     # constructs a RoleInclude, which attempts to resolve the role path.
-    if not isinstance(
-        ds, (str, dict, ans.AnsibleBaseYAMLObject, int)
-    ):  # pyright: ignore
+    if not isinstance(ds, (str, dict, ans.AnsibleBaseYAMLObject, int)):  # pyright: ignore
         raise LoadTypeError(
             "role dependency", str | dict | ans.AnsibleBaseYAMLObject, ds
         )

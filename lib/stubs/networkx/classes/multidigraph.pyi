@@ -9,7 +9,6 @@ from networkx._types import EdgeAttrT, GraphAttrT, NodeT
 from .digraph import DiGraph
 from .multigraph import MultiGraph
 
-
 class MultiDiGraph(
     MultiGraph[NodeT, GraphAttrT, EdgeAttrT], DiGraph[NodeT, GraphAttrT, EdgeAttrT]
 ):

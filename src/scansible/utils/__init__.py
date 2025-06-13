@@ -43,7 +43,9 @@ def make_immutable(obj: _T) -> _T:
     if isinstance(obj, str):
         return obj  # type: ignore[return-value]
     if isinstance(obj, Mapping):
-        return FrozenDict({make_immutable(k): make_immutable(v) for k, v in obj.items()})  # type: ignore
+        return FrozenDict(
+            {make_immutable(k): make_immutable(v) for k, v in obj.items()}
+        )  # type: ignore
     if isinstance(obj, Sequence):
         return tuple([make_immutable(e) for e in obj])  # type: ignore
 

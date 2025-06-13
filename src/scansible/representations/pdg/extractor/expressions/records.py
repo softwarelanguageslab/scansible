@@ -32,12 +32,10 @@ class TemplateRecord(_RecordBase):
     used_variables: list[VariableValueRecord]
 
     @property
-    def may_be_impure(self) -> bool:
-        ...
+    def may_be_impure(self) -> bool: ...
 
     @property
-    def is_literal(self) -> bool:
-        ...
+    def is_literal(self) -> bool: ...
 
 
 @dataclass(frozen=True)

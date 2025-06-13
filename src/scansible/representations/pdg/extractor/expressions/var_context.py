@@ -143,9 +143,9 @@ class VarContext:
         allow_undefined: bool = True,
     ) -> rep.Variable:
         var_node = self._value_to_var_node.get((var_def, val_revision))
-        assert (
-            allow_undefined or var_node is not None
-        ), "Internal error: var node undefined"
+        assert allow_undefined or var_node is not None, (
+            "Internal error: var node undefined"
+        )
 
         if var_node is None:
             assert val_revision > 0, "Internal error: First variable node undefined"
@@ -280,7 +280,8 @@ class VarContext:
     ) -> None:
         child = self._add_literal_node(value).data_node
         assert not isinstance(
-            key, (tuple, list, Mapping)  # type: ignore[unreachable]
+            key,
+            (tuple, list, Mapping),  # type: ignore[unreachable]
         ), "Internal error: Unexpected composite keys"
         self.extraction_ctx.graph.add_edge(child, parent, rep.Composition(str(key)))
 
@@ -529,9 +530,9 @@ class VarContext:
             return self._create_new_variable_value(vdef, template_record)
 
         logger.debug(f"Found pre-existing value {vval!r}, reusing")
-        assert isinstance(
-            vval, ChangeableVariableValueRecord
-        ), f"Expected evaluated value to be changeable"
+        assert isinstance(vval, ChangeableVariableValueRecord), (
+            f"Expected evaluated value to be changeable"
+        )
         return vval
 
     def _create_new_variable_value(
@@ -551,21 +552,21 @@ class VarContext:
         self._envs.set_changeable_variable_value(vdef.name, value_record)
 
         var_node = self._get_var_node_for_value(vdef, value_revision)
-        assert (
-            var_node.version == vdef.revision
-        ), "Internal Error: Bad reuse of var node, revision differs"
-        assert (
-            var_node.value_version == value_revision
-        ), "Internal Error: Bad reuse of var node, val revision differs"
+        assert var_node.version == vdef.revision, (
+            "Internal Error: Bad reuse of var node, revision differs"
+        )
+        assert var_node.value_version == value_revision, (
+            "Internal Error: Bad reuse of var node, val revision differs"
+        )
 
         # Link the edge
         self.extraction_ctx.graph.add_edge(template_record.data_node, var_node, rep.DEF)
         return value_record
 
     def _get_undefined_variable_value(self, name: str) -> ConstantVariableValueRecord:
-        assert not self._envs.has_variable_value(
-            name
-        ), f"Internal Error: Variable {name!r} has no definition but does have value"
+        assert not self._envs.has_variable_value(name), (
+            f"Internal Error: Variable {name!r} has no definition but does have value"
+        )
 
         return self._define_constant_and_get_value(name)
 
@@ -597,9 +598,9 @@ class VarContext:
         vval = self._envs.get_variable_value_for_constant_definition(
             vdef.name, vdef.revision
         )
-        assert vval is not None and isinstance(
-            vval, ConstantVariableValueRecord
-        ), f"Internal Error: Could not find constant value for variable without expression ({vdef.name!r})"
+        assert vval is not None and isinstance(vval, ConstantVariableValueRecord), (
+            f"Internal Error: Could not find constant value for variable without expression ({vdef.name!r})"
+        )
         logger.debug(
             f"Variable {vdef.name!r} has no initialiser, using constant value record {vval!r}"
         )

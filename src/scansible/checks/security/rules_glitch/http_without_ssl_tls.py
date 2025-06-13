@@ -51,8 +51,8 @@ class HTTPWithoutSSLTLSRule(Rule):
 
             subresult = db.query(
                 f"""
-                MATCH (server_source:Literal) -[:DEF|USE|DEFLOOPITEM*0..]->({{ node_id: {source.properties["node_id"] }}})
-                WHERE {self.create_localhost_test('server_source.value', 'server_source.type')}
+                MATCH (server_source:Literal) -[:DEF|USE|DEFLOOPITEM*0..]->({{ node_id: {source.properties["node_id"]}}})
+                WHERE {self.create_localhost_test("server_source.value", "server_source.type")}
                 RETURN server_source
             """
             )

@@ -33,9 +33,9 @@ def get_var_origin(graph: Graph, node: Variable) -> Expression | Literal | Task 
 
     def_literal = get_node_predecessors(graph, node, node_type=Literal, edge_type=Def)
     if def_literal:
-        assert (
-            len(def_literal) == 1
-        ), f"Expected {node!r} to be defined by one literal, found {len(def_literal)}"
+        assert len(def_literal) == 1, (
+            f"Expected {node!r} to be defined by one literal, found {len(def_literal)}"
+        )
         return def_literal[0]
 
     return get_def_expression(graph, node)

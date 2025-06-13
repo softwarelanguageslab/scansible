@@ -4,7 +4,6 @@ from ..rules.base import Rule
 
 
 class AdminByDefaultRule(Rule):
-
     USER_ROLE_TOKENS = (
         "root",
         "user",

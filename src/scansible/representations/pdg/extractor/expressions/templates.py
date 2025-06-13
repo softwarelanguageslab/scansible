@@ -1,4 +1,5 @@
 """Extract information from template expressions."""
+
 from __future__ import annotations
 
 from typing import Any, cast
@@ -224,7 +225,7 @@ class ASTStringifier(NodeVisitor):
         return f"{head}{body}{else_}{end}"
 
     def visit_Tuple(self, node: nodes.Tuple, **kwargs: Any) -> str:
-        return f'({", ".join(self.visit(child) for child in node.items)})'
+        return f"({', '.join(self.visit(child) for child in node.items)})"
 
     def visit_Assign(self, node: nodes.Assign, **kwargs: Any) -> str:
         assign = f"set {self.visit(node.target)} = {self.visit(node.node)}"

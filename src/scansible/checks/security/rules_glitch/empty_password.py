@@ -4,7 +4,6 @@ from ..rules.base import Rule
 
 
 class EmptyPasswordRule(Rule):
-
     PASSWORD_TOKENS = [
         "pass",
         "pwd",
