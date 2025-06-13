@@ -1,0 +1,39 @@
+{% extends "base.html.j2" %}
+{% block title %}Module index for Ansible project "{{ project_name }}"{% endblock %}
+{% block content %}
+  <div id="accordion">
+    {% for module in modules | sort(attribute="name") %}
+    <div class="card">
+      <div class="card-header" id="heading-{{ module.name | replace('.', '-') }}">
+        <h5 class="mb-0">
+          <a class="btn btn-link" href="#{{ module.name | replace('.', '-') }}" data-toggle="collapse" data-target="#{{ module.name | replace('.', '-') }}" aria-expanded="true" aria-controls="{{ module.name | replace('.', '-') }}">
+            Module <tt>{{ module.name }}</tt>
+          </a>
+        </h5>
+      </div>
+
+      <div id="{{ module.name | replace('.', '-') }}" class="collapse" aria-labelledby="heading-{{ module.name | replace('.', '-') }}" data-parent="#accordion">
+        <div class="card-body">
+          Part of <a href="collections.html#{{ module.name.split('.')[:2] | join('-') }}">{{ module.name.split('.')[:2] | join('.') }}</a> collection.<br/>
+          Dependencies: {% if not module.dependencies %} None <br/> {% else %}
+          <ul>
+          {% for dep in module.dependencies | sort(attribute="name") %}
+            <li><a href="dependencies.html#{{ dep.type }}-{{ dep.name }}"><tt>{{ dep.name }}</tt></a> <span class="badge badge-secondary">{{ dep.type }}</span></li>
+          {% endfor %}
+          </ul>
+          {% endif %}
+          Usage locations:
+          <ul>
+            {% for usage in module.usages | sort() %}
+              <li>
+                <tt>{{ usage }}</tt>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+
+  </div>
+{% endblock %}

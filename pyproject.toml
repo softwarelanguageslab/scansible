@@ -19,6 +19,7 @@ MarkupSafe = "2.0.1"
 redis = "^4.4.0"
 pyyaml = "^6.0.1"
 ansible-core = "<2.14.0"
+requests = "^2.32.3"
 
 [tool.poetry.group.dev.dependencies]
 hypothesis = "^6.17.0"
@@ -33,6 +34,7 @@ types-redis = "^4.3.21.6"
 black = "^23.1.0"
 isort = "^5.12.0"
 pyright = "^1.1.300"
+jupyter = "^1.1.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

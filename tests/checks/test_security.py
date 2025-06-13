@@ -62,6 +62,7 @@ def describe_hardcoded_secret_rule() -> None:
 
         assert results == [
             RuleResult(
+                "HardcodedSecret",
                 "Hardcoded secrets can compromise security when the source code falls into the wrong hands",
                 f"{pb_path}:7:31",
                 f"{pb_path}:4:19",
@@ -91,6 +92,7 @@ def describe_hardcoded_secret_rule() -> None:
 
         assert results == [
             RuleResult(
+                "HardcodedSecret",
                 "Hardcoded secrets can compromise security when the source code falls into the wrong hands",
                 f"{pb_path}:4:24",
                 f"{pb_path}:6:19",
@@ -121,6 +123,7 @@ def describe_hardcoded_secret_rule() -> None:
 
         assert results == [
             RuleResult(
+                "HardcodedSecret",
                 "Hardcoded secrets can compromise security when the source code falls into the wrong hands",
                 f"{pb_path}:4:24",
                 f"{pb_path}:7:19",
@@ -147,6 +150,7 @@ def describe_hardcoded_secret_rule() -> None:
 
         assert results == [
             RuleResult(
+                "HardcodedSecret",
                 "Hardcoded secrets can compromise security when the source code falls into the wrong hands",
                 f"{pb_path}:4:34",
                 f"{pb_path}:4:17",
@@ -174,6 +178,7 @@ def describe_hardcoded_secret_rule() -> None:
 
         assert results == [
             RuleResult(
+                "HardcodedSecret",
                 "Hardcoded secrets can compromise security when the source code falls into the wrong hands",
                 f"{pb_path}:4:24",
                 f"{pb_path}:5:17",
@@ -301,6 +306,7 @@ def describe_empty_password_rule() -> None:
 
         assert results == [
             RuleResult(
+                "EmptyPassword",
                 "Never use empty passwords, these are easy to crack",
                 f"{pb_path}:7:31",
                 f"{pb_path}:4:19",
@@ -328,6 +334,7 @@ def describe_empty_password_rule() -> None:
 
         assert results == [
             RuleResult(
+                "EmptyPassword",
                 "Never use empty passwords, these are easy to crack",
                 f"{pb_path}:4:19",
                 f"{pb_path}:4:19",
@@ -357,6 +364,7 @@ def describe_empty_password_rule() -> None:
 
         assert results == [
             RuleResult(
+                "EmptyPassword",
                 "Never use empty passwords, these are easy to crack",
                 f"{pb_path}:4:24",
                 f"{pb_path}:6:19",
@@ -387,6 +395,7 @@ def describe_empty_password_rule() -> None:
 
         assert results == [
             RuleResult(
+                "EmptyPassword",
                 "Never use empty passwords, these are easy to crack",
                 f"{pb_path}:4:24",
                 f"{pb_path}:7:19",
@@ -413,6 +422,7 @@ def describe_empty_password_rule() -> None:
 
         assert results == [
             RuleResult(
+                "EmptyPassword",
                 "Never use empty passwords, these are easy to crack",
                 f"{pb_path}:4:34",
                 f"{pb_path}:4:17",
@@ -440,6 +450,7 @@ def describe_empty_password_rule() -> None:
 
         assert results == [
             RuleResult(
+                "EmptyPassword",
                 "Never use empty passwords, these are easy to crack",
                 f"{pb_path}:4:24",
                 f"{pb_path}:5:17",
@@ -467,6 +478,7 @@ def describe_admin_by_default_rule() -> None:
 
         assert results == [
             RuleResult(
+                "AdminByDefault",
                 "Avoid using admin accounts, as this violates the principle of least privileges",
                 f"{pb_path}:5:32",
                 f"{pb_path}:4:19",
@@ -494,6 +506,7 @@ def describe_admin_by_default_rule() -> None:
 
         assert results == [
             RuleResult(
+                "AdminByDefault",
                 "Avoid using admin accounts, as this violates the principle of least privileges",
                 f"{pb_path}:4:28",
                 f"{pb_path}:6:19",
@@ -521,6 +534,7 @@ def describe_http_without_tls_or_ssl_rule() -> None:
 
         assert results == [
             RuleResult(
+                "HTTPWithoutSSLTLS",
                 "Always use SSL/TLS to connect over HTTP, i.e., use HTTPS",
                 f"{pb_path}:5:26",
                 f"{pb_path}:4:19",
@@ -548,6 +562,7 @@ def describe_http_without_tls_or_ssl_rule() -> None:
 
         assert results == [
             RuleResult(
+                "HTTPWithoutSSLTLS",
                 "Always use SSL/TLS to connect over HTTP, i.e., use HTTPS",
                 f"{pb_path}:4:27",
                 f"{pb_path}:6:19",
@@ -575,6 +590,7 @@ def describe_http_without_tls_or_ssl_rule() -> None:
 
         assert results == [
             RuleResult(
+                "HTTPWithoutSSLTLS",
                 "Always use SSL/TLS to connect over HTTP, i.e., use HTTPS",
                 f"{pb_path}:7:26",
                 f"{pb_path}:6:19",
@@ -603,6 +619,7 @@ def describe_http_without_tls_or_ssl_rule() -> None:
 
         assert results == [
             RuleResult(
+                "HTTPWithoutSSLTLS",
                 "Always use SSL/TLS to connect over HTTP, i.e., use HTTPS",
                 f"{pb_path}:5:22",
                 f"{pb_path}:7:19",
@@ -727,6 +744,7 @@ def describe_http_without_tls_or_ssl_rule() -> None:
 
         assert results == [
             RuleResult(
+                "HTTPWithoutSSLTLS",
                 "Always use SSL/TLS to connect over HTTP, i.e., use HTTPS",
                 f"{pb_path}:4:22",
                 f"{pb_path}:10:19",
@@ -754,6 +772,7 @@ def describe_missing_integrity_check_rule() -> None:
 
         assert results == [
             RuleResult(
+                "MissingIntegrityCheck",
                 "The integrity of source code needs to be checked with cryptographic hashes after downloading",
                 f"{pb_path}:5:26",
                 f"{pb_path}:4:19",
@@ -781,6 +800,7 @@ def describe_missing_integrity_check_rule() -> None:
 
         assert results == [
             RuleResult(
+                "MissingIntegrityCheck",
                 "The integrity of source code needs to be checked with cryptographic hashes after downloading",
                 f"{pb_path}:4:27",
                 f"{pb_path}:6:19",
@@ -808,6 +828,7 @@ def describe_missing_integrity_check_rule() -> None:
 
         assert results == [
             RuleResult(
+                "MissingIntegrityCheck",
                 "The integrity of source code needs to be checked with cryptographic hashes after downloading",
                 f"{pb_path}:7:26",
                 f"{pb_path}:6:19",
@@ -834,6 +855,7 @@ def describe_missing_integrity_check_rule() -> None:
 
         assert results == [
             RuleResult(
+                "MissingIntegrityCheck",
                 "The integrity of source code needs to be checked with cryptographic hashes after downloading",
                 f"{pb_path}:4:19",
                 f"{pb_path}:4:19",
@@ -860,6 +882,7 @@ def describe_missing_integrity_check_rule() -> None:
 
         assert results == [
             RuleResult(
+                "MissingIntegrityCheck",
                 "The integrity of source code needs to be checked with cryptographic hashes after downloading",
                 f"{pb_path}:4:19",
                 f"{pb_path}:4:19",
@@ -888,6 +911,7 @@ def describe_missing_integrity_check_rule() -> None:
 
         assert results == [
             RuleResult(
+                "MissingIntegrityCheck",
                 "The integrity of source code needs to be checked with cryptographic hashes after downloading",
                 f"{pb_path}:4:17",
                 f"{pb_path}:6:19",
@@ -971,6 +995,7 @@ def describe_unrestricted_ip_address_rule() -> None:
 
         assert results == [
             RuleResult(
+                "UnrestrictedIPAddress",
                 "Do not bind to the 0.0.0.0 address, as this exposes the service to the entire Internet",
                 f"{pb_path}:5:27",
                 f"{pb_path}:4:19",
@@ -998,6 +1023,7 @@ def describe_unrestricted_ip_address_rule() -> None:
 
         assert results == [
             RuleResult(
+                "UnrestrictedIPAddress",
                 "Do not bind to the 0.0.0.0 address, as this exposes the service to the entire Internet",
                 f"{pb_path}:4:31",
                 f"{pb_path}:6:19",
@@ -1026,6 +1052,7 @@ def describe_weak_crypto_rule() -> None:
 
         assert results == [
             RuleResult(
+                "WeakCryptoAlgorithm",
                 "Do not use weak cryptographic algorithms like CRC32, MD5, or SHA-1. Use SHA-256 or stronger instead.",
                 f"{pb_path}:6:31",
                 f"{pb_path}:4:19",
@@ -1054,6 +1081,7 @@ def describe_weak_crypto_rule() -> None:
 
         assert results == [
             RuleResult(
+                "WeakCryptoAlgorithm",
                 "Do not use weak cryptographic algorithms like CRC32, MD5, or SHA-1. Use SHA-256 or stronger instead.",
                 f"{pb_path}:4:32",
                 f"{pb_path}:6:19",
@@ -1080,6 +1108,7 @@ def describe_weak_crypto_rule() -> None:
 
         assert results == [
             RuleResult(
+                "WeakCryptoAlgorithm",
                 "Do not use weak cryptographic algorithms like CRC32, MD5, or SHA-1. Use SHA-256 or stronger instead.",
                 f"{pb_path}:6:31",
                 f"{pb_path}:4:19",
@@ -1107,6 +1136,7 @@ def describe_glitch_test_cases() -> None:
 
         assert results == [
             RuleResult(
+                "AdminByDefault",
                 "Avoid using admin accounts, as this violates the principle of least privileges",
                 f"{pb_path}:5:32",
                 f"{pb_path}:4:19",
@@ -1143,6 +1173,7 @@ def describe_glitch_test_cases() -> None:
 
         assert results == [
             RuleResult(
+                "EmptyPassword",
                 "Never use empty passwords, these are easy to crack",
                 f"{pb_path}:4:19",
                 f"{pb_path}:4:19",
@@ -1179,6 +1210,7 @@ def describe_glitch_test_cases() -> None:
 
         assert results == [
             RuleResult(
+                "HardcodedSecret",
                 "Hardcoded secrets can compromise security when the source code falls into the wrong hands",
                 f"{pb_path}:10:33",
                 f"{pb_path}:4:19",
@@ -1215,6 +1247,7 @@ def describe_glitch_test_cases() -> None:
 
         assert results == [
             RuleResult(
+                "HTTPWithoutSSLTLS",
                 "Always use SSL/TLS to connect over HTTP, i.e., use HTTPS",
                 f"{pb_path}:6:26",
                 f"{pb_path}:4:19",
@@ -1272,6 +1305,7 @@ def describe_glitch_test_cases() -> None:
 
         assert results == [
             RuleResult(
+                "UnrestrictedIPAddress",
                 "Do not bind to the 0.0.0.0 address, as this exposes the service to the entire Internet",
                 f"{pb_path}:6:39",
                 f"{pb_path}:4:19",
@@ -1306,6 +1340,7 @@ def describe_glitch_test_cases() -> None:
 
         assert results == [
             RuleResult(
+                "WeakCryptoAlgorithm",
                 "Do not use weak cryptographic algorithms like CRC32, MD5, or SHA-1. Use SHA-256 or stronger instead.",
                 f"{pb_path}:6:38",
                 f"{pb_path}:8:19",

@@ -1,0 +1,40 @@
+{% extends "base.html.j2" %}
+{% block title %}Security weaknesses for Ansible project "{{ project_name }}"{% endblock %}
+{% block content %}
+  <div id="accordion">
+    {% for smell in smells %}
+    {% set idx = loop.index %}
+    <div class="card">
+      <div class="card-header" id="heading-{{ idx }}">
+        <h5 class="mb-0">
+          <a class="btn btn-link" href="#{{ idx }}" data-toggle="collapse" data-target="#{{ idx }}" aria-expanded="true" aria-controls="{{ idx }}">
+            {{ smell.rule_name }}
+          </a>
+        </h5>
+      </div>
+
+      <div id="{{ idx }}" class="collapse" aria-labelledby="heading-{{ idx }}" data-parent="#accordion">
+        <div class="card-body">
+          {{ smell.rule_description }}<br/>
+          {% if smell.source_location == smell.sink_location %}
+          Location: <tt>{{ smell.source_location }}</tt>
+          <pre data-line-offset="{{ smell.source_text_start }}" data-line="{{ smell.source_text_line }}"><code class="language-yaml">
+            {{- smell.source_text | e -}}
+          </code></pre>
+          {% else %}
+          Source location: <tt>{{ smell.source_location }}</tt><br/>
+          <pre data-line-offset="{{ smell.source_text_start }}" data-line="{{ smell.source_text_line }}"><code class="language-yaml">
+            {{- smell.source_text | e -}}
+          </code></pre>
+          Sink location: <tt>{{ smell.sink_location }}</tt>
+          <pre data-line-offset="{{ smell.sink_text_start }}" data-line="{{ smell.sink_text_line }}"><code class="language-yaml">
+            {{- smell.sink_text | e -}}
+          </code></pre>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+
+  </div>
+{% endblock %}

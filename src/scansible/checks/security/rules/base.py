@@ -11,6 +11,8 @@ import json
 class RuleResult(NamedTuple):
     #: The rule that was triggered.
     rule_name: str
+    #: Rule description
+    rule_description: str
     #: Location in the code of the source of the smell (file:line:column)
     source_location: str
     #: Location in the code of the sink of the smell (file:line:column)
@@ -30,6 +32,10 @@ def _convert_location(neo_loc: str | None) -> str:
 class Rule(abc.ABC):
     @property
     def name(self) -> str:
+        return self.__class__.__name__.removesuffix("Rule")
+
+    @property
+    def short_name(self) -> str:
         return self.__class__.__name__.removesuffix("Rule")
 
     def _create_string_contains_test(
@@ -147,6 +153,7 @@ class Rule(abc.ABC):
         ) in self.postprocess_results(raw_results.result_set, graph_db):
             results.append(
                 RuleResult(
+                    self.short_name,
                     self.name,
                     _convert_location(source_location),
                     _convert_location(sink_location),

@@ -1,0 +1,178 @@
+{% extends "base.html.j2" %}
+{% block title %}Dependency report for Ansible project "{{ project_name }}"{% endblock %}
+{% block content %}
+  <div class="row py-3">
+    <div class="col-sm">
+      <h2 class="py-3 text-center">Dependency types</h2>
+      <div class="w-100">
+        <canvas id="chart-dependencies"></canvas>
+      </div>
+    </div>
+    <div class="col-sm">
+      <h2 class="py-3 text-center">Vulnerabilities</h2>
+      <div class="w-100">
+        <canvas id="chart-vulnerabilities"></canvas>
+      </div>
+    </div>
+    <div class="col-sm">
+      <h2 class="py-3 text-center">Weaknesses</h2>
+      <div class="w-100">
+        <canvas id="chart-smells"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="row py-5">
+    <div class="col-sm">
+      <h2 class="py-3">Top collections</h2>
+      <table class="table table-sm table-striped">
+        <thead>
+          <tr>
+            <th scope="col">Collection</th>
+            <th scope="col">#usages</th>
+            <th scope="col">#modules</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for collection in (collections | sort(attribute="num_usages", reverse=True))[:5] %}
+          <tr>
+            <th scope="row"><a href="collections.html#{{ collection.name | replace('.', '-') }}"><tt>{{ collection.name }}</tt></a></th>
+            <td>{{ collection.num_usages }}</td>
+            <td>{{ collection.num_modules }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="col-sm">
+      <h2 class="py-3">Top modules</h2>
+      <table class="table table-sm table-striped">
+        <thead>
+          <tr>
+            <th scope="col">Module</th>
+            <th scope="col">#usages</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for module in (modules | sort(attribute="num_usages", reverse=True))[:5] %}
+            <tr>
+              <th scope="row"><a href="modules.html#{{ module.name | replace('.', '-') }}"><tt>{{ module.name }}</tt></a></th>
+              <td>{{ module.usages | length }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="col-sm">
+      <h2 class="py-3">Top dependencies</h2>
+      <table class="table table-sm table-striped">
+        <thead>
+          <tr>
+            <th scope="col">Dependency</th>
+            <th scope="col">#usages</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for dep in (dependencies | sort(attribute="num_usages", reverse=True))[:5] %}
+            <tr>
+              <th scope="row"><a href="dependencies.html#{{ dep.type }}-{{ dep.name }}"><tt>{{ dep.name }}</tt></a> <span class="badge badge-secondary">{{ dep.type }}</span></th>
+              <td>{{ dep.num_usages }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}
+
+{% block script %}
+  <script>
+    const style = getComputedStyle(document.body);
+    const theme = {
+      primary: style.getPropertyValue('--primary'),
+      secondary: style.getPropertyValue('--secondary'),
+      success: style.getPropertyValue('--success'),
+      info: style.getPropertyValue('--info'),
+      warning: style.getPropertyValue('--warning'),
+      danger: style.getPropertyValue('--danger'),
+      light: style.getPropertyValue('--light'),
+      dark: style.getPropertyValue('--dark'),
+      muted: style.getPropertyValue('--gray'),
+    };
+
+    new Chart(document.getElementById("chart-dependencies"), {
+      type: "doughnut",
+      data: {
+        labels: ["Collections", "Modules", "Roles", "Python packages", "OS packages"],
+        datasets: [{
+          data: [{{ collections | length }}, {{ modules | length }}, {{ roles | length }}, {{ dependencies | selectattr("type", "equalto", "Python") | list | length }} , {{ dependencies | selectattr("type", "equalto", "OS") | list | length }}],
+          backgroundColor: [
+            theme.primary,
+            theme.success,
+            theme.warning,
+            theme.danger,
+            theme.secondary,
+          ],
+          borderColor: "transparent"
+        }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        cutoutPercentage: 65,
+      }
+    });
+
+    new Chart(document.getElementById("chart-vulnerabilities"), {
+      type: "doughnut",
+      data: {
+        labels: ["Critical", "High", "Medium", "Low", "Unknown"],
+        datasets: [{
+          data: [
+            {% for severity in ("critical", "high", "medium", "low", "unknown") %}
+              {{ vulnerabilities | selectattr("severity", "equalto", severity) | list | length }},
+            {% endfor %}
+            ],
+          backgroundColor: [
+            "#a0010e",
+            theme.danger,
+            theme.warning,
+            theme.info,
+            theme.muted,
+          ],
+          borderColor: "transparent"
+        }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        cutoutPercentage: 65,
+      }
+    });
+
+    let smells = {{ smells | tojson }};
+    let smell_labels = [...new Set(smells.map(s => s.rule_name))];
+    new Chart(document.getElementById("chart-smells"), {
+      type: "doughnut",
+      data: {
+        labels: smell_labels,
+        datasets: [{
+          data: smell_labels.map(l => smells.filter(s => s.rule_name == l).length),
+          backgroundColor: [
+            theme.primary,
+            theme.success,
+            theme.warning,
+            theme.danger,
+            theme.secondary,
+            theme.muted,
+          ],
+          borderColor: "transparent"
+        }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        cutoutPercentage: 65,
+      }
+    });
+  </script>
+{% endblock %}

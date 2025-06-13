@@ -1,0 +1,48 @@
+{% extends "base.html.j2" %}
+{% block title %}Role index for Ansible project "{{ project_name }}"{% endblock %}
+
+{% block content %}
+  <div id="accordion">
+    {% for role in roles | sort(attribute="name") %}
+    <div class="card">
+      <div class="card-header" id="heading-{{ role.name | replace('.', '-') }}">
+        <h5 class="mb-0">
+          <a class="btn btn-link" href="#{{ role.name | replace('.', '-') }}" data-toggle="collapse" data-target="#{{ role.name | replace('.', '-') }}" aria-expanded="true" aria-controls="{{ role.name | replace('.', '-') }}">
+            Role <tt>{{ role.name }}</tt>
+          </a>
+        </h5>
+      </div>
+
+      <div id="{{ role.name | replace('.', '-') }}" class="collapse" aria-labelledby="heading-{{ role.name | replace('.', '-') }}" data-parent="#accordion">
+        <div class="card-body">
+          Used colletions:
+          <ul>
+            {% for coll in role.used_collections | sort() %}
+              <li>
+                <a href="collections.html#{{ coll | replace('.', '-') }}"><tt>{{ coll }}</tt></a>
+              </li>
+            {% endfor %}
+          </ul>
+          Used modules:
+          <ul>
+            {% for mod in role.used_modules | sort() %}
+              <li>
+                <a href="modules.html#{{ mod | replace('.', '-') }}"><tt>{{ mod }}</tt></a>
+              </li>
+            {% endfor %}
+          </ul>
+          Include locations:
+          <ul>
+            {% for usage in role.usages | sort() %}
+              <li>
+                <tt>{{ usage }}</tt>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+
+  </div>
+{% endblock %}

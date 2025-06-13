@@ -1,0 +1,31 @@
+{% extends "base.html.j2" %}
+{% block title %}Collection index for Ansible project "{{ project_name }}"{% endblock %}
+{% block content %}
+  <div id="accordion">
+    {% for collection in collections | sort(attribute="name") %}
+    <div class="card">
+      <div class="card-header" id="heading-{{ collection.name | replace('.', '-') }}">
+        <h5 class="mb-0">
+          <a class="btn btn-link" href="#{{ collection.name | replace('.', '-') }}" data-toggle="collapse" data-target="#{{ collection.name | replace('.', '-') }}" aria-expanded="true" aria-controls="{{ collection.name | replace('.', '-') }}">
+            Collection <tt>{{ collection.name }}</tt>
+          </a>
+        </h5>
+      </div>
+
+      <div id="{{ collection.name | replace('.', '-') }}" class="collapse" aria-labelledby="heading-{{ collection.name | replace('.', '-') }}" data-parent="#accordion">
+        <div class="card-body">
+          Contents:
+          <ul>
+            {% for module in collection.modules | sort(attribute="name") %}
+              <li>
+                <a href="modules.html#{{ module.name | replace('.', '-') }}"><tt>{{ module.name }}</tt></a> <span class="badge badge-secondary">{{ module.num_usages }} usages</span></li>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+
+  </div>
+{% endblock %}

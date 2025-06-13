@@ -330,6 +330,27 @@ def prepare_module_kb(
     output_path.parent.mkdir(exist_ok=True, parents=True)
     kb.dump_to_file(output_path, slim=not full)
 
+@cli.command()
+@click.argument(
+    "input_project",
+    type=click.Path(resolve_path=True, path_type=Path, exists=True, file_okay=False),
+)
+@click.argument(
+    "output_dir",
+    type=click.Path(resolve_path=True, path_type=Path, file_okay=False),
+)
+@click.option(
+    "--role-search-path",
+    type=click.Path(file_okay=False, path_type=Path),
+    envvar="ROLE_SEARCH_PATH",
+    multiple=True,
+    help='Additional search paths to find role dependencies. Can be specified as environment variable "ROLE_SEARCH_PATH" (multiple paths can be separated with ":"). Provided directories are prepended to Ansible defaults.',
+)
+def sca(input_project: Path, output_dir: Path, role_search_path: Sequence[Path]) -> None:
+    """Run Software Composition Analysis on project."""
+    from .sca import scan_project
+    scan_project(input_project, output_dir, list(role_search_path))
+
 
 @cli.command()
 @click.argument("input_file", type=click.File())

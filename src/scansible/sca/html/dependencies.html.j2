@@ -1,0 +1,45 @@
+{% extends "base.html.j2" %}
+{% block title %}Dependency index for Ansible project "{{ project_name }}"{% endblock %}
+
+{% block content %}
+  <div id="accordion">
+    {% for dependency in dependencies | sort(attribute="name") %}
+    <div class="card">
+      <div class="card-header" id="heading-{{ dependency.type }}-{{ dependency.name | replace('.', '-') }}">
+        <h5 class="mb-0">
+          <a class="btn btn-link" href="#{{ dependency.type }}-{{ dependency.name | replace('.', '-') }}" data-toggle="collapse" data-target="#{{ dependency.type }}-{{ dependency.name | replace('.', '-') }}" aria-expanded="true" aria-controls="{{ dependency.type }}-{{ dependency.name | replace('.', '-') }}">
+            <tt>{{ dependency.name }}</tt> {{ dependency.type }} {% if dependency.type == "Python" %} package {% else %} binary {% endif %}
+          </a>
+            {% for severity in ("critical", "high", "medium", "low", "unknown") %}
+              {% set vulns = dependency.vulnerabilities | selectattr("severity", "equalto", severity) | list %}
+              {% if vulns %}
+                <span class="badge badge-{{ (vulns | first).severity_class }}" {% if severity == "critical" %} style="background-color: #a0010e;" {% endif %}>{{ vulns | length }} {{ severity }}</span>
+              {% endif %}
+            {% endfor %}
+        </h5>
+      </div>
+
+      <div id="{{ dependency.type }}-{{ dependency.name | replace('.', '-') }}" class="collapse" aria-labelledby="heading-{{ dependency.type }}-{{ dependency.name | replace('.', '-') }}" data-parent="#accordion">
+        <div class="card-body">
+          Required by:
+          <ul>
+            {% for module in dependency.modules %}
+              <li>
+                <a href="modules.html#{{ module | replace('.', '-') }}"><tt>{{ module }}</tt></a></li>
+              </li>
+            {% endfor %}
+          </ul>
+          Vulnerabilities: {% if not dependency.vulnerabilities %} No known vulnerabilities <br/> {% else %}
+          <ul>
+          {% for vul in dependency.vulnerabilities | sort(attribute="id", reverse=True) %}
+            <li><span class="badge badge-{{ vul.severity_class }}" {% if vul.severity == "critical" %} style="background-color: #a0010e;" {% endif %}>{{ vul.severity }}</span> <strong>{{ vul.id }}</strong>: {{ vul.summary | e }} </li>
+          {% endfor %}
+          </ul>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+
+  </div>
+{% endblock %}
