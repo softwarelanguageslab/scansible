@@ -115,7 +115,7 @@ def _find_collection(namespace: str, name: str) -> tuple[Path, Path]:
 
     base_path = Path("ansible_collections") / namespace / name / "plugins"
 
-    return coll_path, base_path
+    return coll_path / "plugins", base_path
 
 
 def extract_module_dependencies(module: str) -> ModuleDependencies:
