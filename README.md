@@ -68,12 +68,30 @@ generate an HTML report in `/path/to/output`.
 To run on a concrete example, use the `examples/example.yaml` playbook:
 
 ```
-scansible sca examples/ /path/to/output
+scansible sca ./examples/ ./examples_dashboard/
 ```
 
 This should produce a report containing a hardcoded secret security weakness,
 as well as several OS binary and Python package dependencies. One of the Python
 packages, `requests`, should contain a number of security advisories.
+
+### Example: Extracting dependencies
+
+This example only extracts dependencies instead of producing an entire SCA report.
+As before, ensure `DependencyPatternMatcher` is compiled.
+Then, run the tool as follows:
+
+```
+scansible extract-dependencies /path/to/project /path/to/output.json
+```
+
+This will write all found dependencies (collections, modules, roles, Python packages, and OS binaries) to the output file in JSON format.
+
+Concrete example:
+
+```
+scansible sca ./examples/ ./example_output.json
+```
 
 ## Running tests
 
