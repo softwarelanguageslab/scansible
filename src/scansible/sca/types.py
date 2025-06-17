@@ -19,6 +19,12 @@ class CollectionContent:
 
 
 @define
+class CollectionUsage:
+    name: str
+    modules: Sequence[ModuleUsage]
+
+
+@define
 class ModuleUsage:
     name: str
     usages: list[str]
@@ -39,15 +45,20 @@ class ModuleDependency:
 
 
 @define
-class ModuleDependencies:
-    name: str
-    dependencies: Sequence[ModuleDependency]
-
-
-@define
 class Vulnerability:
     package_name: str
     id: str
     summary: str
     severity: str
     description: str
+
+
+@define
+class ProjectDependencies:
+    collections: list[CollectionUsage]
+    roles: list[RoleUsage]
+    module_dependencies: dict[str, Sequence[ModuleDependency]]
+
+    @property
+    def modules(self) -> list[ModuleUsage]:
+        return [mod for coll in self.collections for mod in coll.modules]

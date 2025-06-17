@@ -4,6 +4,7 @@ import csv
 import json
 import subprocess
 from collections import defaultdict
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import overload
@@ -18,12 +19,12 @@ from scansible.sca.constants import (
     MODULE_SCA_PROJECT_TIMEOUT,
     PYTHON_BUILTINS,
 )
-from scansible.sca.types import ModuleDependencies, ModuleDependency
+from scansible.sca.types import ModuleDependency
 
 
 class Cache:
     def __init__(self) -> None:
-        self._cache: dict[str, dict[str, ModuleDependencies]] = {}
+        self._cache: dict[str, Mapping[str, Sequence[ModuleDependency]]] = {}
         self._cache_path = Path("cache") / "dep_cache.json"
         if self._cache_path.is_file():
             self._read_cache()
@@ -34,12 +35,10 @@ class Cache:
         self._cache = {}
 
         for coll, values in cache_data.items():
-            dct = {}
+            dct: dict[str, Sequence[ModuleDependency]] = {}
             self._cache[coll] = dct
             for mod, deps in values.items():
-                dct[mod] = ModuleDependencies(
-                    mod, [ModuleDependency(dep["name"], dep["type"]) for dep in deps]
-                )
+                dct[mod] = [ModuleDependency(dep["name"], dep["type"]) for dep in deps]
 
     def _write_cache(self) -> None:
         cache_dct = {}
@@ -47,9 +46,7 @@ class Cache:
             dct = {}
             cache_dct[coll] = dct
             for mod, deps in values.items():
-                dct[mod] = [
-                    {"name": dep.name, "type": dep.type} for dep in deps.dependencies
-                ]
+                dct[mod] = [{"name": dep.name, "type": dep.type} for dep in deps]
 
         old_cache = self._cache
         self._cache_path.write_text(json.dumps(cache_dct))
@@ -59,21 +56,21 @@ class Cache:
     def __contains__(self, key: str) -> bool:
         return key in self._cache
 
-    def set(self, key: str, value: dict[str, ModuleDependencies]) -> None:
+    def set(self, key: str, value: Mapping[str, Sequence[ModuleDependency]]) -> None:
         self._cache[key] = value
         self._write_cache()
 
     @overload
-    def get(self, key: str) -> dict[str, ModuleDependencies] | None: ...
+    def get(self, key: str) -> Mapping[str, Sequence[ModuleDependency]] | None: ...
 
     @overload
     def get(
-        self, key: str, default: dict[str, ModuleDependencies]
-    ) -> dict[str, ModuleDependencies]: ...
+        self, key: str, default: Mapping[str, Sequence[ModuleDependency]]
+    ) -> Mapping[str, Sequence[ModuleDependency]]: ...
 
     def get(
-        self, key: str, default: dict[str, ModuleDependencies] | None = None
-    ) -> dict[str, ModuleDependencies] | None:
+        self, key: str, default: Mapping[str, Sequence[ModuleDependency]] | None = None
+    ) -> Mapping[str, Sequence[ModuleDependency]] | None:
         return self._cache.get(key, default)
 
 
@@ -118,7 +115,7 @@ def _find_collection(namespace: str, name: str) -> tuple[Path, Path]:
     return coll_path / "plugins", base_path
 
 
-def extract_module_dependencies(module: str) -> ModuleDependencies:
+def extract_module_dependencies(module: str) -> Sequence[ModuleDependency]:
     [coll_namespace, coll_name, mod_name] = module.split(".")
     coll_fqn = f"{coll_namespace}.{coll_name}"
 
@@ -126,11 +123,12 @@ def extract_module_dependencies(module: str) -> ModuleDependencies:
         coll_results = _extract_collection_dependencies(coll_fqn)
         CACHE.set(coll_fqn, coll_results)
 
-    tmp = CACHE.get(coll_fqn, {}).get(mod_name, ModuleDependencies(module, []))
-    return ModuleDependencies(module, tmp.dependencies)
+    return CACHE.get(coll_fqn, {}).get(mod_name, [])
 
 
-def _extract_collection_dependencies(coll_fqn: str) -> dict[str, ModuleDependencies]:
+def _extract_collection_dependencies(
+    coll_fqn: str,
+) -> Mapping[str, Sequence[ModuleDependency]]:
     with TemporaryDirectory() as tmpd:
         d = Path(tmpd)
 
@@ -170,7 +168,7 @@ def _extract_collection_dependencies(coll_fqn: str) -> dict[str, ModuleDependenc
         return _parse_output(output_file)
 
 
-def _parse_output(output_file: Path) -> dict[str, ModuleDependencies]:
+def _parse_output(output_file: Path) -> Mapping[str, Sequence[ModuleDependency]]:
     with output_file.open() as outf:
         reader = csv.reader(outf)
         # Skip header
@@ -197,7 +195,4 @@ def _parse_output(output_file: Path) -> dict[str, ModuleDependencies]:
 
         output[mod_name].append(ModuleDependency(dep_name, dep_type))
 
-    return {
-        mod_name: ModuleDependencies(mod_name, deps)
-        for mod_name, deps in output.items()
-    }
+    return output

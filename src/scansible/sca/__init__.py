@@ -6,6 +6,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Iterable, Sequence
 
+import attrs
 from ansible import constants as ans_constants
 from loguru import logger
 from rich.markup import escape
@@ -37,7 +38,7 @@ from scansible.utils.entrypoints import find_entrypoints
 from .collection_info import ModuleInfo, get_collection_index
 from .module_scanner import extract_module_dependencies
 from .report import generate_report
-from .types import ModuleUsage, RoleUsage
+from .types import CollectionUsage, ModuleUsage, ProjectDependencies, RoleUsage
 from .vulnerabilities import find_vulnerabilities
 
 
@@ -71,9 +72,14 @@ def _extend_role_usages(
         r.used_modules.add(mod.name)
 
 
-def scan_project(
-    project: Path, output_dir: Path, role_search_paths: list[Path]
-) -> None:
+def extract_dependencies(project: Path, output_path: Path) -> None:
+    deps = _extract_project_dependencies(project)
+
+    output_path.write_text(json.dumps(attrs.asdict(deps)))
+    _print_dependencies(deps)
+
+
+def _extract_project_dependencies(project: Path) -> ProjectDependencies:
     module_usages = extract_modules(project)
     role_usages = extract_roles(project)
 
@@ -83,7 +89,7 @@ def scan_project(
         r = ru_todo.pop()
         role_path = _find_role(r.name)
         if role_path is None:
-            CONSOLE.print(f"[bold red]Could not resolve role {r.name}")
+            logger.error(f"Could not resolve role {r.name}")
             continue
 
         _extend_role_usages(role_path, r, module_usages)
@@ -94,16 +100,48 @@ def scan_project(
                 role_usages.append(ru)
                 ru_todo.append(ru)
 
-    smells = _detect_smells(project, role_search_paths)
-    CONSOLE.print(smells)
+    collections: dict[str, list[ModuleUsage]] = defaultdict(list)
+    for mod in module_usages:
+        coll_fqn = ".".join(mod.name.split(".")[:2])
+        collections[coll_fqn].append(mod)
+    collection_usages = [
+        CollectionUsage(name, mods) for name, mods in collections.items()
+    ]
 
     dependencies = {
         module.name: extract_module_dependencies(module.name)
         for module in module_usages
     }
+
+    return ProjectDependencies(collection_usages, role_usages, dependencies)
+
+
+def _print_dependencies(project_deps: ProjectDependencies) -> None:
+    for usage in sorted(
+        project_deps.modules, key=lambda x: len(x.usages), reverse=True
+    ):
+        CONSOLE.print(f"[bold green]{usage.name}")
+        for deps in sorted(
+            project_deps.module_dependencies[usage.name], key=lambda dep: dep.name
+        ):
+            CONSOLE.print(
+                f"\tDepends on: [bold]{deps.name}[/bold] {deps.type} {'package' if deps.type == 'Python' else 'binary'}"
+            )
+        for loc in usage.usages:
+            CONSOLE.print(f"\t[blue]{loc}")
+
+
+def scan_project(
+    project: Path, output_dir: Path, role_search_paths: list[Path]
+) -> None:
+    smells = _detect_smells(project, role_search_paths)
+    CONSOLE.print(smells)
+
+    project_deps = _extract_project_dependencies(project)
+
     unique_dependencies: set[tuple[str, str]] = set()
-    for deps in dependencies.values():
-        for dep in deps.dependencies:
+    for deps in project_deps.module_dependencies.values():
+        for dep in deps:
             unique_dependencies.add((dep.name, dep.type))
 
     dep_vulns = {
@@ -111,16 +149,7 @@ def scan_project(
         for dep_name, dep_type in unique_dependencies
     }
 
-    for usage in sorted(module_usages, key=lambda x: len(x.usages), reverse=True):
-        CONSOLE.print(f"[bold green]{usage.name}")
-        for deps in sorted(
-            dependencies[usage.name].dependencies, key=lambda dep: dep.name
-        ):
-            CONSOLE.print(
-                f"\tDepends on: [bold]{deps.name}[/bold] {deps.type} {'package' if deps.type == 'Python' else 'binary'}"
-            )
-        for loc in usage.usages:
-            CONSOLE.print(f"\t[blue]{loc}")
+    _print_dependencies(project_deps)
 
     CONSOLE.print("")
     CONSOLE.print("[bold]Dependencies")
@@ -141,9 +170,7 @@ def scan_project(
     generate_report(
         project.name,
         output_dir,
-        module_usages,
-        role_usages,
-        dependencies,
+        project_deps,
         dep_vulns,
         smells,
     )

@@ -366,6 +366,22 @@ def sca(
 
 
 @cli.command()
+@click.argument(
+    "input_project",
+    type=click.Path(resolve_path=True, path_type=Path, exists=True, file_okay=False),
+)
+@click.argument(
+    "output_file",
+    type=click.Path(resolve_path=True, path_type=Path, file_okay=True, dir_okay=False),
+)
+def extract_dependencies(input_project: Path, output_file: Path) -> None:
+    """Extract all dependencies for INPUT_PROJECT and write the results to OUTPUT_FILE."""
+    from .sca import extract_dependencies
+
+    extract_dependencies(input_project, output_file)
+
+
+@cli.command()
 @click.argument("input_file", type=click.File())
 @click.argument(
     "repo_dir",

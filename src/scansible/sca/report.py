@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from typing import Any
-
 from pathlib import Path
+from typing import Any
 
 import attrs
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -10,53 +9,51 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from scansible.checks.security.rules.base import RuleResult
 from scansible.sca.constants import HTML_CLASS_SEVERITY
 
-from .types import ModuleDependencies, ModuleUsage, RoleUsage, Vulnerability
+from .types import ProjectDependencies, Vulnerability
 
 
 def generate_report(
     project_name: str,
     output_dir: Path,
-    raw_modules: list[ModuleUsage],
-    role_usages: list[RoleUsage],
-    module_dependencies: dict[str, ModuleDependencies],
+    dependencies: ProjectDependencies,
     dependency_vulnerabilities: dict[str, list[Vulnerability]],
     smells_raw: list[RuleResult],
 ) -> None:
-    modules = [
-        attrs.asdict(mod) | {"num_usages": len(mod.usages)} for mod in raw_modules
-    ]
-    for mod in modules:
-        deps = module_dependencies.get(mod["name"])
-        mod["dependencies"] = deps.dependencies if deps is not None else []
-
-    collections: dict[str, dict[str, Any]] = {}
-    for module in modules:
-        coll_fqn = ".".join(module["name"].split(".")[:2])
-        if coll_fqn not in collections:
-            collections[coll_fqn] = {
-                "name": coll_fqn,
-                "modules": [],
-                "num_modules": 0,
-                "num_usages": 0,
+    collections: list[dict[str, Any]] = []
+    for coll in dependencies.collections:
+        collections.append(
+            {
+                "name": coll.name,
+                "modules": [
+                    attrs.asdict(mod)
+                    | {
+                        "num_usages": len(mod.usages),
+                        "dependencies": dependencies.module_dependencies.get(
+                            mod.name, []
+                        ),
+                    }
+                    for mod in coll.modules
+                ],
+                "num_modules": len(coll.modules),
+                "num_usages": sum(len(mod.usages) for mod in coll.modules),
             }
-        coll_dct = collections[coll_fqn]
-        coll_dct["num_modules"] += 1
-        coll_dct["num_usages"] += len(module["usages"])
-        coll_dct["modules"].append(module)
+        )
 
-    dependencies: dict[str, dict[str, Any]] = {}
-    for mod in module_dependencies.values():
-        for dep in mod.dependencies:
-            if dep.name not in dependencies:
-                dependencies[dep.name] = {
+    modules = [mod for coll in collections for mod in coll["modules"]]
+
+    all_module_dependencies: dict[str, dict[str, Any]] = {}
+    for mod, deps in dependencies.module_dependencies.items():
+        for dep in deps:
+            if dep.name not in all_module_dependencies:
+                all_module_dependencies[dep.name] = {
                     "name": dep.name,
                     "type": dep.type,
                     "num_usages": 0,
                     "modules": [],
                 }
-            dependencies[dep.name]["num_usages"] += 1
-            dependencies[dep.name]["modules"].append(mod.name)
-    for dep in dependencies.values():
+            all_module_dependencies[dep.name]["num_usages"] += 1
+            all_module_dependencies[dep.name]["modules"].append(mod)
+    for dep in all_module_dependencies.values():
         dep["vulnerabilities"] = [
             attrs.asdict(vuln) for vuln in dependency_vulnerabilities[dep["name"]]
         ]
@@ -67,7 +64,7 @@ def generate_report(
             if vuln["severity"] not in HTML_CLASS_SEVERITY:
                 vuln["severity"] = "unknown"
 
-    vulnerabilities: list[Vulnerability] = []
+    vulnerabilities: list[dict[str, str]] = []
     for vulns in dependency_vulnerabilities.values():
         vulnerabilities.extend(attrs.asdict(vuln) for vuln in vulns)
     for vuln in vulnerabilities:
@@ -95,10 +92,10 @@ def generate_report(
     )
     env.globals = dict(
         project_name=project_name,
-        collections=list(collections.values()),
+        collections=collections,
         modules=modules,
-        roles=role_usages,
-        dependencies=list(dependencies.values()),
+        roles=dependencies.roles,
+        dependencies=list(all_module_dependencies.values()),
         vulnerabilities=vulnerabilities,
         smells=smells,
         pages=pages,
