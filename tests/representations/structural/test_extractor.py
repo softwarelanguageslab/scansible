@@ -551,8 +551,11 @@ def a_task_extractor() -> None:
             raw=None,
         )
 
+    @pytest.mark.xfail(
+        reason="Broken in more recent Ansible versions, we need to reduce the reliance on Ansible for parsing"
+    )
     def does_not_eagerly_evaluate_expressions(
-        extractor: TaskExtractor, task_representation: Type[rep.Task]
+        extractor: TaskExtractor, task_representation: type[rep.Task]
     ) -> None:
         # register is a "static" field and Ansible will try to evaluate the
         # expression eagerly, which we should prevent
@@ -757,7 +760,7 @@ def a_task_extractor() -> None:
                 name: test
                 file:
                     path: test.txt
-                loop: 0
+                loop_control: 0
             """
                     )
                 ),

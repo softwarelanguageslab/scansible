@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ansible import constants
+from ansible.utils.fqcn import add_internal_fqcns
 
 
 def is_set_fact(action: str) -> bool:
@@ -12,7 +13,9 @@ def is_include_vars(action: str) -> bool:
 
 
 def is_import_include_tasks(action: str) -> bool:
-    return action in constants._ACTION_ALL_INCLUDE_IMPORT_TASKS  # pyright: ignore
+    return action in constants._ACTION_ALL_INCLUDE_IMPORT_TASKS or is_bare_include(
+        action
+    )  # pyright: ignore
 
 
 def is_include_tasks(action: str) -> bool:
@@ -34,4 +37,4 @@ def is_import_playbook(action: str) -> bool:
 
 
 def is_bare_include(action: str) -> bool:
-    return action in constants._ACTION_INCLUDE  # pyright: ignore
+    return action in add_internal_fqcns(["include"])

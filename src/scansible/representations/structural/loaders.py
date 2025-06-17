@@ -7,13 +7,14 @@ parsed data structure without modifications.
 
 from __future__ import annotations
 
-from typing import Any, Generator, Literal, Type, cast, overload
-
 import types
 from collections.abc import Sequence
 from contextlib import contextmanager
 from copy import deepcopy
 from pathlib import Path
+from typing import Any, Generator, Literal, Type, cast, overload
+
+from ansible.parsing import mod_args
 
 from scansible.utils import actions
 
@@ -256,7 +257,12 @@ def _patch_lookup_loader() -> Generator[None, None, None]:
 
 
 def _get_task_action(ds: dict[str, ans.AnsibleValue]) -> str:
-    args_parser = ans.ModuleArgsParser(ds)
+    # Ansible raises an error if _raw_params is present for actions that don't support
+    # it, and they removed `include` from the possible modules that support it, so add it
+    # back.
+    mod_args.RAW_PARAM_MODULES = mod_args.RAW_PARAM_MODULES | {"include"}
+    fixed_ds = {key: value for key, value in ds.items() if key != "_raw_params"}
+    args_parser = ans.ModuleArgsParser(fixed_ds)
     (action, _, _) = args_parser.parse()
     return action
 

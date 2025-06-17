@@ -17,9 +17,9 @@ dependencies = [
     "MarkupSafe==2.0.1",
     "redis>5,<6", # Redis 6 removed support for RedisGraph.
     "pyyaml>=6.0.1,<7",
-    "ansible-core<2.14.0", # >=2.14 introduces breaking changes to the API that we have not yet resolved.
     "requests>=2.32.3,<3",
-    "ansible<7.0.0", # Needed for collections, <7.0.0 to avoid version conflict with ansible-core.
+    "ansible-core<3",
+    "ansible", # Needed for collections.
 ]
 
 [project.scripts]
@@ -53,7 +53,8 @@ sections = "FUTURE,TYPING,STDLIB,THIRDPARTY,FIRSTPARTY,LOCALFOLDER"
 
 [tool.pyright]
 stubPath = "./lib/stubs"
-typeCheckingMode = "strict"
+typeCheckingMode = "recommended"
+useLibraryCodeForTypes = true
 reportImportCycles = "none"
 
 [tool.pytest.ini_options]

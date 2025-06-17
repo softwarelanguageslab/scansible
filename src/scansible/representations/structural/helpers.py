@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Generator, NoReturn
-
 import io
 import os.path
 from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
+from typing import Any, Callable, Generator, NoReturn
 
 from . import ansible_types as ans
 from . import representation as rep
@@ -90,7 +89,7 @@ def validate_ansible_object(obj: ans.FieldAttributeBase) -> None:
     # We have to reimplement Ansible's logic because it eagerly templates certain
     # expressions. We don't want that.
     templar = ans.Templar(ans.DataLoader())
-    for name, attribute in obj._valid_attrs.items():
+    for name, attribute in obj.fattributes.items():
         value = getattr(obj, name)
         if value is None:
             continue

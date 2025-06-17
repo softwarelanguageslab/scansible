@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-from io import StringIO
-from typing import Any, Callable, Literal, TypeVar, overload
-
 from collections.abc import Iterable
 from functools import partial
 from itertools import chain
 from pathlib import Path
+from typing import Any, Callable, Literal, TypeVar, overload
 
 from scansible.utils import actions
 
@@ -52,12 +50,16 @@ def _ansible_to_dict(obj: ans.FieldAttributeBase) -> dict[str, Any]:
     directive values.
     """
 
-    attr_names = obj._attributes.keys()
+    attrs = obj.fattributes
     # For `include_role` actions, we can't use the field attributes since they
     # include action arguments, which we don't store specially. We'll instead
     # take them from its superclass.
     if isinstance(obj, ans.IncludeRole):
-        attr_names = ans.TaskInclude._attributes.keys()
+        attrs = ans.TaskInclude.fattributes
+
+    attr_names = {
+        attr_name for attr_name, attr in attrs.items() if attr_name != attr.alias
+    }
 
     return {attr_name: getattr(obj, attr_name) for attr_name in attr_names}
 

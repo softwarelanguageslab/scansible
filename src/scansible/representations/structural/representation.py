@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import datetime
+import re
+from abc import abstractmethod
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -13,11 +17,6 @@ from typing import (
     TypeVar,
     Union,
 )
-
-import datetime
-import re
-from abc import abstractmethod
-from pathlib import Path
 
 import attrs
 from attrs import define, field, frozen
@@ -328,10 +327,13 @@ class LoopControl(StructuralBase):
     label: AnyValue = default_field(default=None)
     #: Amount of time in seconds to pause between each iteration. Can be a
     #: string in case this is an expression. 0 by default.
-    pause: str | int | float = default_field(default=0)
+    pause: str | int | float = default_field(default=0.0)
     #: Whether to include more information in the loop items.
     #: See https://docs.ansible.com/ansible/latest/user_guide/playbooks_loops.html#extended-loop-variables
     extended: str | bool | None = default_field(default=None)
+    #: Whether to include `allitems` in the extended version.
+    extended_allitems: str | bool | None = default_field(default=True)
+    break_when: list[str] | None = default_field(factory=list)
 
 
 @define(slots=False)
@@ -366,7 +368,7 @@ class DirectivesBase(StructuralBase):
     #: Dictionary converted into environment variables.
     environment: Sequence[Mapping[str, str] | str] | None = default_field(default=None)
     #: To disable logging of action.
-    no_log: bool | str | None = default_field(default=None)
+    no_log: bool | str | None = default_field(default=False)
     #: Run on a single host only.
     run_once: bool | str | None = default_field(default=None)
     #: Ignore task failures.
@@ -418,7 +420,7 @@ class TaskBase(DirectivesBase):
     #: Conditional expression(s) to override "changed" status.
     changed_when: Sequence[str | bool] = default_field(factory=list)
     #: Number of seconds to delay between retries.
-    delay: str | int | None = default_field(default=5)
+    delay: str | float | int | None = default_field(default=5.0)
     #: Delegate task execution to another host.
     delegate_to: str | None = default_field(default=None)
     #: Apply facts to delegated host.
@@ -435,7 +437,7 @@ class TaskBase(DirectivesBase):
     #: `with_items` -> `items`.
     loop_with: str | None = default_field(default=None)
     #: Loop control defined on the task.
-    loop_control: LoopControl | None = default_field(default=None)
+    loop_control: LoopControl | None = default_field(factory=LoopControl)
     #: List of handler names of handlers to notify.
     notify: Sequence[str] | None = default_field(default=None)
     #: Polling interval for async tasks.
@@ -444,7 +446,7 @@ class TaskBase(DirectivesBase):
     #: the result of this action.
     register: str | None = default_field(default=None)
     #: Number of tries for failed tasks.
-    retries: str | int | None = default_field(default=3)
+    retries: str | int | None = default_field(default=None)
     #: Retry task until condition(s) are satisfied.
     until: Sequence[str | bool] = default_field(factory=list)
     #: Condition on the task, or None if no condition.
@@ -542,8 +544,8 @@ class RoleRequirement(DirectivesBase):
 
     #: Delegate execution to another host.
     delegate_to: str | None = default_field(default=None)
-    #: Apply facts to delegated host. Contrary to tasks, the default here is False.
-    delegate_facts: str | bool | None = default_field(default=False)
+    #: Apply facts to delegated host.
+    delegate_facts: str | bool | None = default_field(default=None)
 
     #: Tags on the role inclusion.
     tags: Sequence[str | int] = default_field(factory=list)

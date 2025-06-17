@@ -10,14 +10,12 @@
   Afterwards, it'll also be possible to remove the dependency on `ansible` and
   depend solely on `ansible-core`, which doesn't include the collections.
 
-- The `pyproject.toml` file contains too many dependencies, many of which are
-  not necessary.
-
-- SCAnsible only supports `ansible-core < 2.14.0` and `ansible < 7.0.0`. Newer
-  versions of Ansible may not be processed correctly.
-  The reason for this is that `ansible-core >= 2.14` introduces API changes that
-  break the AST extraction.
-  FIX: Adapt AST extraction to use the new APIs.
+- SCAnsible heavily relies on Ansible to parse and validate code, as well as for
+  several other utilities. This is a rather heavy dependency, and importing Ansible
+  slows down SCAnsible's initial start. Moreover, the parsing logic is full of hacks
+  to work around issues arising from the reliance on Ansible.
+  FIX: We should reduce and ideally remove the dependency on Ansible. For starters,
+  parsing and validating can be reimplemented to avoid the hacks.
 
 - GASEL requires a Redisgraph database to be running to represent the graph in an
   in-memory database on which it runs the security smell queries.

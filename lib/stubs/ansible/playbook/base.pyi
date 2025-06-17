@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence, TypeVar, Union
+from typing import Any, ClassVar, Mapping, Sequence, TypeVar, Union
 
 from ansible.parsing.dataloader import DataLoader
 from ansible.parsing.yaml.objects import AnsibleMapping, AnsibleSequence, AnsibleUnicode
@@ -13,11 +13,10 @@ SelfType = TypeVar("SelfType", bound=Base)
 
 class FieldAttribute:
     isa: str
+    alias: str
 
 class FieldAttributeBase:
-    _attributes: Mapping[str, Value] = ...
-    _valid_attrs: Mapping[str, FieldAttribute] = ...
-
+    fattributes: ClassVar[Mapping[str, FieldAttribute]]
     def dump_attrs(self) -> Mapping[str, object]: ...
     def get_validated_value(
         self, name: str, attribute: FieldAttribute, value: object, templar: object
