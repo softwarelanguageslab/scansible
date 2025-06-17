@@ -398,18 +398,6 @@ wheels = [
 ]
 
 [[package]]
-name = "nodeenv"
-version = "1.7.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "setuptools" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/f3/9d/a28ecbd1721cd6c0ea65da6bfb2771d31c5d7e32d916a8f643b062530af3/nodeenv-1.7.0.tar.gz", hash = "sha256:e0e7f7dfb85fc5394c6fe1e8fa98131a2473e04311a45afb6508f7cf1836fa2b", size = 36354, upload-time = "2022-06-25T15:38:20.344Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/96/a8/d3b5baead78adadacb99e7281b3e842126da825cf53df61688cfc8b8ff91/nodeenv-1.7.0-py2.py3-none-any.whl", hash = "sha256:27083a7b96a25f2f5e1d8cb4b6317ee8aeda3bdd121394e5ac54e498028a042e", size = 21875, upload-time = "2022-06-25T15:38:17.819Z" },
-]
-
-[[package]]
 name = "nodejs-wheel-binaries"
 version = "22.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -496,18 +484,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/e0/ef/5905cd3642f2337d44143529c941cc3a02e5af16f0f65f81cbef7af452bb/Pygments-2.13.0.tar.gz", hash = "sha256:56a8508ae95f98e2b9bdf93a6be5ae3f7d8af858b43e02c5a2ff083726be40c1", size = 4324285, upload-time = "2022-08-15T16:03:23.698Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/4f/82/672cd382e5b39ab1cd422a672382f08a1fb3d08d9e0c0f3707f33a52063b/Pygments-2.13.0-py3-none-any.whl", hash = "sha256:f643f331ab57ba3c9d89212ee4a2dabc6e94f117cf4eefde99a0574720d14c42", size = 1098748, upload-time = "2022-08-15T16:03:20.04Z" },
-]
-
-[[package]]
-name = "pyright"
-version = "1.1.303"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "nodeenv" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/34/8e/7ae414af3fca49b2c3066a958010b23e0509664d9858c207fc73f83df78d/pyright-1.1.303.tar.gz", hash = "sha256:7daa516424555681e8974b21a95c108c5def791bf5381522b1410026d4da62c1", size = 16692, upload-time = "2023-04-14T01:29:12.632Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/65/17/d2af2e05577bba68b66d14755d4fdd962ba770f4e9e4d0955d21eb835362/pyright-1.1.303-py3-none-any.whl", hash = "sha256:8fe3d122d7e965e2df2cef64e1ceb98cff8200f458e7892d92a4c21ee85689c7", size = 17485, upload-time = "2023-04-14T01:29:10.871Z" },
 ]
 
 [[package]]
@@ -689,7 +665,6 @@ dev = [
     { name = "coverage" },
     { name = "hypothesis" },
     { name = "isort" },
-    { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-describe" },
@@ -725,7 +700,6 @@ dev = [
     { name = "coverage", specifier = ">=6.5.0,<7" },
     { name = "hypothesis", specifier = ">=6.17.0,<7" },
     { name = "isort", specifier = ">=5.12.0,<6" },
-    { name = "pyright", specifier = ">=1.1.300,<2" },
     { name = "pytest", specifier = ">=7.2.0,<8" },
     { name = "pytest-cov", specifier = ">=4.0.0,<5" },
     { name = "pytest-describe", specifier = ">=2.0.1,<3" },
@@ -733,15 +707,6 @@ dev = [
     { name = "ruff", specifier = ">=0.11.13,<0.12" },
     { name = "types-pyyaml", specifier = ">=6.0.12.1,<7" },
     { name = "types-redis", specifier = ">=4.3.21.6,<5" },
-]
-
-[[package]]
-name = "setuptools"
-version = "67.6.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/25/f3/d68c20919bc774c6cb127f1762f2f2f999d700a58198556e883dd3700e58/setuptools-67.6.0.tar.gz", hash = "sha256:2ee892cd5f29f3373097f5a814697e397cf3ce313616df0af11231e2ad118077", size = 2485539, upload-time = "2023-03-08T11:05:00.714Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/c3/9e/8a7ba2c9984a060daa6c6f9fff4d576b7ace3936239d6b771541eab972ed/setuptools-67.6.0-py3-none-any.whl", hash = "sha256:b78aaa36f6b90a074c1fa651168723acbf45d14cb1196b6f02c0fd07f17623b2", size = 1089190, upload-time = "2023-03-08T11:04:58.291Z" },
 ]
 
 [[package]]
