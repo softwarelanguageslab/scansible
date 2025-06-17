@@ -23,18 +23,19 @@
   in-memory database on which it runs the security smell queries.
   FIX: Remove this requirement and perform graph queries directly on the Python
   graph representation.
+  Alternatively, [Kuzu](https://docs.kuzudb.com/) is an embedded in-memory graph database with Cypher support.
 
 - SCAnsible writes many cache files to the `cache` directory in the current working
   directory. These are not project-specific, are not refreshed, and should likely be
   stored elsewhere.
 
-    - `ecosystems_cache.json` and `debian_advisories.json` contain advisory information
-      for the detected dependencies. These should be refreshed periodically.
-    - `collection_content.json` stores names and parameters of all modules in the
-      scanned collections. This is not yet extracted automatically, and should be project-specific.
-    - `dep_cache.json` and `smells_cache.json` caches results of dependency detection
-      and smell detection, respectively. These should be project-specific and invalidated
-      when the code changes.
+  - `ecosystems_cache.json` and `debian_advisories.json` contain advisory information
+    for the detected dependencies. These should be refreshed periodically.
+  - `collection_content.json` stores names and parameters of all modules in the
+    scanned collections. This is not yet extracted automatically, and should be project-specific.
+  - `dep_cache.json` and `smells_cache.json` caches results of dependency detection
+    and smell detection, respectively. These should be project-specific and invalidated
+    when the code changes.
 
 - SCAnsible security advisories for OS binaries relies on Debian Security advisories.
   This may not be appropriate for packages on other Linux distros.
