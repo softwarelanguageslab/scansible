@@ -149,7 +149,7 @@ class VarContext:
 
         if var_node is None:
             assert val_revision > 0, "Internal error: First variable node undefined"
-            logger.debug(f"Creating new variable node to represent value")
+            logger.debug("Creating new variable node to represent value")
             old_var_node = self._get_var_node_for_value(
                 var_def, 0, allow_undefined=False
             )
@@ -531,7 +531,7 @@ class VarContext:
 
         logger.debug(f"Found pre-existing value {vval!r}, reusing")
         assert isinstance(vval, ChangeableVariableValueRecord), (
-            f"Expected evaluated value to be changeable"
+            "Expected evaluated value to be changeable"
         )
         return vval
 
@@ -587,7 +587,7 @@ class VarContext:
         vval = self._envs.get_variable_value_for_constant_definition(
             name, self._next_def_revisions[name] - 1
         )
-        assert vval is not None, f"Internal Error: No value for newly-defined var"
+        assert vval is not None, "Internal Error: No value for newly-defined var"
         return vval
 
     def _get_variable_value_without_initialiser(

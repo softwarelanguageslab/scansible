@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from typing import Any, Callable, Type
+
 from functools import partial
 from itertools import chain
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Callable, Type
 
 import ansible.parsing.dataloader
 import pytest
@@ -64,7 +65,7 @@ def describe_extracting_metadata_file() -> None:
     def extracts_simple_string_dependencies(tmp_path: Path) -> None:
         (tmp_path / "main.yml").write_text(
             dedent(
-                f"""
+                """
             dependencies:
                 - testrole
         """
@@ -82,7 +83,7 @@ def describe_extracting_metadata_file() -> None:
     def extracts_simple_dict_dependencies_with_role_key(tmp_path: Path) -> None:
         (tmp_path / "main.yml").write_text(
             dedent(
-                f"""
+                """
             dependencies:
                 - role: testrole
         """
@@ -100,7 +101,7 @@ def describe_extracting_metadata_file() -> None:
     def extracts_simple_dict_dependencies_with_name_key(tmp_path: Path) -> None:
         (tmp_path / "main.yml").write_text(
             dedent(
-                f"""
+                """
             dependencies:
                 - name: testrole
         """

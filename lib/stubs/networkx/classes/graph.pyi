@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Generic, Iterable, Iterator, Literal, Sequence, overload
+from typing import Generic, Iterable, Iterator, Literal, overload
 
 from networkx._types import EdgeAttrT, GraphAttrT, NodeT
 

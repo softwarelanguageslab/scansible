@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from typing import Any, Callable, Literal, TypeVar, overload
+
 from collections.abc import Iterable
 from functools import partial
 from itertools import chain
 from pathlib import Path
-from typing import Any, Callable, Literal, TypeVar, overload
 
 from scansible.utils import actions
 

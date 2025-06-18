@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from typing import Any, Callable, Generator, NoReturn
+
 import io
 import os.path
 from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
-from typing import Any, Callable, Generator, NoReturn
 
 from . import ansible_types as ans
 from . import representation as rep

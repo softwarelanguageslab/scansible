@@ -103,7 +103,7 @@ class TaskExtractor(abc.ABC):
 
     def warn_remaining_kws(self, action: str = "") -> None:
         for other_kw, _ in self.task.__get_non_default_attributes__():
-            if not other_kw in self.SUPPORTED_TASK_ATTRIBUTES() and other_kw not in (
+            if other_kw not in self.SUPPORTED_TASK_ATTRIBUTES() and other_kw not in (
                 "raw",
                 "location",
                 "parent",

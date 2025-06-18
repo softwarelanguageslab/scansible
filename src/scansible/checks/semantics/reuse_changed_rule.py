@@ -69,7 +69,7 @@ class ReuseChangedVariableRule(Rule):
             warning_expl_lines = [
                 f"This variable was previously used as {v1!r}, but now as {v2!r}.",
                 f"The expression defining this variable has remained the same, however, it references a variable {dep_v1.name!r}.",
-                f"This dependence has potentially been changed since the previous usage.",
+                "This dependence has potentially been changed since the previous usage.",
                 f"In the first usages of {v1.name!r}, {dep_v1.name!r} was defined in {dep_v1.location!r}",
                 f"In later usages of {v2.name!r}, {dep_v1.name!r} was defined in {dep_v2.location!r}",
             ]

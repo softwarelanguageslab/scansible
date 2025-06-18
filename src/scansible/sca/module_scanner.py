@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import overload
+
 import csv
 import json
 import subprocess
@@ -7,7 +9,6 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import overload
 
 import ansible
 

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from typing import Iterable, Sequence
+
 import json
 import os
 from collections import defaultdict
 from pathlib import Path
-from typing import Iterable, Sequence
 
 import attrs
 from ansible import constants as ans_constants

@@ -10,7 +10,7 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 
 class Sentinel:
     def __repr__(self) -> str:
-        return f"SENTINEL"
+        return "SENTINEL"
 
 
 SENTINEL = Sentinel()

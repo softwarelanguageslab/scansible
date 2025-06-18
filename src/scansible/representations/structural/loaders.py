@@ -7,12 +7,13 @@ parsed data structure without modifications.
 
 from __future__ import annotations
 
+from typing import Any, Generator, Literal, Type, cast, overload
+
 import types
 from collections.abc import Sequence
 from contextlib import contextmanager
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Generator, Literal, Type, cast, overload
 
 from ansible.parsing import mod_args
 

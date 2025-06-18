@@ -62,8 +62,8 @@ class ReuseImpureExpressionRule(Rule):
             warning_header = f'Potentially unsafe reuse of variable "{v2.name}@{v2.version}" due to potential impure expression.'
             warning_expl_lines = [
                 f"This variable was previously used as {v1!r}, but now as {v2!r}.",
-                f"The expression defining this variable has remained the same, however, it may not be pure.",
-                f"Therefore, its value may have changed since the previous evaluation.",
+                "The expression defining this variable has remained the same, however, it may not be pure.",
+                "Therefore, its value may have changed since the previous evaluation.",
                 f"{value_change_context.expr!r} may be impure due to the usage of the following components:",
             ]
             for impure_component in value_change_context.impure_components:

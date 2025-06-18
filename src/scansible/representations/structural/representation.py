@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-import datetime
-import re
-from abc import abstractmethod
-from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -17,6 +13,11 @@ from typing import (
     TypeVar,
     Union,
 )
+
+import datetime
+import re
+from abc import abstractmethod
+from pathlib import Path
 
 import attrs
 from attrs import define, field, frozen

@@ -87,7 +87,7 @@ class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]
             self._check_conditions()
 
             if not included_name_expr or not isinstance(included_name_expr, str):
-                self.logger.error(f"Unknown included file name!")
+                self.logger.error("Unknown included file name!")
                 included_result = self._create_placeholder_task(
                     included_name_expr, predecessors
                 )

@@ -90,8 +90,8 @@ class UnnecessaryIncludeVarsRule(Rule):
                 warning_header = f'Unnecessary use of include_vars for variable "{v.name}@{v.version}"'
                 warning_body_lines = [
                     f"Variable {v!r} is unconditionally included through include_vars.",
-                    f"Variables included through include_vars have unusually high precedence, which makes tracing values difficult.",
-                    f"Since this variable is unconditionally included, it can instead be placed into default variables, role variables, or a local scope, to prevent variable precedence issue.",
+                    "Variables included through include_vars have unusually high precedence, which makes tracing values difficult.",
+                    "Since this variable is unconditionally included, it can instead be placed into default variables, role variables, or a local scope, to prevent variable precedence issue.",
                     f"All usages of {v.name}@{v.version}:",
                 ]
                 for vval in vs_sorted:

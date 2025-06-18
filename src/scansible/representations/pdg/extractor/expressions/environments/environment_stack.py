@@ -48,7 +48,7 @@ def _values_have_changed(
             )
             return True
 
-    logger.debug(f"No differences in used variables found. DECISION: UNCHANGED")
+    logger.debug("No differences in used variables found. DECISION: UNCHANGED")
     return False
 
 
