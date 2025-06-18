@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Generator
-
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any, Generator
 
 import pytest
 
