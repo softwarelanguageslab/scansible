@@ -1,36 +1,36 @@
 from __future__ import annotations
 
+from typing import final, override
+
 from .base import Rule
 
 
+@final
 class UnrestrictedIPAddressRule(Rule):
-    name = "Do not bind to the 0.0.0.0 address, as this exposes the service to the entire Internet"
+    description = "Do not bind to the 0.0.0.0 address, as this exposes the service to the entire Internet"
 
-    BAD_IPS = ("0.0.0.0",)
-
-    def create_unrestricted_ip_address_check(
-        self, value_accessor: str, type_accessor: str
-    ) -> str:
-        return self._create_string_contains_test(
-            self.BAD_IPS, value_accessor, type_accessor
-        )
+    BAD_IP_REGEX = r"\b0\.0\.0\.0"
 
     @property
-    def query(self) -> str:
-        return f"""
+    @override
+    def query(self) -> tuple[str, dict[str, str]]:
+        return (
+            f"""
             {self._create_query("ScalarLiteral", "value", "type")}
             UNION
             {self._create_query("Expression", "expr")}
-        """
+        """,
+            {"bad_ip_regex": self.BAD_IP_REGEX},
+        )
 
     def _create_query(
         self, source_type: str, value_prop: str, type_prop: str = ""
     ) -> str:
         value_accessor = f"source.{value_prop}"
-        type_accessor = f"source.{type_prop}" if type_prop else ""
+        # type_accessor = f"source.{type_prop}" if type_prop else ""
         return f"""
-            MATCH chain = (source:{source_type}) -[:DEF|INPUT|DEFLOOPITEM*0..]->()-[:KEYWORD*0..1]->(sink)
-            WHERE {self.create_unrestricted_ip_address_check(value_accessor, type_accessor)}
-                AND (sink:Task OR (sink:Variable AND NOT (sink)-[:INPUT|KEYWORD]->()))
-            {self._query_returns}
+            MATCH (source:{source_type}) -[:e_Def|e_DefLoopItem|e_Input*0..]->()-[:e_Keyword*0..1]->(sink:Task:Variable)
+            WHERE regexp_matches({value_accessor}, $bad_ip_regex)
+                AND (NOT (label(sink) = "Variable" AND (sink)-[:e_Input|e_Keyword]->()))
+            RETURN source.node_id, sink.node_id
         """

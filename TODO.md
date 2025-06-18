@@ -17,12 +17,6 @@
   FIX: We should reduce and ideally remove the dependency on Ansible. For starters,
   parsing and validating can be reimplemented to avoid the hacks.
 
-- GASEL requires a Redisgraph database to be running to represent the graph in an
-  in-memory database on which it runs the security smell queries.
-  FIX: Remove this requirement and perform graph queries directly on the Python
-  graph representation.
-  Alternatively, [Kuzu](https://docs.kuzudb.com/) is an embedded in-memory graph database with Cypher support.
-
 - SCAnsible writes many cache files to the `cache` directory in the current working
   directory. These are not project-specific, are not refreshed, and should likely be
   stored elsewhere.

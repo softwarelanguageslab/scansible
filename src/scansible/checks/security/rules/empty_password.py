@@ -1,29 +1,33 @@
 from __future__ import annotations
 
+from typing import final, override
+
 from .base import Rule
 
 
+@final
 class EmptyPasswordRule(Rule):
-    name = "Never use empty passwords, these are easy to crack"
+    description = "Never use empty passwords, these are easy to crack"
 
     PASSWORD_TOKENS = ("pass", "pwd")
-
-    def create_password_test(self, key_getter: str) -> str:
-        return self._create_string_contains_test(self.PASSWORD_TOKENS, key_getter)
+    PASSWORD_REGEX = "|".join(PASSWORD_TOKENS)
 
     @property
-    def query(self) -> str:
-        return f"""
-            {self._construct_query("[arg:KEYWORD]->(sink:Task)", "arg.keyword")}
+    @override
+    def query(self) -> tuple[str, dict[str, str]]:
+        return (
+            f"""
+            {self._construct_query("[arg:e_Keyword]->(sink:Task)", "arg.keyword")}
             UNION
-            {self._construct_query("[:DEF|DEFLOOPITEM]->(sink:Variable)-[:DEF|DEFLOOPITEM|INPUT*0..]->()-[:KEYWORD]->(:Task)", "sink.name")}
-        """
+            {self._construct_query("[:e_Def|e_DefLoopItem]->(sink:Variable)-[:e_Def|e_DefLoopItem|e_Input*0..]->()-[:e_Keyword]->(:Task)", "sink.name")}
+        """,
+            {"password_regex": self.PASSWORD_REGEX},
+        )
 
     def _construct_query(self, chain_tail: str, key_getter: str) -> str:
         return f"""
-            MATCH chain = (source:ScalarLiteral)-[:DEF|INPUT|DEFLOOPITEM*0..]->()-{chain_tail}
-            WHERE {self.create_password_test(key_getter)}
-                AND ((source.type = 'str' AND source.value = '' or source.value = 'omit')
-                    OR source.type = 'NoneType')
-            {self._query_returns}
+            MATCH (source:ScalarLiteral)-[:e_Def|e_Input|e_DefLoopItem*0..]->()-{chain_tail}
+            WHERE regexp_matches({key_getter}, $password_regex)
+                AND (source.type = 'NoneType' OR (source.type = 'str' AND (source.value = 'omit' OR source.value IS NULL)))
+            RETURN source.node_id, sink.node_id
         """

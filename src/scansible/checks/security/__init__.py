@@ -4,30 +4,21 @@ from datetime import datetime
 
 from loguru import logger
 
-from scansible.representations.pdg import Graph, neo4j_dump
+from scansible.representations.pdg import Graph
 
-from .db import RedisGraphDatabase
+from .db import GraphDatabase
 from .rules import Rule, RuleResult, get_all_rules
 
 
-def run_all_checks(pdg: Graph, db_host: str) -> list[RuleResult]:
+def run_all_checks(pdg: Graph) -> list[RuleResult]:
     rules = get_all_rules()
-    return run_checks(pdg, db_host, rules)
+    return run_checks(pdg, rules)
 
 
-def run_checks(pdg: Graph, db_host: str, rules: list[Rule]) -> list[RuleResult]:
-    pdg_import_query = neo4j_dump(pdg)
-
-    if not pdg_import_query.strip():
-        return []
-
+def run_checks(pdg: Graph, rules: list[Rule]) -> list[RuleResult]:
     start_time = datetime.now()
-    db = RedisGraphDatabase(db_host)
-
     results: list[RuleResult] = []
-    with db.temporary_graph(
-        f"{pdg.role_name}@{pdg.role_version}", pdg_import_query
-    ) as db_graph:
+    with GraphDatabase(pdg) as db_graph:
         logger.info(
             f"Imported graph of {len(pdg)} nodes and {len(pdg.edges())} edges in {(datetime.now() - start_time).total_seconds():.2f}s"
         )

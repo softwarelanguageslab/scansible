@@ -39,15 +39,6 @@ scansible check --enable-semantics --skip-security /path/to/role-or-playbook
 
 ### Example: Running security smell detection
 
-Make sure you have a Redis database running and accessible on port 6379.
-The easiest way to do this is by running it as a Docker container:
-
-```
-docker run -d --name redis -p 6379:6379 redislabs/redisgraph:2.10.4
-```
-
-Then, run Scansible:
-
 ```
 scansible check --enable-security /path/to/role-or-playbook
 ```
@@ -55,7 +46,6 @@ scansible check --enable-security /path/to/role-or-playbook
 ### Example: Running the SCA
 
 Ensure the `DependencyPatternMatcher` is compiled as described above.
-Also ensure that the Redis database is online, as described in the previous point.
 Then, run the SCA:
 
 ```
@@ -95,7 +85,7 @@ scansible sca ./examples/ ./example_output.json
 
 ## Running tests
 
-Ensure that the Redis database is up (see above), then run PyTest:
+This project uses PyTest as the test framework. Tests can be executed as follows:
 
 ```
 pytest

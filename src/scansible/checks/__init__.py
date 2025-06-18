@@ -20,7 +20,6 @@ class CheckResult(NamedTuple):
 
 def run_all_checks(
     extraction_context: ExtractionContext,
-    db_host: str,
     enable_security: bool = True,
     enable_semantics: bool = True,
 ) -> list[CheckResult]:
@@ -28,7 +27,7 @@ def run_all_checks(
     if enable_security:
         results.extend(
             CheckResult(res.rule_name, res.source_location)
-            for res in security.run_all_checks(extraction_context.graph, db_host)
+            for res in security.run_all_checks(extraction_context.graph)
         )
     if enable_semantics:
         results.extend(

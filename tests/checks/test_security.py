@@ -2,39 +2,46 @@
 
 from __future__ import annotations
 
-from typing import Any, Generator
-
+import sys
+from collections.abc import Iterator
 from contextlib import contextmanager
+from functools import partial
 from pathlib import Path
 
 import pytest
+from loguru import logger
 
 from scansible.checks.security import rules
-from scansible.checks.security.db import RedisGraphDatabase
+from scansible.checks.security.db import GraphDatabase
+from scansible.checks.security.rules.admin_by_default import AdminByDefaultRule
 from scansible.checks.security.rules.base import RuleResult
+from scansible.checks.security.rules.empty_password import EmptyPasswordRule
+from scansible.checks.security.rules.hardcoded_secret import HardcodedSecretRule
+from scansible.checks.security.rules.http_without_ssl_tls import HTTPWithoutSSLTLSRule
+from scansible.checks.security.rules.missing_integrity_check import (
+    MissingIntegrityCheckRule,
+)
+from scansible.checks.security.rules.unrestricted_ip_address import (
+    UnrestrictedIPAddressRule,
+)
+from scansible.checks.security.rules.weak_crypto import WeakCryptoAlgorithmRule
 from scansible.representations.pdg import extract_pdg
-from scansible.representations.pdg.io.neo4j import dump_graph as pdg_to_neo4j
-
-
-@pytest.fixture(scope="module")
-def db_instance() -> Generator[RedisGraphDatabase, None, None]:
-    yield RedisGraphDatabase("localhost")
 
 
 @contextmanager
-def temp_import_pb(db: RedisGraphDatabase, path: Path) -> Generator[Any, None, None]:  # type: ignore[misc]
+def temp_import_pb(path: Path) -> Iterator[GraphDatabase]:
+    logger.remove()
     pdg_ctx = extract_pdg(path, "test", "test", [])
-    query = pdg_to_neo4j(pdg_ctx.graph)
-    print(query)
-    with db.temporary_graph("test@test", query) as graph:
-        yield graph
+    _ = logger.add(sys.stderr, format="{level} {message}", level="DEBUG")
+    with GraphDatabase(pdg_ctx.graph) as graph_db:
+        yield graph_db
 
 
 def write_pb(content: str, path: Path) -> None:
-    path.write_text(content)
+    _ = path.write_text(content)
 
 
-def run_all_checks(db: RedisGraphDatabase) -> list[RuleResult]:
+def run_all_checks(db: GraphDatabase) -> list[RuleResult]:
     results: list[RuleResult] = []
     for rule in rules.get_all_rules():
         results.extend(rule.run(db))
@@ -42,9 +49,11 @@ def run_all_checks(db: RedisGraphDatabase) -> list[RuleResult]:
 
 
 def describe_hardcoded_secret_rule() -> None:
-    def matches_literal_on_task(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    _result = partial(
+        RuleResult, HardcodedSecretRule.name, HardcodedSecretRule.description
+    )
+
+    def matches_literal_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -57,22 +66,12 @@ def describe_hardcoded_secret_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.HardcodedSecretRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "HardcodedSecret",
-                "Hardcoded secrets can compromise security when the source code falls into the wrong hands",
-                f"{pb_path}:7:31",
-                f"{pb_path}:4:19",
-                0,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:7:31", f"{pb_path}:4:19")]
 
-    def matches_variable_on_task(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def matches_variable_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -87,22 +86,12 @@ def describe_hardcoded_secret_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.HardcodedSecretRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "HardcodedSecret",
-                "Hardcoded secrets can compromise security when the source code falls into the wrong hands",
-                f"{pb_path}:4:24",
-                f"{pb_path}:6:19",
-                1,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:4:24", f"{pb_path}:6:19")]
 
-    def matches_2_chain_variable_on_task(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def matches_2_chain_variable_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -118,22 +107,12 @@ def describe_hardcoded_secret_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.HardcodedSecretRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "HardcodedSecret",
-                "Hardcoded secrets can compromise security when the source code falls into the wrong hands",
-                f"{pb_path}:4:24",
-                f"{pb_path}:7:19",
-                2,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:4:24", f"{pb_path}:7:19")]
 
-    def matches_variable_name_with_literal(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def matches_variable_name_with_literal(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -145,22 +124,12 @@ def describe_hardcoded_secret_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.HardcodedSecretRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "HardcodedSecret",
-                "Hardcoded secrets can compromise security when the source code falls into the wrong hands",
-                f"{pb_path}:4:34",
-                f"{pb_path}:4:17",
-                1,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:4:34", f"{pb_path}:4:17")]
 
-    def matches_indirect_variable_name(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def matches_indirect_variable_name(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -173,22 +142,12 @@ def describe_hardcoded_secret_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.HardcodedSecretRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "HardcodedSecret",
-                "Hardcoded secrets can compromise security when the source code falls into the wrong hands",
-                f"{pb_path}:4:24",
-                f"{pb_path}:5:17",
-                2,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:4:24", f"{pb_path}:5:17")]
 
-    def does_not_match_update_password_flag_as_literal(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def does_not_match_update_password_flag_as_literal(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -200,14 +159,12 @@ def describe_hardcoded_secret_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.HardcodedSecretRule().run(graph_db)
 
         assert not results
 
-    def does_not_match_update_password_flag_as_expression(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def does_not_match_update_password_flag_as_expression(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -221,14 +178,12 @@ def describe_hardcoded_secret_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.HardcodedSecretRule().run(graph_db)
 
         assert not results
 
-    def does_not_match_vault_value(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def does_not_match_vault_value(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -240,14 +195,12 @@ def describe_hardcoded_secret_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.HardcodedSecretRule().run(graph_db)
 
         assert not results
 
-    def does_not_match_variable_from_inventory(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def does_not_match_variable_from_inventory(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -259,14 +212,12 @@ def describe_hardcoded_secret_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.HardcodedSecretRule().run(graph_db)
 
         assert not results
 
-    def does_not_match_task_key_in_whitelist(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def does_not_match_task_key_in_whitelist(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -279,16 +230,16 @@ def describe_hardcoded_secret_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.HardcodedSecretRule().run(graph_db)
 
         assert not results
 
 
 def describe_empty_password_rule() -> None:
-    def matches_literal_on_task(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    _result = partial(RuleResult, EmptyPasswordRule.name, EmptyPasswordRule.description)
+
+    def matches_literal_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -301,22 +252,30 @@ def describe_empty_password_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.EmptyPasswordRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "EmptyPassword",
-                "Never use empty passwords, these are easy to crack",
-                f"{pb_path}:7:31",
-                f"{pb_path}:4:19",
-                0,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:7:31", f"{pb_path}:4:19")]
 
-    def matches_null_literal_on_task(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def matches_omit_literal_on_task(tmp_path: Path) -> None:
+        pb_path = tmp_path / "pb.yml"
+        write_pb(
+            """
+            - hosts: localhost
+              tasks:
+                - name: test
+                  user:
+                    name: me
+                    password: omit
+        """,
+            pb_path,
+        )
+        with temp_import_pb(pb_path) as graph_db:
+            results = rules.EmptyPasswordRule().run(graph_db)
+
+        assert results == [_result(f"{pb_path}:7:31", f"{pb_path}:4:19")]
+
+    def matches_null_literal_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -329,22 +288,12 @@ def describe_empty_password_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.EmptyPasswordRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "EmptyPassword",
-                "Never use empty passwords, these are easy to crack",
-                f"{pb_path}:4:19",
-                f"{pb_path}:4:19",
-                0,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:4:19", f"{pb_path}:4:19")]
 
-    def matches_variable_on_task(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def matches_variable_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -359,22 +308,12 @@ def describe_empty_password_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.EmptyPasswordRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "EmptyPassword",
-                "Never use empty passwords, these are easy to crack",
-                f"{pb_path}:4:24",
-                f"{pb_path}:6:19",
-                1,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:4:24", f"{pb_path}:6:19")]
 
-    def matches_2_chain_variable_on_task(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def matches_2_chain_variable_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -390,22 +329,12 @@ def describe_empty_password_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.EmptyPasswordRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "EmptyPassword",
-                "Never use empty passwords, these are easy to crack",
-                f"{pb_path}:4:24",
-                f"{pb_path}:7:19",
-                2,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:4:24", f"{pb_path}:7:19")]
 
-    def matches_variable_name_with_literal(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def matches_variable_name_with_literal(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -417,22 +346,12 @@ def describe_empty_password_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.EmptyPasswordRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "EmptyPassword",
-                "Never use empty passwords, these are easy to crack",
-                f"{pb_path}:4:34",
-                f"{pb_path}:4:17",
-                1,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:4:34", f"{pb_path}:4:17")]
 
-    def matches_indirect_variable_name(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def matches_indirect_variable_name(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -445,24 +364,18 @@ def describe_empty_password_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.EmptyPasswordRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "EmptyPassword",
-                "Never use empty passwords, these are easy to crack",
-                f"{pb_path}:4:24",
-                f"{pb_path}:5:17",
-                2,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:4:24", f"{pb_path}:5:17")]
 
 
 def describe_admin_by_default_rule() -> None:
-    def matches_literal_on_task(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    _result = partial(
+        RuleResult, AdminByDefaultRule.name, AdminByDefaultRule.description
+    )
+
+    def matches_literal_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -473,22 +386,12 @@ def describe_admin_by_default_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.AdminByDefaultRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "AdminByDefault",
-                "Avoid using admin accounts, as this violates the principle of least privileges",
-                f"{pb_path}:5:32",
-                f"{pb_path}:4:19",
-                0,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:5:32", f"{pb_path}:4:19")]
 
-    def matches_variable_on_task(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def matches_variable_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -501,24 +404,18 @@ def describe_admin_by_default_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.AdminByDefaultRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "AdminByDefault",
-                "Avoid using admin accounts, as this violates the principle of least privileges",
-                f"{pb_path}:4:28",
-                f"{pb_path}:6:19",
-                1,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:4:28", f"{pb_path}:6:19")]
 
 
 def describe_http_without_tls_or_ssl_rule() -> None:
-    def matches_literal_on_task(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    _result = partial(
+        RuleResult, HTTPWithoutSSLTLSRule.name, HTTPWithoutSSLTLSRule.description
+    )
+
+    def matches_literal_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -529,22 +426,12 @@ def describe_http_without_tls_or_ssl_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.HTTPWithoutSSLTLSRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "HTTPWithoutSSLTLS",
-                "Always use SSL/TLS to connect over HTTP, i.e., use HTTPS",
-                f"{pb_path}:5:26",
-                f"{pb_path}:4:19",
-                0,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:5:26", f"{pb_path}:4:19")]
 
-    def matches_variable_on_task(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def matches_variable_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -557,22 +444,12 @@ def describe_http_without_tls_or_ssl_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.HTTPWithoutSSLTLSRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "HTTPWithoutSSLTLS",
-                "Always use SSL/TLS to connect over HTTP, i.e., use HTTPS",
-                f"{pb_path}:4:27",
-                f"{pb_path}:6:19",
-                1,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:4:27", f"{pb_path}:6:19")]
 
-    def matches_expression_creating_url(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def matches_expression_creating_url(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -585,22 +462,12 @@ def describe_http_without_tls_or_ssl_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.HTTPWithoutSSLTLSRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "HTTPWithoutSSLTLS",
-                "Always use SSL/TLS to connect over HTTP, i.e., use HTTPS",
-                f"{pb_path}:7:26",
-                f"{pb_path}:6:19",
-                1,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:7:26", f"{pb_path}:6:19")]
 
-    def matches_transitive_expression_creating_url(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def matches_transitive_expression_creating_url(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -614,22 +481,12 @@ def describe_http_without_tls_or_ssl_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.HTTPWithoutSSLTLSRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "HTTPWithoutSSLTLS",
-                "Always use SSL/TLS to connect over HTTP, i.e., use HTTPS",
-                f"{pb_path}:5:22",
-                f"{pb_path}:7:19",
-                2,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:5:22", f"{pb_path}:7:19")]
 
-    def does_not_match_localhost(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def does_not_match_localhost(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -640,14 +497,12 @@ def describe_http_without_tls_or_ssl_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.HTTPWithoutSSLTLSRule().run(graph_db)
 
         assert not results
 
-    def does_not_match_localhost_ip(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def does_not_match_localhost_ip(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -658,14 +513,12 @@ def describe_http_without_tls_or_ssl_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.HTTPWithoutSSLTLSRule().run(graph_db)
 
         assert not results
 
-    def does_not_match_localhost_in_expression(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def does_not_match_localhost_in_expression(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -676,14 +529,12 @@ def describe_http_without_tls_or_ssl_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.HTTPWithoutSSLTLSRule().run(graph_db)
 
         assert not results
 
-    def does_not_match_localhost_with_indirection(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def does_not_match_localhost_with_indirection(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -697,12 +548,12 @@ def describe_http_without_tls_or_ssl_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.HTTPWithoutSSLTLSRule().run(graph_db)
 
         assert not results
 
-    def does_not_match_https(db_instance: RedisGraphDatabase, tmp_path: Path) -> None:
+    def does_not_match_https(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -713,14 +564,12 @@ def describe_http_without_tls_or_ssl_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.HTTPWithoutSSLTLSRule().run(graph_db)
 
         assert not results
 
-    def matches_only_the_correct_one(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def matches_only_the_correct_one(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -739,24 +588,20 @@ def describe_http_without_tls_or_ssl_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.HTTPWithoutSSLTLSRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "HTTPWithoutSSLTLS",
-                "Always use SSL/TLS to connect over HTTP, i.e., use HTTPS",
-                f"{pb_path}:4:22",
-                f"{pb_path}:10:19",
-                2,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:4:22", f"{pb_path}:10:19")]
 
 
 def describe_missing_integrity_check_rule() -> None:
-    def matches_literal_url_on_task(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    _result = partial(
+        RuleResult,
+        MissingIntegrityCheckRule.name,
+        MissingIntegrityCheckRule.description,
+    )
+
+    def matches_literal_url_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -767,22 +612,12 @@ def describe_missing_integrity_check_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.MissingIntegrityCheckRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "MissingIntegrityCheck",
-                "The integrity of source code needs to be checked with cryptographic hashes after downloading",
-                f"{pb_path}:5:26",
-                f"{pb_path}:4:19",
-                0,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:5:26", f"{pb_path}:4:19")]
 
-    def matches_variable_on_task(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def matches_variable_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -795,22 +630,12 @@ def describe_missing_integrity_check_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.MissingIntegrityCheckRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "MissingIntegrityCheck",
-                "The integrity of source code needs to be checked with cryptographic hashes after downloading",
-                f"{pb_path}:4:27",
-                f"{pb_path}:6:19",
-                1,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:4:27", f"{pb_path}:6:19")]
 
-    def matches_expression_creating_url(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def matches_expression_creating_url(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -823,22 +648,12 @@ def describe_missing_integrity_check_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.MissingIntegrityCheckRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "MissingIntegrityCheck",
-                "The integrity of source code needs to be checked with cryptographic hashes after downloading",
-                f"{pb_path}:7:26",
-                f"{pb_path}:6:19",
-                1,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:7:26", f"{pb_path}:6:19")]
 
-    def matches_disabled_gpgcheck(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def matches_disabled_gpgcheck(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -850,22 +665,12 @@ def describe_missing_integrity_check_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.MissingIntegrityCheckRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "MissingIntegrityCheck",
-                "The integrity of source code needs to be checked with cryptographic hashes after downloading",
-                f"{pb_path}:4:19",
-                f"{pb_path}:4:19",
-                0,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:4:19", f"{pb_path}:4:19")]
 
-    def matches_inverted_disabled_gpgcheck(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def matches_inverted_disabled_gpgcheck(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -877,22 +682,12 @@ def describe_missing_integrity_check_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.MissingIntegrityCheckRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "MissingIntegrityCheck",
-                "The integrity of source code needs to be checked with cryptographic hashes after downloading",
-                f"{pb_path}:4:19",
-                f"{pb_path}:4:19",
-                0,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:4:19", f"{pb_path}:4:19")]
 
-    def matches_disabled_gpgcheck_indirectly(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def matches_disabled_gpgcheck_indirectly(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -906,22 +701,12 @@ def describe_missing_integrity_check_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.MissingIntegrityCheckRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "MissingIntegrityCheck",
-                "The integrity of source code needs to be checked with cryptographic hashes after downloading",
-                f"{pb_path}:4:17",
-                f"{pb_path}:6:19",
-                1,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:4:17", f"{pb_path}:6:19")]
 
-    def does_not_match_enabled_gpgcheck(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def does_not_match_enabled_gpgcheck(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -933,14 +718,12 @@ def describe_missing_integrity_check_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.MissingIntegrityCheckRule().run(graph_db)
 
         assert not results
 
-    def does_not_match_url_with_checksum(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def does_not_match_url_with_checksum(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -952,14 +735,12 @@ def describe_missing_integrity_check_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.MissingIntegrityCheckRule().run(graph_db)
 
         assert not results
 
-    def does_not_match_non_source_url(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def does_not_match_non_source_url(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -970,16 +751,20 @@ def describe_missing_integrity_check_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.MissingIntegrityCheckRule().run(graph_db)
 
         assert not results
 
 
 def describe_unrestricted_ip_address_rule() -> None:
-    def matches_literal_on_task(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    _result = partial(
+        RuleResult,
+        UnrestrictedIPAddressRule.name,
+        UnrestrictedIPAddressRule.description,
+    )
+
+    def matches_literal_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -990,22 +775,12 @@ def describe_unrestricted_ip_address_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.UnrestrictedIPAddressRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "UnrestrictedIPAddress",
-                "Do not bind to the 0.0.0.0 address, as this exposes the service to the entire Internet",
-                f"{pb_path}:5:27",
-                f"{pb_path}:4:19",
-                0,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:5:27", f"{pb_path}:4:19")]
 
-    def matches_indirect_literal_on_task(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def matches_indirect_literal_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -1018,24 +793,36 @@ def describe_unrestricted_ip_address_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.UnrestrictedIPAddressRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "UnrestrictedIPAddress",
-                "Do not bind to the 0.0.0.0 address, as this exposes the service to the entire Internet",
-                f"{pb_path}:4:31",
-                f"{pb_path}:6:19",
-                1,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:4:31", f"{pb_path}:6:19")]
+
+    def does_not_match_10_0_0_0(tmp_path: Path) -> None:
+        pb_path = tmp_path / "pb.yml"
+        write_pb(
+            """
+            - hosts: localhost
+              vars:
+                bind_address: 10.0.0.0
+              tasks:
+                - test:
+                    bind: '{{ bind_address }}'
+        """,
+            pb_path,
+        )
+        with temp_import_pb(pb_path) as graph_db:
+            results = rules.UnrestrictedIPAddressRule().run(graph_db)
+
+        assert not results
 
 
 def describe_weak_crypto_rule() -> None:
-    def matches_literal_on_task(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    _result = partial(
+        RuleResult, WeakCryptoAlgorithmRule.name, WeakCryptoAlgorithmRule.description
+    )
+
+    def matches_literal_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -1047,22 +834,12 @@ def describe_weak_crypto_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.WeakCryptoAlgorithmRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "WeakCryptoAlgorithm",
-                "Do not use weak cryptographic algorithms like CRC32, MD5, or SHA-1. Use SHA-256 or stronger instead.",
-                f"{pb_path}:6:31",
-                f"{pb_path}:4:19",
-                0,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:6:31", f"{pb_path}:4:19")]
 
-    def matches_indirect_literal_on_task(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def matches_indirect_literal_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -1076,22 +853,12 @@ def describe_weak_crypto_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.WeakCryptoAlgorithmRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "WeakCryptoAlgorithm",
-                "Do not use weak cryptographic algorithms like CRC32, MD5, or SHA-1. Use SHA-256 or stronger instead.",
-                f"{pb_path}:4:32",
-                f"{pb_path}:6:19",
-                1,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:4:32", f"{pb_path}:6:19")]
 
-    def matches_usage_in_expressions(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def matches_usage_in_expressions(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -1103,22 +870,14 @@ def describe_weak_crypto_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = rules.WeakCryptoAlgorithmRule().run(graph_db)
 
-        assert results == [
-            RuleResult(
-                "WeakCryptoAlgorithm",
-                "Do not use weak cryptographic algorithms like CRC32, MD5, or SHA-1. Use SHA-256 or stronger instead.",
-                f"{pb_path}:6:31",
-                f"{pb_path}:4:19",
-                1,
-            )
-        ]
+        assert results == [_result(f"{pb_path}:6:31", f"{pb_path}:4:19")]
 
 
 def describe_glitch_test_cases() -> None:
-    def admin_by_default(db_instance: RedisGraphDatabase, tmp_path: Path) -> None:
+    def admin_by_default(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -1131,21 +890,20 @@ def describe_glitch_test_cases() -> None:
             pb_path,
         )
 
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = run_all_checks(graph_db)
 
         assert results == [
             RuleResult(
-                "AdminByDefault",
-                "Avoid using admin accounts, as this violates the principle of least privileges",
+                AdminByDefaultRule.name,
+                AdminByDefaultRule.description,
                 f"{pb_path}:5:32",
                 f"{pb_path}:4:19",
-                0,
             )
         ]
 
     @pytest.mark.xfail(reason="nested key in dict literal")
-    def empty_password(db_instance: RedisGraphDatabase, tmp_path: Path) -> None:
+    def empty_password(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -1168,21 +926,20 @@ def describe_glitch_test_cases() -> None:
             pb_path,
         )
 
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = run_all_checks(graph_db)
 
         assert results == [
             RuleResult(
-                "EmptyPassword",
-                "Never use empty passwords, these are easy to crack",
+                EmptyPasswordRule.name,
+                EmptyPasswordRule.description,
                 f"{pb_path}:4:19",
                 f"{pb_path}:4:19",
-                0,
             )
         ]
 
     @pytest.mark.xfail(reason="nested key in dict literal")
-    def hardcoded_secret(db_instance: RedisGraphDatabase, tmp_path: Path) -> None:
+    def hardcoded_secret(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -1205,20 +962,19 @@ def describe_glitch_test_cases() -> None:
             pb_path,
         )
 
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = run_all_checks(graph_db)
 
         assert results == [
             RuleResult(
-                "HardcodedSecret",
-                "Hardcoded secrets can compromise security when the source code falls into the wrong hands",
+                HardcodedSecretRule.name,
+                HardcodedSecretRule.description,
                 f"{pb_path}:10:33",
                 f"{pb_path}:4:19",
-                0,
             )
         ]
 
-    def http_without_tls_ssl(db_instance: RedisGraphDatabase, tmp_path: Path) -> None:
+    def http_without_tls_ssl(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -1242,20 +998,19 @@ def describe_glitch_test_cases() -> None:
             pb_path,
         )
 
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = run_all_checks(graph_db)
 
         assert results == [
             RuleResult(
-                "HTTPWithoutSSLTLS",
-                "Always use SSL/TLS to connect over HTTP, i.e., use HTTPS",
+                HTTPWithoutSSLTLSRule.name,
+                HTTPWithoutSSLTLSRule.description,
                 f"{pb_path}:6:26",
                 f"{pb_path}:4:19",
-                1,
             )
         ]
 
-    def no_integrity_check(db_instance: RedisGraphDatabase, tmp_path: Path) -> None:
+    def no_integrity_check(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -1274,16 +1029,14 @@ def describe_glitch_test_cases() -> None:
             pb_path,
         )
 
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = run_all_checks(graph_db)
 
         # False positive
         assert not results
 
     @pytest.mark.xfail(reason="unsupported literal type")
-    def unrestricted_ip_address(
-        db_instance: RedisGraphDatabase, tmp_path: Path
-    ) -> None:
+    def unrestricted_ip_address(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -1300,20 +1053,19 @@ def describe_glitch_test_cases() -> None:
             pb_path,
         )
 
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = run_all_checks(graph_db)
 
         assert results == [
             RuleResult(
-                "UnrestrictedIPAddress",
-                "Do not bind to the 0.0.0.0 address, as this exposes the service to the entire Internet",
+                UnrestrictedIPAddressRule.name,
+                UnrestrictedIPAddressRule.description,
                 f"{pb_path}:6:39",
                 f"{pb_path}:4:19",
-                1,
             )
         ]
 
-    def weak_crypto(db_instance: RedisGraphDatabase, tmp_path: Path) -> None:
+    def weak_crypto(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_pb(
             """
@@ -1335,15 +1087,14 @@ def describe_glitch_test_cases() -> None:
             pb_path,
         )
 
-        with temp_import_pb(db_instance, pb_path) as graph_db:
+        with temp_import_pb(pb_path) as graph_db:
             results = run_all_checks(graph_db)
 
         assert results == [
             RuleResult(
-                "WeakCryptoAlgorithm",
-                "Do not use weak cryptographic algorithms like CRC32, MD5, or SHA-1. Use SHA-256 or stronger instead.",
+                WeakCryptoAlgorithmRule.name,
+                WeakCryptoAlgorithmRule.description,
                 f"{pb_path}:6:38",
                 f"{pb_path}:8:19",
-                2,
             ),
         ]

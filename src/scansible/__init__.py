@@ -167,7 +167,6 @@ def build_pdg(
     type=click.Choice(["playbook", "role"]),
     help="Type of the provided project (default: autodetect)",
 )
-@click.option("--db-host", help="DB host", envvar="DB_HOST")
 @click.option(
     "--role-search-path",
     type=click.Path(file_okay=False, path_type=Path),
@@ -197,7 +196,6 @@ def check(
     strict: bool,
     enable_security: bool,
     enable_semantics: bool,
-    db_host: str,
 ) -> None:
     """Check the project residing at PROJECT_PATH for smells."""
     name = project_path.name
@@ -217,7 +215,6 @@ def check(
     reporter = TerminalReporter()
     results = run_all_checks(
         ctx,
-        db_host,
         enable_security=enable_security,
         enable_semantics=enable_semantics,
     )

@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from typing import Iterable, Sequence
-
 import json
-import os
 from collections import defaultdict
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 
 import attrs
@@ -135,7 +133,7 @@ def _print_dependencies(project_deps: ProjectDependencies) -> None:
 def scan_project(
     project: Path, output_dir: Path, role_search_paths: list[Path]
 ) -> None:
-    smells = _detect_smells(project, role_search_paths)
+    smells = list(_detect_smells(project, role_search_paths))
     CONSOLE.print(smells)
 
     project_deps = _extract_project_dependencies(project)
@@ -179,24 +177,7 @@ def scan_project(
     # json_results = _serialise_results_to_json(module_usages, dependencies, dep_vulns)
 
 
-def _detect_smells(project: Path, role_search_paths: list[Path]) -> list[RuleResult]:
-    cache_file = Path("cache") / "smells_cache.json"
-    if not cache_file.is_file():
-        cache_file.write_text(json.dumps({}))
-
-    cache = json.loads(cache_file.read_text())
-
-    if str(project) not in cache:
-        smells = set(_detect_smells_uncached(project, role_search_paths))
-        cache[str(project)] = list(smells)
-        cache_file.write_text(json.dumps(cache))
-        return list(smells)
-
-    smells_raw = cache[str(project)]
-    return [RuleResult(*smell) for smell in smells_raw]
-
-
-def _detect_smells_uncached(
+def _detect_smells(
     project: Path, role_search_paths: list[Path]
 ) -> Iterable[RuleResult]:
     role_search_paths = role_search_paths + list(
@@ -218,10 +199,7 @@ def _detect_smells_uncached(
         )
 
         CONSOLE.print(f"Running checks on {project_type} {entrypoint}")
-        yield from run_all_checks(
-            ctx.graph,
-            os.getenv("DB_HOST"),
-        )
+        yield from run_all_checks(ctx.graph)
 
 
 def is_trivial_module(m: ModuleInfo) -> bool:
