@@ -109,7 +109,6 @@ def generate_report(
 
 
 def _read_code(loc: str, num_lines: int) -> tuple[str, int, int]:
-    print(loc)
     *file_path_str, lineno_raw, _ = loc.split(":")
     lineno = int(lineno_raw) - 1
     file_path = Path(":".join(file_path_str))

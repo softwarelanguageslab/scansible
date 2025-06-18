@@ -239,7 +239,7 @@ class VarContext:
         expr: Sequence[struct.AnyValue] | Mapping[struct.Scalar, struct.AnyValue],
     ) -> TemplateEvaluationResult:
         key_vals = expr.items() if isinstance(expr, Mapping) else enumerate(expr)
-        parent_node = rep.CompositeLiteral(extract_type_name(expr))
+        parent_node = rep.CompositeLiteral(type=extract_type_name(expr))
         self.extraction_ctx.graph.add_node(parent_node)
 
         all_used_vars: list[VariableValueRecord] = []
@@ -251,7 +251,7 @@ class VarContext:
                 logger.warning("Templated keys are not supported yet!")
 
             self.extraction_ctx.graph.add_edge(
-                val_tr.data_node, parent_node, rep.Composition(str(k))
+                val_tr.data_node, parent_node, rep.Composition(index=str(k))
             )
 
         return TemplateEvaluationResult(parent_node, parent_node, all_used_vars)
@@ -283,7 +283,9 @@ class VarContext:
             key,
             (tuple, list, Mapping),  # type: ignore[unreachable]
         ), "Internal error: Unexpected composite keys"
-        self.extraction_ctx.graph.add_edge(child, parent, rep.Composition(str(key)))
+        self.extraction_ctx.graph.add_edge(
+            child, parent, rep.Composition(index=str(key))
+        )
 
     def _resolve_expression(
         self, ast: TemplateExpressionAST

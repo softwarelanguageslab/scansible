@@ -9,7 +9,6 @@ from collections import defaultdict
 from collections.abc import Iterator
 from pathlib import Path
 
-import attrs
 import kuzu
 
 if TYPE_CHECKING:
@@ -58,9 +57,8 @@ def _escape_string(v: str) -> str:
 def _node_to_dict(node: Node) -> dict[str, Any]:
     node_dict = {
         k: (_escape_string(v) if isinstance(v, str) else v)
-        for k, v in attrs.asdict(node).items()
+        for k, v in node.model_dump(exclude={"location"}).items()
     }
-    _ = node_dict.pop("location")
 
     return node_dict
 
@@ -88,11 +86,12 @@ type EdgeType = tuple[str, str, str]
 type EdgeValue = tuple[Node, Node, Edge]
 
 
-def _edge_to_dict(edge: EdgeValue) -> dict[str, Scalar]:
+def _edge_to_dict(edge: EdgeValue) -> dict[str, Any]:
     source, target, edge_value = edge
-    edge_serialised: dict[str, Scalar] = {"from": source.node_id, "to": target.node_id}
-    if attrs.has(type(edge_value)):
-        edge_serialised |= attrs.asdict(edge_value)
+    edge_serialised = {
+        "from": source.node_id,
+        "to": target.node_id,
+    } | edge_value.model_dump()
     return edge_serialised
 
 

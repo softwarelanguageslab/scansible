@@ -2,20 +2,18 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Iterable, cast, overload
+from typing import TYPE_CHECKING, Annotated, final, overload, override
 from typing import Literal as LiteralT
 
-from collections.abc import Callable
+import abc
+from collections.abc import Iterable
 
-import attrs
-from attrs import define, field, frozen, setters
 from networkx.algorithms.dag import transitive_closure
 from networkx.classes import MultiDiGraph
 from networkx.classes.graphviews import subgraph_view
+from pydantic import BaseModel, Field, StringConstraints, field_validator
 
-from scansible.utils.type_validators import type_validator
-
-ValidTypeStr = LiteralT[
+type ValidTypeStr = LiteralT[
     "str",
     "bool",
     "int",
@@ -28,24 +26,24 @@ ValidTypeStr = LiteralT[
     "datetime",
 ]
 
-
-def non_empty_validator(_inst: object, attr: attrs.Attribute[str], value: str) -> None:
-    assert isinstance(value, str)
-    if not value:
-        raise ValueError(
-            f"Expected {attr.name} to be non-empty string, got empty string"
-        )
+type Scalar = str | int | bool | float | None
 
 
-@frozen(str=False)
-class NodeLocation:
-    file: str = field(validator=type_validator())
-    line: int = field(validator=type_validator())
-    column: int = field(validator=type_validator())
-    includer_location: NodeLocation | None = field(
-        validator=type_validator(), default=None
-    )
+class _BaseRepresentation(BaseModel, strict=True, extra="forbid"):
+    pass
 
+
+class _FrozenRepresentation(BaseModel, frozen=True, strict=True, extra="forbid"):
+    pass
+
+
+class NodeLocation(_FrozenRepresentation, frozen=True):
+    file: str
+    line: int
+    column: int
+    includer_location: NodeLocation | None = None
+
+    @override
     def __str__(self) -> str:
         base = f"{self.file}:{self.line}:{self.column}"
         if self.includer_location:
@@ -54,172 +52,139 @@ class NodeLocation:
         return base
 
 
-def _frozen_node_id(inst: Node, attr: attrs.Attribute[int], new_value: int) -> int:
-    if getattr(inst, attr.name) >= 0:
-        raise attrs.exceptions.FrozenAttributeError()
-    return new_value
-
-
-@define(slots=False, hash=False)
-class Node:
+class Node(_BaseRepresentation):
     """Base nodes."""
 
-    node_id: int = field(
-        validator=type_validator(), default=-1, init=False, on_setattr=_frozen_node_id
-    )
-    location: NodeLocation | None = field(
-        validator=type_validator(),
-        default=None,
-        kw_only=True,
-        on_setattr=setters.frozen,
-    )
+    # TODO: Prevent reassignment to node_id once instantiated
+    node_id: int = Field(init=False, default=-1)
+    location: NodeLocation | None = Field(default=None, kw_only=True, frozen=True)
 
+    @override
     def __hash__(self) -> int:
-        if self.node_id is None or self.node_id < 0:  # pyright: ignore
+        if self.node_id < 0:
             raise ValueError(
                 f"attempting to hash a partially initialised {self.__class__.__name__}"
             )
 
-        return hash(tuple(getattr(self, attr.name) for attr in self.__attrs_attrs__))  # type: ignore[attr-defined]
+        return hash(tuple(self))
 
 
-@define(slots=False, hash=False)
-class ControlNode(Node): ...
+class ControlNode(Node, _BaseRepresentation): ...
 
 
-@define(slots=False, hash=False)
-class DataNode(Node): ...
+class DataNode(Node, _BaseRepresentation): ...
 
 
-@define(slots=False, hash=False)
-class Task(ControlNode):
+class Task(ControlNode, _BaseRepresentation):
     """Node representing a task."""
 
-    action: str = field(
-        validator=[type_validator(), non_empty_validator], on_setattr=setters.frozen
-    )
-    name: str | None = field(
-        validator=type_validator(), on_setattr=setters.frozen, default=None
-    )
+    action: Annotated[str, StringConstraints(min_length=1)] = Field(frozen=True)
+    name: str | None = Field(frozen=True, default=None)
 
 
-@define(slots=False, hash=False)
-class Variable(DataNode):
+class Variable(DataNode, _BaseRepresentation):
     """Node representing variables."""
 
-    name: str = field(
-        validator=[type_validator(), non_empty_validator], on_setattr=setters.frozen
-    )
-    version: int = field(validator=type_validator(), on_setattr=setters.frozen)
-    value_version: int = field(validator=type_validator(), on_setattr=setters.frozen)
-    scope_level: int = field(validator=type_validator(), on_setattr=setters.frozen)
+    name: Annotated[str, StringConstraints(min_length=1)] = Field(frozen=True)
+    version: int = Field(frozen=True)
+    value_version: int = Field(frozen=True)
+    scope_level: int = Field(frozen=True)
 
 
-@define(slots=False, hash=False)
-class IntermediateValue(DataNode):
+class IntermediateValue(DataNode, _BaseRepresentation):
     """Node representing intermediate values."""
 
-    identifier: int = field(validator=type_validator(), on_setattr=setters.frozen)
+    identifier: int = Field(frozen=True)
 
 
-@define(slots=False, hash=False)
-class Literal(DataNode):
+class Literal(DataNode, _BaseRepresentation):
     """Node representing a literal."""
 
-    type: ValidTypeStr = field(validator=type_validator(), on_setattr=setters.frozen)
+    type: ValidTypeStr = Field(frozen=True)
 
 
-@define(slots=False, hash=False)
-class ScalarLiteral(Literal):
-    value: Any = field(validator=type_validator(), on_setattr=setters.frozen)
+class ScalarLiteral(Literal, _BaseRepresentation):
+    value: Scalar = Field(frozen=True)
 
 
-@define(slots=False, hash=False)
-class CompositeLiteral(Literal):
+class CompositeLiteral(Literal, _BaseRepresentation):
     """Node representing a literal of a composite type."""
 
 
-def _convert_to_tuple(obj: tuple[str, ...] | list[str]) -> tuple[str, ...]:
-    if isinstance(obj, tuple):
-        return obj
-    return tuple(obj)
-
-
-@define(slots=False, hash=False)
-class Expression(DataNode):
+class Expression(DataNode, _BaseRepresentation):
     """Node representing a template expression."""
 
-    expr: str = field(
-        validator=[type_validator(), non_empty_validator], on_setattr=setters.frozen
-    )
-    is_conditional: bool = field(
-        validator=type_validator(), on_setattr=setters.frozen, default=False
-    )
-    orig_expr: str = field(
-        validator=type_validator(), on_setattr=setters.frozen, default=""
-    )
+    expr: Annotated[str, StringConstraints(min_length=1)] = Field(frozen=True)
+    is_conditional: bool = Field(frozen=True, default=False)
+    orig_expr: str = Field(frozen=True, default="")
 
-    impure_components: tuple[str, ...] = field(
-        validator=type_validator(),
-        factory=cast(Callable[[], tuple[str, ...]], tuple),
-        converter=_convert_to_tuple,
-        on_setattr=setters.frozen,
-    )
+    impure_components: tuple[str, ...] = Field(frozen=True, default_factory=tuple)
 
     @property
     def is_pure(self) -> bool:
         return not self.impure_components
 
+    @field_validator("impure_components", mode="before")
+    @classmethod
+    def _convert_impure_components_list(cls, value: object) -> object:
+        # Needs to be a tuple for hashing, but when deserialising it could be
+        # provided as a list (e.g., in the GraphML deserialiser or from JSON).
+        if isinstance(value, list):
+            return tuple(value)
+        return value
 
-class Edge:
+
+class Edge(abc.ABC, _FrozenRepresentation, frozen=True):
     """Base edge."""
 
     @classmethod
+    @abc.abstractmethod
     def raise_if_disallowed(cls, source: Node, target: Node) -> None:
         raise NotImplementedError()
 
 
-class ControlFlowEdge(Edge):
+class ControlFlowEdge(Edge, _FrozenRepresentation, frozen=True):
     """Edges representing control flow."""
 
     @classmethod
+    @override
     def raise_if_disallowed(cls, source: Node, target: Node) -> None:
         if not (isinstance(source, ControlNode) and isinstance(target, ControlNode)):
             raise TypeError("Control flow edges are only allowed between control nodes")
 
 
-class DataFlowEdge(Edge):
+class DataFlowEdge(Edge, abc.ABC, _FrozenRepresentation, frozen=True):
     """Edges representing data flow."""
 
 
-@frozen
-class Order(ControlFlowEdge):
+class Order(ControlFlowEdge, _FrozenRepresentation, frozen=True):
     """Edges representing order between control nodes."""
 
-    transitive: bool = field(validator=type_validator(), default=False)
-    back: bool = field(validator=type_validator(), default=False)
+    transitive: bool = False
+    back: bool = False
 
 
-class Notifies(ControlFlowEdge):
+class Notifies(ControlFlowEdge, _FrozenRepresentation, frozen=True):
     """Edges representing notification from task to handler."""
 
 
-class When(ControlFlowEdge):
+class When(ControlFlowEdge, _FrozenRepresentation, frozen=True):
     """Edges representing conditional execution from data node to task."""
 
     @classmethod
+    @override
     def raise_if_disallowed(cls, source: Node, target: Node) -> None:
         # Can end in both data nodes (conditional definition) or control nodes (conditional execution)
         if not isinstance(source, DataNode):
             raise TypeError("Conditional edges are only allowed from data node")
 
 
-@frozen
-class Loop(ControlFlowEdge):
+class Loop(ControlFlowEdge, _FrozenRepresentation, frozen=True):
     """Edges representing looping execution from data node (over which we iterate)
     to task."""
 
     @classmethod
+    @override
     def raise_if_disallowed(cls, source: Node, target: Node) -> None:
         if not (isinstance(source, DataNode) and isinstance(target, ControlNode)):
             raise TypeError(
@@ -227,10 +192,11 @@ class Loop(ControlFlowEdge):
             )
 
 
-class Use(DataFlowEdge):
+class Use(DataFlowEdge, _FrozenRepresentation, frozen=True):
     """Edges representing data usage."""
 
     @classmethod
+    @override
     def raise_if_disallowed(cls, source: Node, target: Node) -> None:
         if not isinstance(source, Variable):
             raise TypeError(
@@ -243,11 +209,11 @@ class Use(DataFlowEdge):
             )
 
 
-@frozen
-class Input(Use):
+class Input(Use, _FrozenRepresentation, frozen=True):
     param_idx: int
 
     @classmethod
+    @override
     def raise_if_disallowed(cls, source: Node, target: Node) -> None:
         if not isinstance(source, DataNode):
             raise TypeError("Input edge must start at a data node")
@@ -256,13 +222,13 @@ class Input(Use):
             raise TypeError("Input edges must only be used with expressions as target")
 
 
-@frozen
-class Keyword(Use):
+class Keyword(Use, _FrozenRepresentation, frozen=True):
     """Edges representing data usage as a task keyword."""
 
-    keyword: str = field(validator=type_validator())
+    keyword: str
 
     @classmethod
+    @override
     def raise_if_disallowed(cls, source: Node, target: Node) -> None:
         if not isinstance(source, DataNode):
             raise TypeError("Keyword edge must start at a data node")
@@ -271,13 +237,13 @@ class Keyword(Use):
             raise TypeError("Keyword edges must only be used with tasks as target")
 
 
-@frozen
-class Composition(Use):
+class Composition(Use, _FrozenRepresentation, frozen=True):
     """Edges representing data composition in composite values."""
 
-    index: str = field(validator=type_validator())
+    index: str
 
     @classmethod
+    @override
     def raise_if_disallowed(cls, source: Node, target: Node) -> None:
         if not isinstance(source, DataNode):
             raise TypeError("Composition edge must start at a data node")
@@ -288,10 +254,11 @@ class Composition(Use):
             )
 
 
-class Def(DataFlowEdge):
+class Def(DataFlowEdge, _FrozenRepresentation, frozen=True):
     """Edges representing data definitions."""
 
     @classmethod
+    @override
     def raise_if_disallowed(cls, source: Node, target: Node) -> None:
         if not isinstance(target, DataNode):
             raise TypeError("Def edges can only define data")
@@ -299,13 +266,13 @@ class Def(DataFlowEdge):
             raise TypeError("Def edges cannot define literals")
 
 
-@frozen
-class DefLoopItem(Def):
+class DefLoopItem(Def, _FrozenRepresentation, frozen=True):
     """Edges representing data definitions for single loop items."""
 
-    loop_with: str | None = field(validator=type_validator())
+    loop_with: str | None
 
     @classmethod
+    @override
     def raise_if_disallowed(cls, source: Node, target: Node) -> None:
         if not isinstance(target, (Variable, IntermediateValue)):
             raise TypeError("Def edges can only define variables")
@@ -327,6 +294,7 @@ else:
     BaseGraph = MultiDiGraph
 
 
+@final
 class Graph(BaseGraph):
     def __init__(self, role_name: str = "", role_version: str = "") -> None:
         super().__init__(role_name=role_name, role_version=role_version)

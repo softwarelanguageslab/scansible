@@ -74,7 +74,10 @@ def describe_unmodified() -> None:
                 {
                     "lit": ScalarLiteral(type="str", value="hello world"),
                     "var": Variable(
-                        "test_var", 0, 0, EnvironmentType.HOST_FACTS.value
+                        name="test_var",
+                        version=0,
+                        value_version=0,
+                        scope_level=EnvironmentType.HOST_FACTS.value,
                     ),  # UNUSED!
                 },
                 [("lit", "var", DEF)],
@@ -102,7 +105,7 @@ def describe_unmodified() -> None:
                     "iv": IntermediateValue(identifier=0),
                 },
                 [
-                    ("var", "expr", Input(1)),
+                    ("var", "expr", Input(param_idx=1)),
                     ("expr", "iv", DEF),
                 ],
             ),
@@ -129,7 +132,7 @@ def describe_unmodified() -> None:
                     "iv": IntermediateValue(identifier=0),
                 },
                 [
-                    ("var", "expr", Input(1)),
+                    ("var", "expr", Input(param_idx=1)),
                     ("expr", "iv", DEF),
                 ],
             ),
@@ -156,7 +159,7 @@ def describe_unmodified() -> None:
                     "iv": IntermediateValue(identifier=0),
                 },
                 [
-                    ("var", "expr", Input(1)),
+                    ("var", "expr", Input(param_idx=1)),
                     ("expr", "iv", DEF),
                 ],
             ),
@@ -202,7 +205,10 @@ def describe_unmodified() -> None:
                     ),
                     "iv": IntermediateValue(identifier=1),
                 },
-                [("target", "expression", Input(1)), ("expression", "iv", DEF)],
+                [
+                    ("target", "expression", Input(param_idx=1)),
+                    ("expression", "iv", DEF),
+                ],
             ),
         )
 
@@ -238,10 +244,10 @@ def describe_unmodified() -> None:
                     "iv2": IntermediateValue(identifier=2),
                 },
                 [
-                    ("target", "e1", Input(1)),
+                    ("target", "e1", Input(param_idx=1)),
                     ("e1", "iv1", DEF),
                     ("iv1", "msg", DEF),
-                    ("msg", "e2", Input(1)),
+                    ("msg", "e2", Input(param_idx=1)),
                     ("e2", "iv2", DEF),
                 ],
             ),
@@ -356,10 +362,10 @@ def describe_modified() -> None:
                 },
                 [
                     ("l1", "a1", DEF),
-                    ("a1", "e1", Input(1)),
+                    ("a1", "e1", Input(param_idx=1)),
                     ("e1", "iv1", DEF),
                     ("l2", "a2", DEF),
-                    ("a2", "e2", Input(1)),
+                    ("a2", "e2", Input(param_idx=1)),
                     ("e2", "iv2", DEF),
                 ],
             ),
@@ -411,11 +417,11 @@ def describe_modified() -> None:
                 [
                     ("e1", "iv1", DEF),
                     ("iv1", "when1", DEF),
-                    ("when1", "e2", Input(1)),
+                    ("when1", "e2", Input(param_idx=1)),
                     ("e2", "iv2", DEF),
                     ("e1", "iv3", DEF),
                     ("iv3", "when2", DEF),
-                    ("when2", "e3", Input(1)),
+                    ("when2", "e3", Input(param_idx=1)),
                     ("e3", "iv4", DEF),
                 ],
             ),
@@ -476,16 +482,16 @@ def describe_modified() -> None:
                 },
                 [
                     ("l1", "a1", DEF),
-                    ("a1", "e1", Input(1)),
+                    ("a1", "e1", Input(param_idx=1)),
                     ("e1", "i1", DEF),
                     ("i1", "b1", DEF),
-                    ("b1", "e2", Input(1)),
+                    ("b1", "e2", Input(param_idx=1)),
                     ("e2", "i2", DEF),
                     ("l2", "a2", DEF),
-                    ("a2", "e3", Input(1)),
+                    ("a2", "e3", Input(param_idx=1)),
                     ("e3", "i3", DEF),
                     ("i3", "b2", DEF),
-                    ("b2", "e4", Input(1)),
+                    ("b2", "e4", Input(param_idx=1)),
                     ("e4", "i4", DEF),
                 ],
             ),
@@ -537,12 +543,12 @@ def describe_modified() -> None:
                 [
                     ("l1", "a1", DEF),
                     ("l2", "b", DEF),
-                    ("a1", "e1", Input(1)),
-                    ("b", "e1", Input(2)),
+                    ("a1", "e1", Input(param_idx=1)),
+                    ("b", "e1", Input(param_idx=2)),
                     ("e1", "i1", DEF),
                     ("l3", "a2", DEF),
-                    ("a2", "e2", Input(1)),
-                    ("b", "e2", Input(2)),
+                    ("a2", "e2", Input(param_idx=1)),
+                    ("b", "e2", Input(param_idx=2)),
                     ("e2", "i2", DEF),
                 ],
             ),
@@ -584,10 +590,10 @@ def describe_scoping() -> None:
                 },
                 [
                     ("1", "aouter", DEF),
-                    ("aouter", "e1", Input(1)),
+                    ("aouter", "e1", Input(param_idx=1)),
                     ("e1", "iv1", DEF),
                     ("2", "ainner", DEF),
-                    ("ainner", "e2", Input(1)),
+                    ("ainner", "e2", Input(param_idx=1)),
                     ("e2", "iv2", DEF),
                 ],
             ),
@@ -627,7 +633,7 @@ def describe_scoping() -> None:
                 [
                     ("1", "aouter", DEF),
                     ("2", "ainner", DEF),
-                    ("ainner", "e", Input(1)),
+                    ("ainner", "e", Input(param_idx=1)),
                     ("e", "iv", DEF),
                 ],
             ),
@@ -646,7 +652,7 @@ def describe_scoping() -> None:
             g,
             create_graph(
                 {
-                    "l123": ScalarLiteral("str", "123"),
+                    "l123": ScalarLiteral(type="str", value="123"),
                     "unused": Variable(
                         name="ansible_version",
                         version=0,
@@ -664,7 +670,7 @@ def describe_scoping() -> None:
                 },
                 [
                     ("l123", "unused", DEF),
-                    ("actual", "e", Input(1)),
+                    ("actual", "e", Input(param_idx=1)),
                     ("e", "iv", DEF),
                 ],
             ),
@@ -684,7 +690,7 @@ def describe_scoping() -> None:
             g,
             create_graph(
                 {
-                    "l123": ScalarLiteral("str", "123"),
+                    "l123": ScalarLiteral(type="str", value="123"),
                     "unused": Variable(
                         name="ansible_version",
                         version=0,
@@ -708,8 +714,8 @@ def describe_scoping() -> None:
                 },
                 [
                     ("l123", "unused", DEF),
-                    ("actual", "e1", Input(1)),
-                    ("actual", "e2", Input(1)),
+                    ("actual", "e1", Input(param_idx=1)),
+                    ("actual", "e2", Input(param_idx=1)),
                     ("e1", "iv1", DEF),
                     ("e2", "iv2", DEF),
                 ],
@@ -731,7 +737,7 @@ def describe_scoping() -> None:
             g,
             create_graph(
                 {
-                    "l123": ScalarLiteral("str", "123"),
+                    "l123": ScalarLiteral(type="str", value="123"),
                     "actual": Variable(
                         name="ansible_os_family",
                         version=0,
@@ -745,7 +751,7 @@ def describe_scoping() -> None:
                 },
                 [
                     ("l123", "actual", DEF),
-                    ("actual", "e", Input(1)),
+                    ("actual", "e", Input(param_idx=1)),
                     ("e", "iv", DEF),
                 ],
             ),
@@ -766,7 +772,7 @@ def describe_scoping() -> None:
             g,
             create_graph(
                 {
-                    "l123": ScalarLiteral("str", "123"),
+                    "l123": ScalarLiteral(type="str", value="123"),
                     "unused": Variable(
                         name="ansible_os_family",
                         version=0,
@@ -786,7 +792,7 @@ def describe_scoping() -> None:
                 },
                 [
                     ("l123", "unused", DEF),
-                    ("actual", "e", Input(1)),
+                    ("actual", "e", Input(param_idx=1)),
                     ("e", "iv", DEF),
                 ],
             ),
@@ -812,8 +818,8 @@ def describe_scoping() -> None:
             g,
             create_graph(
                 {
-                    "l123": ScalarLiteral("str", "123"),
-                    "l456": ScalarLiteral("str", "456"),
+                    "l123": ScalarLiteral(type="str", value="123"),
+                    "l456": ScalarLiteral(type="str", value="456"),
                     "unused": Variable(
                         name="ansible_os_family",
                         version=0,
@@ -844,9 +850,9 @@ def describe_scoping() -> None:
                 [
                     ("l123", "unused", DEF),
                     ("l456", "actual_role_var", DEF),
-                    ("actual_host_fact", "e_host_fact", Input(1)),
+                    ("actual_host_fact", "e_host_fact", Input(param_idx=1)),
                     ("e_host_fact", "iv_host_fact", DEF),
-                    ("actual_role_var", "e_role_var", Input(1)),
+                    ("actual_role_var", "e_role_var", Input(param_idx=1)),
                     ("e_role_var", "iv_role_var", DEF),
                 ],
             ),
@@ -878,8 +884,8 @@ def describe_scoping() -> None:
                     "iv2": IntermediateValue(identifier=2),
                 },
                 [
-                    ("actual", "e1", Input(1)),
-                    ("actual", "e2", Input(1)),
+                    ("actual", "e1", Input(param_idx=1)),
+                    ("actual", "e2", Input(param_idx=1)),
                     ("e1", "iv1", DEF),
                     ("e2", "iv2", DEF),
                 ],
@@ -912,7 +918,7 @@ def describe_scoping() -> None:
                 },
                 [
                     ("1", "aouter", DEF),
-                    ("aouter", "e1", Input(1)),
+                    ("aouter", "e1", Input(param_idx=1)),
                     ("e1", "iv1", DEF),
                 ],
             ),
@@ -953,7 +959,7 @@ def describe_scoping() -> None:
                 [
                     ("1", "aouter", DEF),
                     ("2", "ainner", DEF),
-                    ("aouter", "e1", Input(1)),
+                    ("aouter", "e1", Input(param_idx=1)),
                     ("e1", "iv1", DEF),
                 ],
             ),
@@ -1001,7 +1007,7 @@ def describe_scoping() -> None:
                     ("1", "aouter", DEF),
                     ("2", "ainner", DEF),
                     ("clit", "c", DEF),
-                    ("aouter", "e1", Input(1)),
+                    ("aouter", "e1", Input(param_idx=1)),
                     ("e1", "iv1", DEF),
                 ],
             ),
@@ -1044,10 +1050,10 @@ def describe_scoping() -> None:
                 },
                 [
                     ("1", "aouter", DEF),
-                    ("aouter", "e1", Input(1)),
+                    ("aouter", "e1", Input(param_idx=1)),
                     ("e1", "iv1", DEF),
                     ("2", "ainner", DEF),
-                    ("ainner", "e2", Input(1)),
+                    ("ainner", "e2", Input(param_idx=1)),
                     ("e2", "iv2", DEF),
                 ],
             ),
@@ -1107,13 +1113,13 @@ def describe_scoping() -> None:
                     ("aeiv", "ai", DEF),
                     ("bil", "binner", DEF),
                     ("ei", "eiv", DEF),
-                    ("ai", "ei", Input(1)),
-                    ("binner", "aei", Input(1)),
+                    ("ai", "ei", Input(param_idx=1)),
+                    ("binner", "aei", Input(param_idx=1)),
                     ("eo", "eov", DEF),
-                    ("ao", "eo", Input(1)),
+                    ("ao", "eo", Input(param_idx=1)),
                     ("aeo", "aeov", DEF),
                     ("aeov", "ao", DEF),
-                    ("bouter", "aeo", Input(1)),
+                    ("bouter", "aeo", Input(param_idx=1)),
                     ("bol", "bouter", DEF),
                 ],
             ),
@@ -1191,17 +1197,17 @@ def describe_scoping() -> None:
                 },
                 [
                     ("cl", "c", DEF),
-                    ("c", "bie", Input(1)),
+                    ("c", "bie", Input(param_idx=1)),
                     ("bie", "biv", DEF),
                     ("biv", "binner", DEF),
                     ("ae", "aiv", DEF),
                     ("aiv", "ai", DEF),
-                    ("binner", "ie", Input(1)),
-                    ("ai", "ie", Input(2)),
+                    ("binner", "ie", Input(param_idx=1)),
+                    ("ai", "ie", Input(param_idx=2)),
                     ("ie", "iev", DEF),
                     ("aiv", "ao", DEF),
-                    ("bouter", "oe", Input(1)),
-                    ("ao", "oe", Input(2)),
+                    ("bouter", "oe", Input(param_idx=1)),
+                    ("ao", "oe", Input(param_idx=2)),
                     ("oe", "oev", DEF),
                 ],
             ),
@@ -1243,8 +1249,8 @@ def describe_scoping() -> None:
                     ("lb", "b", DEF),
                     ("aei", "a", DEF),
                     ("ae", "aei", DEF),
-                    ("b", "ae", Input(1)),
-                    ("a", "te", Input(1)),
+                    ("b", "ae", Input(param_idx=1)),
+                    ("a", "te", Input(param_idx=1)),
                     ("te", "tei", DEF),
                 ],
             ),
@@ -1285,7 +1291,7 @@ def describe_scoping() -> None:
                 {
                     ("1", "bsf", DEF),
                     ("2", "bt", DEF),
-                    ("bsf", "be", Input(1)),
+                    ("bsf", "be", Input(param_idx=1)),
                     ("be", "beiv", DEF),
                 },
             ),
@@ -1327,7 +1333,7 @@ def describe_scoping() -> None:
                 {
                     ("1", "binner", DEF),
                     ("2", "b", DEF),
-                    ("b", "be", Input(1)),
+                    ("b", "be", Input(param_idx=1)),
                     ("be", "beiv", DEF),
                 },
             ),
@@ -1370,7 +1376,7 @@ def describe_scoping() -> None:
                 {
                     ("1", "b1", DEF),
                     ("2", "b", DEF),
-                    ("b", "be", Input(1)),
+                    ("b", "be", Input(param_idx=1)),
                     ("be", "beiv", DEF),
                 },
             ),
@@ -1481,8 +1487,8 @@ def _describe_caching() -> None:
                 {
                     ("be", "bei", DEF),
                     ("bei", "b", DEF),
-                    ("b", "e1", Input(1)),
-                    ("b", "e2", Input(1)),
+                    ("b", "e1", Input(param_idx=1)),
+                    ("b", "e2", Input(param_idx=1)),
                     ("e1", "ei1", DEF),
                     ("e2", "ei2", DEF),
                 },

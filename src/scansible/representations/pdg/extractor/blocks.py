@@ -111,7 +111,9 @@ class BlockExtractor:
                 if isinstance(value, rep.Literal):
                     prev_value = value
 
-                self.context.graph.add_edge(value, ctrl_node, rep.Keyword(misc_kw))
+                self.context.graph.add_edge(
+                    value, ctrl_node, rep.Keyword(keyword=misc_kw)
+                )
 
         for kw, _ in self.block.__get_non_default_attributes__():
             if kw not in self.SUPPORTED_BLOCK_ATTRIBUTES and kw not in (

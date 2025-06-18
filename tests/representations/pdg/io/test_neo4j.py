@@ -63,7 +63,7 @@ def describe_dump_node() -> None:
 
     def should_dump_task_with_location(g: Graph) -> None:
         t = Task(
-            action="file", name="task name", location=NodeLocation("test.yml", 1, 10)
+            action="file", name="task name", location=NodeLocation(file="test.yml", line=1, column=10)
         )
         t.node_id = 0
 

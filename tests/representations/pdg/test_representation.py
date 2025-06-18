@@ -20,41 +20,41 @@ class NodeFactory(Protocol):
 # Shared behaviour for nodes
 def a_node() -> None:
     def should_be_constructible(factory: NodeFactory) -> None:
-        node = factory(rep.NodeLocation("test.yml", 0, 0))
+        node = factory(rep.NodeLocation(file="test.yml", line=0, column=0))
 
         assert node is not None
 
     def should_not_be_hashable_before_node_id_is_set(factory: NodeFactory) -> None:
-        node = factory(rep.NodeLocation("test.yml", 0, 0))
+        node = factory(rep.NodeLocation(file="test.yml", line=0, column=0))
 
         with pytest.raises(Exception):
             hash(node)
 
     def should_be_hashable_after_node_id_is_set(factory: NodeFactory) -> None:
-        node = factory(rep.NodeLocation("test.yml", 0, 0))
+        node = factory(rep.NodeLocation(file="test.yml", line=0, column=0))
         node.node_id = 0
 
         assert hash(node) is not None
 
     def should_support_equality(factory: NodeFactory) -> None:
-        node = factory(rep.NodeLocation("test.yml", 0, 0))
+        node = factory(rep.NodeLocation(file="test.yml", line=0, column=0))
 
         assert node == node
 
     def should_be_unique_if_different_location(factory: NodeFactory) -> None:
-        node1 = factory(rep.NodeLocation("test.yml", 0, 0))
-        node2 = factory(rep.NodeLocation("test.yml", 1, 0))
+        node1 = factory(rep.NodeLocation(file="test.yml", line=0, column=0))
+        node2 = factory(rep.NodeLocation(file="test.yml", line=1, column=0))
 
         assert node1 != node2
 
     def should_be_same_if_same_location(factory: NodeFactory) -> None:
-        node1 = factory(rep.NodeLocation("test.yml", 0, 0))
-        node2 = factory(rep.NodeLocation("test.yml", 0, 0))
+        node1 = factory(rep.NodeLocation(file="test.yml", line=0, column=0))
+        node2 = factory(rep.NodeLocation(file="test.yml", line=0, column=0))
 
         assert node1 == node2
 
     def should_have_id(factory: NodeFactory) -> None:
-        node = factory(rep.NodeLocation("test.yml", 0, 0))
+        node = factory(rep.NodeLocation(file="test.yml", line=0, column=0))
 
         assert isinstance(node.node_id, int)
 
@@ -121,9 +121,16 @@ def describe_literal() -> None:
         with pytest.raises(ValueError):
             rep.ScalarLiteral(type="not_a_type", value=None)  # type: ignore[arg-type]
 
-    @pytest.mark.parametrize("value", [None, 1, ["values"], "value"])
-    def should_have_value(value: object) -> None:
+    @pytest.mark.parametrize("value", [None, 1, "value", 1.0, False])
+    def scalar_should_have_value(value: int | str | float | bool | None) -> None:
         _ = rep.ScalarLiteral(type="str", value=value)
+
+    @pytest.mark.parametrize("value", [["value1", "value2"], {"value1": "value2"}])
+    def scalar_should_reject_composite_values(
+        value: list[str] | dict[str, str],
+    ) -> None:
+        with pytest.raises(ValueError):
+            _ = rep.ScalarLiteral(type="str", value=value)
 
 
 @behaves_like(a_node)
@@ -201,8 +208,14 @@ def describe_add_node() -> None:
 
     def should_add_two_equivalent_nodes_with_different_locations(g: rep.Graph) -> None:
         n1, n2 = (
-            rep.Task(action="file", location=rep.NodeLocation("test.yml", 1, 1)),
-            rep.Task(action="file", location=rep.NodeLocation("test.yml", 5, 1)),
+            rep.Task(
+                action="file",
+                location=rep.NodeLocation(file="test.yml", line=1, column=1),
+            ),
+            rep.Task(
+                action="file",
+                location=rep.NodeLocation(file="test.yml", line=5, column=1),
+            ),
         )
         g.add_node(n1)
         g.add_node(n2)
@@ -249,8 +262,14 @@ def describe_add_nodes_from() -> None:
 
     def should_add_two_equivalent_nodes_with_different_location(g: rep.Graph) -> None:
         n1, n2 = (
-            rep.Task(action="file", location=rep.NodeLocation("test.yml", 1, 1)),
-            rep.Task(action="file", location=rep.NodeLocation("test.yml", 5, 1)),
+            rep.Task(
+                action="file",
+                location=rep.NodeLocation(file="test.yml", line=1, column=1),
+            ),
+            rep.Task(
+                action="file",
+                location=rep.NodeLocation(file="test.yml", line=5, column=1),
+            ),
         )
         g.add_nodes_from([n1, n2])
 

@@ -6,8 +6,6 @@ from typing import Any, Iterable
 
 import operator
 
-import attrs
-
 from scansible.representations.pdg import Edge, Graph, IntermediateValue, Node
 
 
@@ -19,7 +17,7 @@ def _match_node(n1: Node, n2: Node, match_locations: bool) -> bool:
     ignored_kws = ("node_id",) if match_locations else ("node_id", "location")
 
     def to_dict(n: Node) -> dict[str, Any]:
-        return {k: v for k, v in attrs.asdict(n).items() if k not in ignored_kws}
+        return {k: v for k, v in n if k not in ignored_kws}
 
     return type(n1) == type(n2) and (
         not isinstance(n1, IntermediateValue) and to_dict(n1) == to_dict(n2)

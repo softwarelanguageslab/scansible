@@ -482,7 +482,10 @@ class ExtractionContext:
             file, line, column = "unknown file", -1, -1
 
         return rep.NodeLocation(
-            file, line, column, self.include_ctx.last_include_location
+            file=file,
+            line=line,
+            column=column,
+            includer_location=self.include_ctx.last_include_location,
         )
 
     def record_extraction_error(self, reason: str, location: LocTuple | None) -> None:

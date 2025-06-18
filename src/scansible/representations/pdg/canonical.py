@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, TypeGuard, TypeVar, cast
 
+import copy
 import re
 from collections import defaultdict
 
@@ -88,7 +89,9 @@ def _qualify_module_names(pdg: Graph, module_kb: ModuleKnowledgeBase) -> None:
             )
             continue
 
-        _replace_node(pdg, node, Task(qualnames[0], node.name, location=node.location))
+        _replace_node(
+            pdg, node, Task(action=qualnames[0], name=node.name, location=node.location)
+        )
 
 
 def _normalize_keyword_aliases(pdg: Graph, module_kb: ModuleKnowledgeBase) -> None:
@@ -120,7 +123,7 @@ def _normalize_keyword_aliases(pdg: Graph, module_kb: ModuleKnowledgeBase) -> No
                 f"Normalizing {node.action}'s {option_name} to {canonical_name}"
             )
             _replace_edge(
-                pdg, src_node, node, kw_edge, Keyword(f"args.{canonical_name}")
+                pdg, src_node, node, kw_edge, Keyword(keyword=f"args.{canonical_name}")
             )
 
 
@@ -255,14 +258,11 @@ def _inline_constants_into_expression(pdg: Graph, expr_node: Expression) -> None
         for lit_node in possible_values:
             assert isinstance(lit_node, ScalarLiteral)
 
-            new_node = Expression(
-                _inline_constant_into_expression(
+            new_node = copy.replace(
+                expr_node,
+                expr=_inline_constant_into_expression(
                     f"_{param_idx}", lit_node.value, expr_node
                 ),
-                expr_node.is_conditional,
-                expr_node.orig_expr,
-                expr_node.impure_components,
-                location=expr_node.location,
             )
             pdg.add_node(new_node)
             for new_src, new_edge in new_in_edges:
@@ -326,13 +326,7 @@ def _simplify_expressions(pdg: Graph) -> None:
         new_expr = ASTStringifier().stringify(ast, node.is_conditional)
 
         if new_expr != node.expr:
-            new_node = Expression(
-                new_expr,
-                node.is_conditional,
-                node.orig_expr,
-                node.impure_components,
-                location=node.location,
-            )
+            new_node = copy.replace(node, expr=new_expr)
             _replace_node(pdg, node, new_node)
             node = new_node
 
@@ -355,7 +349,7 @@ def _shift_input_indices(pdg: Graph, expr_node: Expression) -> None:
     for src_node, edge in input_edges:
         new_idx = idx_mappings[edge.param_idx]
         if new_idx != edge.param_idx:
-            _replace_edge(pdg, src_node, expr_node, edge, Input(new_idx))
+            _replace_edge(pdg, src_node, expr_node, edge, Input(param_idx=new_idx))
 
     ast = _parse_ast(expr_node)
 
@@ -375,13 +369,7 @@ def _shift_input_indices(pdg: Graph, expr_node: Expression) -> None:
     RenamerVisitor().visit(ast)
     new_expr = ASTStringifier().stringify(ast, expr_node.is_conditional)
     if new_expr != expr_node.expr:
-        new_node = Expression(
-            new_expr,
-            expr_node.is_conditional,
-            expr_node.orig_expr,
-            expr_node.impure_components,
-            location=expr_node.location,
-        )
+        new_node = copy.replace(expr_node, expr=new_expr)
         _replace_node(pdg, expr_node, new_node)
 
 
@@ -421,7 +409,7 @@ def _replace_constant_expressions(pdg: Graph) -> None:
 
         ast = _parse_ast(node)
         if isinstance(ast, jnodes.Const):
-            lit_node = ScalarLiteral(extract_type_name(ast.value), ast.value)
+            lit_node = ScalarLiteral(type=extract_type_name(ast.value), value=ast.value)
         elif _is_simple_expression(ast):
             assert isinstance(ast.body[0], jnodes.Output)
             all_const = all(
@@ -433,7 +421,7 @@ def _replace_constant_expressions(pdg: Graph) -> None:
             value = "".join(
                 cast(jnodes.TemplateData, child).data for child in ast.body[0].nodes
             )
-            lit_node = ScalarLiteral("str", value)
+            lit_node = ScalarLiteral(type="str", value=value)
         else:
             continue
 
@@ -500,7 +488,7 @@ def _coerce_param(
 
 def _create_literal_node(pdg: Graph, value: Any) -> ScalarLiteral | CompositeLiteral:
     if isinstance(value, (list, tuple, dict)):
-        node = CompositeLiteral(extract_type_name(value))  # pyright: ignore
+        node = CompositeLiteral(type=extract_type_name(value))  # pyright: ignore
         pdg.add_node(node)
         children = (  # pyright: ignore
             value.items() if isinstance(value, dict) else enumerate(value)  # pyright: ignore
@@ -510,11 +498,11 @@ def _create_literal_node(pdg: Graph, value: Any) -> ScalarLiteral | CompositeLit
             pdg.add_edge(
                 child_node,
                 node,
-                Composition(str(child_key)),  # pyright: ignore
+                Composition(index=str(child_key)),  # pyright: ignore
             )
         return node
 
-    lit = ScalarLiteral(extract_type_name(value), value)
+    lit = ScalarLiteral(type=extract_type_name(value), value=value)
     pdg.add_node(lit)
     return lit
 

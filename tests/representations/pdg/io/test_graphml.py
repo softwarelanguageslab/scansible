@@ -19,40 +19,47 @@ def pop_g(g: rep.Graph) -> rep.Graph:
     return create_graph(
         {
             "t1": rep.Task(
-                action="file", name="task 1", location=rep.NodeLocation("x.yml", 1, 1)
+                action="file",
+                name="task 1",
+                location=rep.NodeLocation(file="x.yml", line=1, column=1),
             ),
             "t2": rep.Task(
                 action="command",
                 name="task 2",
-                location=rep.NodeLocation("x.yml", 5, 1),
+                location=rep.NodeLocation(file="x.yml", line=5, column=1),
             ),
             "l1": rep.ScalarLiteral(
                 type="str",
                 value='echo "Hello"',
-                location=rep.NodeLocation("x.yml", 2, 5),
+                location=rep.NodeLocation(file="x.yml", line=2, column=5),
             ),
             "l2": rep.ScalarLiteral(
-                type="bool", value=False, location=rep.NodeLocation("x.yml", 3, 5)
+                type="bool",
+                value=False,
+                location=rep.NodeLocation(file="x.yml", line=3, column=5),
             ),
             "l3": rep.ScalarLiteral(
-                type="int", value=0o777, location=rep.NodeLocation("x.yml", 7, 123)
+                type="int",
+                value=0o777,
+                location=rep.NodeLocation(file="x.yml", line=7, column=123),
             ),
             "v": rep.Variable(
                 name="filepath",
                 version=0,
                 value_version=0,
                 scope_level=1,
-                location=rep.NodeLocation("x.yml", 4, 2),
+                location=rep.NodeLocation(file="x.yml", line=4, column=2),
             ),
             "e": rep.Expression(
-                expr="test/{{ filepath }}", location=rep.NodeLocation("x.yml", 10, 43)
+                expr="test/{{ filepath }}",
+                location=rep.NodeLocation(file="x.yml", line=10, column=43),
             ),
             "v2": rep.Variable(
                 name="$1",
                 version=0,
                 value_version=0,
                 scope_level=1,
-                location=rep.NodeLocation("x.yml", 123, 343),
+                location=rep.NodeLocation(file="x.yml", line=123, column=343),
             ),
         },
         [

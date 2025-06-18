@@ -67,7 +67,7 @@ class SetFactTaskExtractor(TaskExtractor):
                 loop_var_name, EnvironmentType.INCLUDE_PARAMS
             )
             self.context.graph.add_edge(
-                loop_source_var, loop_target_var, rep.DefLoopItem(loop_with)
+                loop_source_var, loop_target_var, rep.DefLoopItem(loop_with=loop_with)
             )
 
             with self.context.activate_loop(loop_source_var):

@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any, Type
 import json
 from xml.etree.ElementTree import Element
 
-import attrs
 from networkx import Graph
 from networkx.readwrite.graphml import GraphMLReader, GraphMLWriter
 
@@ -31,12 +30,9 @@ class CustomGraphMLWriter(WriterBase):
         self.attributes[xml_obj].append(
             ("type", edge.__class__.__name__.upper(), scope, default.get("type"))
         )
-        if attrs.has(type(edge)):
-            for k, v in attrs.asdict(edge).items():
-                self.attribute_types[(k, scope)].add(str)
-                self.attributes[xml_obj].append(
-                    (k, json.dumps(v), scope, default.get(k))
-                )
+        for k, v in edge:
+            self.attribute_types[(k, scope)].add(str)
+            self.attributes[xml_obj].append((k, json.dumps(v), scope, default.get(k)))
 
     def add_nodes(
         self, G: Graph[rep.Node, Any, rep.Edge], graph_element: Element
@@ -52,7 +48,7 @@ class CustomGraphMLWriter(WriterBase):
         result = {
             "node_type": node.__class__.__name__,
         }
-        for k, v in attrs.asdict(node).items():
+        for k, v in node.model_dump().items():
             if v is None:
                 continue
             result[k] = json.dumps(v)

@@ -29,6 +29,6 @@ class SanityCheckNumberOfTasksRule(Rule):
                 rule_message="",
                 role_name=graph.role_name,
                 role_version=graph.role_version,
-                location=NodeLocation("tasks/main.yml", 1, 1),
+                location=NodeLocation(file="tasks/main.yml", line=1, column=1),
             )
         ]

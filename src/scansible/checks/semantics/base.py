@@ -6,7 +6,7 @@ from scansible.representations.pdg.extractor.context import VisibilityInformatio
 from scansible.representations.pdg.representation import Graph, NodeLocation
 
 
-class RuleResult(BaseModel):
+class RuleResult(BaseModel, frozen=True, strict=True, extra="forbid"):
     rule_category: str
     rule_name: str
     rule_subname: str
@@ -16,9 +16,6 @@ class RuleResult(BaseModel):
     role_name: str
     role_version: str
     location: NodeLocation | None
-
-    class Config:
-        arbitrary_types_allowed = True
 
 
 class Rule:

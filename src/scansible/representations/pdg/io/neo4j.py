@@ -6,8 +6,6 @@ from typing import Any
 
 import json
 
-import attrs
-
 from .. import representation as rep
 
 
@@ -34,7 +32,7 @@ def _create_attr_content(attrs: dict[str, Any]) -> str:
 def dump_node(n: rep.Node, g: rep.Graph) -> str:
     node_label = n.__class__.__name__
     node_id = n.node_id
-    node_attrs = attrs.asdict(n) | _get_shared_node_attrs(g)
+    node_attrs = n.model_dump() | _get_shared_node_attrs(g)
 
     attr_content = _create_attr_content(node_attrs)
 
@@ -49,8 +47,8 @@ def dump_edge(e: rep.Edge, source: rep.Node, target: rep.Node) -> str:
     if isinstance(e, rep.Order) and e.transitive:
         return ""
 
-    if attrs.has(type(e)):
-        attr_content = _create_attr_content(attrs.asdict(e))
+    attr_content = _create_attr_content(e.model_dump())
+    if attr_content:
         edge_spec = f":{edge_label} {{ {attr_content} }}"
     else:
         edge_spec = f":{edge_label}"

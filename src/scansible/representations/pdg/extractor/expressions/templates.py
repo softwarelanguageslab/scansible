@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any, cast, override
 
 import os
 import re
 from collections.abc import Callable, Iterable
 
-from attrs import frozen
 from jinja2 import Environment, nodes
 from jinja2.compiler import DependencyFinderVisitor
 from jinja2.exceptions import TemplateSyntaxError
 from jinja2.visitor import NodeVisitor
 from loguru import logger
+from pydantic import BaseModel
 
 ANSIBLE_GLOBALS = frozenset({"lookup", "query", "q", "now", "finalize", "omit"})
 
@@ -559,29 +559,30 @@ def generify_var_references(ast: nodes.Node) -> tuple[nodes.Node, dict[str, int]
     return ast, param_indices
 
 
-class LookupTarget:
+class LookupTarget(BaseModel, frozen=True):
     pass
 
 
-@frozen(hash=True)
-class NamedLookupTarget(LookupTarget):
+class NamedLookupTarget(LookupTarget, frozen=True):
     name: str
 
 
-class LookupTargetLiteral(NamedLookupTarget):
+class LookupTargetLiteral(NamedLookupTarget, frozen=True):
+    @override
     def __str__(self) -> str:
         return f"'{self.name}'"
 
 
-class LookupTargetVariable(NamedLookupTarget):
+class LookupTargetVariable(NamedLookupTarget, frozen=True):
+    @override
     def __str__(self) -> str:
         return self.name
 
 
-@frozen(hash=True)
-class LookupTargetUnknown(LookupTarget):
+class LookupTargetUnknown(LookupTarget, frozen=True):
     value: str
 
+    @override
     def __str__(self) -> str:
         return self.value
 
