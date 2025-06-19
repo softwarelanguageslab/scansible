@@ -4,7 +4,6 @@ from typing import Any
 
 from pathlib import Path
 
-import attrs
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from scansible.checks.security.rules.base import RuleResult
@@ -26,7 +25,7 @@ def generate_report(
             {
                 "name": coll.name,
                 "modules": [
-                    attrs.asdict(mod)
+                    mod._asdict()
                     | {
                         "num_usages": len(mod.usages),
                         "dependencies": dependencies.module_dependencies.get(
@@ -56,7 +55,7 @@ def generate_report(
             all_module_dependencies[dep.name]["modules"].append(mod)
     for dep in all_module_dependencies.values():
         dep["vulnerabilities"] = [
-            attrs.asdict(vuln) for vuln in dependency_vulnerabilities[dep["name"]]
+            vuln._asdict() for vuln in dependency_vulnerabilities[dep["name"]]
         ]
         for vuln in dep["vulnerabilities"]:
             vuln["severity_class"] = HTML_CLASS_SEVERITY.get(
@@ -67,7 +66,7 @@ def generate_report(
 
     vulnerabilities: list[dict[str, str]] = []
     for vulns in dependency_vulnerabilities.values():
-        vulnerabilities.extend(attrs.asdict(vuln) for vuln in vulns)
+        vulnerabilities.extend(vuln._asdict() for vuln in vulns)
     for vuln in vulnerabilities:
         if vuln["severity"] not in HTML_CLASS_SEVERITY:
             vuln["severity"] = "unknown"

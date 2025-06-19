@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from typing import Collection, Mapping
-
 import json
 from collections import defaultdict
+from collections.abc import Collection, Mapping
 
 from .constants import COLLECTION_CONTENT_PATH
 from .types import CollectionContent, ModuleInfo
 
 
-def get_module_match_score(module: ModuleInfo, args: list[str]) -> int:
+def get_module_match_score(module: ModuleInfo, args: Collection[str]) -> int:
     extra_score = 0
     if module.collection.startswith("ansible."):
         extra_score = 2

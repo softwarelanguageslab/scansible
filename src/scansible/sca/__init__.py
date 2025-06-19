@@ -5,7 +5,6 @@ from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from pathlib import Path
 
-import attrs
 from ansible import constants as ans_constants
 from loguru import logger
 from rich.markup import escape
@@ -74,7 +73,7 @@ def _extend_role_usages(
 def extract_dependencies(project: Path, output_path: Path) -> None:
     deps = _extract_project_dependencies(project)
 
-    output_path.write_text(json.dumps(attrs.asdict(deps)))
+    output_path.write_text(json.dumps(deps._asdict()))
     _print_dependencies(deps)
 
 

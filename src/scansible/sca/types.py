@@ -1,51 +1,44 @@
 from __future__ import annotations
 
-from typing import Mapping, Sequence
+from typing import NamedTuple
 
-from attrs import define
+from collections.abc import Collection, Mapping, Sequence
 
 
-@define
-class ModuleInfo:
+class ModuleInfo(NamedTuple):
     name: str
     collection: str
     params: Sequence[str]
 
 
-@define
-class CollectionContent:
+class CollectionContent(NamedTuple):
     name: str
     modules: Mapping[str, ModuleInfo]
 
 
-@define
-class CollectionUsage:
+class CollectionUsage(NamedTuple):
     name: str
     modules: Sequence[ModuleUsage]
 
 
-@define
-class ModuleUsage:
+class ModuleUsage(NamedTuple):
     name: str
     usages: list[str]
 
 
-@define
-class RoleUsage:
+class RoleUsage(NamedTuple):
     name: str
     usages: Sequence[str]
-    used_collections: set[str]
-    used_modules: set[str]
+    used_collections: Collection[str]
+    used_modules: Collection[str]
 
 
-@define
-class ModuleDependency:
+class ModuleDependency(NamedTuple):
     name: str
     type: str
 
 
-@define
-class Vulnerability:
+class Vulnerability(NamedTuple):
     package_name: str
     id: str
     summary: str
@@ -53,12 +46,11 @@ class Vulnerability:
     description: str
 
 
-@define
-class ProjectDependencies:
-    collections: list[CollectionUsage]
-    roles: list[RoleUsage]
-    module_dependencies: dict[str, Sequence[ModuleDependency]]
+class ProjectDependencies(NamedTuple):
+    collections: Sequence[CollectionUsage]
+    roles: Sequence[RoleUsage]
+    module_dependencies: Mapping[str, Sequence[ModuleDependency]]
 
     @property
-    def modules(self) -> list[ModuleUsage]:
+    def modules(self) -> Sequence[ModuleUsage]:
         return [mod for coll in self.collections for mod in coll.modules]

@@ -11,25 +11,29 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import rich.progress
-from attrs import Attribute, asdict, field, frozen
 from loguru import logger
+from pydantic import (
+    BaseModel,
+    Field,
+    SerializationInfo,
+    SerializerFunctionWrapHandler,
+    model_serializer,
+)
 
 from scansible.utils import first
-from scansible.utils.type_validators import type_validator
 
 
-@frozen
-class OptionInfo:
-    description: Sequence[str] = field(validator=type_validator())
-    type: str | None = field(validator=type_validator())
-    required: bool = field(validator=type_validator())
-    default: Any | None = field(validator=type_validator())
-    version_added: Any | None = field(validator=type_validator())
-    version_added_collection: Any | None = field(validator=type_validator())
-    aliases: Sequence[str] = field(validator=type_validator())
-    elements: str | None = field(validator=type_validator())
-    choices: Sequence[Any] | None = field(validator=type_validator())
-    suboptions: Mapping[str, OptionInfo] | None = field(validator=type_validator())
+class OptionInfo(BaseModel, frozen=True, extra="forbid"):
+    description: Sequence[str]
+    type: str | None
+    required: bool
+    default: Any | None
+    version_added: Any | None
+    version_added_collection: Any | None
+    aliases: Sequence[str]
+    elements: str | None
+    choices: Sequence[Any] | None
+    suboptions: Mapping[str, OptionInfo] | None
 
     @classmethod
     def parse(cls, info: dict[str, Any], name: str, mod_name: str) -> OptionInfo:  # type: ignore[misc]
@@ -62,29 +66,26 @@ class OptionInfo:
         return inst
 
 
-ReturnInfo = Mapping[str, Any]
-AttributeInfo = Mapping[str, Any]
+type ReturnInfo = Mapping[str, Any]
+type AttributeInfo = Mapping[str, Any]
 
 
-@frozen
-class ModuleInfo:
-    collection: str = field(validator=type_validator())
-    short_name: str = field(validator=type_validator())
-    description: Sequence[str] = field(validator=type_validator())
-    short_description: str = field(validator=type_validator())
+class ModuleInfo(BaseModel, frozen=True, extra="forbid"):
+    collection: str
+    short_name: str
+    description: Sequence[str]
+    short_description: str
 
-    author: Sequence[str] = field(validator=type_validator())
-    has_action: bool = field(validator=type_validator())
-    notes: Sequence[str] = field(validator=type_validator())
-    requirements: Sequence[str] = field(validator=type_validator())
+    author: Sequence[str]
+    has_action: bool
+    notes: Sequence[str]
+    requirements: Sequence[str]
 
-    attributes: Mapping[str, AttributeInfo] = field(validator=type_validator())
-    options: Mapping[str, OptionInfo] = field(validator=type_validator())
-    examples: str = field(validator=type_validator())
-    metadata: object = field(validator=type_validator(), default=None)
-    returns: Mapping[str, ReturnInfo] | None = field(
-        validator=type_validator(), default=None
-    )
+    attributes: Mapping[str, AttributeInfo]
+    options: Mapping[str, OptionInfo]
+    examples: str
+    metadata: object = Field(default=None)
+    returns: Mapping[str, ReturnInfo] | None = Field(default=None)
 
     @property
     def qualified_name(self) -> str:
@@ -107,6 +108,46 @@ class ModuleInfo:
             for canonical_name, opt in self.options.items()
             if option_name in opt.aliases
         )
+
+    @model_serializer(mode="wrap")
+    def _slim_dump(
+        self, nxt: SerializerFunctionWrapHandler, info: SerializationInfo
+    ) -> dict[str, Any]:
+        serialized = nxt(self)
+        if not info.context.get("slim", False):
+            return serialized
+
+        def deep_slim(value: object) -> object:
+            match value:
+                case dict():
+                    return {
+                        k: deep_slim_dict_item(k, v)
+                        for k, v in value.items()
+                        if v is not None
+                    }
+                case list():
+                    return [deep_slim(e) for e in value]
+                case _:
+                    return value
+
+        def deep_slim_dict_item(key: str, value: object) -> object:
+            match key:
+                case "examples":
+                    return ""
+                case "notes" | "requirements":
+                    return []
+                case "returns" if isinstance(value, dict):
+                    _ = value.pop("description", None)
+                    _ = value.pop("sample", None)
+                    return deep_slim(value)
+                case "description" if isinstance(value, list):
+                    return []
+                case "description" if isinstance(value, str):
+                    return ""
+                case _:
+                    return deep_slim(value)
+
+        return deep_slim(serialized)
 
     @classmethod
     def load(cls, info: dict[str, Any]) -> ModuleInfo:  # type: ignore[misc]
@@ -190,12 +231,7 @@ class ModuleKnowledgeBase:
 
     def dump(self, slim: bool = True) -> dict[str, Any]:
         return {
-            mod_name: asdict(
-                mod_info,
-                recurse=True,
-                value_serializer=_slim_dump_converter if slim else None,
-                filter=_slim_dump_filter if slim else None,
-            )
+            mod_name: mod_info.model_dump(context={"slim": slim})
             for mod_name, mod_info in self.modules.items()
         }
 
@@ -237,35 +273,3 @@ class ModuleKnowledgeBase:
             for cand, score in candidates_scored
             if score == highest_score
         ]
-
-
-def _slim_dump_filter(field: Attribute[Any], value: Any) -> bool:
-    return value is not None
-
-
-def _slim_dump_converter(inst: Any, field: Attribute[Any] | None, value: Any) -> Any:
-    if field is None:
-        return value
-
-    if isinstance(inst, ModuleInfo):
-        if field.name == "examples":
-            return ""
-        if field.name in ("notes", "requirements"):
-            return []
-        if field.name == "returns" and value is not None:
-            return {
-                ret_name: {
-                    k: v
-                    for k, v in ret_desc.items()
-                    if k not in ("description", "sample")
-                }
-                for ret_name, ret_desc in value.items()
-            }
-
-    if field.name == "description":
-        if isinstance(value, list):
-            return []
-        if isinstance(value, str):
-            return ""
-
-    return value
