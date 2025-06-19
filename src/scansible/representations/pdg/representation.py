@@ -69,20 +69,20 @@ class Node(_BaseRepresentation):
         return hash(tuple(self))
 
 
-class ControlNode(Node, _BaseRepresentation): ...
+class ControlNode(Node): ...
 
 
-class DataNode(Node, _BaseRepresentation): ...
+class DataNode(Node): ...
 
 
-class Task(ControlNode, _BaseRepresentation):
+class Task(ControlNode):
     """Node representing a task."""
 
     action: Annotated[str, StringConstraints(min_length=1)] = Field(frozen=True)
     name: str | None = Field(frozen=True, default=None)
 
 
-class Variable(DataNode, _BaseRepresentation):
+class Variable(DataNode):
     """Node representing variables."""
 
     name: Annotated[str, StringConstraints(min_length=1)] = Field(frozen=True)
@@ -91,27 +91,27 @@ class Variable(DataNode, _BaseRepresentation):
     scope_level: int = Field(frozen=True)
 
 
-class IntermediateValue(DataNode, _BaseRepresentation):
+class IntermediateValue(DataNode):
     """Node representing intermediate values."""
 
     identifier: int = Field(frozen=True)
 
 
-class Literal(DataNode, _BaseRepresentation):
+class Literal(DataNode):
     """Node representing a literal."""
 
     type: ValidTypeStr = Field(frozen=True)
 
 
-class ScalarLiteral(Literal, _BaseRepresentation):
+class ScalarLiteral(Literal):
     value: Scalar = Field(frozen=True)
 
 
-class CompositeLiteral(Literal, _BaseRepresentation):
+class CompositeLiteral(Literal):
     """Node representing a literal of a composite type."""
 
 
-class Expression(DataNode, _BaseRepresentation):
+class Expression(DataNode):
     """Node representing a template expression."""
 
     expr: Annotated[str, StringConstraints(min_length=1)] = Field(frozen=True)
@@ -143,7 +143,7 @@ class Edge(abc.ABC, _FrozenRepresentation, frozen=True):
         raise NotImplementedError()
 
 
-class ControlFlowEdge(Edge, _FrozenRepresentation, frozen=True):
+class ControlFlowEdge(Edge, frozen=True):
     """Edges representing control flow."""
 
     @classmethod
@@ -153,22 +153,22 @@ class ControlFlowEdge(Edge, _FrozenRepresentation, frozen=True):
             raise TypeError("Control flow edges are only allowed between control nodes")
 
 
-class DataFlowEdge(Edge, abc.ABC, _FrozenRepresentation, frozen=True):
+class DataFlowEdge(Edge, abc.ABC, frozen=True):
     """Edges representing data flow."""
 
 
-class Order(ControlFlowEdge, _FrozenRepresentation, frozen=True):
+class Order(ControlFlowEdge, frozen=True):
     """Edges representing order between control nodes."""
 
     transitive: bool = False
     back: bool = False
 
 
-class Notifies(ControlFlowEdge, _FrozenRepresentation, frozen=True):
+class Notifies(ControlFlowEdge, frozen=True):
     """Edges representing notification from task to handler."""
 
 
-class When(ControlFlowEdge, _FrozenRepresentation, frozen=True):
+class When(ControlFlowEdge, frozen=True):
     """Edges representing conditional execution from data node to task."""
 
     @classmethod
@@ -179,7 +179,7 @@ class When(ControlFlowEdge, _FrozenRepresentation, frozen=True):
             raise TypeError("Conditional edges are only allowed from data node")
 
 
-class Loop(ControlFlowEdge, _FrozenRepresentation, frozen=True):
+class Loop(ControlFlowEdge, frozen=True):
     """Edges representing looping execution from data node (over which we iterate)
     to task."""
 
@@ -192,7 +192,7 @@ class Loop(ControlFlowEdge, _FrozenRepresentation, frozen=True):
             )
 
 
-class Use(DataFlowEdge, _FrozenRepresentation, frozen=True):
+class Use(DataFlowEdge, frozen=True):
     """Edges representing data usage."""
 
     @classmethod
@@ -209,7 +209,7 @@ class Use(DataFlowEdge, _FrozenRepresentation, frozen=True):
             )
 
 
-class Input(Use, _FrozenRepresentation, frozen=True):
+class Input(Use, frozen=True):
     param_idx: int
 
     @classmethod
@@ -222,7 +222,7 @@ class Input(Use, _FrozenRepresentation, frozen=True):
             raise TypeError("Input edges must only be used with expressions as target")
 
 
-class Keyword(Use, _FrozenRepresentation, frozen=True):
+class Keyword(Use, frozen=True):
     """Edges representing data usage as a task keyword."""
 
     keyword: str
@@ -237,7 +237,7 @@ class Keyword(Use, _FrozenRepresentation, frozen=True):
             raise TypeError("Keyword edges must only be used with tasks as target")
 
 
-class Composition(Use, _FrozenRepresentation, frozen=True):
+class Composition(Use, frozen=True):
     """Edges representing data composition in composite values."""
 
     index: str
@@ -254,7 +254,7 @@ class Composition(Use, _FrozenRepresentation, frozen=True):
             )
 
 
-class Def(DataFlowEdge, _FrozenRepresentation, frozen=True):
+class Def(DataFlowEdge, frozen=True):
     """Edges representing data definitions."""
 
     @classmethod
@@ -266,7 +266,7 @@ class Def(DataFlowEdge, _FrozenRepresentation, frozen=True):
             raise TypeError("Def edges cannot define literals")
 
 
-class DefLoopItem(Def, _FrozenRepresentation, frozen=True):
+class DefLoopItem(Def, frozen=True):
     """Edges representing data definitions for single loop items."""
 
     loop_with: str | None
