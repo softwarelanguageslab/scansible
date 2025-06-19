@@ -654,7 +654,7 @@ def a_task_extractor() -> None:
         )
 
         assert result == task_representation(
-            action="include",
+            action="include_tasks",
             args={
                 "_raw_params": "test.yml",
             },

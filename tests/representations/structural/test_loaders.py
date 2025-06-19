@@ -454,6 +454,134 @@ def describe_load_task_file() -> None:
             )
 
 
+def describe_get_task_action() -> None:
+    # Yes, all of these are legal :exploding_head:
+    @pytest.mark.parametrize(
+        ["task", "expected_action"],
+        [
+            pytest.param(
+                {"debug": {"msg": "hi"}},
+                "debug",
+                id="module name with args dict",
+            ),
+            pytest.param(
+                {"debug": {"msg": "hi"}, "name": "", "when": ["x"], "vars": {}},
+                "debug",
+                id="module name with args dict and additional task directives",
+            ),
+            pytest.param(
+                {"debug": "msg=hi"},
+                "debug",
+                id="module name with k=v args",
+            ),
+            pytest.param(
+                {"shell": "echo hi"},
+                "shell",
+                id="module name with freeform args",
+            ),
+            pytest.param(
+                {"shell": "echo hi", "args": {"chdir": "/tmp"}},
+                "shell",
+                id="module name with freeform and structured args",
+            ),
+            pytest.param(
+                {"ping": None},
+                "ping",
+                id="module name without args",
+            ),
+            pytest.param(
+                {"action": "debug msg=hi"},
+                "debug",
+                id="legacy action form with k=v args",
+            ),
+            pytest.param(
+                {"action": "shell echo hi"},
+                "shell",
+                id="legacy action form with freeform args",
+            ),
+            pytest.param(
+                {"action": "ping"},
+                "ping",
+                id="legacy action form without args",
+            ),
+            pytest.param(
+                {"local_action": "shell echo hi"},
+                "shell",
+                id="legacy local_action form with freeform args",
+            ),
+            pytest.param(
+                {"local_action": "debug msg=hi"},
+                "debug",
+                id="legacy local_action form with k=v args",
+            ),
+            pytest.param(
+                {"action": "debug", "args": {"msg": "hi"}},
+                "debug",
+                id="legacy action form with top-level structured args",
+            ),
+            pytest.param(
+                {"action": {"module": "debug", "args": {"msg": "hi"}}},
+                "debug",
+                id="legacy action form with nested dict",
+            ),
+            pytest.param(
+                {"action": {"module": "debug", "msg": "hi"}},
+                "debug",
+                id="legacy action form with nested dict and flat args",
+            ),
+            # Special cases
+            pytest.param(
+                {"include": "test.yml", "static": True},
+                "include",
+                id="include with static directive",
+            ),
+        ],
+    )
+    def loads_correct_action(
+        task: dict[str, ans.AnsibleValue], expected_action: str
+    ) -> None:
+        action = loaders.get_task_action(task)
+
+        assert action == expected_action
+
+    @pytest.mark.parametrize(
+        ["task"],
+        [
+            pytest.param(
+                {"debug": {"msg": "hi"}, "file": {"path": "..."}},
+                id="mixing multiple module names",
+            ),
+            pytest.param(
+                {"debug": {"msg": "hi"}, "action": "shell echo hi"},
+                id="mixing action and module names",
+            ),
+            pytest.param(
+                {"debug": {"msg": "hi"}, "local_action": "shell echo hi"},
+                id="mixing local_action and module names",
+            ),
+            pytest.param(
+                {"action": "shell echo hi", "local_action": "shell echo hi"},
+                id="mixing local_action and action",
+            ),
+            pytest.param(
+                {"name": "", "when": ["x"], "vars": {}},
+                id="no action",
+            ),
+            pytest.param(
+                {"action": ["debug msg=hi", "file path=..."]},
+                id="malformed action",
+            ),
+            pytest.param(
+                {"local_action": ["debug msg=hi", "file path=..."]},
+                id="malformed local_action",
+            ),
+        ],
+    )
+    def rejects_invalid_actions(task: dict[str, ans.AnsibleValue]) -> None:
+        with pytest.raises(LoadError):
+            _ = loaders.get_task_action(task)
+
+
 def describe_load_task() -> None:
     def loads_correct_task() -> None:
         task_ds = _as_ansible(

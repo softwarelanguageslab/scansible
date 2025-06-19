@@ -17,6 +17,7 @@ from pathlib import Path
 
 from ansible.parsing import mod_args
 
+from scansible.representations.structural.representation import Handler, Task
 from scansible.utils import actions
 
 from . import ansible_types as ans
@@ -257,40 +258,102 @@ def _patch_lookup_loader() -> Generator[None, None, None]:
         ans.PluginLoader.__contains__ = old_loader_has_plugin  # type: ignore[assignment]
 
 
-def _get_task_action(ds: dict[str, ans.AnsibleValue]) -> str:
-    # Ansible raises an error if _raw_params is present for actions that don't support
-    # it, and they removed `include` from the possible modules that support it, so add it
-    # back.
-    mod_args.RAW_PARAM_MODULES = mod_args.RAW_PARAM_MODULES | {"include"}
-    fixed_ds = {key: value for key, value in ds.items() if key != "_raw_params"}
-    args_parser = ans.ModuleArgsParser(fixed_ds)
-    (action, _, _) = args_parser.parse()
+def get_task_action(ds: dict[str, ans.AnsibleValue]) -> str:
+    action: str | None = None
+
+    # Tasks of the forms:
+    # - action: shell echo hi
+    # - action: file path=...
+    # - action: file
+    #   args:
+    #     path: ...
+    # - action:
+    #     module: file
+    #     ...
+    for action_key in ("action", "local_action"):
+        if action_key not in ds:
+            continue
+
+        if action is not None:
+            raise LoadError(
+                "task",
+                f"Conflicting action directives: Unexpected {action_key}, action already parsed.",
+                extra_msg=repr(ds),
+            )
+
+        action_val = ds[action_key]
+        if isinstance(action_val, str):
+            action = action_val.split(" ")[0]
+        elif isinstance(action_val, dict) and isinstance(
+            action_module := action_val.get("module"), str
+        ):
+            action = action_module
+        else:
+            raise LoadError(
+                "task", f"Invalid specification for {action_key}", extra_msg=repr(ds)
+            )
+
+    # Tasks of the form
+    # - debug: msg=hi
+    # - debug:
+    #     msg: hi
+    # - shell: echo hi
+    # - ping:
+    task_directives = {attr.name for attr in Task.__attrs_attrs__}
+    task_directives.update({attr.name for attr in Handler.__attrs_attrs__})
+    task_directives.update({"local_action", "static"})
+
+    # note: this also subtracts "action" and "args" but that's okay, they've been
+    # processed above. Also make sure to remove `with_<lookup>`.
+    extra_directives = {
+        directive
+        for directive in ds.keys()
+        if directive not in task_directives and not directive.startswith("with_")
+    }
+
+    for directive in extra_directives:
+        if action is not None:
+            raise LoadError(
+                "task",
+                f"Conflicting action directives: Unexpected {extra_directives}, action already parsed.",
+                extra_msg=repr(ds),
+            )
+
+        action = directive
+
+    if action is None:
+        raise LoadError("task", "No action found in task", extra_msg=repr(ds))
+
     return action
 
 
-def _transform_task_static_include(
-    ds: dict[str, ans.AnsibleValue], action: str
-) -> None:
-    # Current Ansible version crashes when the old static key is used.
+def _transform_task_include(ds: dict[str, ans.AnsibleValue], action: str) -> None:
+    # Current Ansible version crashes when the old static directive or the
+    # `include` action is used.
     # Transform it to modern syntax, either into `import_tasks` if it's a
     # static include, or `include_tasks` if it isn't.
     if "static" in ds:
         is_static = ds["static"] is not None and ans.convert_bool(ds["static"])
-
         del ds["static"]
-        if actions.is_bare_include(action):
-            include_args = ds["include"]
-            del ds["include"]
-            if is_static:
-                ds["import_tasks"] = include_args
-            else:
-                ds["include_tasks"] = include_args
-        elif actions.is_include_tasks(action) and is_static:
-            raise LoadError(
-                "task", "include_tasks with static: yes", extra_msg=repr(ds)
-            )
-        elif actions.is_import_tasks(action) and not is_static:
-            raise LoadError("task", "import_tasks with static: no", extra_msg=repr(ds))
+    else:
+        is_static = None
+
+    if actions.is_bare_include(action):
+        include_args = ds["include"]
+        del ds["include"]
+        if is_static:
+            ds["import_tasks"] = include_args
+        else:
+            # FIXME: If static is not explicitly set, Ansible will attempt to
+            # figure out whether the inclusion is static or dynamic based on
+            # context and based on whether the file exists, and fall back to
+            # dynamic inclusion if that fails. This may lead to slightly different
+            # semantics than our approximation here.
+            ds["include_tasks"] = include_args
+    elif actions.is_include_tasks(action) and is_static is True:
+        raise LoadError("task", "include_tasks with static: yes", extra_msg=repr(ds))
+    elif actions.is_import_tasks(action) and is_static is False:
+        raise LoadError("task", "import_tasks with static: no", extra_msg=repr(ds))
 
 
 def _transform_old_become(ds: dict[str, ans.AnsibleValue]) -> None:
@@ -384,38 +447,36 @@ def load_task(
     _transform_old_become(ds)
     _transform_old_always_run(ds)
 
+    action = get_task_action(ds)
+    is_include_tasks = actions.is_import_include_tasks(action)
+
+    if actions.is_import_playbook(action):
+        # This loader only gets called for tasks in task lists, so an
+        # import_playbook is illegal here.
+        raise LoadError(
+            "task", "import_playbook is only allowed as a top-level playbook task"
+        )
+
+    if actions.is_bare_include(action) or "static" in ds:
+        # Transform deprecated/removed ansible.builtin.include tasks and
+        # tasks with the static attribute.
+        _transform_task_include(ds, action)
+
+    # This can happen and Ansible doesn't do anything about it, it just
+    # ignores the when. Remove the directive so that defaults take over.
+    if "when" in ds and ds["when"] is None:
+        del ds["when"]
+
+    # Use the correct Ansible representation so that more validation is done.
+    ansible_cls: type[ans.Task]
+    if actions.is_import_include_role(action):
+        ansible_cls = ans.IncludeRole
+    elif not as_handler:
+        ansible_cls = ans.Task if not is_include_tasks else ans.TaskInclude
+    else:
+        ansible_cls = ans.Handler if not is_include_tasks else ans.HandlerTaskInclude
+
     with _patch_modargs_parser(), _patch_lookup_loader():
-        action = _get_task_action(ds)
-        is_include_tasks = actions.is_import_include_tasks(action)
-
-        if actions.is_import_playbook(action):
-            # This loader only gets called for tasks in task lists, so an
-            # import_playbook is illegal here.
-            raise LoadError(
-                "task", "import_playbook is only allowed as a top-level playbook task"
-            )
-
-        if actions.is_import_include_tasks(action):
-            # Check for include/import tasks and transform them if the static
-            # directive is present.
-            _transform_task_static_include(ds, action)
-
-        # This can happen and Ansible doesn't do anything about it, it just
-        # ignores the when. Remove the directive so that defaults take over.
-        if "when" in ds and ds["when"] is None:
-            del ds["when"]
-
-        # Use the correct Ansible representation so that more validation is done.
-        ansible_cls: Type[ans.Task]
-        if actions.is_import_include_role(action):
-            ansible_cls = ans.IncludeRole
-        elif not as_handler:
-            ansible_cls = ans.Task if not is_include_tasks else ans.TaskInclude
-        else:
-            ansible_cls = (
-                ans.Handler if not is_include_tasks else ans.HandlerTaskInclude
-            )
-
         raw_task = ansible_cls.load(ds)
         validate_ansible_object(raw_task)
 
