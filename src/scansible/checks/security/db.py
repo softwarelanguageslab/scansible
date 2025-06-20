@@ -1,21 +1,21 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Self, final
+from typing import Protocol, Self, final
 
 import csv
 import json
 import tempfile
 from collections import defaultdict
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 
 import kuzu
 
-if TYPE_CHECKING:
-    from ansible.playbook.base import Scalar
-
 from scansible.representations.pdg import Graph
 from scansible.representations.pdg.representation import Edge, Node, NodeLocation
+from scansible.types import AnyValue
+
+type DatabaseValue = AnyValue
 
 ## NOTE: Edges in the graph database are named as "e_<edge type>", e.g., "e_Order",
 ## as some edge types conflict with reserved keywords in the graph DB queries (e.g., Order).
@@ -54,7 +54,7 @@ def _escape_string(v: str) -> str:
     return json.dumps(v)[1:-1]
 
 
-def _node_to_dict(node: Node) -> dict[str, Any]:
+def _node_to_dict(node: Node) -> Mapping[str, DatabaseValue]:
     node_dict = {
         k: (_escape_string(v) if isinstance(v, str) else v)
         for k, v in node.model_dump(exclude={"location"}).items()
@@ -63,30 +63,16 @@ def _node_to_dict(node: Node) -> dict[str, Any]:
     return node_dict
 
 
-def _nodes_to_dicts(node_type: str, nodes: list[Node]) -> list[dict[str, Any]]:
+def _nodes_to_dicts(nodes: Sequence[Node]) -> Sequence[Mapping[str, DatabaseValue]]:
     nodes_serialised = list(map(_node_to_dict, nodes))
     return nodes_serialised
-
-
-def _results_to_list(
-    raw_results: kuzu.QueryResult | list[kuzu.QueryResult],
-) -> list[tuple[Any, ...]]:
-    results: list[tuple[Any, ...]] = []
-    if not isinstance(raw_results, list):
-        raw_results = [raw_results]
-
-    for raw_result in raw_results:
-        while raw_result.has_next():
-            results.append(tuple(raw_result.get_next()))
-
-    return results
 
 
 type EdgeType = tuple[str, str, str]
 type EdgeValue = tuple[Node, Node, Edge]
 
 
-def _edge_to_dict(edge: EdgeValue) -> dict[str, Any]:
+def _edge_to_dict(edge: EdgeValue) -> Mapping[str, DatabaseValue]:
     source, target, edge_value = edge
     edge_serialised = {
         "from": source.node_id,
@@ -95,11 +81,28 @@ def _edge_to_dict(edge: EdgeValue) -> dict[str, Any]:
     return edge_serialised
 
 
-def _edges_to_dicts(
-    edge_type: EdgeType, edges: list[EdgeValue]
-) -> list[dict[str, Scalar]]:
+def _edges_to_dicts(edges: list[EdgeValue]) -> Sequence[Mapping[str, DatabaseValue]]:
     edges_serialised = list(map(_edge_to_dict, edges))
     return edges_serialised
+
+
+class DatabaseResultConverter[T](Protocol):
+    def __call__(self, result: tuple[DatabaseValue, ...], /) -> T: ...
+
+
+def _results_to_list[ResultType](
+    raw_results: kuzu.QueryResult | list[kuzu.QueryResult],
+    result_converter: DatabaseResultConverter[ResultType],
+) -> Sequence[ResultType]:
+    results: Sequence[ResultType] = []
+    if not isinstance(raw_results, list):
+        raw_results = [raw_results]
+
+    for raw_result in raw_results:
+        while raw_result.has_next():
+            results.append(result_converter(tuple(raw_result.get_next())))
+
+    return results
 
 
 @final
@@ -141,7 +144,7 @@ class GraphDatabase:
             type_to_nodes[node.__class__.__name__].append(node)
 
         dumped_nodes = {
-            node_type: _nodes_to_dicts(node_type, nodes)
+            node_type: _nodes_to_dicts(nodes)
             for node_type, nodes in type_to_nodes.items()
         }
 
@@ -165,7 +168,7 @@ class GraphDatabase:
             type_to_edges[dict_key].append((source, target, edge["type"]))
 
         dumped_edges = {
-            edge_type: _edges_to_dicts(edge_type, edges)
+            edge_type: _edges_to_dicts(edges)
             for edge_type, edges in type_to_edges.items()
         }
 
@@ -201,14 +204,18 @@ class GraphDatabase:
         self._conn.close()
         self._db.close()
 
-    def query(
-        self, query: str, parameters: dict[str, Any] | None = None
-    ) -> Iterator[tuple[int, ...]]:
+    def query[ResultType](
+        self,
+        result_converter: DatabaseResultConverter[ResultType],
+        query: str,
+        parameters: Mapping[str, DatabaseValue] | None = None,
+    ) -> Sequence[ResultType]:
+        parameters = dict(parameters) if parameters is not None else None
         raw_results = self._conn.execute(query, parameters=parameters)
-        results = _results_to_list(raw_results)
+        results = _results_to_list(raw_results, result_converter)
 
         _close_all(raw_results)
-        yield from results
+        return results
 
     def get_location(self, node_id: int) -> NodeLocation | None:
         return self._node_locations.get(node_id)

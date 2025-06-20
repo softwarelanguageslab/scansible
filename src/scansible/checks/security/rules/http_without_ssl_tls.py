@@ -2,22 +2,24 @@ from __future__ import annotations
 
 from typing import final, override
 
-from .base import Rule
+from .base import Rule, RuleQuery
 
 
 @final
 class HTTPWithoutSSLTLSRule(Rule):
     description = "Always use SSL/TLS to connect over HTTP, i.e., use HTTPS"
 
-    IP_WHITELIST = ("localhost", "127.0.0.1")
+    #: Regular expression to identify http:// URLs.
     HTTP_REGEX = "^http://"
+
+    #: IPs and domain names that are allowed with http:// URLs.
+    IP_WHITELIST = ("localhost", "127.0.0.1")
     IP_WHITELIST_REGEX = f"^(http://)?{'|'.join(IP_WHITELIST)}"
 
     @property
     @override
-    def query(self) -> tuple[str, dict[str, str]]:
-        return (
-            """
+    def query(self) -> RuleQuery:
+        query = """
             MATCH (source:ScalarLiteral) -[:e_Def|e_Input|e_DefLoopItem*0..]->()-[:e_Keyword*0..1]->(sink:Task:Variable)
             WHERE regexp_matches(source.value, $http_regex)
                 AND (NOT regexp_matches(source.value, $ip_whitelist_regex))
@@ -25,6 +27,7 @@ class HTTPWithoutSSLTLSRule(Rule):
             RETURN source.node_id, sink.node_id
 
             UNION
+
             MATCH (source:Expression) -[:e_Def|e_Input|e_DefLoopItem*0..]->()-[:e_Keyword*0..1]->(sink:Task:Variable)
             WHERE regexp_matches(source.expr, $http_regex)
                 AND (NOT regexp_matches(source.expr, $ip_whitelist_regex))
@@ -35,9 +38,9 @@ class HTTPWithoutSSLTLSRule(Rule):
                     WHERE regexp_matches(server_source.value, $ip_whitelist_regex)
                 })
             RETURN source.node_id, sink.node_id
-        """,
-            {
-                "http_regex": self.HTTP_REGEX,
-                "ip_whitelist_regex": self.IP_WHITELIST_REGEX,
-            },
-        )
+        """
+        params = {
+            "http_regex": self.HTTP_REGEX,
+            "ip_whitelist_regex": self.IP_WHITELIST_REGEX,
+        }
+        return query, params

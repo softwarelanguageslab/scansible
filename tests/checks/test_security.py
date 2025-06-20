@@ -67,7 +67,7 @@ def describe_hardcoded_secret_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.HardcodedSecretRule().run(graph_db)
+            results = HardcodedSecretRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:7:31", f"{pb_path}:4:19")]
 
@@ -87,7 +87,7 @@ def describe_hardcoded_secret_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.HardcodedSecretRule().run(graph_db)
+            results = HardcodedSecretRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:4:24", f"{pb_path}:6:19")]
 
@@ -108,7 +108,7 @@ def describe_hardcoded_secret_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.HardcodedSecretRule().run(graph_db)
+            results = HardcodedSecretRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:4:24", f"{pb_path}:7:19")]
 
@@ -125,7 +125,7 @@ def describe_hardcoded_secret_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.HardcodedSecretRule().run(graph_db)
+            results = HardcodedSecretRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:4:34", f"{pb_path}:4:17")]
 
@@ -143,7 +143,7 @@ def describe_hardcoded_secret_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.HardcodedSecretRule().run(graph_db)
+            results = HardcodedSecretRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:4:24", f"{pb_path}:5:17")]
 
@@ -160,7 +160,7 @@ def describe_hardcoded_secret_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.HardcodedSecretRule().run(graph_db)
+            results = HardcodedSecretRule().run(graph_db)
 
         assert not results
 
@@ -179,7 +179,7 @@ def describe_hardcoded_secret_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.HardcodedSecretRule().run(graph_db)
+            results = HardcodedSecretRule().run(graph_db)
 
         assert not results
 
@@ -196,7 +196,7 @@ def describe_hardcoded_secret_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.HardcodedSecretRule().run(graph_db)
+            results = HardcodedSecretRule().run(graph_db)
 
         assert not results
 
@@ -213,7 +213,7 @@ def describe_hardcoded_secret_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.HardcodedSecretRule().run(graph_db)
+            results = HardcodedSecretRule().run(graph_db)
 
         assert not results
 
@@ -231,7 +231,7 @@ def describe_hardcoded_secret_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.HardcodedSecretRule().run(graph_db)
+            results = HardcodedSecretRule().run(graph_db)
 
         assert not results
 
@@ -253,7 +253,7 @@ def describe_empty_password_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.EmptyPasswordRule().run(graph_db)
+            results = EmptyPasswordRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:7:31", f"{pb_path}:4:19")]
 
@@ -271,7 +271,7 @@ def describe_empty_password_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.EmptyPasswordRule().run(graph_db)
+            results = EmptyPasswordRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:7:31", f"{pb_path}:4:19")]
 
@@ -289,7 +289,7 @@ def describe_empty_password_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.EmptyPasswordRule().run(graph_db)
+            results = EmptyPasswordRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:4:19", f"{pb_path}:4:19")]
 
@@ -309,7 +309,7 @@ def describe_empty_password_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.EmptyPasswordRule().run(graph_db)
+            results = EmptyPasswordRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:4:24", f"{pb_path}:6:19")]
 
@@ -330,7 +330,7 @@ def describe_empty_password_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.EmptyPasswordRule().run(graph_db)
+            results = EmptyPasswordRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:4:24", f"{pb_path}:7:19")]
 
@@ -347,7 +347,7 @@ def describe_empty_password_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.EmptyPasswordRule().run(graph_db)
+            results = EmptyPasswordRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:4:34", f"{pb_path}:4:17")]
 
@@ -365,7 +365,7 @@ def describe_empty_password_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.EmptyPasswordRule().run(graph_db)
+            results = EmptyPasswordRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:4:24", f"{pb_path}:5:17")]
 
@@ -387,7 +387,7 @@ def describe_admin_by_default_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.AdminByDefaultRule().run(graph_db)
+            results = AdminByDefaultRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:5:32", f"{pb_path}:4:19")]
 
@@ -405,7 +405,7 @@ def describe_admin_by_default_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.AdminByDefaultRule().run(graph_db)
+            results = AdminByDefaultRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:4:28", f"{pb_path}:6:19")]
 
@@ -427,7 +427,7 @@ def describe_http_without_tls_or_ssl_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.HTTPWithoutSSLTLSRule().run(graph_db)
+            results = HTTPWithoutSSLTLSRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:5:26", f"{pb_path}:4:19")]
 
@@ -445,7 +445,7 @@ def describe_http_without_tls_or_ssl_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.HTTPWithoutSSLTLSRule().run(graph_db)
+            results = HTTPWithoutSSLTLSRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:4:27", f"{pb_path}:6:19")]
 
@@ -463,7 +463,7 @@ def describe_http_without_tls_or_ssl_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.HTTPWithoutSSLTLSRule().run(graph_db)
+            results = HTTPWithoutSSLTLSRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:7:26", f"{pb_path}:6:19")]
 
@@ -482,7 +482,7 @@ def describe_http_without_tls_or_ssl_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.HTTPWithoutSSLTLSRule().run(graph_db)
+            results = HTTPWithoutSSLTLSRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:5:22", f"{pb_path}:7:19")]
 
@@ -498,7 +498,7 @@ def describe_http_without_tls_or_ssl_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.HTTPWithoutSSLTLSRule().run(graph_db)
+            results = HTTPWithoutSSLTLSRule().run(graph_db)
 
         assert not results
 
@@ -514,7 +514,7 @@ def describe_http_without_tls_or_ssl_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.HTTPWithoutSSLTLSRule().run(graph_db)
+            results = HTTPWithoutSSLTLSRule().run(graph_db)
 
         assert not results
 
@@ -530,7 +530,7 @@ def describe_http_without_tls_or_ssl_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.HTTPWithoutSSLTLSRule().run(graph_db)
+            results = HTTPWithoutSSLTLSRule().run(graph_db)
 
         assert not results
 
@@ -549,7 +549,7 @@ def describe_http_without_tls_or_ssl_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.HTTPWithoutSSLTLSRule().run(graph_db)
+            results = HTTPWithoutSSLTLSRule().run(graph_db)
 
         assert not results
 
@@ -565,7 +565,7 @@ def describe_http_without_tls_or_ssl_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.HTTPWithoutSSLTLSRule().run(graph_db)
+            results = HTTPWithoutSSLTLSRule().run(graph_db)
 
         assert not results
 
@@ -589,7 +589,7 @@ def describe_http_without_tls_or_ssl_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.HTTPWithoutSSLTLSRule().run(graph_db)
+            results = HTTPWithoutSSLTLSRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:4:22", f"{pb_path}:10:19")]
 
@@ -613,7 +613,7 @@ def describe_missing_integrity_check_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.MissingIntegrityCheckRule().run(graph_db)
+            results = MissingIntegrityCheckRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:5:26", f"{pb_path}:4:19")]
 
@@ -631,7 +631,7 @@ def describe_missing_integrity_check_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.MissingIntegrityCheckRule().run(graph_db)
+            results = MissingIntegrityCheckRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:4:27", f"{pb_path}:6:19")]
 
@@ -649,7 +649,7 @@ def describe_missing_integrity_check_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.MissingIntegrityCheckRule().run(graph_db)
+            results = MissingIntegrityCheckRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:7:26", f"{pb_path}:6:19")]
 
@@ -666,7 +666,7 @@ def describe_missing_integrity_check_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.MissingIntegrityCheckRule().run(graph_db)
+            results = MissingIntegrityCheckRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:4:19", f"{pb_path}:4:19")]
 
@@ -683,7 +683,7 @@ def describe_missing_integrity_check_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.MissingIntegrityCheckRule().run(graph_db)
+            results = MissingIntegrityCheckRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:4:19", f"{pb_path}:4:19")]
 
@@ -702,7 +702,7 @@ def describe_missing_integrity_check_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.MissingIntegrityCheckRule().run(graph_db)
+            results = MissingIntegrityCheckRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:4:17", f"{pb_path}:6:19")]
 
@@ -719,7 +719,24 @@ def describe_missing_integrity_check_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.MissingIntegrityCheckRule().run(graph_db)
+            results = MissingIntegrityCheckRule().run(graph_db)
+
+        assert not results
+
+    def does_not_match_inverted_enabled_gpgcheck(tmp_path: Path) -> None:
+        pb_path = tmp_path / "pb.yml"
+        write_pb(
+            """
+            - hosts: localhost
+              tasks:
+                - apt:
+                    name: test
+                    disablegpgcheck: no
+        """,
+            pb_path,
+        )
+        with temp_import_pb(pb_path) as graph_db:
+            results = MissingIntegrityCheckRule().run(graph_db)
 
         assert not results
 
@@ -736,7 +753,7 @@ def describe_missing_integrity_check_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.MissingIntegrityCheckRule().run(graph_db)
+            results = MissingIntegrityCheckRule().run(graph_db)
 
         assert not results
 
@@ -752,7 +769,7 @@ def describe_missing_integrity_check_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.MissingIntegrityCheckRule().run(graph_db)
+            results = MissingIntegrityCheckRule().run(graph_db)
 
         assert not results
 
@@ -776,7 +793,7 @@ def describe_unrestricted_ip_address_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.UnrestrictedIPAddressRule().run(graph_db)
+            results = UnrestrictedIPAddressRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:5:27", f"{pb_path}:4:19")]
 
@@ -794,7 +811,7 @@ def describe_unrestricted_ip_address_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.UnrestrictedIPAddressRule().run(graph_db)
+            results = UnrestrictedIPAddressRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:4:31", f"{pb_path}:6:19")]
 
@@ -812,7 +829,7 @@ def describe_unrestricted_ip_address_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.UnrestrictedIPAddressRule().run(graph_db)
+            results = UnrestrictedIPAddressRule().run(graph_db)
 
         assert not results
 
@@ -835,7 +852,7 @@ def describe_weak_crypto_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.WeakCryptoAlgorithmRule().run(graph_db)
+            results = WeakCryptoAlgorithmRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:6:31", f"{pb_path}:4:19")]
 
@@ -854,7 +871,7 @@ def describe_weak_crypto_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.WeakCryptoAlgorithmRule().run(graph_db)
+            results = WeakCryptoAlgorithmRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:4:32", f"{pb_path}:6:19")]
 
@@ -871,7 +888,7 @@ def describe_weak_crypto_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = rules.WeakCryptoAlgorithmRule().run(graph_db)
+            results = WeakCryptoAlgorithmRule().run(graph_db)
 
         assert results == [_result(f"{pb_path}:6:31", f"{pb_path}:4:19")]
 

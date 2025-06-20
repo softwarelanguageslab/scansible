@@ -1,14 +1,17 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar, NamedTuple, Sequence
+from typing import ClassVar, NamedTuple
 
 import abc
-import json
+from collections.abc import Mapping
+from textwrap import dedent
 
 from loguru import logger
+from pydantic import TypeAdapter
 
-from scansible.checks.security.db import GraphDatabase
 from scansible.representations.pdg.representation import NodeLocation
+
+from ..db import DatabaseResultConverter, DatabaseValue, GraphDatabase
 
 
 # TODO: Locations should use NodeLocation.
@@ -21,6 +24,18 @@ class RuleResult(NamedTuple):
     source_location: str | None
     #: Location in the code of the sink of the smell
     sink_location: str | None
+
+
+type RuleParameters = Mapping[str, DatabaseValue]
+type RuleQuery = tuple[str, RuleParameters]
+
+# Note: Cannot use `type` statements here as we need these as values.
+RuleQueryResult = tuple[int, int]
+LocationQueryResult = tuple[int]
+
+
+def _validate_query_result[T](result_type: type[T]) -> DatabaseResultConverter[T]:
+    return TypeAdapter(result_type).validate_python
 
 
 def _convert_location(loc: NodeLocation | None) -> str:
@@ -45,7 +60,7 @@ class Rule(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def query(self) -> tuple[str, dict[str, Any]]:
+    def query(self) -> RuleQuery:
         raise NotImplementedError("To be implemented by subclass")
 
     def _get_location(self, db: GraphDatabase, node_id: int) -> NodeLocation | None:
@@ -54,11 +69,10 @@ class Rule(abc.ABC):
         # Node may not have location information stored (e.g., scalar literals),
         # so get location of the node it is assigned to.
         while node_location is None or node_location.file == "unknown file":
-            assigned_nodes = list(
-                db.query(
-                    "MATCH (n) -[:e_Def|e_Keyword]->(n2) WHERE n.node_id = $node_id RETURN n2.node_id",
-                    parameters={"node_id": node_id},
-                )
+            assigned_nodes = db.query(
+                _validate_query_result(LocationQueryResult),
+                "MATCH (n) -[:e_Def|e_Keyword]->(n2) WHERE n.node_id = $node_id RETURN n2.node_id",
+                parameters={"node_id": node_id},
             )
 
             if not assigned_nodes:
@@ -79,7 +93,10 @@ class Rule(abc.ABC):
 
     def run(self, graph_db: GraphDatabase) -> list[RuleResult]:
         query, query_params = self.query
-        raw_results = graph_db.query(query, query_params)
+        query = dedent(query).strip()
+        raw_results = graph_db.query(
+            _validate_query_result(RuleQueryResult), query, query_params
+        )
 
         results: list[RuleResult] = []
         for source, sink in raw_results:

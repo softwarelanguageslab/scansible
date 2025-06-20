@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from .admin_by_default import AdminByDefaultRule
-from .base import Rule
+from .base import Rule as Rule
 from .base import RuleResult as RuleResult
 from .empty_password import EmptyPasswordRule
 from .hardcoded_secret import HardcodedSecretRule
