@@ -6,12 +6,14 @@ from typing import TYPE_CHECKING, Annotated, final, overload, override
 from typing import Literal as LiteralT
 
 import abc
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 
 from networkx.algorithms.dag import transitive_closure
 from networkx.classes import MultiDiGraph
 from networkx.classes.graphviews import subgraph_view
 from pydantic import BaseModel, Field, StringConstraints, field_validator
+
+from scansible.types import ScalarValue
 
 type ValidTypeStr = LiteralT[
     "str",
@@ -25,8 +27,6 @@ type ValidTypeStr = LiteralT[
     "date",
     "datetime",
 ]
-
-type Scalar = str | int | bool | float | None
 
 
 class _BaseRepresentation(BaseModel, strict=True, extra="forbid"):
@@ -104,7 +104,7 @@ class Literal(DataNode):
 
 
 class ScalarLiteral(Literal):
-    value: Scalar = Field(frozen=True)
+    value: ScalarValue = Field(frozen=True)
 
 
 class CompositeLiteral(Literal):
@@ -118,20 +118,18 @@ class Expression(DataNode):
     is_conditional: bool = Field(frozen=True, default=False)
     orig_expr: str = Field(frozen=True, default="")
 
-    impure_components: tuple[str, ...] = Field(frozen=True, default_factory=tuple)
+    impure_components: Sequence[str] = Field(frozen=True, default_factory=tuple)
 
     @property
     def is_pure(self) -> bool:
         return not self.impure_components
 
-    @field_validator("impure_components", mode="before")
+    @field_validator("impure_components", mode="after")
     @classmethod
-    def _convert_impure_components_list(cls, value: object) -> object:
+    def _convert_impure_components_list(cls, value: Sequence[str]) -> tuple[str, ...]:
         # Needs to be a tuple for hashing, but when deserialising it could be
         # provided as a list (e.g., in the GraphML deserialiser or from JSON).
-        if isinstance(value, list):
-            return tuple(value)
-        return value
+        return tuple(value)
 
 
 class Edge(abc.ABC, _FrozenRepresentation, frozen=True):
