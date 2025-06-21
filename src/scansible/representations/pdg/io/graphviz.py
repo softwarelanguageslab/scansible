@@ -104,9 +104,9 @@ def dump_graph(g: rep.Graph) -> gv.Digraph:
     dot = gv.Digraph()
     dot.attr("node", fontname="Courier")
 
-    for n in g:
+    for n in g.nodes:
         dump_node(n, dot)
-    for src, target, e in g.edges(data=True):
-        dump_edge(e["type"], src, target, dot)
+    for src, target, edge in g.edges:
+        dump_edge(edge, src, target, dot)
 
     return dot

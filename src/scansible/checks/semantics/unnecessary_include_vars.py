@@ -18,20 +18,18 @@ from .utils import (
     find_variable_usages,
     get_def_conditions,
     get_def_expression,
-    get_node_predecessors,
-    get_nodes,
     get_used_variables,
 )
 
 
 def get_var_origin(graph: Graph, node: Variable) -> Expression | Literal | Task | None:
-    def_tasks = get_node_predecessors(graph, node, node_type=Task, edge_type=Def)
+    def_tasks = graph.get_predecessors(node, node_type=Task, edge_type=Def)
     if def_tasks:
         # register, not set_fact. For register, it's possible for the variable
         # to have multiple DEFs (e.g. task itself and loop)
         return def_tasks[0]
 
-    def_literal = get_node_predecessors(graph, node, node_type=Literal, edge_type=Def)
+    def_literal = graph.get_predecessors(node, node_type=Literal, edge_type=Def)
     if def_literal:
         assert len(def_literal) == 1, (
             f"Expected {node!r} to be defined by one literal, found {len(def_literal)}"
@@ -71,7 +69,7 @@ class UnnecessaryIncludeVarsRule(Rule):
     def scan(self, graph: Graph, visinfo: VisibilityInformation) -> list[RuleResult]:
         included_vars = [
             node
-            for node in get_nodes(graph, Variable)
+            for node in graph.get_nodes(Variable)
             if node.scope_level == EnvironmentType.INCLUDE_VARS.value
         ]
         # Group into unique definitions so we only emit a warning for the first value version

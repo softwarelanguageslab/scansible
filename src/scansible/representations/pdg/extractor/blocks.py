@@ -93,13 +93,10 @@ class BlockExtractor:
                 if not isinstance(ctrl_node, rep.Task):
                     continue
 
-                in_edges = self.context.graph.in_edges(ctrl_node, data="type")
-                has_overridden_kw = any(
-                    in_edge.keyword == misc_kw
-                    for _, _, in_edge in in_edges
-                    if isinstance(in_edge, rep.Keyword)
-                )
-                if has_overridden_kw:
+                # Don't add inherited keywords if the child overrides it.
+                if self.context.graph.has_predecessor(
+                    ctrl_node, edge=rep.Keyword(keyword=misc_kw)
+                ):
                     continue
 
                 try:

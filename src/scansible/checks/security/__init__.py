@@ -20,7 +20,7 @@ def run_checks(pdg: Graph, rules: list[Rule]) -> list[RuleResult]:
     results: list[RuleResult] = []
     with GraphDatabase(pdg) as db_graph:
         logger.info(
-            f"Imported graph of {len(pdg)} nodes and {len(pdg.edges())} edges in {(datetime.now() - start_time).total_seconds():.2f}s"
+            f"Imported graph of {pdg.num_nodes} nodes and {pdg.num_edges} edges in {(datetime.now() - start_time).total_seconds():.2f}s"
         )
         prev_time = datetime.now()
         for rule in rules:

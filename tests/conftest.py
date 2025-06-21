@@ -33,5 +33,5 @@ def pytest_collection_modifyitems(config: Any, items: Any) -> None:
 @pytest.fixture()
 def g() -> Graph:
     g = create_graph({}, [])
-    assert len(g) == 0
+    assert g.num_nodes == 0
     return g

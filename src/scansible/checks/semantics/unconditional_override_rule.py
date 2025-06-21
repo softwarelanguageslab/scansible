@@ -13,7 +13,6 @@ from .utils import (
     get_all_used_variables,
     get_def_conditions,
     get_def_expression,
-    get_nodes,
     get_register_all_used_variables,
     is_registered_variable,
     register_task_has_conditions,
@@ -30,7 +29,7 @@ class UnconditionalOverrideRule(Rule):
     """
 
     def scan(self, graph: Graph, visinfo: VisibilityInformation) -> list[RuleResult]:
-        var_nodes = get_nodes(graph, Variable)
+        var_nodes = graph.get_nodes(Variable)
 
         # Grouping. We need the different values to find usages for reporting
         var_name_to_vars: dict[str, dict[int, list[Variable]]] = defaultdict(

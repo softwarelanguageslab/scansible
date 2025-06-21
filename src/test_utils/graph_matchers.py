@@ -2,52 +2,39 @@
 
 from __future__ import annotations
 
-from typing import Any, Iterable
-
 import operator
+from collections.abc import Iterable
 
 from scansible.representations.pdg import Edge, Graph, IntermediateValue, Node
 
 
-def _get_in_out_neighbours(g: Graph, n: Node) -> set[Node]:
-    return set(g.predecessors(n)) | set(g.successors(n))
-
-
 def _match_node(n1: Node, n2: Node, match_locations: bool) -> bool:
-    ignored_kws = ("node_id",) if match_locations else ("node_id", "location")
+    ignored_kws = {"node_id"} if match_locations else {"node_id", "location"}
 
-    def to_dict(n: Node) -> dict[str, Any]:
-        return {k: v for k, v in n if k not in ignored_kws}
-
-    return type(n1) == type(n2) and (
-        not isinstance(n1, IntermediateValue) and to_dict(n1) == to_dict(n2)
+    return type(n1) is type(n2) and (
+        not isinstance(n1, IntermediateValue)
+        and n1.model_dump(exclude=ignored_kws) == n2.model_dump(exclude=ignored_kws)
     )
-
-
-def get_graph_kws(g: Graph, ignore: set[str]) -> dict[str, Any]:
-    return {k: v for k, v in g.graph.items() if k not in ignore}
 
 
 def assert_graphs_match(
     g1: Graph,
     g2: Graph,
     *,
-    ignore_graph_kws: set[str] | None = None,
     match_locations: bool = False,
 ) -> None:
     __tracebackhide__ = True
 
-    if ignore_graph_kws is None:
-        ignore_graph_kws = set()
-
-    if get_graph_kws(g1, ignore_graph_kws) != get_graph_kws(g2, ignore_graph_kws):
-        raise AssertionError(
-            f"Mismatching graph attributes: Expected {g2.graph}, got {g1.graph}"
-        )
+    assert g1.role_name == g2.role_name, (
+        f"Mismatching role name: Expected {g2.role_name}, got {g1.role_name}"
+    )
+    assert g1.role_version == g2.role_version, (
+        f"Mismatching role version: Expected {g2.role_version}, got {g1.role_version}"
+    )
 
     # Compare nodes
-    nodes1 = set(g1)
-    nodes2 = set(g2)
+    nodes1 = set(g1.nodes)
+    nodes2 = set(g2.nodes)
     correspondences: dict[Node, Node] = {}
     for n1 in sorted(nodes1, key=operator.attrgetter("node_id")):
         if isinstance(n1, IntermediateValue):
@@ -65,34 +52,38 @@ def assert_graphs_match(
         if not isinstance(n2, IntermediateValue):
             raise AssertionError(f"Missing node {n2!r} in first graph")
 
-    # Construct correspondences between intermediate values
+    # Construct correspondences between intermediate values.
+    # For every n1 in g1, find a node n2 in g2 whose neighbours all correspond
+    # to n1's neighbors.
     for n1 in nodes1:
         if n1 in correspondences:
             continue
         assert isinstance(n1, IntermediateValue), "Only IVs expected here"
-        connected_nodes = _get_in_out_neighbours(g1, n1)
+        n1_neighbors = g1.get_neighbors(n1)
 
-        if not connected_nodes:
+        if not n1_neighbors:
             raise AssertionError(
                 "Disconnected intermediate value in first graph. Cannot handle that"
             )
 
-        if any(isinstance(cn, IntermediateValue) for cn in connected_nodes):
+        if any(isinstance(cn, IntermediateValue) for cn in n1_neighbors):
             raise AssertionError(
                 f"Chain of intermediate values with {n1!r} in first graph. Cannot handle those."
             )
 
-        conn_in_g2 = {correspondences[cn] for cn in connected_nodes}
-        assert len(conn_in_g2) == len(connected_nodes)
+        # Map n1's neighbors to the corresponding nodes in g2.
+        n1_neighbors_in_g2 = {correspondences[cn] for cn in n1_neighbors}
+        assert len(n1_neighbors_in_g2) == len(n1_neighbors)
 
-        candidates = [
-            cand for cn2 in conn_in_g2 for cand in _get_in_out_neighbours(g2, cn2)
+        # All candidate n2s, which are all neighbors of the n1's neighbors mapped in g2.
+        n2_candidates = [
+            cand for cn2 in n1_neighbors_in_g2 for cand in g2.get_neighbors(cn2)
         ]
         found = False
-        for cand in candidates:
+        for cand in n2_candidates:
             if not isinstance(cand, IntermediateValue):
                 continue
-            if _get_in_out_neighbours(g2, cand) == conn_in_g2 and cand in nodes2:
+            if set(g2.get_neighbors(cand)) == n1_neighbors_in_g2 and cand in nodes2:
                 if found:
                     raise AssertionError(
                         "Multiple intermediate values between same nodes. Cannot handle that."
@@ -103,34 +94,29 @@ def assert_graphs_match(
                 break
         else:
             raise AssertionError(
-                f"Unexpected intermediate value {n1!r} of first graph (connected to {connected_nodes}"
+                f"Unexpected intermediate value {n1!r} of first graph (connected to {n1_neighbors}"
             )
 
     for n2 in nodes2:
         raise AssertionError(f"Missing intermediate value {n2!r} in first graph")
 
     # Compare edges
-    edges1 = set(g1.edges())
-    edges2 = set(g2.edges())
-    for e1 in edges1:
-        e2 = (correspondences[e1[0]], correspondences[e1[1]])
+    edges1 = set(g1.edges)
+    edges2 = set(g2.edges)
+    for e1_src, e1_target, e1_edge in edges1:
+        e2 = (correspondences[e1_src], correspondences[e1_target], e1_edge)
 
         if e2 not in edges2:
             raise AssertionError(
-                f"Unexpected edge {e1[0]!r} -> {e1[1]!r} in first graph"
+                f"Unexpected edge {e1_src!r} -[{e1_edge}]-> {e1_target!r} in first graph"
             )
 
         edges2.remove(e2)
 
-        d1 = g1[e1[0]][e1[1]]
-        d2 = g2[e2[0]][e2[1]]
-        if d1 != d2:
-            raise AssertionError(
-                f"Mismatch in edge data for {e2[0]!r} -> {e2[1]!r}: Expected {d2}, got {d1}"
-            )
-
-    for e2 in edges2:
-        raise AssertionError(f"Missing edge {e2[0]!r} -> {e2[1]!r} in first graph")
+    for e2_src, e2_target, e2_edge in edges2:
+        raise AssertionError(
+            f"Missing edge {e2_src!r} -[{e2_edge}]-> {e2_target!r} in first graph"
+        )
 
 
 NodeSpecs = dict[str, Node]
@@ -144,7 +130,7 @@ def create_graph(
     role_version: str = "test_version",
 ) -> Graph:
     g = Graph(role_name=role_name, role_version=role_version)
-    g.add_nodes_from(nodes.values())
+    g.add_nodes(nodes.values())
     for src, target, edge in edges:
         g.add_edge(nodes[src], nodes[target], edge)
     return g

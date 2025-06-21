@@ -23,7 +23,6 @@ def extract_pdg(
     *,
     as_pb: bool | None = None,
     lenient: bool = True,
-    construct_transitive_cfg: bool = False,
 ) -> ExtractionContext:
     """
     Extract a PDG for a project at a given path.
@@ -44,10 +43,6 @@ def extract_pdg(
     :param      lenient:                   Whether the extraction should be
                                            lenient.
     :type       lenient:                   bool
-    :param      construct_transitive_cfg:  Whether to construct a transitive
-                                           closure of the CFG and add it to the
-                                           graph.
-    :type       construct_transitive_cfg:  bool
 
     :returns:   The extraction context resulting from extraction.
     :rtype:     ExtractionContext
@@ -62,9 +57,7 @@ def extract_pdg(
             path, project_id, project_rev, lenient=lenient, extract_all=False
         )
 
-    return StructuralGraphExtractor(
-        model, role_search_paths, lenient, construct_transitive_cfg
-    ).extract()
+    return StructuralGraphExtractor(model, role_search_paths, lenient).extract()
 
 
 def _project_is_role(path: Path) -> bool:
@@ -86,10 +79,8 @@ class StructuralGraphExtractor:
         model: struct.StructuralModel,
         role_search_paths: Sequence[Path],
         lenient: bool,
-        construct_cfg_closure: bool = False,
     ) -> None:
         self.model = model
-        self.construct_cfg_closure = construct_cfg_closure
         graph = rep.Graph(model.id, model.version)
         for logstr in model.logs:
             logger.debug(logstr)
@@ -116,9 +107,6 @@ class StructuralGraphExtractor:
             self._extract_role()
 
         logger.remove(log_handle)
-
-        if self.construct_cfg_closure:
-            self.context.graph.construct_cfg_closure()
 
         return self.context
 

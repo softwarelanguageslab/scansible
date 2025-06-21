@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, TypeGuard, TypeVar, cast
+from typing import Any, TypeGuard, cast
 
 import copy
 import re
@@ -12,7 +12,6 @@ from jinja2 import nodes as jnodes
 from jinja2.visitor import NodeVisitor
 from loguru import logger
 
-from scansible.utils import first
 from scansible.utils.module_type_info import ModuleInfo, ModuleKnowledgeBase, OptionInfo
 from scansible.utils.type_validators import ensure_not_none
 
@@ -29,7 +28,6 @@ from .representation import (
     ControlFlowEdge,
     Def,
     DefLoopItem,
-    Edge,
     Expression,
     Graph,
     Input,
@@ -40,6 +38,7 @@ from .representation import (
     Task,
     Variable,
 )
+from .representation import Literal as LiteralNode
 
 
 def canonicalize_pdg(pdg: Graph, module_kb: ModuleKnowledgeBase) -> Graph:
@@ -63,10 +62,7 @@ def _keyword_to_option_name(keyword: str) -> str:
 
 
 def _qualify_module_names(pdg: Graph, module_kb: ModuleKnowledgeBase) -> None:
-    for node in list(pdg.nodes()):
-        if not isinstance(node, Task):
-            continue
-
+    for node in pdg.get_nodes(Task):
         if module_kb.is_qualified_module_name(node.action):
             continue
 
@@ -78,8 +74,7 @@ def _qualify_module_names(pdg: Graph, module_kb: ModuleKnowledgeBase) -> None:
         if len(qualnames) > 1:
             used_options = [
                 _keyword_to_option_name(edge.keyword)
-                for _, _, edge in pdg.in_edges(node, data="type")
-                if isinstance(edge, Keyword)
+                for edge, _ in pdg.get_in_edges(node, edge_type=Keyword)
             ]
             qualnames = module_kb.get_best_matching_qualname(node.action, used_options)
 
@@ -89,25 +84,20 @@ def _qualify_module_names(pdg: Graph, module_kb: ModuleKnowledgeBase) -> None:
             )
             continue
 
-        _replace_node(
-            pdg, node, Task(action=qualnames[0], name=node.name, location=node.location)
+        pdg.replace_node(
+            node, Task(action=qualnames[0], name=node.name, location=node.location)
         )
 
 
 def _normalize_keyword_aliases(pdg: Graph, module_kb: ModuleKnowledgeBase) -> None:
-    for node in list(pdg.nodes()):
-        if not isinstance(node, Task):
-            continue
-
+    for node in pdg.get_nodes(Task):
         module = module_kb.modules.get(node.action)
         if module is None:
             logger.warning(f"Could not resolve module {node.action!r}")
             continue
 
-        for src_node, _, kw_edge in list(pdg.in_edges(node, data="type")):
-            if not isinstance(kw_edge, Keyword) or not kw_edge.keyword.startswith(
-                "args."
-            ):
+        for kw_edge, src_node in pdg.get_in_edges(node, edge_type=Keyword):
+            if not kw_edge.keyword.startswith("args."):
                 continue
 
             option_name = _keyword_to_option_name(kw_edge.keyword)
@@ -122,8 +112,8 @@ def _normalize_keyword_aliases(pdg: Graph, module_kb: ModuleKnowledgeBase) -> No
             logger.info(
                 f"Normalizing {node.action}'s {option_name} to {canonical_name}"
             )
-            _replace_edge(
-                pdg, src_node, node, kw_edge, Keyword(keyword=f"args.{canonical_name}")
+            pdg.replace_edge(
+                src_node, node, kw_edge, Keyword(keyword=f"args.{canonical_name}")
             )
 
 
@@ -141,14 +131,12 @@ def _simplify_dataflow(pdg: Graph) -> None:
 
 
 def _propagate_constants(pdg: Graph) -> None:
-    for node in list(pdg.nodes()):
-        if not isinstance(node, (ScalarLiteral, CompositeLiteral)):
-            continue
+    for node in pdg.get_nodes(LiteralNode):
         _propagate_constant(pdg, node)
 
 
-def _propagate_constant(pdg: Graph, lit: ScalarLiteral | CompositeLiteral) -> None:
-    for _, target_node, edge in list(pdg.out_edges(lit, data="type")):
+def _propagate_constant(pdg: Graph, lit: LiteralNode) -> None:
+    for edge, target_node in pdg.get_out_edges(lit):
         if isinstance(edge, Keyword):
             assert isinstance(target_node, Task)
             continue
@@ -170,15 +158,12 @@ def _propagate_constant(pdg: Graph, lit: ScalarLiteral | CompositeLiteral) -> No
 
         # Replace (lit)-[DEF]->(var) with just (lit)
         # and thus also (lit)-[DEF]->(var)-[INPUT:_1]->(expr) to (lit)-[INPUT:_1]->(expr)
-        _remove_edge(pdg, lit, target_node, edge)
-        _replace_node(pdg, target_node, lit)
+        pdg.remove_edge(lit, target_node, edge)
+        pdg.replace_node(target_node, lit)
 
 
 def _inline_constants_into_expressions(pdg: Graph) -> None:
-    for node in list(pdg.nodes()):
-        if not isinstance(node, Expression):
-            continue
-
+    for node in pdg.get_nodes(Expression):
         try:
             _inline_constants_into_expression(pdg, node)
         except TemplateSyntaxError:
@@ -209,18 +194,16 @@ def _replace_simple_reference(
 ) -> None:
     assert len(inputs) == 1 and 1 in inputs
     new_in_edges = [
-        (src_node, edge)
-        for src_node, _, edge in pdg.in_edges(node, "type")
+        (edge, src_node)
+        for edge, src_node in pdg.get_in_edges(node)
         if not isinstance(edge, Input)
     ]
-    new_out_edges = [
-        (target_node, edge) for _, target_node, edge in pdg.out_edges(node, "type")
-    ]
+    new_out_edges = pdg.get_out_edges(node)
 
     for replacement in inputs[1]:
-        for new_src, new_edge in new_in_edges:
+        for new_edge, new_src in new_in_edges:
             pdg.add_edge(new_src, replacement, new_edge)
-        for new_target, new_edge in new_out_edges:
+        for new_edge, new_target in new_out_edges:
             pdg.add_edge(replacement, new_target, new_edge)
 
     pdg.remove_node(node)
@@ -228,9 +211,7 @@ def _replace_simple_reference(
 
 def _inline_constants_into_expression(pdg: Graph, expr_node: Expression) -> None:
     inputs: dict[int, list[Node]] = defaultdict(list)
-    for src_node, _, in_edge in pdg.in_edges(expr_node, "type"):
-        if not isinstance(in_edge, Input):
-            continue
+    for in_edge, src_node in pdg.get_in_edges(expr_node, edge_type=Input):
         inputs[in_edge.param_idx].append(src_node)
 
     ast = _parse_ast(expr_node)
@@ -246,14 +227,11 @@ def _inline_constants_into_expression(pdg: Graph, expr_node: Expression) -> None
             continue
 
         new_in_edges = [
-            (src_node, edge)
-            for src_node, _, edge in pdg.in_edges(expr_node, "type")
+            (edge, src_node)
+            for edge, src_node in pdg.get_in_edges(expr_node)
             if not (isinstance(edge, Input) and edge.param_idx == param_idx)
         ]
-        new_out_edges = [
-            (target_node, edge)
-            for _, target_node, edge in pdg.out_edges(expr_node, "type")
-        ]
+        new_out_edges = pdg.get_out_edges(expr_node)
 
         for lit_node in possible_values:
             assert isinstance(lit_node, ScalarLiteral)
@@ -265,11 +243,11 @@ def _inline_constants_into_expression(pdg: Graph, expr_node: Expression) -> None
                 ),
             )
             pdg.add_node(new_node)
-            for new_src, new_edge in new_in_edges:
+            for new_edge, new_src in new_in_edges:
                 pdg.add_edge(new_src, new_node, new_edge)
-            for new_src, _, new_edge in pdg.in_edges(lit_node, "type"):
+            for new_edge, new_src in pdg.get_in_edges(lit_node):
                 pdg.add_edge(new_src, new_node, new_edge)
-            for new_target, new_edge in new_out_edges:
+            for new_edge, new_target in new_out_edges:
                 pdg.add_edge(new_node, new_target, new_edge)
 
         pdg.remove_node(expr_node)
@@ -313,10 +291,7 @@ def _parse_ast(node: Expression) -> jnodes.Node:
 
 
 def _simplify_expressions(pdg: Graph) -> None:
-    for node in list(pdg.nodes()):
-        if not isinstance(node, Expression):
-            continue
-
+    for node in pdg.get_nodes(Expression):
         ast = _parse_ast(node)
         if _is_simple_expression(ast):
             assert isinstance(ast.body[0], jnodes.Output)
@@ -327,29 +302,25 @@ def _simplify_expressions(pdg: Graph) -> None:
 
         if new_expr != node.expr:
             new_node = copy.replace(node, expr=new_expr)
-            _replace_node(pdg, node, new_node)
+            pdg.replace_node(node, new_node)
             node = new_node
 
         _shift_input_indices(pdg, node)
 
 
 def _shift_input_indices(pdg: Graph, expr_node: Expression) -> None:
-    input_edges = [
-        (src_node, in_edge)
-        for src_node, _, in_edge in pdg.in_edges(expr_node, "type")
-        if isinstance(in_edge, Input)
-    ]
+    input_edges = pdg.get_in_edges(expr_node, edge_type=Input)
 
     new_idx = 1
     idx_mappings: dict[int, int] = {}
-    for old_idx in sorted(set(edge.param_idx for _, edge in input_edges)):
+    for old_idx in sorted(set(edge.param_idx for edge, _ in input_edges)):
         idx_mappings[old_idx] = new_idx
         new_idx += 1
 
-    for src_node, edge in input_edges:
+    for edge, src_node in input_edges:
         new_idx = idx_mappings[edge.param_idx]
         if new_idx != edge.param_idx:
-            _replace_edge(pdg, src_node, expr_node, edge, Input(param_idx=new_idx))
+            pdg.replace_edge(src_node, expr_node, edge, Input(param_idx=new_idx))
 
     ast = _parse_ast(expr_node)
 
@@ -370,7 +341,7 @@ def _shift_input_indices(pdg: Graph, expr_node: Expression) -> None:
     new_expr = ASTStringifier().stringify(ast, expr_node.is_conditional)
     if new_expr != expr_node.expr:
         new_node = copy.replace(expr_node, expr=new_expr)
-        _replace_node(pdg, expr_node, new_node)
+        pdg.replace_node(expr_node, new_node)
 
 
 def _convert_top_level_const_to_templatedata(ast: jnodes.Output) -> None:
@@ -403,10 +374,7 @@ def _fix_escaped_templatedata(nodes: list[jnodes.Expr]) -> list[jnodes.Expr]:
 
 
 def _replace_constant_expressions(pdg: Graph) -> None:
-    for node in list(pdg.nodes()):
-        if not isinstance(node, Expression):
-            continue
-
+    for node in pdg.get_nodes(Expression):
         ast = _parse_ast(node)
         if isinstance(ast, jnodes.Const):
             lit_node = ScalarLiteral(type=extract_type_name(ast.value), value=ast.value)
@@ -425,11 +393,11 @@ def _replace_constant_expressions(pdg: Graph) -> None:
         else:
             continue
 
-        _replace_node(pdg, node, lit_node)
+        pdg.replace_node(node, lit_node)
 
 
 def _normalize_data_types(pdg: Graph, module_kb: ModuleKnowledgeBase) -> None:
-    tasks = [node for node in pdg.nodes() if isinstance(node, Task)]
+    tasks = pdg.get_nodes(Task)
     for task in tasks:
         module_info = module_kb.modules.get(task.action)
         if module_info is not None:
@@ -437,8 +405,7 @@ def _normalize_data_types(pdg: Graph, module_kb: ModuleKnowledgeBase) -> None:
 
 
 def _coerce_params(pdg: Graph, task: Task, module_info: ModuleInfo) -> None:
-    inputs = [(src_node, edge) for src_node, _, edge in pdg.in_edges(task, "type")]
-    for input_node, input_edge in inputs:
+    for input_edge, input_node in pdg.get_in_edges(task):
         if not isinstance(input_edge, Keyword) or not isinstance(
             input_node, ScalarLiteral
         ):
@@ -480,10 +447,10 @@ def _coerce_param(
     )
     new_node = _create_literal_node(pdg, validated_value)
 
-    for src_node, _, in_edge in pdg.in_edges(lit, "type"):
+    for in_edge, src_node in pdg.get_in_edges(lit):
         pdg.add_edge(src_node, new_node, in_edge)
     pdg.add_edge(new_node, task, kw)
-    _remove_edge(pdg, lit, task, kw)
+    pdg.remove_edge(lit, task, kw)
 
 
 def _create_literal_node(pdg: Graph, value: Any) -> ScalarLiteral | CompositeLiteral:
@@ -508,53 +475,12 @@ def _create_literal_node(pdg: Graph, value: Any) -> ScalarLiteral | CompositeLit
 
 
 def _remove_unused_subgraphs(pdg: Graph) -> None:
-    old_num_nodes = len(pdg) + 1
+    old_num_nodes = pdg.num_nodes + 1
 
-    while len(pdg) != old_num_nodes:
-        old_num_nodes = len(pdg)
-        for node in list(pdg.nodes()):
+    while pdg.num_nodes != old_num_nodes:
+        old_num_nodes = pdg.num_nodes
+        for node in list(pdg.nodes):
             if isinstance(node, Task):
                 continue
-            if not pdg.out_edges(node):
+            if not pdg.has_successor(node):
                 pdg.remove_node(node)
-
-
-_NodeType = TypeVar("_NodeType", bound=Node)
-_EdgeType = TypeVar("_EdgeType", bound=Edge)
-
-
-def _replace_node(pdg: Graph, node: _NodeType, new_node: _NodeType) -> None:
-    in_edges = pdg.in_edges(node, data="type")
-    out_edges = pdg.out_edges(node, data="type")
-
-    pdg.add_node(new_node)
-
-    for source, _, in_edge in in_edges:
-        pdg.add_edge(source, new_node, in_edge)
-    for _, target, out_edge in out_edges:
-        pdg.add_edge(new_node, target, out_edge)
-
-    pdg.remove_node(node)
-
-
-def _remove_edge(pdg: Graph, src_node: Node, target_node: Node, edge: Edge) -> None:
-    edge_keys = ensure_not_none(pdg.get_edge_data(src_node, target_node))
-    edge_key = ensure_not_none(
-        first(
-            edge_idx
-            for edge_idx, edge_data in edge_keys.items()
-            if edge_data["type"] == edge
-        )
-    )
-    pdg.remove_edge(src_node, target_node, key=edge_key)
-
-
-def _replace_edge(
-    pdg: Graph,
-    src_node: Node,
-    target_node: Node,
-    orig_edge: _EdgeType,
-    new_edge: _EdgeType,
-) -> None:
-    _remove_edge(pdg, src_node, target_node, orig_edge)
-    pdg.add_edge(src_node, target_node, new_edge)

@@ -8,7 +8,7 @@ from scansible.representations.pdg.extractor.expressions import EnvironmentType
 from scansible.representations.pdg.representation import Graph, Variable
 
 from .base import Rule, RuleResult
-from .utils import find_variable_usages, get_nodes
+from .utils import find_variable_usages
 
 
 class UnusedOverriddenRule(Rule):
@@ -20,7 +20,7 @@ class UnusedOverriddenRule(Rule):
     """
 
     def scan(self, graph: Graph, visinfo: VisibilityInformation) -> list[RuleResult]:
-        var_nodes = get_nodes(graph, Variable)
+        var_nodes = graph.get_nodes(Variable)
 
         # Grouping. We need the different values to find usages for reporting
         var_name_to_vars: dict[str, dict[int, list[Variable]]] = defaultdict(

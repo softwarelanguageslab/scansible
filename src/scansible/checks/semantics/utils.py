@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Type, TypeVar
-
 from enum import Enum
 
 from scansible.representations.pdg.extractor.expressions import EnvironmentType
@@ -9,58 +7,15 @@ from scansible.representations.pdg.representation import (
     ControlNode,
     DataFlowEdge,
     Def,
-    Edge,
     Expression,
     Graph,
     IntermediateValue,
     Literal,
-    Node,
     Task,
     Use,
     Variable,
     When,
 )
-
-NodeT = TypeVar("NodeT", bound=Node)
-EdgeT = TypeVar("EdgeT", bound=Edge)
-
-
-def get_nodes(graph: Graph, node_type: Type[NodeT]) -> list[NodeT]:
-    return [node for node in graph if isinstance(node, node_type)]
-
-
-def get_edges(graph: Graph, source: Node, target: Node) -> list[Edge]:
-    return [edge["type"] for edge in graph[source][target].values()]
-
-
-def get_edges_of_type(
-    graph: Graph, source: Node, target: Node, edge_type: Type[EdgeT]
-) -> list[EdgeT]:
-    return [
-        edge for edge in get_edges(graph, source, target) if isinstance(edge, edge_type)
-    ]
-
-
-def get_node_predecessors(
-    graph: Graph, node: Node, *, node_type: Type[NodeT], edge_type: Type[EdgeT]
-) -> list[NodeT]:
-    return [
-        pred
-        for pred in graph.predecessors(node)
-        if isinstance(pred, node_type)
-        and bool(get_edges_of_type(graph, pred, node, edge_type))
-    ]
-
-
-def get_node_successors(
-    graph: Graph, node: Node, node_type: Type[NodeT], edge_type: Type[EdgeT]
-) -> list[NodeT]:
-    return [
-        succ
-        for succ in graph.successors(node)
-        if isinstance(succ, node_type)
-        and bool(get_edges_of_type(graph, node, succ, edge_type))
-    ]
 
 
 def get_def_expression(
@@ -70,15 +25,11 @@ def get_def_expression(
         def_iv = node
     else:
         # Need to follow intermediate value first
-        pred_ivs = get_node_predecessors(
-            graph, node, node_type=IntermediateValue, edge_type=Def
+        pred_ivs = graph.get_predecessors(
+            node, node_type=IntermediateValue, edge_type=Def
         )
         num_pred_ivs = len(pred_ivs)
-        num_succ_ivs = len(
-            get_node_successors(
-                graph, node, node_type=IntermediateValue, edge_type=Edge
-            )
-        )
+        num_succ_ivs = len(graph.get_successors(node, node_type=IntermediateValue))
         assert num_succ_ivs <= 1, (
             f"Expected {node!r} to define at most one intermediate value, but found {num_succ_ivs}"
         )
@@ -93,9 +44,7 @@ def get_def_expression(
 
         def_iv = pred_ivs[0]
 
-    def_exprs = get_node_predecessors(
-        graph, def_iv, node_type=Expression, edge_type=Def
-    )
+    def_exprs = graph.get_predecessors(def_iv, node_type=Expression, edge_type=Def)
     num_def_exprs = len(def_exprs)
     assert num_def_exprs == 1, (
         f"Expected intermediate value defining {def_iv!r} to be defined by exactly one expression, but found {num_def_exprs}"
@@ -104,9 +53,7 @@ def get_def_expression(
 
 
 def get_def_conditions(graph: Graph, v: Variable) -> list[Expression]:
-    conditional_data_nodes = get_node_predecessors(
-        graph, v, node_type=Node, edge_type=When
-    )
+    conditional_data_nodes = graph.get_predecessors(v, edge_type=When)
 
     cond_exprs: list[Expression] = []
     for civ in conditional_data_nodes:
@@ -125,7 +72,7 @@ def get_def_conditions(graph: Graph, v: Variable) -> list[Expression]:
 
 
 def get_used_variables(graph: Graph, expr: Expression) -> list[Variable]:
-    usages = get_node_predecessors(graph, expr, node_type=Node, edge_type=Use)
+    usages = graph.get_predecessors(expr, edge_type=Use)
     usages_cleaned: list[Variable] = []
     for usage in usages:
         assert isinstance(usage, Variable), (
@@ -154,12 +101,12 @@ def get_all_used_variables(graph: Graph, expr: Expression) -> list[Variable]:
 
 def get_register_all_used_variables(graph: Graph, var: Variable) -> list[Variable]:
     """Like above, but for variables defined through register."""
-    def_nodes = get_node_predecessors(graph, var, node_type=ControlNode, edge_type=Def)
+    def_nodes = graph.get_predecessors(var, node_type=ControlNode, edge_type=Def)
     usages: list[Variable] = []
 
     for def_node in def_nodes:
-        used_ivs = get_node_predecessors(
-            graph, def_node, node_type=IntermediateValue, edge_type=Use
+        used_ivs = graph.get_predecessors(
+            def_node, node_type=IntermediateValue, edge_type=Use
         )
         for used_iv in used_ivs:
             expr = get_def_expression(graph, used_iv)
@@ -171,18 +118,18 @@ def get_register_all_used_variables(graph: Graph, var: Variable) -> list[Variabl
 
 def is_registered_variable(graph: Graph, var: Variable) -> bool:
     return var.scope_level == EnvironmentType.SET_FACTS_REGISTERED.value and bool(
-        get_node_predecessors(graph, var, node_type=Task, edge_type=Def)
+        graph.get_predecessors(var, node_type=Task, edge_type=Def)
     )
 
 
 def register_task_has_conditions(graph: Graph, var: Variable) -> bool:
-    task_nodes = get_node_predecessors(graph, var, node_type=Task, edge_type=Def)
+    task_nodes = graph.get_predecessors(var, node_type=Task, edge_type=Def)
     assert len(task_nodes) == 1, (
         f"Internal Error: Expected one task node found for registered variable {var!r}, found {len(task_nodes)}"
     )
     task_node = task_nodes[0]
 
-    return bool(get_node_predecessors(graph, task_node, node_type=Node, edge_type=When))
+    return bool(graph.get_predecessors(task_node, edge_type=When))
 
 
 class ValueChangeReason(Enum):
@@ -252,26 +199,26 @@ def determine_value_version_change_reason(
 def find_variable_usages(
     graph: Graph, variable: Variable, indirection_chain: list[str] | None = None
 ) -> set[str]:
-    usages = get_node_successors(graph, variable, node_type=Expression, edge_type=Use)
+    usages = graph.get_successors(variable, node_type=Expression, edge_type=Use)
     if not usages:
-        assert not list(graph.successors(variable)), (
+        assert not graph.has_successor(variable), (
             f"Variable {variable!r} has successors but is not used in any expression"
         )
 
     usage_descriptions: set[str] = set()
     for usage in usages:
-        expr_ivs = get_node_successors(
-            graph, usage, node_type=IntermediateValue, edge_type=Def
+        expr_ivs = graph.get_successors(
+            usage, node_type=IntermediateValue, edge_type=Def
         )
         assert len(expr_ivs) >= 1, (
             f"Variable {variable!r} is used in expression without defined intermediate values"
         )
         for iv in expr_ivs:
-            control_usages = get_node_successors(
-                graph, iv, node_type=ControlNode, edge_type=DataFlowEdge
+            control_usages = graph.get_successors(
+                iv, node_type=ControlNode, edge_type=DataFlowEdge
             )
-            indirect_usages = get_node_successors(
-                graph, iv, node_type=Variable, edge_type=Def
+            indirect_usages = graph.get_successors(
+                iv, node_type=Variable, edge_type=Def
             )
 
             for control_usage in control_usages:

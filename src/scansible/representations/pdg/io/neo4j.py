@@ -57,10 +57,8 @@ def dump_edge(e: rep.Edge, source: rep.Node, target: rep.Node) -> str:
 
 
 def dump_graph(g: rep.Graph) -> str:
-    node_strs = [dump_node(n, g) for n in g]
-    edge_strs = [
-        dump_edge(e["type"], src, target) for (src, target, e) in g.edges(data=True)
-    ]
+    node_strs = [dump_node(n, g) for n in g.nodes]
+    edge_strs = [dump_edge(edge, src, target) for (src, target, edge) in g.edges]
 
     query = ", \n".join([s for s in node_strs + edge_strs if s])
     if not query:

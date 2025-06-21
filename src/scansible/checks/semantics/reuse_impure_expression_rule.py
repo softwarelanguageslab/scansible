@@ -11,13 +11,12 @@ from .utils import (
     ValueChangeReason,
     determine_value_version_change_reason,
     find_variable_usages,
-    get_nodes,
 )
 
 
 class ReuseImpureExpressionRule(Rule):
     def scan(self, graph: Graph, visinfo: VisibilityInformation) -> list[RuleResult]:
-        var_nodes = get_nodes(graph, Variable)
+        var_nodes = graph.get_nodes(Variable)
 
         # Mapping from (variable name, definition version) to all variables in graph with those properties.
         # I.e. aggregation of all nodes of the same variable but with different values

@@ -63,7 +63,9 @@ def describe_dump_node() -> None:
 
     def should_dump_task_with_location(g: Graph) -> None:
         t = Task(
-            action="file", name="task name", location=NodeLocation(file="test.yml", line=1, column=10)
+            action="file",
+            name="task name",
+            location=NodeLocation(file="test.yml", line=1, column=10),
         )
         t.node_id = 0
 
@@ -162,7 +164,6 @@ def describe_dump_graph() -> None:
 
     def should_return_query_for_graph_with_single_node(g: Graph) -> None:
         t = Task(action="file", name="task name")
-        t.node_id = 0
         g.add_node(t)
 
         result = dump_graph(g)
@@ -173,9 +174,7 @@ def describe_dump_graph() -> None:
         g: Graph,
     ) -> None:
         t = Task(action="file", name="task name")
-        t.node_id = 0
         v = Variable(name="avar", version=0, value_version=0, scope_level=1)
-        v.node_id = 1
         g.add_node(t)
         g.add_node(v)
 
@@ -185,9 +184,7 @@ def describe_dump_graph() -> None:
 
     def should_return_query_for_graph_with_multiple_nodes_with_edges(g: Graph) -> None:
         t = Task(action="file", name="task name")
-        t.node_id = 0
         v = Variable(name="avar", version=0, value_version=0, scope_level=1)
-        v.node_id = 1
         e = Keyword(keyword="args.path")
         g.add_node(t)
         g.add_node(v)

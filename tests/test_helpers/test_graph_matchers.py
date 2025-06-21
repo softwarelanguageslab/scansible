@@ -112,8 +112,8 @@ def describe_assert_graphs_match() -> None:
         v4 = Variable(name="world", version=1, value_version=1, scope_level=1)
         v5 = Variable(name="!", version=1, value_version=1, scope_level=1)
         v6 = Variable(name="!", version=1, value_version=1, scope_level=1)
-        g1.add_nodes_from([v1, v3, v5])
-        g2.add_nodes_from([v2, v4, v6])
+        g1.add_nodes([v1, v3, v5])
+        g2.add_nodes([v2, v4, v6])
         g1.add_edge(v1, v3, DEF)
         g1.add_edge(v3, v5, DEF)
         g2.add_edge(v2, v4, DEF)
@@ -128,8 +128,8 @@ def describe_assert_graphs_match() -> None:
         v2 = Variable(name="hello", version=1, value_version=1, scope_level=1)
         v3 = Variable(name="world", version=1, value_version=1, scope_level=1)
         v4 = Variable(name="world", version=1, value_version=1, scope_level=1)
-        g1.add_nodes_from([v1, v3])
-        g2.add_nodes_from([v2, v4])
+        g1.add_nodes([v1, v3])
+        g2.add_nodes([v2, v4])
         g1.add_edge(v1, v3, DEF)
 
         with pytest.raises(AssertionError):
@@ -142,8 +142,8 @@ def describe_assert_graphs_match() -> None:
         v2 = Variable(name="hello", version=1, value_version=1, scope_level=1)
         v3 = Variable(name="world", version=1, value_version=1, scope_level=1)
         v4 = Variable(name="world", version=1, value_version=1, scope_level=1)
-        g1.add_nodes_from([v1, v3])
-        g2.add_nodes_from([v2, v4])
+        g1.add_nodes([v1, v3])
+        g2.add_nodes([v2, v4])
         g2.add_edge(v2, v4, DEF)
 
         with pytest.raises(AssertionError):
@@ -156,8 +156,8 @@ def describe_assert_graphs_match() -> None:
         v2 = Variable(name="hello", version=1, value_version=1, scope_level=1)
         v3 = Variable(name="world", version=1, value_version=1, scope_level=1)
         v4 = Variable(name="world", version=1, value_version=1, scope_level=1)
-        g1.add_nodes_from([v1, v3])
-        g2.add_nodes_from([v2, v4])
+        g1.add_nodes([v1, v3])
+        g2.add_nodes([v2, v4])
         g1.add_edge(v1, v3, DEF)
         g2.add_edge(v4, v2, DEF)
 
@@ -171,8 +171,8 @@ def describe_assert_graphs_match() -> None:
         t2 = Task(name="hello", action="world")
         t3 = Task(name="hello", action="world")
         t4 = Task(name="hello", action="world")
-        g1.add_nodes_from([t1, t3])
-        g2.add_nodes_from([t2, t4])
+        g1.add_nodes([t1, t3])
+        g2.add_nodes([t2, t4])
         g1.add_edge(t1, t3, ORDER)
         g2.add_edge(t2, t4, ORDER_TRANS)
 
@@ -186,8 +186,8 @@ def describe_assert_graphs_match() -> None:
         v2 = Variable(name="hello", version=1, value_version=1, scope_level=1)
         i1 = IntermediateValue(identifier=0)
         i2 = IntermediateValue(identifier=0)
-        g1.add_nodes_from([v1, i1])
-        g2.add_nodes_from([v2, i2])
+        g1.add_nodes([v1, i1])
+        g2.add_nodes([v2, i2])
         g1.add_edge(v1, i1, DEF)
         g2.add_edge(v2, i2, DEF)
 
@@ -200,8 +200,8 @@ def describe_assert_graphs_match() -> None:
         v2 = Variable(name="hello", version=1, value_version=1, scope_level=1)
         i1 = IntermediateValue(identifier=0)
         i2 = IntermediateValue(identifier=1)
-        g1.add_nodes_from([v1, i1])
-        g2.add_nodes_from([v2, i2])
+        g1.add_nodes([v1, i1])
+        g2.add_nodes([v2, i2])
         g1.add_edge(v1, i1, DEF)
         g2.add_edge(v2, i2, DEF)
 
@@ -214,8 +214,8 @@ def describe_assert_graphs_match() -> None:
         v2 = Variable(name="hello", version=1, value_version=1, scope_level=1)
         i1 = IntermediateValue(identifier=0)
         i2 = IntermediateValue(identifier=1)
-        g1.add_nodes_from([v1, i1])
-        g2.add_nodes_from([v2, i2])
+        g1.add_nodes([v1, i1])
+        g2.add_nodes([v2, i2])
         g1.add_edge(i1, v1, DEF)
         g2.add_edge(v2, i2, DEF)
 
@@ -230,8 +230,8 @@ def describe_assert_graphs_match() -> None:
         i1 = IntermediateValue(identifier=0)
         i2 = IntermediateValue(identifier=1)
         i3 = IntermediateValue(identifier=2)
-        g1.add_nodes_from([v1, i1, i3])
-        g2.add_nodes_from([v2, i2])
+        g1.add_nodes([v1, i1, i3])
+        g2.add_nodes([v2, i2])
         g1.add_edge(v1, i1, DEF)
         g1.add_edge(v1, i3, DEF)
         g2.add_edge(v2, i2, DEF)
@@ -247,8 +247,8 @@ def describe_assert_graphs_match() -> None:
         i1 = IntermediateValue(identifier=0)
         i2 = IntermediateValue(identifier=1)
         i3 = IntermediateValue(identifier=2)
-        g1.add_nodes_from([v1, i1])
-        g2.add_nodes_from([v2, i2, i3])
+        g1.add_nodes([v1, i1])
+        g2.add_nodes([v2, i2, i3])
         g1.add_edge(v1, i1, DEF)
         g2.add_edge(v2, i3, DEF)
         g2.add_edge(v2, i2, DEF)
@@ -267,8 +267,8 @@ def describe_assert_graphs_match() -> None:
         v2 = Variable(name="a", version=0, value_version=1, scope_level=1)
         v3 = Variable(name="a", version=1, value_version=1, scope_level=1)
         v4 = Variable(name="a", version=1, value_version=1, scope_level=1)
-        g1.add_nodes_from([e1, v1, e3, v3])
-        g2.add_nodes_from([e2, v2, e4, v4])
+        g1.add_nodes([e1, v1, e3, v3])
+        g2.add_nodes([e2, v2, e4, v4])
         g1.add_edge(e1, v1, DEF)
         g1.add_edge(e3, v3, DEF)
         g2.add_edge(e2, v2, DEF)
@@ -299,7 +299,7 @@ def describe_create_graph() -> None:
             [],
         )
         g2 = Graph(role_name="test_role", role_version="test_version")
-        g2.add_nodes_from(
+        g2.add_nodes(
             [
                 Variable(name="a", version=1, value_version=1, scope_level=1),
                 Variable(name="b", version=1, value_version=1, scope_level=1),
@@ -321,7 +321,7 @@ def describe_create_graph() -> None:
         a = Expression(expr="a")
         b = Variable(name="b", version=1, value_version=1, scope_level=1)
         c = IntermediateValue(identifier=1)
-        g2.add_nodes_from([a, b, c])
+        g2.add_nodes([a, b, c])
         g2.add_edge(b, a, USE)
         g2.add_edge(a, c, DEF)
 

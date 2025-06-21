@@ -140,7 +140,7 @@ class GraphDatabase:
 
     def _create_node_csvs(self, d: Path) -> Iterator[tuple[str, Path]]:
         type_to_nodes = defaultdict[str, list[Node]](list)
-        for node in self._pdg.nodes():
+        for node in self._pdg.nodes:
             type_to_nodes[node.__class__.__name__].append(node)
 
         dumped_nodes = {
@@ -158,14 +158,14 @@ class GraphDatabase:
 
     def _create_edge_csvs(self, d: Path) -> Iterator[tuple[EdgeType, Path]]:
         type_to_edges = defaultdict[EdgeType, list[EdgeValue]](list)
-        for source, target, edge in self._pdg.edges(data=True):
+        for source, target, edge in self._pdg.edges:
             dict_key = (
                 source.__class__.__name__,
                 target.__class__.__name__,
                 # prefix with e_ to avoid name clashes with reserved keywords
-                "e_" + edge["type"].__class__.__name__,
+                "e_" + edge.__class__.__name__,
             )
-            type_to_edges[dict_key].append((source, target, edge["type"]))
+            type_to_edges[dict_key].append((source, target, edge))
 
         dumped_edges = {
             edge_type: _edges_to_dicts(edges)
@@ -184,7 +184,7 @@ class GraphDatabase:
     def _populate_node_locations(self) -> None:
         self._node_locations = {
             node.node_id: node.location
-            for node in self._pdg.nodes()
+            for node in self._pdg.nodes
             if node.location is not None
         }
 

@@ -380,12 +380,6 @@ def describe_modified() -> None:
         ctx.build_expression("The time is {{ when }}")
         ctx.build_expression("The time is {{ when }}")
 
-        e2 = Expression(expr="The time is {{ _1 }}", orig_expr="The time is {{ when }}")
-        e3 = Expression(expr="The time is {{ _1 }}", orig_expr="The time is {{ when }}")
-        # Specify node ID to ensure proper match with duplicates
-        e2.node_id = 100
-        e3.node_id = 101
-
         assert_graphs_match(
             g,
             create_graph(
@@ -402,9 +396,13 @@ def describe_modified() -> None:
                         value_version=0,
                         scope_level=EnvironmentType.HOST_FACTS.value,
                     ),
-                    "e2": e2,
+                    "e2": Expression(
+                        expr="The time is {{ _1 }}", orig_expr="The time is {{ when }}"
+                    ),
                     "iv2": IntermediateValue(identifier=2),
-                    "e3": e3,
+                    "e3": Expression(
+                        expr="The time is {{ _1 }}", orig_expr="The time is {{ when }}"
+                    ),
                     "iv3": IntermediateValue(identifier=3),
                     "when2": Variable(
                         name="when",

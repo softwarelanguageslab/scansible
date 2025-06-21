@@ -471,7 +471,7 @@ def _infer_dataflow(graph: rep.Graph) -> Dataflow:
 
 
 def _yield_debug_tasks(graph: rep.Graph) -> Iterable[rep.Task]:
-    for node in graph:
+    for node in graph.nodes:
         if not isinstance(node, rep.Task):
             continue
         if node.action == "debug":
@@ -481,7 +481,7 @@ def _yield_debug_tasks(graph: rep.Graph) -> Iterable[rep.Task]:
 def _get_expected_output(printer: rep.Task, graph: rep.Graph) -> str:
     expr = _get_printed_expr(printer, graph)
     if printer.name and printer.name.endswith("is defined?"):
-        use_node = list(_find_predecessors(graph, expr, rep.USE))[0]
+        use_node = graph.get_predecessors(expr, edge=rep.USE)[0]
         # Defined, get the value
         if isinstance(use_node, rep.IntermediateValue):
             return _resolve_iv_to_value(graph, use_node)
@@ -496,31 +496,19 @@ def _get_expected_output(printer: rep.Task, graph: rep.Graph) -> str:
 
 
 def _get_printed_expr(printer: rep.Task, graph: rep.Graph) -> rep.Expression:
-    message_iv = list(
-        _find_predecessors(graph, printer, rep.Keyword(keyword="args.msg"))
-    )
+    message_iv = graph.get_predecessors(printer, edge=rep.Keyword(keyword="args.msg"))
     assert message_iv, "No expression?!"
     assert len(message_iv) == 1, "Multiple expressions?!"
 
     # IV should've been produced by an expression
-    expr = next(_find_predecessors(graph, message_iv[0], rep.DEF))
+    expr = graph.get_predecessors(message_iv[0], edge=rep.DEF)[0]
     assert isinstance(expr, rep.Expression), "Wrong node type?!"
     return expr
 
 
-def _find_predecessors(
-    g: rep.Graph, n: rep.Node, edata: rep.Edge
-) -> Iterator[rep.Node]:
-    for e in g.edges():
-        if not e[1] == n:
-            continue
-        if g[e[0]][n].get(0)["type"] == edata:  # type: ignore[index]
-            yield e[0]
-
-
 def _resolve_expr_to_value(g: rep.Graph, expr: rep.Expression) -> str:
     # Should only use one data node
-    used_data = next(_find_predecessors(g, expr, rep.USE))
+    used_data = g.get_predecessors(expr, edge=rep.USE)[0]
     if isinstance(used_data, rep.ScalarLiteral):
         data = used_data.value
     elif isinstance(used_data, rep.IntermediateValue):
@@ -540,13 +528,13 @@ def _resolve_expr_to_value(g: rep.Graph, expr: rep.Expression) -> str:
 
 
 def _resolve_iv_to_value(g: rep.Graph, iv: rep.IntermediateValue) -> str:
-    def_node = next(_find_predecessors(g, iv, rep.DEF))
+    def_node = g.get_predecessors(iv, edge=rep.DEF)[0]
     assert isinstance(def_node, rep.Expression), f"unexpected DEF node: {def_node}"
     return _resolve_expr_to_value(g, def_node)
 
 
 def _resolve_var_to_value(g: rep.Graph, v: rep.Variable) -> str | None:
-    def_nodes = list(_find_predecessors(g, v, rep.DEF))
+    def_nodes = g.get_predecessors(v, edge=rep.DEF)
     if not def_nodes:
         return None
     assert len(def_nodes) == 1, "Multiple defs should not happen here!"

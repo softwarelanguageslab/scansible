@@ -24,10 +24,7 @@ def partition_local_global(defs: set[tuple[str, int]]) -> tuple[set[str], set[st
 
 
 def getvars(graph: Graph) -> Iterable[tuple[str, int]]:
-    for node in graph.nodes():
-        if not isinstance(node, Variable):
-            continue
-
+    for node in graph.get_nodes(Variable):
         yield (node.name, node.scope_level)
 
 

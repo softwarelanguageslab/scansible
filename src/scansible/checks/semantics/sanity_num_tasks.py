@@ -4,12 +4,11 @@ from scansible.representations.pdg.extractor.context import VisibilityInformatio
 from scansible.representations.pdg.representation import Graph, NodeLocation, Task
 
 from .base import Rule, RuleResult
-from .utils import get_nodes
 
 
 class SanityCheckNumberOfTasksRule(Rule):
     def scan(self, graph: Graph, visinfo: VisibilityInformation) -> list[RuleResult]:
-        num_tasks = len(get_nodes(graph, Task))
+        num_tasks = len(graph.get_nodes(Task))
         if num_tasks > 2:
             return []
 

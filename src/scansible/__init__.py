@@ -49,9 +49,9 @@ def cli(verbose: bool, quiet: bool) -> None:
     "-f",
     "--format",
     "output_format",
-    type=click.Choice(["graphml", "neo4j", "graphviz"]),
-    default="graphml",
-    help="Output format (default: graphml)",
+    type=click.Choice(["neo4j", "graphviz"]),
+    default="neo4j",
+    help="Output format (default: neo4j)",
 )
 @click.option(
     "-t",
@@ -98,11 +98,6 @@ def cli(verbose: bool, quiet: bool) -> None:
     type=click.Path(resolve_path=True, path_type=Path, dir_okay=False, exists=True),
     help="Path to the module knowledge base (only required when --canonicalize is set)",
 )
-@click.option(
-    "--transitive-cfg/--no-transitive-cfg",
-    default=False,
-    help="Whether to construct a transitive closure over the CFG.",
-)
 def build_pdg(
     project_path: Path,
     name: str | None,
@@ -116,7 +111,6 @@ def build_pdg(
     strict: bool,
     canonicalize: bool,
     module_kb_path: Path | None,
-    transitive_cfg: bool,
 ) -> None:
     """Build a PDG for a project residing at PROJECT_PATH."""
     if name is None:
@@ -138,15 +132,14 @@ def build_pdg(
         role_search_paths,
         as_pb=as_pb,
         lenient=not strict,
-        construct_transitive_cfg=transitive_cfg,
     )
     pdg = ctx.graph
-    logger.info(f"Extracted PDG of {len(pdg)} nodes and {len(pdg.edges())} edges")
+    logger.info(f"Extracted PDG of {pdg.num_nodes} nodes and {pdg.num_edges} edges")
 
     if canonicalize:
         assert module_kb_path
         pdg = canonicalize_pdg(pdg, ModuleKnowledgeBase.load_from_file(module_kb_path))
-        logger.info(f"Reduced size to {len(pdg)} nodes and {len(pdg.edges())} edges")
+        logger.info(f"Reduced size to {pdg.num_nodes} nodes and {pdg.num_edges} edges")
 
     output.write(dump_graph(output_format, pdg))
 
@@ -235,7 +228,6 @@ def check(
     type=click.Choice(["playbook", "role"]),
     help="Type of the provided project (default: autodetect)",
 )
-@click.option("--db-host", help="DB host", envvar="DB_HOST")
 @click.option(
     "--role-search-path",
     type=click.Path(file_okay=False, path_type=Path),
@@ -266,7 +258,6 @@ def check_all(
     strict: bool,
     enable_security: bool,
     enable_semantics: bool,
-    db_host: str,
 ) -> None:
     """Check the project residing at PROJECT_PATH for smells in all files."""
     name = project_path.name
@@ -297,7 +288,6 @@ def check_all(
         results.extend(
             run_all_checks(
                 ctx,
-                db_host,
                 enable_security=enable_security,
                 enable_semantics=enable_semantics,
             )
@@ -417,13 +407,12 @@ def bulk_build(
     role_search_path: Sequence[Path],
     canonicalize: bool,
     module_kb_path: Path | None,
-    transitive_cfg: bool,
 ) -> None:
     """Build a collection of PDGs in bulk.
 
     Input entrypoint paths are read from INPUT_FILE, which should be a CSV containing
     fields `repo`, `relative_path`, `type`.
-    Resulting PDGs are stored in GraphML format in OUTPUT_PATH, which should be
+    Resulting PDGs are stored in Neo4j format in OUTPUT_PATH, which should be
     a directory and will be created if it does not exist. Each entrypoint will
     be extracted separately.
     """
@@ -470,17 +459,16 @@ def bulk_build(
                     role_search_paths=role_search_path,
                     lenient=True,
                     as_pb=entrypoint["type"] == "playbook",
-                    construct_transitive_cfg=transitive_cfg,
                 )
                 pdg = ctx.graph
                 logger.info(
-                    f"Extracted PDG of {len(pdg)} nodes and {len(pdg.edges())} edges"
+                    f"Extracted PDG of {pdg.num_nodes} nodes and {pdg.num_edges} edges"
                 )
 
                 if canonicalize:
                     pdg = canonicalize_pdg(pdg, module_kb)  # pyright: ignore
                     logger.info(
-                        f"Reduced size to {len(pdg)} nodes and {len(pdg.edges())} edges"
+                        f"Reduced size to {pdg.num_nodes} nodes and {pdg.num_edges} edges"
                     )
             except Exception as exc:
                 if isinstance(exc, KeyboardInterrupt):
@@ -494,7 +482,9 @@ def bulk_build(
 
                 continue
 
-            (output_base / f"{output_name}.xml").write_text(dump_graph("graphml", pdg))
+            _ = (output_base / f"{output_name}.txt").write_text(
+                dump_graph("neo4j", pdg)
+            )
 
 
 if __name__ == "__main__":

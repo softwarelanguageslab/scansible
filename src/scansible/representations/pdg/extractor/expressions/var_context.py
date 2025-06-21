@@ -179,11 +179,10 @@ class VarContext:
         # applies to definitions, not individual possible values. We'll
         # retrieve these from the first variable node, as that will be the one
         # manipulated by the caller.
-        for predecessor in self.extraction_ctx.graph.predecessors(old_var_node):
-            edge_type = self.extraction_ctx.graph[predecessor][old_var_node][0]["type"]
-            if edge_type is not rep.WHEN:
-                continue
-            self.extraction_ctx.graph.add_edge(predecessor, new_var_node, edge_type)
+        for predecessor in self.extraction_ctx.graph.get_predecessors(
+            old_var_node, edge=rep.WHEN
+        ):
+            self.extraction_ctx.graph.add_edge(predecessor, new_var_node, rep.WHEN)
 
     @contextmanager
     def enter_scope(self, env_type: LocalEnvType) -> Generator[None, None, None]:
