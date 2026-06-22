@@ -268,7 +268,10 @@ def check_all(
     from .representations.pdg import extract_pdg
     from .utils.entrypoints import find_entrypoints
 
-    entrypoints = find_entrypoints(project_path)
+    if project_path.parent != project_path:
+        entrypoints = find_entrypoints(project_path)
+    else:
+        entrypoints = [(file_path, "playbook")]
     results = []
     logger.remove()
 
