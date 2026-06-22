@@ -16,6 +16,7 @@ from copy import deepcopy
 from pathlib import Path
 
 from ansible.parsing import mod_args
+from ansible.utils.fqcn import add_internal_fqcns
 
 from scansible.representations.structural.representation import Handler, Task
 from scansible.utils import actions
@@ -339,8 +340,10 @@ def _transform_task_include(ds: dict[str, ans.AnsibleValue], action: str) -> Non
         is_static = None
 
     if actions.is_bare_include(action):
-        include_args = ds["include"]
-        del ds["include"]
+        include_names: list[str] = add_internal_fqcns(["include"])
+        include_name = next(name for name in include_names if name in ds)
+        include_args = ds[include_name]
+        del ds[include_name]
         if is_static:
             ds["import_tasks"] = include_args
         else:
