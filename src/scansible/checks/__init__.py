@@ -25,10 +25,10 @@ def run_all_checks(
 ) -> list[CheckResult]:
     results: list[CheckResult] = []
     if enable_security:
-        results.extend(
-            CheckResult(res.rule_name, res.source_location)
-            for res in security.run_all_checks(extraction_context.graph)
-        )
+        for res in security.run_all_checks(extraction_context.graph):
+            results.append(CheckResult(res.rule_name, res.sink_location))
+            if res.sink_location != res.source_location:
+                results.append(CheckResult(res.rule_name, res.source_location))
     if enable_semantics:
         results.extend(
             CheckResult(
