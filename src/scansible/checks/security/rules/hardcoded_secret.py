@@ -7,7 +7,7 @@ from .base import Rule, RuleQuery
 
 @final
 class HardcodedSecretRule(Rule):
-    description = "Hardcoded secrets can compromise security when the source code falls into the wrong hands"
+    description = 'Use "ansible-vault" instead of hardcoding secrets'
 
     #: Substrings in variable or argument names that indicate secrets.
     TOKEN_REGEXES = (

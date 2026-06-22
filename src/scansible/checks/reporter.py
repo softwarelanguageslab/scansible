@@ -4,10 +4,16 @@ from typing import TYPE_CHECKING
 
 import rich
 
+from scansible.checks import security
 from scansible.representations.pdg.representation import NodeLocation
 
 if TYPE_CHECKING:
     from . import CheckResult
+
+
+def get_description(name: str) -> str:
+    rule_cls = getattr(security.rules, f"{name}Rule")
+    return rule_cls.description
 
 
 class TerminalReporter:
@@ -18,11 +24,12 @@ class TerminalReporter:
         for name, loc in sorted(set(results), key=lambda p: str(p[1])):
             if isinstance(loc, str):
                 console.print(
-                    f"[gray]{loc}[/gray] - [bold red]{name}[/bold red]", width=999
+                    f"[gray]{loc}[/gray] - [bold red]{get_description(name)}[/bold red]",
+                    width=999,
                 )
             else:
                 console.print(
-                    f"[gray]{loc.file}:{loc.line}:{loc.column}[/gray] - [bold red]{name}[/bold red]",
+                    f"[gray]{loc.file}:{loc.line}:{loc.column}[/gray] - [bold red]{get_description(name)}[/bold red]",
                     width=999,
                 )
                 if loc.includer_location is not None:
