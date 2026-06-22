@@ -51,7 +51,8 @@ def _escape_string(v: str) -> str:
     """Escape special characters in the given string, such as newlines."""
     # JSON does all the escaping we need, but we'll strip out the surrounding
     # quotes so that the queries do not need to deal with them.
-    return json.dumps(v)[1:-1]
+    # Also need to escape comma characters, otherwise Kuzu tries to parse them as CSV separators.
+    return json.dumps(v)[1:-1].replace(",", "&#44;")
 
 
 def _node_to_dict(node: Node) -> Mapping[str, DatabaseValue]:
