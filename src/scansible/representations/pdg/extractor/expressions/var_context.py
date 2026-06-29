@@ -7,6 +7,7 @@ from collections.abc import Generator, Iterable, Mapping, Sequence
 from contextlib import contextmanager
 
 from loguru import logger
+from icontract import require
 
 from scansible.representations import structural as struct
 from scansible.representations.structural import ansible_types as ans
@@ -274,24 +275,21 @@ class VarContext:
         self.extraction_ctx.graph.add_node(lit)
         return LiteralEvaluationResult(lit)
 
+    @require(lambda key: not isinstance(key, (tuple, list, Mapping)), "Composite keys not supported")
     def _add_composite_literal_component(
         self, parent: rep.CompositeLiteral, key: struct.Scalar, value: struct.AnyValue
     ) -> None:
         child = self._add_literal_node(value).data_node
-        assert not isinstance(
-            key,
-            (tuple, list, Mapping),  # type: ignore[unreachable]
-        ), "Internal error: Unexpected composite keys"
         self.extraction_ctx.graph.add_edge(
             child, parent, rep.Composition(index=str(key))
         )
 
+    @require(lambda ast: not ast.is_literal())
     def _resolve_expression(
         self, ast: TemplateExpressionAST
     ) -> TemplateEvaluationResult:
         """Parse a template, add required nodes to the graph, and return the record."""
         logger.debug(f"Building expression {ast.raw!r}")
-        assert not ast.is_literal(), f"Expected an expression, got literal {ast.raw!r}"
 
         used_values = list(self._resolve_expression_values(ast))
 

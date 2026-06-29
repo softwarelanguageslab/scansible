@@ -20,6 +20,7 @@ dependencies = [
     "ansible", # Needed for collections.
     "kuzu>=0.10.0",
     "rustworkx>=0.16.0",
+    "icontract>=2.7.3",
 ]
 
 [project.scripts]
