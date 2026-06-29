@@ -530,35 +530,6 @@ def _find_ast_differences(a: nodes.Node, b: nodes.Node) -> Iterable[str]:
         yield from _find_ast_differences(a_child, b_child)
 
 
-def generify_var_references(ast: nodes.Node) -> tuple[nodes.Node, dict[str, int]]:
-    param_indices: dict[str, int] = {}
-    next_idx = 1
-
-    class Visitor(NodeVisitor):
-        def __init__(self) -> None:
-            self.declared: set[str] = set()
-
-        def visit_Name(self, node: nodes.Name) -> None:
-            if node.ctx == "store":
-                self.declared.add(node.name)
-                return
-
-            assert node.ctx == "load"
-
-            if node.name in ANSIBLE_GLOBALS or node.name in self.declared:
-                return
-
-            if node.name not in param_indices:
-                nonlocal next_idx
-                param_indices[node.name] = next_idx
-                next_idx += 1
-
-            node.name = f"_{param_indices[node.name]}"
-
-    Visitor().visit(ast)
-    return ast, param_indices
-
-
 class LookupTarget(BaseModel, frozen=True):
     pass
 

@@ -116,7 +116,6 @@ class Expression(DataNode):
 
     expr: Annotated[str, StringConstraints(min_length=1)] = Field(frozen=True)
     is_conditional: bool = Field(frozen=True, default=False)
-    orig_expr: str = Field(frozen=True, default="")
 
     impure_components: Sequence[str] = Field(frozen=True, default_factory=tuple)
 
@@ -208,8 +207,6 @@ class Use(DataFlowEdge, frozen=True):
 
 
 class Input(Use, frozen=True):
-    param_idx: int
-
     @classmethod
     @override
     def raise_if_disallowed(cls, source: Node, target: Node) -> None:

@@ -26,12 +26,12 @@ CREATE NODE TABLE Variable(node_id INT64, name STRING, version INT64, value_vers
 CREATE NODE TABLE IntermediateValue(node_id INT64, identifier INT64, PRIMARY KEY (node_id));
 CREATE NODE TABLE ScalarLiteral(node_id INT64, type STRING, value STRING, PRIMARY KEY (node_id));
 CREATE NODE TABLE CompositeLiteral(node_id INT64, type STRING, PRIMARY KEY (node_id));
-CREATE NODE TABLE Expression(node_id INT64, expr STRING, is_conditional BOOLEAN, orig_expr STRING, impure_components STRING, PRIMARY KEY (node_id));
+CREATE NODE TABLE Expression(node_id INT64, expr STRING, is_conditional BOOLEAN, impure_components STRING, PRIMARY KEY (node_id));
 CREATE REL TABLE e_Order(FROM Task TO Task, transitive BOOLEAN, back BOOLEAN);
 CREATE REL TABLE e_Notifies(FROM Task TO Task);
 CREATE REL TABLE e_When(FROM IntermediateValue TO Task, FROM ScalarLiteral TO Task, FROM CompositeLiteral TO Task, FROM IntermediateValue TO Variable, FROM ScalarLiteral TO Variable, FROM CompositeLiteral TO Variable);
 CREATE REL TABLE e_Loop(FROM IntermediateValue TO Task, FROM ScalarLiteral TO Task, FROM CompositeLiteral TO Task);
-CREATE REL TABLE e_Input(FROM IntermediateValue TO Expression, FROM ScalarLiteral TO Expression, FROM CompositeLiteral TO Expression, FROM Variable TO Expression, param_idx INT8);
+CREATE REL TABLE e_Input(FROM IntermediateValue TO Expression, FROM ScalarLiteral TO Expression, FROM CompositeLiteral TO Expression, FROM Variable TO Expression);
 CREATE REL TABLE e_Keyword(FROM IntermediateValue TO Task, FROM ScalarLiteral TO Task, FROM CompositeLiteral TO Task, keyword STRING);
 CREATE REL TABLE e_Composition(FROM IntermediateValue TO CompositeLiteral, FROM ScalarLiteral TO CompositeLiteral, FROM CompositeLiteral TO CompositeLiteral, index STRING);
 CREATE REL TABLE e_Def(FROM Task TO Variable, FROM Expression TO IntermediateValue, FROM IntermediateValue TO Variable, FROM ScalarLiteral TO Variable, FROM CompositeLiteral TO Variable);

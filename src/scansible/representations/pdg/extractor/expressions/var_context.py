@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeGuard, cast
+from typing import TYPE_CHECKING, TypeGuard, cast, final
 
 from collections import defaultdict
 from collections.abc import Generator, Iterable, Mapping, Sequence
 from contextlib import contextmanager
 
-from loguru import logger
 from icontract import require
+from loguru import logger
 
 from scansible.representations import structural as struct
 from scansible.representations.structural import ansible_types as ans
@@ -37,12 +37,7 @@ from .records import (
 if TYPE_CHECKING:
     from ..context import ExtractionContext
 
-from .templates import (
-    ASTStringifier,
-    LookupTargetLiteral,
-    TemplateExpressionAST,
-    generify_var_references,
-)
+from .templates import LookupTargetLiteral, TemplateExpressionAST
 
 
 class RecursiveDefinitionError(Exception):
@@ -118,6 +113,7 @@ _ValueToVarMap = dict[tuple[VariableDefinitionRecord, int], rep.Variable]
 
 # TODO: Maybe simplify single-variable templates ("{{ var }}") to bypass
 # intermediate values?
+@final
 class VarContext:
     """Context for variable management."""
 
@@ -275,7 +271,10 @@ class VarContext:
         self.extraction_ctx.graph.add_node(lit)
         return LiteralEvaluationResult(lit)
 
-    @require(lambda key: not isinstance(key, (tuple, list, Mapping)), "Composite keys not supported")
+    @require(
+        lambda key: not isinstance(key, (tuple, list, Mapping)),
+        "Composite keys not supported",
+    )
     def _add_composite_literal_component(
         self, parent: rep.CompositeLiteral, key: struct.Scalar, value: struct.AnyValue
     ) -> None:
@@ -356,11 +355,9 @@ class VarContext:
     def _create_new_expression_result(
         self, ast: TemplateExpressionAST, used_values: list[VariableValueRecord]
     ) -> TemplateEvaluationResult:
-        generified_ast, param_indices = generify_var_references(ast.ast_root)
         en = rep.Expression(
-            expr=ASTStringifier().stringify(generified_ast, ast.is_conditional),
+            expr=ast.raw,
             is_conditional=ast.is_conditional,
-            orig_expr=ast.raw,
             impure_components=tuple(_get_impure_components(ast)),
             location=self.extraction_ctx.get_location(ast.raw),
         )
@@ -376,9 +373,7 @@ class VarContext:
                 used_value.value_revision,
                 allow_undefined=False,
             )
-            self.extraction_ctx.graph.add_edge(
-                var_node, en, rep.Input(param_idx=param_indices.get(used_value.name, 0))
-            )
+            self.extraction_ctx.graph.add_edge(var_node, en, rep.Input())
 
         tr = TemplateEvaluationResult(iv, en, used_values)
         self._envs.set_expression_evaluation_result(ast.raw, tr)
