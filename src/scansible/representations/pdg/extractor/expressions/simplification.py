@@ -142,7 +142,8 @@ def _get_inlined_candidates(
                 logger.debug(f"Simplified reference {var_ref!r} to {var_init!r}")
                 yield SimplifiedExpression(
                     nodes.Output([nodes.TemplateData(str(var_init))]),
-                    FrozenDict(expr.var_mappings | new_var_mappings),
+                    # collections.abc.Mapping doesn't support the | merge operator.
+                    FrozenDict({**expr.var_mappings, **new_var_mappings}),
                     join_sequences(expr.conditions, new_conditions),
                 )
             continue
@@ -162,6 +163,7 @@ def _get_inlined_candidates(
 
         yield SimplifiedExpression(
             ref_ast.ast_root.body[0],
-            FrozenDict(expr.var_mappings | new_var_mappings),
+            # collections.abc.Mapping doesn't support the | merge operator.
+            FrozenDict({**expr.var_mappings, **new_var_mappings}),
             join_sequences(expr.conditions, new_conditions),
         )

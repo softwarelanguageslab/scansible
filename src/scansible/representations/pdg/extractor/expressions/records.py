@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
+import abc
 import dataclasses
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -25,7 +26,7 @@ class _RecordBase:
     __replace__ = partialmethod(dataclasses.replace)
 
 
-class TemplateRecord(_RecordBase):
+class TemplateRecord(_RecordBase, abc.ABC):
     """Result of a template expression evaluation."""
 
     data_node: rep.DataNode
@@ -48,10 +49,12 @@ class LiteralEvaluationResult(TemplateRecord):
     )
 
     @property
+    @override
     def is_literal(self) -> bool:
         return True
 
     @property
+    @override
     def may_be_impure(self) -> bool:
         return False
 
@@ -65,10 +68,12 @@ class TemplateEvaluationResult(TemplateRecord):
     used_variables: list[VariableValueRecord]
 
     @property
+    @override
     def is_literal(self) -> bool:
         return False
 
     @property
+    @override
     def may_be_impure(self) -> bool:
         return isinstance(self.expr_node, rep.Expression) and not self.expr_node.is_pure
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TypeVar
+from typing import TypeVar, final
 
 import operator
 from collections.abc import Callable, Iterable, Sequence
@@ -52,6 +52,7 @@ def _values_have_changed(
     return False
 
 
+@final
 class EnvironmentStack:
     """Collection of variable environments."""
 
@@ -378,4 +379,4 @@ class EnvironmentStack:
 
     def exit_scope(self) -> None:
         logger.debug(f"Leaving {self.environment_stack[-1]}")
-        self._local_environment_stack.pop()
+        _ = self._local_environment_stack.pop()

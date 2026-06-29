@@ -257,7 +257,7 @@ class VarContext:
         type_ = extract_type_name(value)
 
         lit: rep.Literal
-        if isinstance(value, (Mapping, tuple, list)):
+        if isinstance(value, (Mapping, Sequence)) and not isinstance(value, str):
             lit = rep.CompositeLiteral(type=type_, location=location)
             self.extraction_ctx.graph.add_node(lit)
             key_vals = value.items() if isinstance(value, Mapping) else enumerate(value)
@@ -576,7 +576,7 @@ class VarContext:
             )
             env_type = EnvironmentType.UNDEFINED
 
-        self.define_injected_variable(name, env_type)
+        _ = self.define_injected_variable(name, env_type)
         # Retrieve the value record that should've been created
         vval = self._envs.get_variable_value_for_constant_definition(
             name, self._next_def_revisions[name] - 1
@@ -602,7 +602,7 @@ class VarContext:
 
     def get_initialisers(
         self, name: str, constraints: Mapping[str, struct.AnyValue]
-    ) -> Sequence[tuple[struct.AnyValue, dict[str, struct.AnyValue], list[str]]]:
+    ) -> Sequence[tuple[struct.AnyValue, Mapping[str, struct.AnyValue], Sequence[str]]]:
         """Get possible initialisers for `name`, adhering to any prior
         initialiser constraints.
         Returns tuples of initialisers, new constraints, and new conditions."""

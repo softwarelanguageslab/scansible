@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import Iterable
+from typing import override
+
+from collections.abc import Iterable
 
 from scansible.representations.pdg.representation import Expression
 
@@ -14,8 +16,8 @@ from .types import EnvironmentType
 
 class Environment:
     def __init__(self, env_type: EnvironmentType, is_cached: bool = False) -> None:
-        self.env_type = env_type
-        self.is_cached = is_cached
+        self.env_type: EnvironmentType = env_type
+        self.is_cached: bool = is_cached
         self.cached_results: dict[str, VariableValueRecord] = {}
         # Values of expressions valid in this scope.
         self._expr_store: dict[str, TemplateEvaluationResult] = {}
@@ -26,6 +28,7 @@ class Environment:
         # this scope.
         self._var_val_store: dict[str, VariableValueRecord] = {}
 
+    @override
     def __repr__(self) -> str:
         return f"Environment(level={self.env_type.name}, is_cached={self.is_cached})"
 
@@ -70,6 +73,7 @@ class Environment:
     def has_expression_evaluation_result(self, expr: str) -> bool:
         return expr in self._expr_store
 
+    @override
     def __str__(self) -> str:
         header = f"Environment@{self.env_type.name}"
 

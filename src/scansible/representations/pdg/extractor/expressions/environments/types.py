@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal, Union, get_args
+from typing import Literal, get_args
 
 from enum import Enum
 
@@ -37,26 +37,28 @@ class EnvironmentType(Enum):
     MAGIC_VARS = 22  # Undocumented, take highest precedence
 
 
-LocalEnvType = Union[
-    Literal[EnvironmentType.TASK_VARS],
-    Literal[EnvironmentType.BLOCK_VARS],
-    Literal[EnvironmentType.ROLE_PARAMS],
-    Literal[EnvironmentType.INCLUDE_PARAMS],
+type LocalEnvType = (
+    Literal[EnvironmentType.TASK_VARS]
+    | Literal[EnvironmentType.BLOCK_VARS]
+    | Literal[EnvironmentType.ROLE_PARAMS]
+    | Literal[EnvironmentType.INCLUDE_PARAMS]
     # Following pop after the play is done.
-    Literal[EnvironmentType.PLAY_VARS],
-    Literal[EnvironmentType.PLAY_VARS_FILES],
-    Literal[EnvironmentType.PLAY_VARS_PROMPT],
+    | Literal[EnvironmentType.PLAY_VARS]
+    | Literal[EnvironmentType.PLAY_VARS_FILES]
+    | Literal[EnvironmentType.PLAY_VARS_PROMPT]
     # Role vars and defaults can pop depending on certain conditions, such as
     # the `private_role_vars` Ansible configuration, whether the role include
     # carries a `public: true` directive, whether it's a play role, import_role,
     # or include_role, etc.
-    Literal[EnvironmentType.ROLE_DEFAULTS],
-    Literal[EnvironmentType.ROLE_VARS],
-]
+    | Literal[EnvironmentType.ROLE_DEFAULTS]
+    | Literal[EnvironmentType.ROLE_VARS]
+)
 
 
 """Environments which can be stacked, i.e., for which a new environment can be created and destroyed."""
-LOCAL_ENV_TYPES = set(get_args(lit)[0] for lit in get_args(LocalEnvType))
+LOCAL_ENV_TYPES: set[EnvironmentType] = set(
+    get_args(lit)[0] for lit in get_args(LocalEnvType.__value__)
+)
 
 """Environments which cannot be stacked."""
 GLOBAL_ENV_TYPES = set(EnvironmentType) - LOCAL_ENV_TYPES

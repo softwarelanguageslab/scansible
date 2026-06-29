@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, cast, override
+from typing import Protocol, TypeVar, cast, final, override
 
 import os
 import re
@@ -29,12 +29,17 @@ OPERAND_TO_STR = {
 
 
 class ASTStringifier(NodeVisitor):
+    @override
     def generic_visit(self, node: nodes.Node, *args: object, **kwargs: object) -> str:
         if isinstance(node, nodes.BinExpr):
             return self.visit_BinExpr(node)
         if isinstance(node, nodes.UnaryExpr):
             return self.visit_UnaryExpr(node)
         raise ValueError(f"Unsupported node: {node}")
+
+    @override
+    def visit(self, node: nodes.Node, *args: object, **kwargs: object) -> str:
+        return cast(str, super().visit(node, *args, **kwargs))
 
     def stringify(self, node: nodes.Node, is_conditional: bool) -> str:
         generated = self.visit(node)
@@ -77,13 +82,13 @@ class ASTStringifier(NodeVisitor):
                 """
         )
 
-    def visit_Name(self, node: nodes.Name, **kwargs: Any) -> str:
+    def visit_Name(self, node: nodes.Name, **_: object) -> str:
         return node.name
 
-    def visit_NSRef(self, node: nodes.NSRef, **kwargs: Any) -> str:
+    def visit_NSRef(self, node: nodes.NSRef, **_: object) -> str:
         return f"{node.name}.{node.attr}"
 
-    def visit_Template(self, node: nodes.Template, **kwargs: Any) -> str:
+    def visit_Template(self, node: nodes.Template, **_: object) -> str:
         parts = [self.visit(child) for child in node.body]
 
         # Escape TemplateData ending with { followed by expression/statement,
@@ -111,7 +116,7 @@ class ASTStringifier(NodeVisitor):
             rendered += "\n"
         return rendered
 
-    def visit_Output(self, node: nodes.Output, **kwargs: Any) -> str:
+    def visit_Output(self, node: nodes.Output, **_: object) -> str:
         result = ""
         for child in node.nodes:
             if isinstance(child, nodes.TemplateData):
@@ -121,7 +126,7 @@ class ASTStringifier(NodeVisitor):
 
         return result
 
-    def visit_TemplateData(self, node: nodes.TemplateData, **kwargs: Any) -> str:
+    def visit_TemplateData(self, node: nodes.TemplateData, **_: object) -> str:
         if (
             "{{" in node.data
             or "}}" in node.data
@@ -131,48 +136,48 @@ class ASTStringifier(NodeVisitor):
             return "{% raw %}" + node.data + "{% endraw %}"
         return node.data
 
-    def visit_Compare(self, node: nodes.Compare, **kwargs: Any) -> str:
+    def visit_Compare(self, node: nodes.Compare, **_: object) -> str:
         if len(node.ops) != 1:
             raise ValueError(f"Unsupported node: {node}")
         return f"({self.visit(node.expr)} {self.visit(node.ops[0])})"
 
-    def visit_Operand(self, node: nodes.Operand, **kwargs: Any) -> str:
+    def visit_Operand(self, node: nodes.Operand, **_: object) -> str:
         return f"{OPERAND_TO_STR.get(node.op, node.op)} {self.visit(node.expr)}"
 
-    def visit_Const(self, node: nodes.Const, **kwargs: Any) -> str:
+    def visit_Const(self, node: nodes.Const, **_: object) -> str:
         return repr(node.value)
 
-    def visit_List(self, node: nodes.List, **kwargs: Any) -> str:
+    def visit_List(self, node: nodes.List, **_: object) -> str:
         return "[" + ", ".join(self.visit(item) for item in node.items) + "]"
 
-    def visit_Dict(self, node: nodes.Dict, **kwargs: Any) -> str:
+    def visit_Dict(self, node: nodes.Dict, **_: object) -> str:
         return "{" + ", ".join(self.visit(item) for item in node.items) + "}"
 
-    def visit_Pair(self, node: nodes.Pair, **kwargs: Any) -> str:
+    def visit_Pair(self, node: nodes.Pair, **_: object) -> str:
         return f"{self.visit(node.key)}: {self.visit(node.value)}"
 
-    def visit_Not(self, node: nodes.Not, **kwargs: Any) -> str:
+    def visit_Not(self, node: nodes.Not, **_: object) -> str:
         if isinstance(node.node, nodes.Test):
             return self.visit_Test(node.node, negate=True)
         return f"(not {self.visit(node.node)})"
 
-    def visit_BinExpr(self, node: nodes.BinExpr, **kwargs: Any) -> str:
+    def visit_BinExpr(self, node: nodes.BinExpr, **_: object) -> str:
         return f"({self.visit(node.left)} {node.operator} {self.visit(node.right)})"
 
-    def visit_UnaryExpr(self, node: nodes.UnaryExpr, **kwargs: Any) -> str:
+    def visit_UnaryExpr(self, node: nodes.UnaryExpr, **_: object) -> str:
         return f"{node.operator} {self.visit(node.node)}"
 
-    def visit_Concat(self, node: nodes.Concat, **kwargs: Any) -> str:
+    def visit_Concat(self, node: nodes.Concat, **_: object) -> str:
         return "(" + " ~ ".join(self.visit(child) for child in node.nodes) + ")"
 
-    def visit_CondExpr(self, node: nodes.CondExpr, **kwargs: Any) -> str:
+    def visit_CondExpr(self, node: nodes.CondExpr, **_: object) -> str:
         base = f"({self.visit(node.expr1)} if {self.visit(node.test)}"
         if node.expr2 is None:
             return base + ")"
         else:
             return f"{base} else {self.visit(node.expr2)})"
 
-    def visit_If(self, node: nodes.If, **kwargs: Any) -> str:
+    def visit_If(self, node: nodes.If, **_: object) -> str:
         head = (
             "{% if "
             + self.visit(node.test)
@@ -201,13 +206,13 @@ class ASTStringifier(NodeVisitor):
 
         return f"{head}{''.join(elifs)}{tail}"
 
-    def visit_FilterBlock(self, node: nodes.FilterBlock, **kwargs: Any) -> str:
+    def visit_FilterBlock(self, node: nodes.FilterBlock, **_: object) -> str:
         head = "{% filter " + self.visit(node.filter) + " %}"
         return (
             head + "".join(self.visit(child) for child in node.body) + "{% endfilter %}"
         )
 
-    def visit_For(self, node: nodes.For, **kwargs: Any) -> str:
+    def visit_For(self, node: nodes.For, **_: object) -> str:
         if node.recursive:
             raise ValueError(f"Unsupported node: {node}")
 
@@ -224,14 +229,14 @@ class ASTStringifier(NodeVisitor):
 
         return f"{head}{body}{else_}{end}"
 
-    def visit_Tuple(self, node: nodes.Tuple, **kwargs: Any) -> str:
+    def visit_Tuple(self, node: nodes.Tuple, **_: object) -> str:
         return f"({', '.join(self.visit(child) for child in node.items)})"
 
-    def visit_Assign(self, node: nodes.Assign, **kwargs: Any) -> str:
+    def visit_Assign(self, node: nodes.Assign, **_: object) -> str:
         assign = f"set {self.visit(node.target)} = {self.visit(node.node)}"
         return "{% " + assign + " %}"
 
-    def visit_AssignBlock(self, node: nodes.AssignBlock, **kwargs: Any) -> str:
+    def visit_AssignBlock(self, node: nodes.AssignBlock, **_: object) -> str:
         if node.filter is not None:
             raise ValueError(f"Unsupported node: {node}")
         head = "{% set " + self.visit(node.target) + "%}"
@@ -239,7 +244,7 @@ class ASTStringifier(NodeVisitor):
         tail = "{% endset %}"
         return "".join((head, body, tail))
 
-    def visit_Test(self, node: nodes.Test, negate: bool = False, **kwargs: Any) -> str:
+    def visit_Test(self, node: nodes.Test, negate: bool = False, **_: object) -> str:
         lhs = self.visit(node.node)
         rhs = self._stringify_call(
             node.name, node.args, node.kwargs, node.dyn_args, node.dyn_kwargs
@@ -249,7 +254,9 @@ class ASTStringifier(NodeVisitor):
         else:
             return f"{lhs} is {rhs}"
 
-    def visit_Filter(self, node: nodes.Filter, **kwargs: Any) -> str:
+    def visit_Filter(
+        self, node: nodes.Filter, parenthesize: bool = False, **_: object
+    ) -> str:
         filter_call = self._stringify_call(
             node.name, node.args, node.kwargs, node.dyn_args, node.dyn_kwargs
         )
@@ -257,11 +264,11 @@ class ASTStringifier(NodeVisitor):
             rendered = f"{self.visit(node.node)} | {filter_call}"
         else:
             rendered = filter_call
-        if kwargs.get("parenthesize"):
+        if parenthesize:
             return f"({rendered})"
         return rendered
 
-    def visit_Call(self, node: nodes.Call, **kwargs: Any) -> str:
+    def visit_Call(self, node: nodes.Call, **_: object) -> str:
         return self._stringify_call(
             self.visit(node.node),
             node.args,
@@ -271,16 +278,16 @@ class ASTStringifier(NodeVisitor):
             force_parens=True,
         )
 
-    def visit_Getitem(self, node: nodes.Getitem, **kwargs: Any) -> str:
+    def visit_Getitem(self, node: nodes.Getitem, **_: object) -> str:
         return f"{self.visit(node.node, parenthesize=True)}[{self.visit(node.arg)}]"
 
-    def visit_Getattr(self, node: nodes.Getattr, **kwargs: Any) -> str:
+    def visit_Getattr(self, node: nodes.Getattr, **_: object) -> str:
         return f"{self.visit(node.node, parenthesize=True)}.{node.attr}"
 
-    def visit_Keyword(self, node: nodes.Keyword, **kwargs: Any) -> str:
+    def visit_Keyword(self, node: nodes.Keyword, **_: object) -> str:
         return f"{node.key}={self.visit(node.value)}"
 
-    def visit_Slice(self, node: nodes.Slice, **kwargs: Any) -> str:
+    def visit_Slice(self, node: nodes.Slice, **_: object) -> str:
         start = self.visit(node.start) if node.start else ""
         stop = self.visit(node.stop) if node.stop else ""
         if node.step:
@@ -319,15 +326,27 @@ class ASTStringifier(NodeVisitor):
         return f"{name}({args_str})"
 
 
+NodeT = TypeVar("NodeT", bound=nodes.Node)
+type NodeMatcher = Callable[[nodes.Node], bool]
+
+
+# Needs to be a protocol so we can enforce the same input and output type with a typevar.
+# If written as a Callable, like NodeMatcher, the typevar would need to be instantiated
+# in the visitor below.
+class NodeReplacer(Protocol):
+    def __call__(self, node: NodeT) -> NodeT: ...
+
+
 class NodeReplacerVisitor(NodeVisitor):
     def __init__(
         self,
-        matcher: Callable[[nodes.Node], bool],
-        replacer: Callable[[nodes.Node], Any],
+        matcher: NodeMatcher,
+        replacer: NodeReplacer,
     ) -> None:
-        self.match = matcher
-        self.replace = replacer
+        self.match: NodeMatcher = matcher
+        self.replace: NodeReplacer = replacer
 
+    @override
     def generic_visit(self, node: nodes.Node, *args: object, **kwargs: object) -> None:
         if isinstance(node, nodes.BinExpr):
             self.visit_BinExpr(node)
@@ -339,18 +358,18 @@ class NodeReplacerVisitor(NodeVisitor):
         if list(node.iter_child_nodes()):
             raise ValueError(f"Unsupported node: {node}")
 
-    def visit(self, node: nodes.Node, *args: object, **kwargs: object) -> nodes.Node:
+    @override
+    def visit(self, node: NodeT, *args: object, **kwargs: object) -> NodeT:
         if self.match(node):
-            return self.replace(node)  # type: ignore[no-any-return]
+            return self.replace(node)
         super().visit(node)
         return node
 
-    def _match_and_replace(self, node: nodes.Node) -> Any:
+    def _match_and_replace(self, node: NodeT) -> NodeT:
         if self.match(node):
             return self.replace(node)
         else:
-            self.visit(node)
-            return node
+            return self.visit(node)
 
     def _match_and_replace_list(self, nodes: list[nodes.Node] | None) -> None:
         if nodes is None:
@@ -480,8 +499,10 @@ def merge_consecutive_templatedata(ast: nodes.Node) -> nodes.Node:
     def _check_node(node: nodes.Node) -> bool:
         return isinstance(node, nodes.Output)
 
-    def _replace_node(node: nodes.Node) -> nodes.Node:
-        assert isinstance(node, nodes.Output)
+    def _replace_node(node: NodeT) -> NodeT:
+        if not isinstance(node, nodes.Output):
+            return node
+
         new_nodes: list[nodes.Expr] = []
         for child in node.nodes:
             if (
@@ -502,7 +523,9 @@ def merge_consecutive_templatedata(ast: nodes.Node) -> nodes.Node:
                 if not (isinstance(node, nodes.TemplateData) and not node.data)
             ]
 
-        return nodes.Output(new_nodes)
+        # Need to cast as the type checker doesn't seem to be able to infer the connection between
+        # this newly connected output and the type guard earlier.
+        return cast(NodeT, nodes.Output(new_nodes))
 
     return NodeReplacerVisitor(_check_node, _replace_node).visit(ast)
 
@@ -511,7 +534,7 @@ def _find_ast_differences(a: nodes.Node, b: nodes.Node) -> Iterable[str]:
     if a == b:
         return
 
-    if type(a) != type(b):
+    if type(a) is not type(b):
         yield f"{type(a)} vs {type(b)}"
         return
 
@@ -603,8 +626,7 @@ def parse_conditional(
         var_str = var_mappings[var_name]
         return parse_wrapped_conditional(var_str, env), {var_name}
 
-    # Otherwise, we don't know anything about the variable, so we parse it as
-    # is.
+    # Otherwise, we don't know anything about the variable, so we parse it as is.
     return ast, set()
 
 
@@ -638,6 +660,7 @@ class FindUndeclaredVariablesVisitor(NodeVisitor):
         pass
 
 
+@final
 class TemplateExpressionAST:
     def __init__(
         self,
