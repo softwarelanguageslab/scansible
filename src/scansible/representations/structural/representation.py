@@ -28,12 +28,14 @@ from . import ansible_types as ans
 
 # Type aliases
 TaskContainer = Union["Block", "Play", "TaskFile"]
+# FIXME: Reconcile with similar type aliases in scansible.types.
+# FIXME: Need a Union here for attrs-strict...
 Scalar = Union[
     bool, int, float, str, "VaultValue", datetime.date, datetime.datetime, None
 ]
 # These should be recursive types, but mypy doesn't support them so they'd be
 # Any anyway, and it also doesn't work with our type validation.
-AnyValue = Union[Scalar, Sequence[Any], Mapping[Scalar, Any]]
+AnyValue = Union[Scalar, Sequence["AnyValue"], Mapping[Scalar, "AnyValue"]]
 Position = tuple[str, int, int]
 
 

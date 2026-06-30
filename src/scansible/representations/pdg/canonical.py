@@ -21,7 +21,7 @@ from .extractor.expressions.templates import (
     TemplateExpressionAST,
     merge_consecutive_templatedata,
 )
-from .extractor.expressions.var_context import extract_type_name
+from .extractor.expressions.expression_types import extract_type_name
 from .representation import (
     CompositeLiteral,
     Composition,

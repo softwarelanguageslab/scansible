@@ -26,7 +26,7 @@ class _RecordBase:
     __replace__ = partialmethod(dataclasses.replace)
 
 
-class TemplateRecord(_RecordBase, abc.ABC):
+class TemplateResult(_RecordBase, abc.ABC):
     """Result of a template expression evaluation."""
 
     data_node: rep.DataNode
@@ -40,7 +40,7 @@ class TemplateRecord(_RecordBase, abc.ABC):
 
 
 @dataclass(frozen=True)
-class LiteralEvaluationResult(TemplateRecord):
+class LiteralEvaluationResult(TemplateResult):
     """Result of a literal expression."""
 
     data_node: rep.DataNode
@@ -60,7 +60,7 @@ class LiteralEvaluationResult(TemplateRecord):
 
 
 @dataclass(frozen=True)
-class TemplateEvaluationResult(TemplateRecord):
+class TemplateEvaluationResult(TemplateResult):
     """Result of a template expression evaluation."""
 
     data_node: rep.DataNode
@@ -115,7 +115,7 @@ class ConstantVariableValueRecord(VariableValueRecord):
 
 @dataclass(frozen=True)
 class ChangeableVariableValueRecord(VariableValueRecord):
-    template_record: TemplateRecord
+    template_record: TemplateResult
 
     def copy(self) -> ChangeableVariableValueRecord:
         return ChangeableVariableValueRecord(

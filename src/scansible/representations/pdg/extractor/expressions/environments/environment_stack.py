@@ -16,7 +16,7 @@ from ..records import (
     ChangeableVariableValueRecord,
     ConstantVariableValueRecord,
     TemplateEvaluationResult,
-    TemplateRecord,
+    TemplateResult,
     VariableDefinitionRecord,
     VariableValueRecord,
 )
@@ -165,7 +165,7 @@ class EnvironmentStack:
         return first(self._iter_variable_values(name)) is not None
 
     def get_variable_value_for_cached_expression(
-        self, name: str, def_revision: int, template_record: TemplateRecord
+        self, name: str, def_revision: int, template_record: TemplateResult
     ) -> ChangeableVariableValueRecord | None:
         logger.debug(
             f"Looking up variable value for {name!r}@{def_revision}, evaluated as {template_record!r}"
@@ -225,7 +225,7 @@ class EnvironmentStack:
         target_env.set_variable_value(name, rec)
 
     def _find_env_for_evaluated_variable(
-        self, name: str, def_revision: int, template_record: TemplateRecord
+        self, name: str, def_revision: int, template_record: TemplateResult
     ) -> Environment:
         _, outermost_env = ensure_not_none(
             self._get_highest_precedence_variable_definition(
@@ -261,7 +261,7 @@ class EnvironmentStack:
         return self.environment_stack[env_idx]
 
     def _get_outermost_env_for_template(
-        self, rec: TemplateRecord
+        self, rec: TemplateResult
     ) -> Environment | None:
         # We're looking for the outermost scope in which we can find every single
         # one of the variable values referenced by the template record, both
@@ -273,7 +273,7 @@ class EnvironmentStack:
         )
 
     def _all_used_values_are_visible_in_env(
-        self, env: Environment, rec: TemplateRecord
+        self, env: Environment, rec: TemplateResult
     ) -> bool:
         scope_idx = self.environment_stack.index(env)
         prec_chain = list(
@@ -293,7 +293,7 @@ class EnvironmentStack:
             return False
 
         # Check transitive dependences
-        transitive_dependences: list[TemplateRecord] = []
+        transitive_dependences: list[TemplateResult] = []
         for used_var in rec.used_variables:
             # Cannot be none, we just checked that they're all visible
             if isinstance(used_var, ChangeableVariableValueRecord):

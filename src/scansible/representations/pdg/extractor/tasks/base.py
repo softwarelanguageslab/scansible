@@ -48,9 +48,7 @@ class TaskExtractor(abc.ABC):
         for condition in conditions:
             # Create an IV for each condition and link it to the conditional node.
             try:
-                condition_value_node = self.context.vars.build_conditional_expression(
-                    condition
-                )
+                condition_value_node = self.context.vars.build_condition(condition)
             except RecursiveDefinitionError as e:
                 self.logger.error(e)
                 continue
