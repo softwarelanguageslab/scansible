@@ -14,7 +14,7 @@ class DataLoader:
     def load_from_file(
         self,
         file_name: str,
-        cache: bool = ...,
+        cache: str = ...,
         unsafe: bool = ...,
         json_only: bool = ...,
     ) -> AnsibleBaseYAMLObject: ...
@@ -24,4 +24,4 @@ class DataLoader:
         name: str,
         extensions: list[str] | None = ...,
         allow_dir: bool = ...,
-    ) -> list[bytes]: ...
+    ) -> list[str]: ...

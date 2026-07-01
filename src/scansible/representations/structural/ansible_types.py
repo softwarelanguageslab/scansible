@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, final
 
 from ansible import constants
 from ansible.errors import AnsibleError as AnsibleError
@@ -41,6 +41,7 @@ if TYPE_CHECKING:
 
 
 # Fake class as stand-in for module.
+@final
 class role:
     from ansible.playbook.role.include import RoleInclude as RoleInclude
     from ansible.playbook.role.requirement import RoleRequirement as RoleRequirement

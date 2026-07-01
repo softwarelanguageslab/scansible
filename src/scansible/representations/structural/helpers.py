@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Generator, NoReturn
+from typing import NoReturn, Protocol, cast, override
 
 import io
 import os.path
+from collections.abc import Iterator, Mapping, Sequence
 from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
 
+from ansible.parsing.yaml.objects import AnsibleUnicode
+
+from scansible.representations.structural.representation import VaultValue
+
 from . import ansible_types as ans
-from . import representation as rep
 
 
 class FatalError(Exception):
@@ -42,6 +46,7 @@ class ProjectPath:
         else:
             self.relative = file_path
 
+    @override
     def __str__(self) -> str:
         return str(self.absolute)
 
@@ -91,7 +96,7 @@ def validate_ansible_object(obj: ans.FieldAttributeBase) -> None:
     # expressions. We don't want that.
     templar = ans.Templar(ans.DataLoader())
     for name, attribute in obj.fattributes.items():
-        value = getattr(obj, name)
+        value = cast(object, getattr(obj, name))
         if value is None:
             continue
         if attribute.isa == "class":
@@ -128,6 +133,7 @@ def find_file(dir_path: ProjectPath, file_name: str) -> ProjectPath | None:
 
     :raises     AssertionError:  When multiple files were found.
     """
+    # TODO: Use `SourceFileMap`?
     loader = ans.DataLoader()
     # DataLoader.find_vars_files is misnamed.
     found_paths = loader.find_vars_files(
@@ -166,7 +172,7 @@ def find_all_files(dir_path: ProjectPath) -> list[ProjectPath]:
 
 
 @contextmanager
-def capture_output() -> Generator[io.StringIO, None, None]:
+def capture_output() -> Iterator[io.StringIO]:
     """Context manager which, while active, captures all printed output.
 
     Useful to capture Ansible logs that otherwise get printed to the terminal.
@@ -181,13 +187,17 @@ def capture_output() -> Generator[io.StringIO, None, None]:
     """
     buffer = io.StringIO()
     with ExitStack() as stack:
-        stack.enter_context(redirect_stderr(buffer))
-        stack.enter_context(redirect_stdout(buffer))
+        _ = stack.enter_context(redirect_stderr(buffer))
+        _ = stack.enter_context(redirect_stdout(buffer))
         yield buffer
 
 
+class _Intercepter(Protocol):
+    def __call__(self, *_args: object, **_kwargs: object) -> NoReturn: ...
+
+
 @contextmanager
-def prevent_undesired_operations() -> Generator[None, None, None]:
+def prevent_undesired_operations() -> Iterator[None]:
     """
     Context manager which, while active, blocks Ansible from performing
     undesired operations such as evaluating template expressions or eagerly
@@ -200,45 +210,50 @@ def prevent_undesired_operations() -> Generator[None, None, None]:
     old_templar_do_template = Templar.do_template
     old_templar_template = Templar.template
 
-    def raise_if_called(name: str) -> Callable[[Any], NoReturn]:
-        def raiser(*args: object, **kwargs: object) -> NoReturn:
+    def raise_if_called(name: str) -> _Intercepter:
+        def raiser(*_args: object, **_kwargs: object) -> NoReturn:
             raise FatalError(f"{name} was called when it was not supposed to be called")
 
         return raiser
 
-    helpers.load_list_of_tasks = raise_if_called("load_list_of_tasks")  # type: ignore[assignment]
-    Templar.do_template = raise_if_called("Templar.do_template")  # type: ignore[assignment]
-    Templar.template = raise_if_called("Templar.template")  # type: ignore[assignment]
+    helpers.load_list_of_tasks = raise_if_called("load_list_of_tasks")
+    Templar.do_template = raise_if_called("Templar.do_template")
+    Templar.template = raise_if_called("Templar.template")
 
     try:
         yield
     finally:
         helpers.load_list_of_tasks = old_load_list_of_tasks
-        Templar.do_template = old_templar_do_template  # type: ignore[assignment]
-        Templar.template = old_templar_template  # type: ignore[assignment]
+        Templar.do_template = old_templar_do_template
+        Templar.template = old_templar_template
 
 
-def convert_ansible_values(obj: Any) -> Any:
+def convert_ansible_values(obj: object) -> object:
+    # FIXME: This is a hack, we should instead apply systematic coercion.
     if isinstance(obj, ans.AnsibleVaultEncryptedUnicode):
-        return rep.VaultValue(data=obj._ciphertext, location=obj.ansible_pos)
-    if isinstance(obj, list):
-        seq = ans.AnsibleSequence(
-            [convert_ansible_values(el) for el in obj]  # pyright: ignore
-        )
-        seq.ansible_pos = getattr(
-            obj,
+        return VaultValue(obj._ciphertext, obj.ansible_pos)
+    if isinstance(obj, str):
+        ans_str = AnsibleUnicode(obj)
+        ans_str.ansible_pos = getattr(
+            cast(object, obj),
             "ansible_pos",
-            ("unknown file", -1, -1),  # pyright: ignore
+            ("unknown file", -1, -1),
+        )
+        return ans_str
+    if isinstance(obj, Sequence):
+        seq = ans.AnsibleSequence([convert_ansible_values(el) for el in obj])  # pyright: ignore[reportArgumentType]
+        seq.ansible_pos = getattr(
+            cast(object, obj),
+            "ansible_pos",
+            ("unknown file", -1, -1),
         )
         return seq
-    if isinstance(obj, dict):
-        dct = ans.AnsibleMapping(
-            {k: convert_ansible_values(v) for k, v in obj.items()}  # pyright: ignore
-        )
+    if isinstance(obj, Mapping):
+        dct = ans.AnsibleMapping({k: convert_ansible_values(v) for k, v in obj.items()})  # pyright: ignore[reportUnknownVariableType]
         dct.ansible_pos = getattr(
-            obj,
+            cast(object, obj),
             "ansible_pos",
-            ("unknown file", -1, -1),  # pyright: ignore
+            ("unknown file", -1, -1),
         )
         return dct
     return obj

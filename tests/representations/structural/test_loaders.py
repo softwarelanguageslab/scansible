@@ -445,7 +445,7 @@ def describe_load_task_file() -> None:
     def raises_on_wrong_property_type(load_tasks_file: LoadTasksFileType) -> None:
         with pytest.raises(
             LoadError,
-            match=r"Expected task file content to be dict\[str, typing\.Any\]",
+            match=r"Expected task file content to be dict\[str, object\]",
         ):
             load_tasks_file(
                 """

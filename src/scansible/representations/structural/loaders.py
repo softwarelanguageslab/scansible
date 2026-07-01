@@ -7,22 +7,27 @@ parsed data structure without modifications.
 
 from __future__ import annotations
 
-from typing import Any, Generator, Literal, Type, cast, overload
+from typing import Literal, cast, final, overload
 
 import types
-from collections.abc import Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from copy import deepcopy
 from pathlib import Path
 
-from ansible.parsing import mod_args
+from ansible.parsing.yaml.objects import AnsibleMapping, AnsibleUnicode
 from ansible.utils.fqcn import add_internal_fqcns
 
 from scansible.representations.structural.representation import Handler, Task
 from scansible.utils import actions
 
 from . import ansible_types as ans
-from .helpers import ProjectPath, parse_file, validate_ansible_object
+from .helpers import (
+    ProjectPath,
+    convert_ansible_values,
+    parse_file,
+    validate_ansible_object,
+)
 
 
 class LoadError(Exception):
@@ -56,27 +61,27 @@ class LoadError(Exception):
         self.file_path = file_path
 
 
-def _type_to_str(type_: Any) -> str:
-    if isinstance(type_, types.GenericAlias):
+def _type_to_str(type_: type | types.UnionType) -> str:
+    if isinstance(type_, (types.GenericAlias, types.UnionType)):
         return str(type_)
-    return type_.__name__ if hasattr(type_, "__name__") else str(type_)  # type: ignore[no-any-return]
+    return type_.__name__ if hasattr(type_, "__name__") else str(type_)
 
 
 class LoadTypeError(LoadError):
     """Raised when loading led to a wrong type."""
 
     #: The expected type.
-    expected_type: Any
+    expected_type: type | types.UnionType
     #: The actual type.
-    actual_type: Type[Any]
+    actual_type: type
     #: The actual object.
-    actual_value: Any
+    actual_value: object
 
     def __init__(
         self,
         object_type: str,
-        expected_type: Any,
-        actual_value: Any,
+        expected_type: type | types.UnionType,
+        actual_value: object,
         file_path: Path | None = None,
     ) -> None:
         extra_msg = f"Expected {object_type} to be {_type_to_str(expected_type)}, got {_type_to_str(type(actual_value))} instead.\nActual value:\n{actual_value!r}"
@@ -91,7 +96,7 @@ class LoadTypeError(LoadError):
         self.actual_value = actual_value
 
 
-def load_role_metadata(path: ProjectPath) -> tuple[dict[str, ans.AnsibleValue], Any]:
+def load_role_metadata(path: ProjectPath) -> tuple[dict[str, ans.AnsibleValue], object]:
     """Load role metadata, return tuple of validated and original data."""
     original_ds = parse_file(path)
     ds = deepcopy(original_ds)
@@ -136,14 +141,14 @@ def _load_meta_platforms(ds: dict[str, ans.AnsibleValue]) -> None:
         raise LoadTypeError("role metadata galaxy_info.platforms", list, platforms)
 
     validated_platforms = ans.AnsibleSequence()
-    for platform in cast(Sequence[Any], platforms):
+    for platform in cast(Sequence[object], platforms):
         if not isinstance(platform, dict):
             print(
                 f"Ignoring malformed platform {platform!r}: expected to be dict, got {_type_to_str(type(platform))}"
             )
             continue
 
-        platform = cast(dict[str, Any], platform)
+        platform = cast(dict[str, object], platform)
         name = platform.get("name")
         versions = platform.get("versions", ["all"])
         # https://github.com/ansible/galaxy/blob/1fe0bd986aaeb4c45157d4e463b7049cad76a25e/galaxy/importer/loaders/role.py#L471
@@ -159,16 +164,19 @@ def _load_meta_platforms(ds: dict[str, ans.AnsibleValue]) -> None:
 
         if not isinstance(versions, list):
             print(
-                f'Ignoring malformed platform {platform!r}: "versions" expected to be list, got {_type_to_str(type(versions))}'
+                f'Ignoring malformed platform {platform!r}: "versions" expected to be list, got {_type_to_str(type(cast(object, versions)))}'
             )
             continue
 
         validated_platforms.append(
-            ans.AnsibleMapping(
-                {
-                    "name": str(name),  # type: ignore[dict-item]
-                    "versions": [str(v) for v in versions],  # type: ignore[dict-item]
-                }
+            cast(
+                ans.AnsibleMapping,
+                convert_ansible_values(
+                    {
+                        "name": str(name),
+                        "versions": [str(v) for v in cast(list[object], versions)],
+                    }
+                ),
             )
         )
 
@@ -185,7 +193,7 @@ def _load_meta_dependencies(ds: dict[str, ans.AnsibleValue]) -> None:
         raise LoadTypeError("role dependencies", list, dependencies)
 
 
-def load_variable_file(path: ProjectPath) -> tuple[dict[str, ans.AnsibleValue], Any]:
+def load_variable_file(path: ProjectPath) -> tuple[dict[str, ans.AnsibleValue], object]:
     original_ds = parse_file(path)
     ds = deepcopy(original_ds)
 
@@ -203,7 +211,9 @@ def load_variable_file(path: ProjectPath) -> tuple[dict[str, ans.AnsibleValue], 
     return cast(dict[str, "ans.AnsibleValue"], ds), original_ds
 
 
-def load_tasks_file(path: ProjectPath) -> tuple[list[dict[str, ans.AnsibleValue]], Any]:
+def load_tasks_file(
+    path: ProjectPath,
+) -> tuple[list[dict[str, ans.AnsibleValue]], object]:
     original_ds = parse_file(path)
     ds = deepcopy(original_ds)
 
@@ -219,44 +229,42 @@ def load_tasks_file(path: ProjectPath) -> tuple[list[dict[str, ans.AnsibleValue]
             isinstance(prop, str) for prop in content
         ):
             raise LoadTypeError(
-                "task file content", dict[str, Any], content, path.relative
+                "task file content", dict[str, object], content, path.relative
             )
 
     return cast(list[dict[str, "ans.AnsibleValue"]], ds), original_ds
 
 
 @contextmanager
-def _patch_modargs_parser() -> Generator[None, None, None]:
+def _patch_modargs_parser() -> Iterator[None]:
     # Patch the ModuleArgsParser so that it doesn't verify whether the action exist.
     # Otherwise it'll complain on non-builtin actions
     old_mod_args_parse = ans.ModuleArgsParser.parse
-    ans.ModuleArgsParser.parse = (
-        lambda self, skip_action_validation=False: old_mod_args_parse(
-            self, skip_action_validation=True
-        )
-    )  # type: ignore[assignment]
+    ans.ModuleArgsParser.parse = lambda self, skip_action_validation=False: (
+        old_mod_args_parse(self, skip_action_validation=True)
+    )
 
     try:
         yield
     finally:
-        ans.ModuleArgsParser.parse = old_mod_args_parse  # type: ignore[assignment]
+        ans.ModuleArgsParser.parse = old_mod_args_parse
 
 
 @contextmanager
-def _patch_lookup_loader() -> Generator[None, None, None]:
+def _patch_lookup_loader() -> Iterator[None]:
     # Patch the lookup_loader so that it always reports a lookup plugin as existing.
     # Ansible does early resolution of `with_*` lookups, and since we may not
     # have all collections installed and we're not registering custom lookup
     # plugins, it'll complain when those are used in `with_*` directives.
     old_loader_has_plugin = ans.PluginLoader.has_plugin
-    ans.PluginLoader.has_plugin = lambda *args, **kwargs: True  # type: ignore[assignment]
-    ans.PluginLoader.__contains__ = lambda *args, **kwargs: True  # type: ignore[assignment]
+    ans.PluginLoader.has_plugin = lambda *args, **kwargs: True  # pyright: ignore[reportUnknownLambdaType]
+    ans.PluginLoader.__contains__ = lambda *args, **kwargs: True  # pyright: ignore[reportUnknownLambdaType]
 
     try:
         yield
     finally:
-        ans.PluginLoader.has_plugin = old_loader_has_plugin  # type: ignore[assignment]
-        ans.PluginLoader.__contains__ = old_loader_has_plugin  # type: ignore[assignment]
+        ans.PluginLoader.has_plugin = old_loader_has_plugin
+        ans.PluginLoader.__contains__ = old_loader_has_plugin
 
 
 def get_task_action(ds: dict[str, ans.AnsibleValue]) -> str:
@@ -340,7 +348,7 @@ def _transform_task_include(ds: dict[str, ans.AnsibleValue], action: str) -> Non
         is_static = None
 
     if actions.is_bare_include(action):
-        include_names: list[str] = add_internal_fqcns(["include"])
+        include_names = add_internal_fqcns(["include"])
         include_name = next(name for name in include_names if name in ds)
         include_args = ds[include_name]
         del ds[include_name]
@@ -384,7 +392,7 @@ def _transform_old_become(ds: dict[str, ans.AnsibleValue]) -> None:
     su_kws = ("su", "su_user", "su_exe", "su_flags", "su_pass")
     main_kw, user_kw, exe_kw, flags_kw, pass_kw = sudo_kws if has_sudo else su_kws
 
-    ds["become_method"] = "sudo" if has_sudo else "su"  # type: ignore[assignment]
+    ds["become_method"] = AnsibleUnicode("sudo" if has_sudo else "su")
 
     if main_kw in ds:
         ds["become"] = ds[main_kw]
@@ -400,9 +408,9 @@ def _transform_old_become(ds: dict[str, ans.AnsibleValue]) -> None:
         del ds[flags_kw]
     if pass_kw in ds:
         # There's no `become_pass` alternative, so define the variable instead.
-        variables: dict[str, ans.AnsibleValue] = ds.get("vars", {})  # type: ignore[assignment]
+        variables = cast(AnsibleMapping, ds.get("vars", {}))
         variables["ansible_become_password"] = ds[pass_kw]
-        ds["vars"] = variables  # type: ignore[assignment]
+        ds["vars"] = variables
         del ds[pass_kw]
 
 
@@ -427,18 +435,18 @@ def _transform_old_always_run(ds: dict[str, ans.AnsibleValue]) -> None:
 @overload
 def load_task(
     original_ds: dict[str, ans.AnsibleValue] | None, as_handler: Literal[True]
-) -> tuple[ans.Handler, Any]: ...
+) -> tuple[ans.Handler, object]: ...
 
 
 @overload
 def load_task(
     original_ds: dict[str, ans.AnsibleValue] | None, as_handler: Literal[False]
-) -> tuple[ans.Task, Any]: ...
+) -> tuple[ans.Task, object]: ...
 
 
 def load_task(
     original_ds: dict[str, ans.AnsibleValue] | None, as_handler: bool
-) -> tuple[ans.Task | ans.Handler, Any]:
+) -> tuple[ans.Task | ans.Handler, object]:
     ds = deepcopy(original_ds)
 
     # Apparently an empty Task is allowed by Ansible.
@@ -486,10 +494,11 @@ def load_task(
     return raw_task, original_ds
 
 
+@final
 class _PatchedBlock(ans.Block):
-    block: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
-    rescue: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
-    always: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
+    block: Sequence[Mapping[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
+    rescue: Sequence[Mapping[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
+    always: Sequence[Mapping[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
 
     def __init__(self, *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
@@ -506,7 +515,9 @@ class _PatchedBlock(ans.Block):
 _PatchedBlock.__name__ = "Block"
 
 
-def load_block(original_ds: dict[str, ans.AnsibleValue]) -> tuple[_PatchedBlock, Any]:
+def load_block(
+    original_ds: dict[str, ans.AnsibleValue],
+) -> tuple[_PatchedBlock, object]:
     ds = deepcopy(original_ds)
 
     _transform_old_become(ds)
@@ -519,18 +530,19 @@ def load_block(original_ds: dict[str, ans.AnsibleValue]) -> tuple[_PatchedBlock,
         )
 
     raw_block = _PatchedBlock(ds)
-    raw_block.load_data(ds)
+    _ = raw_block.load_data(ds)
     validate_ansible_object(raw_block)
 
     return raw_block, ds
 
 
+@final
 class _PatchedPlay(ans.Play):
-    tasks: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
-    handlers: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
-    pre_tasks: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
-    post_tasks: list[dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
-    roles: list[str | dict[str, ans.AnsibleValue]]  # type: ignore[assignment]
+    tasks: Sequence[Mapping[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
+    handlers: Sequence[Mapping[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
+    pre_tasks: Sequence[Mapping[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
+    post_tasks: Sequence[Mapping[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
+    roles: Sequence[str | Mapping[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
 
     def __init__(self, *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
@@ -547,25 +559,27 @@ class _PatchedPlay(ans.Play):
 _PatchedPlay.__name__ = "Play"
 
 
-def load_play(original_ds: dict[str, ans.AnsibleValue]) -> tuple[_PatchedPlay, Any]:
+def load_play(original_ds: dict[str, ans.AnsibleValue]) -> tuple[_PatchedPlay, object]:
     ds = deepcopy(original_ds)
 
     _transform_old_become(ds)
 
     # remove the "accelerate" key if present. It was removed in 2.4
-    ds.pop("accelerate", None)
+    _ = ds.pop("accelerate", None)
 
     if "vars_files" in ds and ds["vars_files"] is None:
         del ds["vars_files"]
 
     raw_play = _PatchedPlay()
-    raw_play.load_data(ds)
+    _ = raw_play.load_data(ds)
     validate_ansible_object(raw_play)
 
     return raw_play, original_ds
 
 
-def load_playbook(path: ProjectPath) -> tuple[list[dict[str, ans.AnsibleValue]], Any]:
+def load_playbook(
+    path: ProjectPath,
+) -> tuple[list[dict[str, ans.AnsibleValue]], object]:
     original_ds = parse_file(path)
     ds = deepcopy(original_ds)
 
@@ -586,9 +600,10 @@ def load_playbook(path: ProjectPath) -> tuple[list[dict[str, ans.AnsibleValue]],
     return cast(list[dict[str, "ans.AnsibleValue"]], ds), original_ds
 
 
+@final
 class _PatchedRoleInclude(ans.role.RoleInclude):
     # Override the _load_role_path method so that it doesn't resolve the path.
-    def _load_role_path(self, role_name: str) -> tuple[str, str]:
+    def _load_role_path(self, role_name: str) -> tuple[str, str]:  # pyright: ignore[reportUnusedFunction]
         return role_name, ""
 
 
@@ -597,7 +612,7 @@ _PatchedRoleInclude.__name__ = "RoleInclude"
 
 def load_role_dependency(
     original_ds: str | dict[str, ans.AnsibleValue], allow_new_style: bool = False
-) -> tuple[_PatchedRoleInclude, dict[str, str] | None, Any]:
+) -> tuple[_PatchedRoleInclude, dict[str, str] | None, object]:
     ds = deepcopy(original_ds)
 
     if isinstance(ds, dict):
@@ -606,9 +621,9 @@ def load_role_dependency(
     if isinstance(ds, dict) and not ("name" in ds or "role" in ds) and allow_new_style:
         # new-style role dependency, needs to be parsed specially and converted
         # to old style for later loading.
-        parsed_def = ans.role.RoleRequirement.role_yaml_parse(ds)  # type: ignore[arg-type]
+        parsed_def = ans.role.RoleRequirement.role_yaml_parse(cast(AnsibleMapping, ds))
         if "name" in parsed_def:
-            ds["name"] = parsed_def["name"]  # type: ignore[assignment]
+            ds["name"] = AnsibleUnicode(parsed_def["name"])
     else:
         parsed_def = None
 
@@ -622,7 +637,7 @@ def _load_old_style_role_dependency(
 
     # Validation from original RoleInclude, can't use the method because it
     # constructs a RoleInclude, which attempts to resolve the role path.
-    if not isinstance(ds, (str, dict, ans.AnsibleBaseYAMLObject, int)):  # pyright: ignore
+    if not isinstance(ds, (str, dict, ans.AnsibleBaseYAMLObject, int)):  # pyright: ignore[reportUnnecessaryIsInstance]
         raise LoadTypeError(
             "role dependency", str | dict | ans.AnsibleBaseYAMLObject, ds
         )
@@ -633,7 +648,7 @@ def _load_old_style_role_dependency(
         )
 
     ri = _PatchedRoleInclude()
-    ri.load_data(ds)
+    _ = ri.load_data(ds)
     validate_ansible_object(ri)
 
     return ri
