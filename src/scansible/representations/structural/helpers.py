@@ -12,7 +12,7 @@ from pathlib import Path
 
 from ansible.parsing.yaml.objects import AnsibleUnicode
 
-from scansible.representations.structural.representation import VaultValue
+from scansible.types import VaultValue
 
 from . import ansible_types as ans
 
@@ -29,13 +29,14 @@ class ProjectPath:
     relative path to a file or directory in the project.
     """
 
-    #: The project's root path.
+    #: The project's root path. Must be a directory.
     root: Path
     #: Path to the content, relative to the root path.
     relative: Path
 
     def __init__(self, root_path: Path, file_path: Path | str) -> None:
         assert root_path.is_absolute()
+        assert root_path.is_dir()
         self.root = root_path
 
         if not isinstance(file_path, Path):
@@ -54,10 +55,13 @@ class ProjectPath:
     def from_root(cls, root_path: Path) -> ProjectPath:
         """
         Construct a ProjectPath instance for the project root.
+        If given a file, will set the root the the parent of the file.
 
         :param      root_path:  The root path to the project.
         :type       root_path:  Path
         """
+        if root_path.is_file():
+            return cls(root_path.parent, root_path.name)
         return cls(root_path, ".")
 
     def join(self, other: Path | str) -> ProjectPath:
@@ -231,8 +235,11 @@ def prevent_undesired_operations() -> Iterator[None]:
 def convert_ansible_values(obj: object) -> object:
     # FIXME: This is a hack, we should instead apply systematic coercion.
     if isinstance(obj, ans.AnsibleVaultEncryptedUnicode):
-        return VaultValue(obj._ciphertext, obj.ansible_pos)
+        return VaultValue(data=obj._ciphertext, ansible_pos=obj.ansible_pos)
+    if isinstance(obj, ans.AnsibleBaseYAMLObject):
+        return obj
     if isinstance(obj, str):
+        assert not isinstance(obj, AnsibleUnicode)
         ans_str = AnsibleUnicode(obj)
         ans_str.ansible_pos = getattr(
             cast(object, obj),

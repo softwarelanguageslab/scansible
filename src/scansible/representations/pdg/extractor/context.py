@@ -1,19 +1,20 @@
 from __future__ import annotations
 
-from typing import Generator, Sequence, TypeAlias, cast
+from typing import TypeAlias, cast, final
 
 import json
 import re
 import textwrap
 from collections import defaultdict
-from collections.abc import Iterable, Iterator
+from collections.abc import Generator, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from os.path import normpath
 from pathlib import Path
 
 from loguru import logger
 
-from scansible.representations import structural as struct_rep
+from scansible.representations.structural import ast
+from scansible.representations.structural import extractor as ast_extractor
 from scansible.representations.structural.helpers import (
     ProjectPath,
     capture_output,
@@ -29,6 +30,7 @@ from .expressions import VarContext
 LocTuple: TypeAlias = tuple[str, int, int]
 
 
+@final
 class IncludeContext:
     _playbook_base_path: ProjectPath | None
 
@@ -49,7 +51,7 @@ class IncludeContext:
 
     def __init__(
         self,
-        model: struct_rep.StructuralModel,
+        model: ast.AST,
         role_search_paths: Sequence[Path],
         *,
         lenient: bool,
@@ -60,7 +62,7 @@ class IncludeContext:
         self._include_stack = []
 
         _last_included_file_path = None
-        if isinstance(model.root, struct_rep.Playbook):
+        if isinstance(model.root, ast.Playbook):
             self._playbook_base_path = ProjectPath.from_root(model.path.parent)
             _last_included_file_path = self._playbook_base_path.join(model.path.name)
         else:
@@ -69,7 +71,7 @@ class IncludeContext:
             self._role_stack.append(role_base_path)
             if model.root.main_tasks_file is not None:
                 _last_included_file_path = role_base_path.join(
-                    model.root.main_tasks_file.file_path
+                    model.root.main_tasks_file.path
                 )
 
         self.all_included_files: set[Path] = set()
@@ -89,12 +91,12 @@ class IncludeContext:
         try:
             yield
         finally:
-            self._include_stack.pop()
+            _ = self._include_stack.pop()
 
     @contextmanager
     def _enter_role(
         self,
-        role: struct_rep.Role,
+        role: ast.Role,
         role_base_path: ProjectPath,
         includer_location: rep.NodeLocation,
     ) -> Generator[None, None, None]:
@@ -103,19 +105,19 @@ class IncludeContext:
             # TODO: this is ugly. we can probably use an ExitStack here.
             if role.main_tasks_file is not None:
                 with self._enter_file(
-                    role_base_path.join(role.main_tasks_file.file_path),
+                    role_base_path.join(role.main_tasks_file.path),
                     includer_location,
                 ):
                     yield
             else:
                 yield
         finally:
-            self._role_stack.pop()
+            _ = self._role_stack.pop()
 
     @contextmanager
     def load_and_enter_task_file(
         self, path: str, includer_location: rep.NodeLocation
-    ) -> Generator[struct_rep.TaskFile | None, None, None]:
+    ) -> Generator[ast.TaskFile | None, None, None]:
         real_path = self._find_file(path, "tasks")
         if not real_path:
             yield None
@@ -129,12 +131,10 @@ class IncludeContext:
             yield None
             return
 
-        struct_ctx = struct_rep.extractor.ExtractionContext(lenient=self.lenient)
+        struct_ctx = ast_extractor.ExtractionContext(lenient=self.lenient)
         try:
             with capture_output() as output, prevent_undesired_operations():
-                task_file = struct_rep.extractor.extract_tasks_file(
-                    real_path, struct_ctx
-                )
+                task_file = ast_extractor.extract_tasks_file(real_path, struct_ctx)
             if logged_output := output.getvalue():
                 logger.warning(logged_output)
         except Exception as e:
@@ -151,7 +151,7 @@ class IncludeContext:
     @contextmanager
     def load_and_enter_role(
         self, role_name: str, includer_location: rep.NodeLocation
-    ) -> Generator[struct_rep.Role | None, None, None]:
+    ) -> Generator[ast.Role | None, None, None]:
         real_path = self.find_role(role_name)
         if not real_path:
             yield None
@@ -165,15 +165,13 @@ class IncludeContext:
             return
 
         try:
-            model = struct_rep.extractor.extract_role(
-                real_path.absolute, role_name, "UNKNOWN!", lenient=self.lenient
-            )
+            model = ast_extractor.extract_role(real_path.absolute, lenient=self.lenient)
         except Exception as e:
             logger.error(e)
             yield None
             return
 
-        role = cast(struct_rep.Role, model.root)
+        role = cast(ast.Role, model.root)
 
         for bt in role.broken_tasks:
             logger.error(bt.reason)
@@ -196,7 +194,7 @@ class IncludeContext:
     @contextmanager
     def load_and_enter_var_file(
         self, path: str, includer_location: rep.NodeLocation
-    ) -> Generator[struct_rep.VariableFile | None, None, None]:
+    ) -> Generator[ast.VariableFile | None, None, None]:
         real_path = self._find_file(path, "vars")
         if not real_path:
             yield None
@@ -204,7 +202,7 @@ class IncludeContext:
 
         try:
             with capture_output() as output, prevent_undesired_operations():
-                var_file = struct_rep.extractor.extract_variable_file(real_path)
+                var_file = ast_extractor.extract_variable_file(real_path)
             if logged_output := output.getvalue():
                 logger.warning(logged_output)
         except Exception as e:
@@ -417,7 +415,7 @@ class ExtractionContext:
     vars: VarContext
     graph: rep.Graph
     include_ctx: IncludeContext
-    model_root: struct_rep.Role | struct_rep.Playbook
+    model_root: ast.Role | ast.Playbook
     # Auxiliary information about variable visibility. We don't store this in
     # the graph itself but in a companion file.
     visibility_information: VisibilityInformation
@@ -431,7 +429,7 @@ class ExtractionContext:
     def __init__(
         self,
         graph: rep.Graph,
-        model: struct_rep.StructuralModel,
+        model: ast.AST,
         role_search_paths: Sequence[Path],
         *,
         lenient: bool,
@@ -474,7 +472,12 @@ class ExtractionContext:
         line: int
         column: int
 
-        if hasattr(ds, "ansible_pos"):
+        if isinstance(ds, ast.ASTNode) and isinstance(
+            ds.position, ast.ConcretePosition
+        ):
+            file = str(ds.position.file)
+            line, column = ds.position.start_line, ds.position.start_column
+        elif hasattr(ds, "ansible_pos"):
             file, line, column = ds.ansible_pos  # type: ignore[attr-defined]
         elif hasattr(ds, "location"):
             file, line, column = ds.location  # type: ignore[attr-defined]

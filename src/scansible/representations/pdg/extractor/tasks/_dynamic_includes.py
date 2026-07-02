@@ -13,7 +13,7 @@ from loguru import logger
 from scansible.representations.pdg.extractor.expressions.simplification import (
     SimplifiedExpression,
 )
-from scansible.representations.structural.representation import AnyValue
+from scansible.types import AnyValue
 
 from ... import representation as rep
 from ..expressions import EnvironmentType, TemplateExpressionAST, simplify_expression

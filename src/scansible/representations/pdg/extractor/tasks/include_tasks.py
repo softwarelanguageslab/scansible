@@ -6,12 +6,12 @@ from collections.abc import Sequence
 
 from loguru import logger
 
-from scansible.representations.structural.representation import (
-    AnyValue,
+from scansible.representations.structural.ast import (
     Block,
     Task,
     TaskFile,
 )
+from scansible.types import AnyValue
 from scansible.utils import actions
 
 from ... import representation as rep

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import override
+
 from collections.abc import Sequence
 
 from ... import representation as rep
@@ -10,6 +12,7 @@ from .base import TaskExtractor
 
 class GenericTaskExtractor(TaskExtractor):
     @classmethod
+    @override
     def SUPPORTED_TASK_ATTRIBUTES(cls) -> frozenset[str]:
         return (
             super()
@@ -29,6 +32,7 @@ class GenericTaskExtractor(TaskExtractor):
             )
         )
 
+    @override
     def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
         self.logger.debug(f"Extracting task with name {self.task.name!r}")
         with self.setup_task_vars_scope(EnvironmentType.TASK_VARS):
@@ -118,11 +122,11 @@ class GenericTaskExtractor(TaskExtractor):
 
         misc_kws = {"check_mode", "become", "become_user", "become_method"}
         for misc_kw in misc_kws:
-            if not self.task.is_default(
-                misc_kw, (kw_val := getattr(self.task, misc_kw))
-            ):
+            if misc_kw in self.task.model_fields_set:
                 try:
-                    val_node = self.context.vars.build_expression(kw_val)
+                    val_node = self.context.vars.build_expression(
+                        getattr(self.task, misc_kw)
+                    )
                 except RecursiveDefinitionError as e:
                     self.logger.error(e)
                     continue

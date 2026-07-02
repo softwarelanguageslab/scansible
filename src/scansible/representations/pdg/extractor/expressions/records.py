@@ -8,7 +8,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from functools import partialmethod
 
-from scansible.representations import structural as struct
+from scansible.types import AnyValue, ScalarValue
 from scansible.utils import Sentinel
 
 from ... import representation as rep
@@ -16,9 +16,7 @@ from ... import representation as rep
 if TYPE_CHECKING:
     from .environments import EnvironmentType
 
-TemplatableType = (
-    str | Mapping["struct.Scalar", "struct.AnyValue"] | Sequence["struct.AnyValue"]
-)
+TemplatableType = str | Mapping[ScalarValue, AnyValue] | Sequence[AnyValue]
 
 
 @dataclass(frozen=True)
@@ -84,7 +82,7 @@ class VariableDefinitionRecord(_RecordBase):
 
     name: str
     revision: int
-    initialiser: struct.AnyValue | Sentinel
+    initialiser: AnyValue | Sentinel
     eagerly_evaluated: bool
     env_type: EnvironmentType
 

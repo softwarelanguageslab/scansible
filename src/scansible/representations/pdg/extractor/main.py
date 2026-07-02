@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-from typing import Sequence
+from typing import cast, final
 
+from collections.abc import Sequence
 from pathlib import Path
 
 import loguru
 from loguru import logger
 
 from scansible.representations import structural as struct
+from scansible.representations.structural.ast import ConcretePosition, SyntheticPosition
 
 from .. import representation as rep
 from .context import ExtractionContext
@@ -17,8 +19,6 @@ from .role import RoleExtractor
 
 def extract_pdg(
     path: Path,
-    project_id: str,
-    project_rev: str,
     role_search_paths: Sequence[Path],
     *,
     as_pb: bool | None = None,
@@ -29,10 +29,6 @@ def extract_pdg(
 
     :param      path:                      The path to the project.
     :type       path:                      Path
-    :param      project_id:                The project identifier.
-    :type       project_id:                str
-    :param      project_rev:               The project revision.
-    :type       project_rev:               str
     :param      role_search_paths:         The role search paths.
     :type       role_search_paths:         { type_description }
     :param      as_pb:                     Whether the project should be
@@ -51,11 +47,9 @@ def extract_pdg(
         as_pb = not _project_is_role(path)
 
     if as_pb:
-        model = struct.extract_playbook(path, project_id, project_rev, lenient=lenient)
+        model = struct.extract_playbook(path, lenient=lenient)
     else:
-        model = struct.extract_role(
-            path, project_id, project_rev, lenient=lenient, extract_all=False
-        )
+        model = struct.extract_role(path, lenient=lenient, extract_all=False)
 
     return StructuralGraphExtractor(model, role_search_paths, lenient).extract()
 
@@ -73,17 +67,16 @@ def _project_is_role(path: Path) -> bool:
     )
 
 
+@final
 class StructuralGraphExtractor:
     def __init__(
         self,
-        model: struct.StructuralModel,
+        model: struct.AST,
         role_search_paths: Sequence[Path],
         lenient: bool,
     ) -> None:
         self.model = model
-        graph = rep.Graph(model.id, model.version)
-        for logstr in model.logs:
-            logger.debug(logstr)
+        graph = rep.Graph()
 
         for bt in model.root.broken_tasks:
             logger.error(bt.reason)
@@ -112,19 +105,23 @@ class StructuralGraphExtractor:
 
     def _capture_log_message(self, message: loguru.Message) -> None:
         location = message.record.get("extra", {}).get("location")
+        if isinstance(location, ConcretePosition):
+            location = (str(location.file), location.start_line, location.start_column)
+        elif isinstance(location, SyntheticPosition):
+            location = None
         if location is not None and location[0] == "unknown file":
             location = None
         reason = str(message)
         self.context.record_extraction_error(reason, location)
 
     def _extract_role(self) -> None:
-        RoleExtractor(
+        _ = RoleExtractor(
             self.context,
-            self.model.root,  # type: ignore[arg-type]
+            cast(struct.Role, self.model.root),
         ).extract_role()
 
     def _extract_playbook(self) -> None:
         PlaybookExtractor(
             self.context,
-            self.model.root,  # type: ignore[arg-type]
+            cast(struct.Playbook, self.model.root),
         ).extract()

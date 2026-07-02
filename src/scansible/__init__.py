@@ -101,7 +101,6 @@ def cli(verbose: bool, quiet: bool) -> None:
 def build_pdg(
     project_path: Path,
     name: str | None,
-    version: str,
     role_search_path: Sequence[Path],
     output: TextIO,
     output_format: str,
@@ -127,8 +126,6 @@ def build_pdg(
 
     ctx = extract_pdg(
         project_path,
-        name,
-        version,
         role_search_paths,
         as_pb=as_pb,
         lenient=not strict,
@@ -191,7 +188,6 @@ def check(
     enable_semantics: bool,
 ) -> None:
     """Check the project residing at PROJECT_PATH for smells."""
-    name = project_path.name
     as_pb = None if project_type is None else project_type == "playbook"
     role_search_paths = list(role_search_path) + [
         Path(p) for p in ans_constants.DEFAULT_ROLES_PATH
@@ -199,9 +195,7 @@ def check(
 
     from .representations.pdg import extract_pdg
 
-    ctx = extract_pdg(
-        project_path, name, "latest", role_search_paths, as_pb=as_pb, lenient=not strict
-    )
+    ctx = extract_pdg(project_path, role_search_paths, as_pb=as_pb, lenient=not strict)
 
     from .checks import TerminalReporter, run_all_checks
 
@@ -260,7 +254,6 @@ def check_all(
     enable_semantics: bool,
 ) -> None:
     """Check the project residing at PROJECT_PATH for smells in all files."""
-    name = project_path.name
     role_search_paths = list(role_search_path) + [
         Path(p) for p in ans_constants.DEFAULT_ROLES_PATH
     ]
@@ -278,12 +271,7 @@ def check_all(
     for entrypoint, project_type in entrypoints:
         as_pb = None if project_type is None else project_type == "playbook"
         ctx = extract_pdg(
-            entrypoint,
-            name,
-            "latest",
-            role_search_paths,
-            as_pb=as_pb,
-            lenient=not strict,
+            entrypoint, role_search_paths, as_pb=as_pb, lenient=not strict
         )
 
         from .checks import TerminalReporter, run_all_checks
@@ -457,8 +445,6 @@ def bulk_build(
             try:
                 ctx = extract_pdg(
                     entrypoint_path,
-                    entrypoint_path.name,
-                    "latest",
                     role_search_paths=role_search_path,
                     lenient=True,
                     as_pb=entrypoint["type"] == "playbook",

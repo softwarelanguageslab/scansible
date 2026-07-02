@@ -30,7 +30,7 @@ class BlockExtractor:
         self.context = context
         self.block = block
         self.location = context.get_location(block)
-        self.logger = logger.bind(location=block.location)
+        self.logger = logger.bind(location=block.position)
 
     def extract_block(
         self, predecessors: Sequence[rep.ControlNode]
@@ -83,9 +83,10 @@ class BlockExtractor:
             )  # type: ignore[arg-type]
 
         for misc_kw in ("become", "become_user", "become_method"):
-            kw_val = getattr(self.block, misc_kw)
-            if self.block.is_default(misc_kw, kw_val):
+            if misc_kw not in self.block.model_fields_set:
+                # Default
                 continue
+            kw_val = getattr(self.block, misc_kw)
 
             prev_value: rep.DataNode | None = None
 
@@ -112,7 +113,10 @@ class BlockExtractor:
                     value, ctrl_node, rep.Keyword(keyword=misc_kw)
                 )
 
-        for kw, _ in self.block.__get_non_default_attributes__():
+        for kw in Block.model_fields:
+            if kw in self.block.model_fields_set:
+                # Default
+                continue
             if kw not in self.SUPPORTED_BLOCK_ATTRIBUTES and kw not in (
                 "location",
                 "raw",

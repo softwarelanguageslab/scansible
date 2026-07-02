@@ -311,19 +311,13 @@ def _filter_nodes(nodes: list[Node], node_type: type[Node] | None) -> Sequence[N
 
 @final
 class Graph:
-    def __init__(self, role_name: str = "", role_version: str = "") -> None:
+    def __init__(self) -> None:
         # Composition over inheritance because we override some methods of the
         # existing class in incompatible ways. For instance, we don't want to
         # return node IDs in `add_node` and prefer to store them in the nodes
         # themselves, allowing `add_edge` to just take the nodes rather than
         # having the PDG builder need to keep track of node IDs separately.
         self._graph = rx.PyDiGraph[Node, Edge]()
-
-        # FIXME: Names make no sense as PDGs are also built for playbooks. Moreover,
-        # it's probably not strictly necessary to store this information in the
-        # graph.
-        self.role_name = role_name
-        self.role_version = role_version
         self._dirty = False
 
     def add_node(self, node: Node) -> None:

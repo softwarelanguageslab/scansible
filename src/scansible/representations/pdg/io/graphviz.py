@@ -81,7 +81,7 @@ def dump_edge(e: rep.Edge, source: rep.Node, target: rep.Node, dot: gv.Digraph) 
     elif isinstance(e, rep.Composition):
         edge_label = e.index
     elif isinstance(e, rep.Input):
-        edge_label = f"_{e.param_idx}"
+        edge_label = "USE"
     elif isinstance(e, rep.DefLoopItem) and e.loop_with is not None:
         edge_label = f"DEFLOOPITEM: {e.loop_with}"
 

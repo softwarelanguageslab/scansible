@@ -13,6 +13,7 @@ from loguru import logger
 
 from scansible.representations import structural as struct
 from scansible.representations.structural import ansible_types as ans
+from scansible.types import VaultValue
 from scansible.utils import SENTINEL, Sentinel, first, make_immutable
 
 from ... import representation as rep
@@ -268,7 +269,7 @@ class VarContext:
         location = self.extraction_ctx.get_location(expr.value)
 
         lit: rep.Literal
-        if isinstance(expr.value, struct.VaultValue):
+        if isinstance(expr.value, VaultValue):
             lit = rep.ScalarLiteral(
                 type=expr.type, value=str(expr.value), location=location
             )

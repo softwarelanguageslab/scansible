@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import abc
 from collections.abc import Generator, Sequence
@@ -8,13 +8,18 @@ from contextlib import contextmanager
 
 from loguru import logger
 
-from scansible.representations.structural import TaskBase
+from scansible.representations.structural import BaseTask
+from scansible.representations.structural.ast import LoopControl
 
 from ... import representation as rep
 from ..context import ExtractionContext
 from ..expressions import EnvironmentType, RecursiveDefinitionError
 from ..result import ExtractionResult
 from ..variables import VariablesExtractor
+
+if TYPE_CHECKING:
+    # Not exported outside of stub files.
+    from loguru import Logger
 
 TaskVarsScopeLevel = Literal[EnvironmentType.TASK_VARS, EnvironmentType.INCLUDE_PARAMS]
 
@@ -27,11 +32,11 @@ class TaskExtractor(abc.ABC):
             {"name", "action", "args", "when", "vars", "loop_with", "tags"}
         )
 
-    def __init__(self, context: ExtractionContext, task: TaskBase) -> None:
-        self.context = context
-        self.task = task
-        self.location = context.get_location(task)
-        self.logger = logger.bind(location=task.location)
+    def __init__(self, context: ExtractionContext, task: BaseTask) -> None:
+        self.context: ExtractionContext = context
+        self.task: BaseTask = task
+        self.location: rep.NodeLocation = context.get_location(task)
+        self.logger: Logger = logger.bind(location=task.position)
 
     @abc.abstractmethod
     def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
@@ -74,11 +79,11 @@ class TaskExtractor(abc.ABC):
         if self.task.loop_control:
             loop_var_name = self.task.loop_control.loop_var or "item"
 
-            for (
-                loop_control_k,
-                _,
-            ) in self.task.loop_control.__get_non_default_attributes__():
-                if loop_control_k == "loop_var":
+            for loop_control_k in LoopControl.model_fields:
+                if (
+                    loop_control_k == "loop_var"
+                    or loop_control_k in self.task.loop_control.model_fields_set
+                ):
                     continue
                 self.logger.warning(
                     f"I cannot handle loop_control option {loop_control_k} yet!"
@@ -94,13 +99,16 @@ class TaskExtractor(abc.ABC):
     ) -> Generator[None, None, None]:
         # TODO: Revisit this when we re-introduce caching, sometimes the scope may be cached.
         with self.context.vars.enter_scope(scope_level):
-            VariablesExtractor(self.context, self.task.vars).extract_variables(
+            _ = VariablesExtractor(self.context, self.task.vars).extract_variables(
                 scope_level
             )
             yield
 
     def warn_remaining_kws(self, action: str = "") -> None:
-        for other_kw, _ in self.task.__get_non_default_attributes__():
+        for other_kw in BaseTask.model_fields:
+            if other_kw not in self.task.model_fields_set:
+                # Default
+                continue
             if other_kw not in self.SUPPORTED_TASK_ATTRIBUTES() and other_kw not in (
                 "raw",
                 "location",

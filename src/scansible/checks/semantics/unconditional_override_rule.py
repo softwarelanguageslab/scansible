@@ -165,7 +165,5 @@ class UnconditionalOverrideRule(Rule):
                 rule_subname=rule_subname,
                 rule_header=warning_header,
                 rule_message="\n".join(warning_expl_lines),
-                role_name=graph.role_name,
-                role_version=graph.role_version,
                 location=v2.location,
             )

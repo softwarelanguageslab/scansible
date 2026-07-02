@@ -84,7 +84,5 @@ class ReuseImpureExpressionRule(Rule):
                 rule_subname="",
                 rule_header=warning_header,
                 rule_message=warning_expl,
-                role_name=graph.role_name,
-                role_version=graph.role_version,
                 location=v2.location,
             )

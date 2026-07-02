@@ -29,14 +29,14 @@ ContextCreator = Callable[[], tuple[VarContext, Graph]]
 
 
 @pytest.fixture()
-def create_context(g: Graph, mocker: MockerFixture) -> ContextCreator:
+def create_context(g: Graph, mocker: MockerFixture, tmp_path: Path) -> ContextCreator:
     return lambda: (
         ExtractionContext(
             g,
             mocker.Mock(
                 **{
-                    "path": Path("/test"),
-                    "root.main_tasks_file.file_path": Path("tasks/main.yml"),
+                    "path": tmp_path,
+                    "root.main_tasks_file.path": Path("tasks/main.yml"),
                 }
             ),
             mocker.Mock(),

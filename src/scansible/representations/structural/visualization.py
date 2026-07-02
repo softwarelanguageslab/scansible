@@ -7,11 +7,13 @@ from pathlib import Path
 
 import graphviz as gv
 
-from . import representation as rep
+from scansible.types import VaultValue
+
+from . import ast
 
 
 def _is_scalar(value: Any) -> bool:
-    return isinstance(value, (str, int, float, bool, Path, rep.VaultValue)) or not value
+    return isinstance(value, (str, int, float, bool, Path, VaultValue)) or not value
 
 
 def _escape_html(s: str) -> str:
@@ -24,7 +26,7 @@ def _create_record_row(attr_name: str, attr_value: Any) -> str:
         textwrap.wrap(_escape_html(str(attr_value)), width=40)
     )
     if (isinstance(attr_value, str) and attr_value) or isinstance(
-        attr_value, (int, float, bool, Path, rep.VaultValue)
+        attr_value, (int, float, bool, Path, VaultValue)
     ):
         attr_label = f"{prefix}<BR/>{attr_value_label}"
     elif not attr_value:
@@ -83,7 +85,7 @@ class VisualizationVisitor:
                 child_val_label = (
                     _escape_html(str(child))
                     if (isinstance(child, str) and child)
-                    or isinstance(child, (int, float, bool, Path, rep.VaultValue))
+                    or isinstance(child, (int, float, bool, Path, VaultValue))
                     else "&#8709"
                 )
                 child_label = f"<<I>{type(child).__name__}</I><BR/>{child_val_label}>"
@@ -93,7 +95,7 @@ class VisualizationVisitor:
             self.g.edge(f"{lst_id}:e{child_idx}", child_id)
         return lst_id
 
-    def visit_multi_structural_model(self, v: rep.MultiStructuralModel) -> str:
+    def visit_multi_structural_model(self, v: ast.MultiStructuralModel) -> str:
         self.g.attr(label="<Structural models for <B>{v.id}</B>")
 
         for version, model in v.structural_models.items():
@@ -105,19 +107,19 @@ class VisualizationVisitor:
 
         return ""
 
-    def visit_structural_model(self, v: rep.StructuralModel) -> str:
+    def visit_structural_model(self, v: ast.StructuralModel) -> str:
         self.g.attr(
             label=f"<Structural model for <B>{v.id}</B>, version <B>{v.version}</B><br/>{v.path}>"
         )
         v.root.accept(self)
         return ""
 
-    def visit_playbook(self, v: rep.Playbook) -> str:
+    def visit_playbook(self, v: ast.Playbook) -> str:
         pb_id = self.add_node(_create_record("Playbook", ("plays", v.plays)))
         self.g.edges((f"{pb_id}:plays", play.accept(self)) for play in v.plays)
         return pb_id
 
-    def visit_play(self, v: rep.Play) -> str:
+    def visit_play(self, v: ast.Play) -> str:
         p_id = self.add_node(
             _create_record("Play", *v.__yield_non_default_representable_attributes__())
         )
@@ -143,7 +145,7 @@ class VisualizationVisitor:
 
         return p_id
 
-    def visit_role(self, v: rep.Role) -> str:
+    def visit_role(self, v: ast.Role) -> str:
         r_id = self.add_node(
             _create_record(
                 "Role",
@@ -176,7 +178,7 @@ class VisualizationVisitor:
 
         return r_id
 
-    def visit_meta_file(self, v: rep.MetaFile) -> str:
+    def visit_meta_file(self, v: ast.MetaFile) -> str:
         mf_id = self.add_node(
             _create_record(
                 "MetaFile", *v.__yield_non_default_representable_attributes__()
@@ -185,7 +187,7 @@ class VisualizationVisitor:
         self.g.edge(f"{mf_id}:metablock", v.metablock.accept(self))
         return mf_id
 
-    def visit_meta_block(self, v: rep.MetaBlock) -> str:
+    def visit_meta_block(self, v: ast.MetaBlock) -> str:
         mb_id = self.add_node(
             _create_record(
                 "MetaBlock", *v.__yield_non_default_representable_attributes__()
@@ -204,7 +206,7 @@ class VisualizationVisitor:
 
         return mb_id
 
-    def visit_task_file(self, v: rep.TaskFile) -> str:
+    def visit_task_file(self, v: ast.TaskFile) -> str:
         tf_id = self.add_node(
             _create_record(
                 "TaskFile", *v.__yield_non_default_representable_attributes__()
@@ -218,7 +220,7 @@ class VisualizationVisitor:
 
         return tf_id
 
-    def visit_block(self, v: rep.Block) -> str:
+    def visit_block(self, v: ast.Block) -> str:
         b_id = self.add_node(
             _create_record("Block", *v.__yield_non_default_representable_attributes__())
         )
@@ -237,7 +239,7 @@ class VisualizationVisitor:
 
         return b_id
 
-    def visit_task(self, v: rep.Task) -> str:
+    def visit_task(self, v: ast.Task) -> str:
         t_id = self.add_node(
             _create_record("Task", *v.__yield_non_default_representable_attributes__())
         )
@@ -253,7 +255,7 @@ class VisualizationVisitor:
 
         return t_id
 
-    def visit_handler(self, v: rep.Handler) -> str:
+    def visit_handler(self, v: ast.Handler) -> str:
         t_id = self.add_node(
             _create_record(
                 "Handler", *v.__yield_non_default_representable_attributes__()
@@ -271,7 +273,7 @@ class VisualizationVisitor:
 
         return t_id
 
-    def visit_loop_control(self, v: rep.LoopControl) -> str:
+    def visit_loop_control(self, v: ast.LoopControl) -> str:
         lc_id = self.add_node(
             _create_record(
                 "LoopControl", *v.__yield_non_default_representable_attributes__()
@@ -286,7 +288,7 @@ class VisualizationVisitor:
 
         return lc_id
 
-    def visit_variable_file(self, v: rep.VariableFile) -> str:
+    def visit_variable_file(self, v: ast.VariableFile) -> str:
         vf_id = self.add_node(
             _create_record(
                 "VariableFile", *v.__yield_non_default_representable_attributes__()
@@ -297,20 +299,20 @@ class VisualizationVisitor:
 
         return vf_id
 
-    def visit_broken_file(self, v: rep.BrokenFile) -> str:
+    def visit_broken_file(self, v: ast.BrokenFile) -> str:
         raise NotImplementedError("Should not reach here")
 
-    def visit_broken_task(self, v: rep.BrokenTask) -> str:
+    def visit_broken_task(self, v: ast.BrokenTask) -> str:
         raise NotImplementedError("Should not reach here")
 
-    def visit_platform(self, v: rep.Platform) -> str:
+    def visit_platform(self, v: ast.Platform) -> str:
         return self.add_node(
             _create_record(
                 "Platform", *v.__yield_non_default_representable_attributes__()
             )
         )
 
-    def visit_role_requirement(self, v: rep.RoleRequirement) -> str:
+    def visit_role_requirement(self, v: ast.RoleRequirement) -> str:
         rr_id = self.add_node(
             _create_record(
                 "RoleRequirement", *v.__yield_non_default_representable_attributes__()
@@ -328,14 +330,14 @@ class VisualizationVisitor:
 
         return rr_id
 
-    def visit_role_source_info(self, v: rep.RoleSourceInfo) -> str:
+    def visit_role_source_info(self, v: ast.RoleSourceInfo) -> str:
         return self.add_node(
             _create_record(
                 "RoleSourceInfo", *v.__yield_non_default_representable_attributes__()
             )
         )
 
-    def visit_vars_prompt(self, v: rep.VarsPrompt) -> str:
+    def visit_vars_prompt(self, v: ast.VarsPrompt) -> str:
         vp_id = self.add_node(
             _create_record(
                 "VarsPrompt", *v.__yield_non_default_representable_attributes__()
@@ -352,7 +354,7 @@ class VisualizationVisitor:
 
 
 def export_dot(
-    model_root: rep.StructuralModel | rep.MultiStructuralModel,
+    model_root: ast.StructuralModel | ast.MultiStructuralModel,
 ) -> gv.Digraph:
     vis = VisualizationVisitor()
     model_root.accept(vis)

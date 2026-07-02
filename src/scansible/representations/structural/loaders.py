@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Literal, cast, final, overload
 
 import types
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from copy import deepcopy
 from pathlib import Path
@@ -18,7 +18,7 @@ from pathlib import Path
 from ansible.parsing.yaml.objects import AnsibleMapping, AnsibleUnicode
 from ansible.utils.fqcn import add_internal_fqcns
 
-from scansible.representations.structural.representation import Handler, Task
+from scansible.representations.structural.ast import Handler, Task
 from scansible.utils import actions
 
 from . import ansible_types as ans
@@ -308,8 +308,8 @@ def get_task_action(ds: dict[str, ans.AnsibleValue]) -> str:
     #     msg: hi
     # - shell: echo hi
     # - ping:
-    task_directives = {attr.name for attr in Task.__attrs_attrs__}
-    task_directives.update({attr.name for attr in Handler.__attrs_attrs__})
+    task_directives = set(Task.model_fields.keys())
+    task_directives.update(Handler.model_fields)
     task_directives.update({"local_action", "static"})
 
     # note: this also subtracts "action" and "args" but that's okay, they've been
@@ -496,9 +496,9 @@ def load_task(
 
 @final
 class _PatchedBlock(ans.Block):
-    block: Sequence[Mapping[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
-    rescue: Sequence[Mapping[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
-    always: Sequence[Mapping[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
+    block: Sequence[dict[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
+    rescue: Sequence[dict[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
+    always: Sequence[dict[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
 
     def __init__(self, *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
@@ -538,11 +538,11 @@ def load_block(
 
 @final
 class _PatchedPlay(ans.Play):
-    tasks: Sequence[Mapping[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
-    handlers: Sequence[Mapping[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
-    pre_tasks: Sequence[Mapping[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
-    post_tasks: Sequence[Mapping[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
-    roles: Sequence[str | Mapping[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
+    tasks: Sequence[dict[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
+    handlers: Sequence[dict[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
+    pre_tasks: Sequence[dict[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
+    post_tasks: Sequence[dict[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
+    roles: Sequence[str | dict[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
 
     def __init__(self, *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)

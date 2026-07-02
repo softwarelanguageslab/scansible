@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from scansible.representations.structural import TaskBase
+from scansible.representations.structural import BaseTask
 from scansible.utils import actions
 
 from ..context import ExtractionContext
@@ -12,7 +12,7 @@ from .include_vars import IncludeVarsTaskExtractor
 from .set_fact import SetFactTaskExtractor
 
 
-def task_extractor_factory(context: ExtractionContext, task: TaskBase) -> TaskExtractor:
+def task_extractor_factory(context: ExtractionContext, task: BaseTask) -> TaskExtractor:
     action = task.action
     if actions.is_set_fact(action):
         return SetFactTaskExtractor(context, task)

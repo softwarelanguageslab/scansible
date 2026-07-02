@@ -12,20 +12,20 @@ from rich.markup import escape
 from scansible.checks.security import run_all_checks
 from scansible.checks.security.rules.base import RuleResult
 from scansible.representations.pdg.extractor.main import extract_pdg
-from scansible.representations.structural.extractor import (
-    ExtractionContext,
-    extract_playbook_file,
-    extract_tasks_file,
-)
-from scansible.representations.structural.helpers import ProjectPath
-from scansible.representations.structural.representation import (
+from scansible.representations.structural.ast import BaseTask as Task
+from scansible.representations.structural.ast import (
     Block,
     Play,
     Playbook,
     Position,
     TaskFile,
 )
-from scansible.representations.structural.representation import TaskBase as Task
+from scansible.representations.structural.extractor import (
+    ExtractionContext,
+    extract_playbook_file,
+    extract_tasks_file,
+)
+from scansible.representations.structural.helpers import ProjectPath
 from scansible.sca.constants import (
     ANSIBLE_ROLE_INCLUDE_MODULES,
     ANSIBLE_TRIVIAL_MODULES,
@@ -189,13 +189,7 @@ def _detect_smells(
 
     for entrypoint, project_type in entrypoints:
         as_pb = project_type == "playbook"
-        ctx = extract_pdg(
-            entrypoint,
-            "",
-            "",
-            role_search_paths,
-            as_pb=as_pb,
-        )
+        ctx = extract_pdg(entrypoint, role_search_paths, as_pb=as_pb)
 
         CONSOLE.print(f"Running checks on {project_type} {entrypoint}")
         yield from run_all_checks(ctx.graph)
@@ -242,26 +236,26 @@ def _extract_role_includes(project: Path) -> Iterable[tuple[str, Position]]:
             continue
 
         match rep:
-            case Playbook(_):
+            case Playbook():
                 worklist.extend(rep.plays)
-            case TaskFile(_):
+            case TaskFile():
                 worklist.extend(flatten_tasks(rep.tasks))
 
     while worklist:
         item = worklist.pop()
         match item:
-            case Play(_):
+            case Play():
                 worklist.extend(flatten_tasks(item.pre_tasks))
                 worklist.extend(flatten_tasks(item.tasks))
                 worklist.extend(flatten_tasks(item.post_tasks))
                 worklist.extend(flatten_tasks(item.handlers))
 
                 for r in item.roles:
-                    yield r.role, item.location
+                    yield r.role, item.position
 
-            case Task(_):
+            case Task():
                 if item.action in ANSIBLE_ROLE_INCLUDE_MODULES:
-                    yield str(item.args["name"]), item.location
+                    yield str(item.args["name"]), item.position
 
 
 def extract_modules(project: Path, relative_paths: bool = True) -> list[ModuleUsage]:
@@ -279,7 +273,7 @@ def extract_modules(project: Path, relative_paths: bool = True) -> list[ModuleUs
         if is_trivial_module(m):
             continue
         mname = f"{m.collection}.{m.name}"
-        tloc = f"{t.location[0]}:{t.location[1]}"
+        tloc = f"{t.position.file}:{t.position.start_line}"
         usages[mname].append(tloc)
 
     if relative_paths:
@@ -301,13 +295,13 @@ def extract_all_tasks(project: Path) -> list[Task]:
             continue
 
         match rep:
-            case Playbook(_):
+            case Playbook():
                 for p in rep.plays:
                     tasks.extend(flatten_tasks(p.pre_tasks))
                     tasks.extend(flatten_tasks(p.tasks))
                     tasks.extend(flatten_tasks(p.post_tasks))
                     tasks.extend(flatten_tasks(p.handlers))
-            case TaskFile(_):
+            case TaskFile():
                 tasks.extend(flatten_tasks(rep.tasks))
 
     return tasks
@@ -316,9 +310,9 @@ def extract_all_tasks(project: Path) -> list[Task]:
 def flatten_tasks(ts: Sequence[Task | Block]) -> Iterable[Task]:
     for t in ts:
         match t:
-            case Task(_):
+            case Task():
                 yield t
-            case Block(_):
+            case Block():
                 yield from flatten_tasks(t.block)
                 yield from flatten_tasks(t.rescue)
                 yield from flatten_tasks(t.always)

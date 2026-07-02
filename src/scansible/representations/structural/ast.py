@@ -1,10 +1,13 @@
 """AST node representations."""
 
+# FIXME!!! Source code position information is largely broken due to Pydantic coercing Ansible types (AnsibleUnicode, AnsibleMapping, ...)
+# to plain data types (str, dict, ...), losing the custom `ansible_pos` field.
+
 from __future__ import annotations
 
 from typing import Annotated, override
 
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from functools import cached_property
 from pathlib import Path
 
@@ -40,11 +43,23 @@ type AbsolutePath = Annotated[Path, AfterValidator(_validate_absolute_path)]
 
 
 class Position(BaseModel, strict=True, frozen=True, extra="forbid"):
-    """Code position of an AST node in a source file."""
+    """Code position of an AST node."""
 
     file: Path
     start_line: int
     start_column: int
+
+
+class ConcretePosition(Position, frozen=True):
+    """Code position of an AST node in a real source file."""
+
+
+class SyntheticPosition(Position, frozen=True):
+    """Mock class to represent an unknown or synthetic code position."""
+
+    file: Path = Path("unknown file")
+    start_line: int = -1
+    start_column: int = -1
 
 
 class ASTNode(BaseModel, strict=True, frozen=True, extra="forbid"):
@@ -59,13 +74,6 @@ class ASTFile(BaseModel, strict=True, frozen=True, extra="forbid"):
 
     #: The relative path to the file in the project.
     path: RelativePath
-
-
-class VaultValue(ASTNode, frozen=True):
-    """Represents an Ansible encrypted vault value."""
-
-    #: The encrypted data.
-    data: bytes
 
 
 class BrokenTask(ASTNode, frozen=True):
@@ -198,7 +206,7 @@ class _CommonDirectives(BaseModel, frozen=True):
     collections: Sequence[str] = Field(default_factory=tuple)
 
 
-class _BaseTask(ASTNode, _CommonDirectives, frozen=True):
+class BaseTask(ASTNode, _CommonDirectives, frozen=True):
     """Represents commonalities for Ansible tasks."""
 
     #: Action of the task.
@@ -242,11 +250,11 @@ class _BaseTask(ASTNode, _CommonDirectives, frozen=True):
     when: Sequence[str | bool] = Field(default_factory=tuple)
 
 
-class Task(_BaseTask, frozen=True):
+class Task(BaseTask, frozen=True):
     """Represents an Ansible task."""
 
 
-class Handler(_BaseTask, frozen=True):
+class Handler(BaseTask, frozen=True):
     """Represents an Ansible handler, a special type of task."""
 
     #: Topics on which the handler listens
@@ -320,7 +328,7 @@ class TaskFile(ASTFile, frozen=True):
     """Represents a file containing tasks and blocks."""
 
     #: The top-level tasks or blocks contained in the file, in the order of definition.
-    tasks: Sequence[Block | Task] | Sequence[Block | Handler]
+    tasks: Sequence[Block | Task]
 
 
 class HandlerFile(ASTFile, frozen=True):
@@ -335,19 +343,28 @@ class SourceFileMap[FileType: ASTFile](Mapping[str, FileType]):
 
     This provides a convenient API to find source files without needing to take the concrete
     extension (.yml, .yaml, or .json) into account.
+
+    Can optionally be given a search prefix. When provided, each lookup will attempt to resolve
+    a prefixed file name, and fall back to unprefixed search later. This can be useful when all
+    files in the map are in the same root directory. For instance, a file map for role task files
+    can use "tasks/" as a prefix, allowing individual task files to be accessed without prefixing
+    "tasks/" in the lookup.
     """
 
-    def __init__(self, file_list: Sequence[FileType]) -> None:
+    def __init__(self, file_list: Iterable[FileType], *, prefix: str = "") -> None:
         self._mapping: Mapping[str, FileType] = FrozenDict(
             {str(file.path): file for file in file_list}
         )
+        # If prefix is given, prioritise with the prefix but try without the prefix afterwards.
+        self._prefixes: Sequence[str] = (prefix, "") if prefix else ("",)
 
     @override
     def __getitem__(self, key: str) -> FileType:
-        for ext in (".yml", ".yaml", ".json", ""):
-            file_name = f"{key}{ext}"
-            if file_name in self._mapping:
-                return self._mapping[file_name]
+        for prefix in self._prefixes:
+            for ext in (".yml", ".yaml", ".json", ""):
+                file_name = f"{prefix}{key}{ext}"
+                if file_name in self._mapping:
+                    return self._mapping[file_name]
 
         raise KeyError(f"No file named {key}")
 
@@ -360,7 +377,8 @@ class SourceFileMap[FileType: ASTFile](Mapping[str, FileType]):
         return iter(self._mapping)
 
 
-class Role(ASTFile, frozen=True):
+# Need arbitrary_types_allowed=True to put SourceFileMap into the model.
+class Role(ASTFile, frozen=True, arbitrary_types_allowed=True):
     """Represents an Ansible role."""
 
     #: Role's main metadata file.
@@ -378,7 +396,7 @@ class Role(ASTFile, frozen=True):
     #: without directory prefix.
     handler_files: SourceFileMap[HandlerFile]
     #: Role's list of broken files.
-    broken_files: SourceFileMap[BrokenFile]
+    broken_files: Sequence[BrokenFile]
     #: Role's list of broken tasks.
     broken_tasks: Sequence[BrokenTask]
 

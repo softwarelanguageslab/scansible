@@ -26,8 +26,6 @@ class SanityCheckNumberOfTasksRule(Rule):
                 rule_subname=rule_subname,
                 rule_header="Found no or very few tasks, something may have gone wrong with extraction",
                 rule_message="",
-                role_name=graph.role_name,
-                role_version=graph.role_version,
                 location=NodeLocation(file="tasks/main.yml", line=1, column=1),
             )
         ]

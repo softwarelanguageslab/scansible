@@ -27,10 +27,7 @@ from ansible.template import Templar
 
 from scansible.representations.pdg.extractor.expressions.records import TemplatableType
 from scansible.representations.pdg.representation import ValidTypeStr
-
-# FIXME: Use type definitions from scansible.types instead!
-from scansible.representations.structural.representation import AnyValue
-from scansible.representations.structural.representation import Scalar as ScalarValue
+from scansible.types import AnyValue, ScalarValue
 
 
 class ScalarLiteral(NamedTuple):

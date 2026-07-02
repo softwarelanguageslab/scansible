@@ -20,73 +20,59 @@ from test_utils.graph_matchers import assert_graphs_match, create_graph
 
 def describe_assert_graphs_match() -> None:
     def should_match_empty_graphs() -> None:
-        g1 = Graph(role_name="test", role_version="1.0.0")
-        g2 = Graph(role_name="test", role_version="1.0.0")
+        g1 = Graph()
+        g2 = Graph()
 
         assert_graphs_match(g1, g2)
 
-    def should_mismatch_with_name() -> None:
-        g1 = Graph(role_name="test", role_version="1.0.0")
-        g2 = Graph(role_name="test2", role_version="1.0.0")
-
-        with pytest.raises(AssertionError):
-            assert_graphs_match(g1, g2)
-
-    def should_mismatch_with_version() -> None:
-        g1 = Graph(role_name="test", role_version="1.0.1")
-        g2 = Graph(role_name="test", role_version="1.0.0")
-
-        with pytest.raises(AssertionError):
-            assert_graphs_match(g1, g2)
-
     def should_mismatch_with_nonempty() -> None:
-        g1 = Graph(role_name="test", role_version="1.0.0")
-        g2 = Graph(role_name="test", role_version="1.0.0")
+        g1 = Graph()
+        g2 = Graph()
         g2.add_node(Variable(name="hello", version=1, value_version=1, scope_level=1))
 
         with pytest.raises(AssertionError):
             assert_graphs_match(g1, g2)
 
     def should_match_standard_nodes() -> None:
-        g1 = Graph(role_name="test", role_version="1.0.0")
+        g1 = Graph()
         g1.add_node(Variable(name="hello", version=1, value_version=1, scope_level=1))
-        g2 = Graph(role_name="test", role_version="1.0.0")
+        g2 = Graph()
         g2.add_node(Variable(name="hello", version=1, value_version=1, scope_level=1))
 
         assert_graphs_match(g1, g2)
 
     def should_match_multiple_standard_nodes() -> None:
-        g1 = Graph(role_name="test", role_version="1.0.0")
+        g1 = Graph()
         g1.add_node(Variable(name="hello", version=1, value_version=1, scope_level=1))
         g1.add_node(Variable(name="world", version=1, value_version=1, scope_level=1))
-        g2 = Graph(role_name="test", role_version="1.0.0")
+        g2 = Graph()
         g2.add_node(Variable(name="hello", version=1, value_version=1, scope_level=1))
         g2.add_node(Variable(name="world", version=1, value_version=1, scope_level=1))
 
         assert_graphs_match(g1, g2)
 
     def should_mismatch_standard_nodes() -> None:
-        g1 = Graph(role_name="test", role_version="1.0.0")
+        g1 = Graph()
         g1.add_node(Variable(name="hello", version=1, value_version=1, scope_level=1))
-        g2 = Graph(role_name="test", role_version="1.0.0")
+        g2 = Graph()
         g2.add_node(Variable(name="world", version=1, value_version=1, scope_level=1))
 
         with pytest.raises(AssertionError):
             assert_graphs_match(g1, g2)
 
     def should_mismatch_mixed_nodes() -> None:
-        g1 = Graph(role_name="test", role_version="1.0.0")
+        g1 = Graph()
         g1.add_node(Variable(name="hello", version=1, value_version=1, scope_level=1))
-        g2 = Graph(role_name="test", role_version="1.0.0")
+        g2 = Graph()
         g2.add_node(IntermediateValue(identifier=0))
 
         with pytest.raises(AssertionError):
             assert_graphs_match(g1, g2)
 
     def should_mismatch_missing_nodes() -> None:
-        g1 = Graph(role_name="test", role_version="1.0.0")
+        g1 = Graph()
         g1.add_node(Variable(name="hello", version=1, value_version=1, scope_level=1))
-        g2 = Graph(role_name="test", role_version="1.0.0")
+        g2 = Graph()
         g2.add_node(Variable(name="hello", version=1, value_version=1, scope_level=1))
         g2.add_node(Variable(name="world", version=1, value_version=1, scope_level=1))
 
@@ -94,18 +80,18 @@ def describe_assert_graphs_match() -> None:
             assert_graphs_match(g1, g2)
 
     def should_mismatch_extra_nodes() -> None:
-        g1 = Graph(role_name="test", role_version="1.0.0")
+        g1 = Graph()
         g1.add_node(Variable(name="hello", version=1, value_version=1, scope_level=1))
         g1.add_node(Variable(name="world", version=1, value_version=1, scope_level=1))
-        g2 = Graph(role_name="test", role_version="1.0.0")
+        g2 = Graph()
         g2.add_node(Variable(name="hello", version=1, value_version=1, scope_level=1))
 
         with pytest.raises(AssertionError):
             assert_graphs_match(g1, g2)
 
     def should_match_edges() -> None:
-        g1 = Graph(role_name="test", role_version="1.0.0")
-        g2 = Graph(role_name="test", role_version="1.0.0")
+        g1 = Graph()
+        g2 = Graph()
         v1 = Variable(name="hello", version=1, value_version=1, scope_level=1)
         v2 = Variable(name="hello", version=1, value_version=1, scope_level=1)
         v3 = Variable(name="world", version=1, value_version=1, scope_level=1)
@@ -122,8 +108,8 @@ def describe_assert_graphs_match() -> None:
         assert_graphs_match(g1, g2)
 
     def should_mismatch_extra_edges() -> None:
-        g1 = Graph(role_name="test", role_version="1.0.0")
-        g2 = Graph(role_name="test", role_version="1.0.0")
+        g1 = Graph()
+        g2 = Graph()
         v1 = Variable(name="hello", version=1, value_version=1, scope_level=1)
         v2 = Variable(name="hello", version=1, value_version=1, scope_level=1)
         v3 = Variable(name="world", version=1, value_version=1, scope_level=1)
@@ -136,8 +122,8 @@ def describe_assert_graphs_match() -> None:
             assert_graphs_match(g1, g2)
 
     def should_mismatch_missing_edges() -> None:
-        g1 = Graph(role_name="test", role_version="1.0.0")
-        g2 = Graph(role_name="test", role_version="1.0.0")
+        g1 = Graph()
+        g2 = Graph()
         v1 = Variable(name="hello", version=1, value_version=1, scope_level=1)
         v2 = Variable(name="hello", version=1, value_version=1, scope_level=1)
         v3 = Variable(name="world", version=1, value_version=1, scope_level=1)
@@ -150,8 +136,8 @@ def describe_assert_graphs_match() -> None:
             assert_graphs_match(g1, g2)
 
     def should_mismatch_edge_direction() -> None:
-        g1 = Graph(role_name="test", role_version="1.0.0")
-        g2 = Graph(role_name="test", role_version="1.0.0")
+        g1 = Graph()
+        g2 = Graph()
         v1 = Variable(name="hello", version=1, value_version=1, scope_level=1)
         v2 = Variable(name="hello", version=1, value_version=1, scope_level=1)
         v3 = Variable(name="world", version=1, value_version=1, scope_level=1)
@@ -165,8 +151,8 @@ def describe_assert_graphs_match() -> None:
             assert_graphs_match(g1, g2)
 
     def should_mismatch_edge_data() -> None:
-        g1 = Graph(role_name="test", role_version="1.0.0")
-        g2 = Graph(role_name="test", role_version="1.0.0")
+        g1 = Graph()
+        g2 = Graph()
         t1 = Task(name="hello", action="world")
         t2 = Task(name="hello", action="world")
         t3 = Task(name="hello", action="world")
@@ -180,8 +166,8 @@ def describe_assert_graphs_match() -> None:
             assert_graphs_match(g1, g2)
 
     def should_match_ivs_with_edges() -> None:
-        g1 = Graph(role_name="test", role_version="1.0.0")
-        g2 = Graph(role_name="test", role_version="1.0.0")
+        g1 = Graph()
+        g2 = Graph()
         v1 = Variable(name="hello", version=1, value_version=1, scope_level=1)
         v2 = Variable(name="hello", version=1, value_version=1, scope_level=1)
         i1 = IntermediateValue(identifier=0)
@@ -194,8 +180,8 @@ def describe_assert_graphs_match() -> None:
         assert_graphs_match(g1, g2)
 
     def should_match_ivs_with_edges_and_diff_ids() -> None:
-        g1 = Graph(role_name="test", role_version="1.0.0")
-        g2 = Graph(role_name="test", role_version="1.0.0")
+        g1 = Graph()
+        g2 = Graph()
         v1 = Variable(name="hello", version=1, value_version=1, scope_level=1)
         v2 = Variable(name="hello", version=1, value_version=1, scope_level=1)
         i1 = IntermediateValue(identifier=0)
@@ -208,8 +194,8 @@ def describe_assert_graphs_match() -> None:
         assert_graphs_match(g1, g2)
 
     def should_mismatch_ivs() -> None:
-        g1 = Graph(role_name="test", role_version="1.0.0")
-        g2 = Graph(role_name="test", role_version="1.0.0")
+        g1 = Graph()
+        g2 = Graph()
         v1 = Variable(name="hello", version=1, value_version=1, scope_level=1)
         v2 = Variable(name="hello", version=1, value_version=1, scope_level=1)
         i1 = IntermediateValue(identifier=0)
@@ -223,8 +209,8 @@ def describe_assert_graphs_match() -> None:
             assert_graphs_match(g1, g2)
 
     def should_mismatch_extra_ivs() -> None:
-        g1 = Graph(role_name="test", role_version="1.0.0")
-        g2 = Graph(role_name="test", role_version="1.0.0")
+        g1 = Graph()
+        g2 = Graph()
         v1 = Variable(name="hello", version=1, value_version=1, scope_level=1)
         v2 = Variable(name="hello", version=1, value_version=1, scope_level=1)
         i1 = IntermediateValue(identifier=0)
@@ -240,8 +226,8 @@ def describe_assert_graphs_match() -> None:
             assert_graphs_match(g1, g2)
 
     def should_mismatch_missing_ivs() -> None:
-        g1 = Graph(role_name="test", role_version="1.0.0")
-        g2 = Graph(role_name="test", role_version="1.0.0")
+        g1 = Graph()
+        g2 = Graph()
         v1 = Variable(name="hello", version=1, value_version=1, scope_level=1)
         v2 = Variable(name="hello", version=1, value_version=1, scope_level=1)
         i1 = IntermediateValue(identifier=0)
@@ -257,8 +243,8 @@ def describe_assert_graphs_match() -> None:
             assert_graphs_match(g1, g2)
 
     def should_respect_order_of_duplicate_nodes() -> None:
-        g1 = Graph(role_name="test", role_version="1.0.0")
-        g2 = Graph(role_name="test", role_version="1.0.0")
+        g1 = Graph()
+        g2 = Graph()
         e1 = Expression(expr="x")
         e2 = Expression(expr="x")
         e3 = Expression(expr="x")
@@ -280,13 +266,7 @@ def describe_assert_graphs_match() -> None:
 def describe_create_graph() -> None:
     def should_create_empty_graph() -> None:
         g1 = create_graph({}, [])
-        g2 = Graph(role_name="test_role", role_version="test_version")
-
-        assert_graphs_match(g1, g2)
-
-    def should_create_empty_graph_with_name_and_version() -> None:
-        g1 = create_graph({}, [], role_name="a", role_version="b")
-        g2 = Graph(role_name="a", role_version="b")
+        g2 = Graph()
 
         assert_graphs_match(g1, g2)
 
@@ -298,7 +278,7 @@ def describe_create_graph() -> None:
             },
             [],
         )
-        g2 = Graph(role_name="test_role", role_version="test_version")
+        g2 = Graph()
         g2.add_nodes(
             [
                 Variable(name="a", version=1, value_version=1, scope_level=1),
@@ -317,7 +297,7 @@ def describe_create_graph() -> None:
             },
             [("b", "a", USE), ("a", "c", DEF)],
         )
-        g2 = Graph(role_name="test_role", role_version="test_version")
+        g2 = Graph()
         a = Expression(expr="a")
         b = Variable(name="b", version=1, value_version=1, scope_level=1)
         c = IntermediateValue(identifier=1)

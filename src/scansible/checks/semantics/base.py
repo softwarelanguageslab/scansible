@@ -13,8 +13,6 @@ class RuleResult(BaseModel, frozen=True, strict=True, extra="forbid"):
     rule_header: str
     rule_message: str
 
-    role_name: str
-    role_version: str
     location: NodeLocation | None
 
 

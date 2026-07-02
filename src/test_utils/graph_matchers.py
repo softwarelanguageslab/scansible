@@ -25,13 +25,6 @@ def assert_graphs_match(
 ) -> None:
     __tracebackhide__ = True
 
-    assert g1.role_name == g2.role_name, (
-        f"Mismatching role name: Expected {g2.role_name}, got {g1.role_name}"
-    )
-    assert g1.role_version == g2.role_version, (
-        f"Mismatching role version: Expected {g2.role_version}, got {g1.role_version}"
-    )
-
     # Compare nodes
     nodes1 = set(g1.nodes)
     nodes2 = set(g2.nodes)
@@ -126,10 +119,8 @@ EdgeSpecs = Iterable[tuple[str, str, Edge]]
 def create_graph(
     nodes: NodeSpecs,
     edges: EdgeSpecs,
-    role_name: str = "test_role",
-    role_version: str = "test_version",
 ) -> Graph:
-    g = Graph(role_name=role_name, role_version=role_version)
+    g = Graph()
     g.add_nodes(nodes.values())
     for src, target, edge in edges:
         g.add_edge(nodes[src], nodes[target], edge)

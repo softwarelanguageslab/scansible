@@ -6,7 +6,8 @@ from collections.abc import Sequence
 
 from loguru import logger
 
-from scansible.representations.structural.representation import AnyValue, Role
+from scansible.representations.structural.ast import Role
+from scansible.types import AnyValue
 
 from ... import representation as rep
 from ..result import ExtractionResult

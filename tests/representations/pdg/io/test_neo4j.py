@@ -24,7 +24,7 @@ from scansible.representations.pdg.io.neo4j import dump_edge, dump_graph, dump_n
 
 @pytest.fixture
 def g() -> Graph:
-    return Graph("testrole", "v1.0.0")
+    return Graph()
 
 
 def describe_dump_node() -> None:
@@ -36,7 +36,7 @@ def describe_dump_node() -> None:
 
         assert (
             result
-            == '(n0:Expression { expr: "{{ test }}", impure_components: "[]", is_conditional: false, location: null, node_id: 0, role_name: "testrole", role_version: "v1.0.0" })'
+            == '(n0:Expression { expr: "{{ test }}", impure_components: "[]", is_conditional: false, location: null, node_id: 0 })'
         )
 
     def should_dump_variable(g: Graph) -> None:
@@ -47,7 +47,7 @@ def describe_dump_node() -> None:
 
         assert (
             result
-            == '(n0:Variable { location: null, name: "test", node_id: 0, role_name: "testrole", role_version: "v1.0.0", scope_level: 1, value_version: 0, version: 0 })'
+            == '(n0:Variable { location: null, name: "test", node_id: 0, scope_level: 1, value_version: 0, version: 0 })'
         )
 
     def should_dump_task(g: Graph) -> None:
@@ -58,7 +58,7 @@ def describe_dump_node() -> None:
 
         assert (
             result
-            == '(n0:Task { action: "file", location: null, name: "task name", node_id: 0, role_name: "testrole", role_version: "v1.0.0" })'
+            == '(n0:Task { action: "file", location: null, name: "task name", node_id: 0 })'
         )
 
     def should_dump_task_with_location(g: Graph) -> None:
@@ -73,7 +73,7 @@ def describe_dump_node() -> None:
 
         assert (
             result
-            == '(n0:Task { action: "file", location: "{\\"file\\": \\"test.yml\\", \\"line\\": 1, \\"column\\": 10, \\"includer_location\\": null}", name: "task name", node_id: 0, role_name: "testrole", role_version: "v1.0.0" })'
+            == '(n0:Task { action: "file", location: "{\\"file\\": \\"test.yml\\", \\"line\\": 1, \\"column\\": 10, \\"includer_location\\": null}", name: "task name", node_id: 0 })'
         )
 
     def should_dump_literal_string(g: Graph) -> None:
@@ -84,7 +84,7 @@ def describe_dump_node() -> None:
 
         assert (
             result
-            == '(n0:ScalarLiteral { location: null, node_id: 0, role_name: "testrole", role_version: "v1.0.0", type: "str", value: "literal value" })'
+            == '(n0:ScalarLiteral { location: null, node_id: 0, type: "str", value: "literal value" })'
         )
 
     @pytest.mark.parametrize(
@@ -110,7 +110,7 @@ def describe_dump_node() -> None:
 
         assert (
             result
-            == f'(n0:ScalarLiteral {{ location: null, node_id: 0, role_name: "testrole", role_version: "v1.0.0", type: "{type}", value: {str(value).lower()} }})'
+            == f'(n0:ScalarLiteral {{ location: null, node_id: 0, type: "{type}", value: {str(value).lower()} }})'
         )
 
 

@@ -37,7 +37,9 @@ if TYPE_CHECKING:
     # This alias doesn't exist outside of the stub files
     from ansible.playbook.base import Value
 
-    AnsibleValue = Value
+    type AnsibleValue = Value
+else:
+    type AnsibleValue = object
 
 
 # Fake class as stand-in for module.

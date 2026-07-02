@@ -31,7 +31,7 @@ class RoleExtractor:
 
         # TODO: Do role variables of the current role get loaded before or after the dependencies?
         if (mf := self.role.meta_file) is not None:
-            with self.context.include_ctx.enter_role_file(mf.file_path):
+            with self.context.include_ctx.enter_role_file(mf.path):
                 for dep in mf.metablock.dependencies:
                     result = result.chain(
                         extract_role_dependency(
@@ -44,14 +44,14 @@ class RoleExtractor:
             self.context.vars.enter_scope(EnvironmentType.ROLE_VARS),
         ):
             if (df := self.role.main_defaults_file) is not None:
-                with self.context.include_ctx.enter_role_file(df.file_path):
+                with self.context.include_ctx.enter_role_file(df.path):
                     df_result = VariablesExtractor(
                         self.context, df.variables
                     ).extract_variables(EnvironmentType.ROLE_DEFAULTS)
                     result = result.merge(df_result)
 
             if (vf := self.role.main_vars_file) is not None:
-                with self.context.include_ctx.enter_role_file(vf.file_path):
+                with self.context.include_ctx.enter_role_file(vf.path):
                     vf_result = VariablesExtractor(
                         self.context, vf.variables
                     ).extract_variables(EnvironmentType.ROLE_VARS)
@@ -73,11 +73,11 @@ class RoleExtractor:
 
             # TODO: These should somehow be linked to tasks.
             if (hf := self.role.main_handlers_file) is not None:
-                with self.context.include_ctx.enter_role_file(hf.file_path):
+                with self.context.include_ctx.enter_role_file(hf.path):
                     result = result.chain(
                         HandlerListExtractor(
                             self.context,
-                            hf.tasks,  # type: ignore[arg-type]
+                            hf.handlers,  # type: ignore[arg-type]
                         ).extract_handlers(result.next_predecessors)
                     )
 

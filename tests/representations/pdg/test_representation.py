@@ -153,26 +153,14 @@ def describe_expression() -> None:
 
 def describe_construction() -> None:
     def should_construct() -> None:
-        g = rep.Graph(role_name="me.role", role_version="1.0.0")
+        g = rep.Graph()
 
         assert g is not None
-
-    @pytest.mark.parametrize("role_name", ["my.role", "your.other_role"])
-    def should_have_role_name(role_name: str) -> None:
-        g = rep.Graph(role_name=role_name, role_version="1.0.0")
-
-        assert g.role_name == role_name
-
-    @pytest.mark.parametrize("role_version", ["1.0.0", "HEAD", "1.2.3"])
-    def should_have_role_version(role_version: str) -> None:
-        g = rep.Graph(role_name="me.role", role_version=role_version)
-
-        assert g.role_version == role_version
 
 
 @pytest.fixture()
 def g() -> rep.Graph:
-    g = rep.Graph(role_name="test", role_version="HEAD")
+    g = rep.Graph()
     assert g.num_nodes == 0
     return g
 

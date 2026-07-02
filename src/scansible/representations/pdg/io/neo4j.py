@@ -9,10 +9,6 @@ import json
 from .. import representation as rep
 
 
-def _get_shared_node_attrs(g: rep.Graph) -> dict[str, str]:
-    return {"role_name": g.role_name, "role_version": g.role_version}
-
-
 def dump_value(v: Any, attr_key: str) -> str:
     if attr_key == "location" and isinstance(v, dict) and v["file"] == "unknown file":
         return "NULL"
@@ -32,7 +28,7 @@ def _create_attr_content(attrs: dict[str, Any]) -> str:
 def dump_node(n: rep.Node, g: rep.Graph) -> str:
     node_label = n.__class__.__name__
     node_id = n.node_id
-    node_attrs = n.model_dump() | _get_shared_node_attrs(g)
+    node_attrs = n.model_dump()
 
     attr_content = _create_attr_content(node_attrs)
 
