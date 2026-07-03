@@ -6,13 +6,9 @@ from typing import NoReturn, Protocol, cast, override
 
 import io
 import os.path
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterator
 from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
-
-from ansible.parsing.yaml.objects import AnsibleUnicode
-
-from scansible.types import VaultValue
 
 from . import ansible_types as ans
 
@@ -230,37 +226,3 @@ def prevent_undesired_operations() -> Iterator[None]:
         helpers.load_list_of_tasks = old_load_list_of_tasks
         Templar.do_template = old_templar_do_template
         Templar.template = old_templar_template
-
-
-def convert_ansible_values(obj: object) -> object:
-    # FIXME: This is a hack, we should instead apply systematic coercion.
-    if isinstance(obj, ans.AnsibleVaultEncryptedUnicode):
-        return VaultValue(data=obj._ciphertext, ansible_pos=obj.ansible_pos)
-    if isinstance(obj, ans.AnsibleBaseYAMLObject):
-        return obj
-    if isinstance(obj, str):
-        assert not isinstance(obj, AnsibleUnicode)
-        ans_str = AnsibleUnicode(obj)
-        ans_str.ansible_pos = getattr(
-            cast(object, obj),
-            "ansible_pos",
-            ("unknown file", -1, -1),
-        )
-        return ans_str
-    if isinstance(obj, Sequence):
-        seq = ans.AnsibleSequence([convert_ansible_values(el) for el in obj])  # pyright: ignore[reportArgumentType]
-        seq.ansible_pos = getattr(
-            cast(object, obj),
-            "ansible_pos",
-            ("unknown file", -1, -1),
-        )
-        return seq
-    if isinstance(obj, Mapping):
-        dct = ans.AnsibleMapping({k: convert_ansible_values(v) for k, v in obj.items()})  # pyright: ignore[reportUnknownVariableType]
-        dct.ansible_pos = getattr(
-            cast(object, obj),
-            "ansible_pos",
-            ("unknown file", -1, -1),
-        )
-        return dct
-    return obj

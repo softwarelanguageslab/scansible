@@ -24,7 +24,6 @@ from scansible.utils import actions
 from . import ansible_types as ans
 from .helpers import (
     ProjectPath,
-    convert_ansible_values,
     parse_file,
     validate_ansible_object,
 )
@@ -171,12 +170,10 @@ def _load_meta_platforms(ds: dict[str, ans.AnsibleValue]) -> None:
         validated_platforms.append(
             cast(
                 ans.AnsibleMapping,
-                convert_ansible_values(
-                    {
-                        "name": str(name),
-                        "versions": [str(v) for v in cast(list[object], versions)],
-                    }
-                ),
+                {
+                    "name": str(name),
+                    "versions": [str(v) for v in cast(list[object], versions)],
+                },
             )
         )
 

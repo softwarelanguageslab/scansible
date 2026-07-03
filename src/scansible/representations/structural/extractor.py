@@ -10,7 +10,6 @@ from pathlib import Path
 
 from ansible.parsing.yaml.objects import AnsibleBaseYAMLObject
 
-from scansible.types import AnyValue
 from scansible.utils import actions
 
 from . import ansible_types as ans
@@ -18,7 +17,6 @@ from . import ast, loaders
 from .helpers import (
     ProjectPath,
     capture_output,
-    convert_ansible_values,
     find_all_files,
     find_file,
     prevent_undesired_operations,
@@ -132,7 +130,7 @@ def _extract_role_dependency(
 
     return ast.RoleRequirement(
         **attrs,  # pyright: ignore[reportArgumentType]
-        params=convert_ansible_values(ri._role_params),  # pyright: ignore[reportArgumentType]
+        params=ri._role_params,  # pyright: ignore[reportArgumentType]
         source_info=None
         if src_info is None
         else ast.RoleSourceInfo(**src_info, position=_get_position(src_info)),
@@ -143,15 +141,8 @@ def _extract_role_dependency(
 def extract_variable_file(path: ProjectPath) -> ast.VariableFile:
     ds, _ = loaders.load_variable_file(path)
 
-    variables = extract_list_of_variables(ds)
-    varfile = ast.VariableFile(path=path.relative, variables=variables)
+    varfile = ast.VariableFile(path=path.relative, variables=ds)  # pyright: ignore[reportArgumentType]
     return varfile
-
-
-def extract_list_of_variables(
-    ds: dict[str, ans.AnsibleValue],
-) -> dict[str, AnyValue]:
-    return {k: cast(AnyValue, convert_ansible_values(v)) for k, v in ds.items()}
 
 
 def extract_handler_file(path: ProjectPath, ctx: ExtractionContext) -> ast.HandlerFile:
@@ -240,7 +231,7 @@ def extract_block(
     attrs["block"] = extract_list_of_tasks_or_blocks(raw_block.block, ctx)
     attrs["rescue"] = extract_list_of_tasks_or_blocks(raw_block.rescue, ctx)
     attrs["always"] = extract_list_of_tasks_or_blocks(raw_block.always, ctx)
-    attrs["vars"] = extract_list_of_variables(raw_block.vars)
+    attrs["vars"] = raw_block.vars
 
     block = ast.Block(**attrs, position=_get_position(raw_ds))  # pyright: ignore[reportArgumentType]
 
@@ -296,9 +287,9 @@ def _extract_task(
         return None
 
     attrs = _ansible_to_dict(raw_task)
-    attrs["args"] = convert_ansible_values(raw_task.args)
+    attrs["args"] = raw_task.args
     attrs["loop_control"] = _extract_loop_control(raw_task.loop_control)
-    attrs["vars"] = extract_list_of_variables(raw_task.vars)
+    attrs["vars"] = raw_task.vars
 
     rep_cls = ast.Handler if as_handler else ast.Task
 
@@ -327,7 +318,7 @@ def extract_play(ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext) -> ast
         if (dep := _extract_role_dependency(raw_dep, ctx, allow_new_style=False))
         is not None
     ]
-    attrs["vars"] = extract_list_of_variables(raw_play.vars)
+    attrs["vars"] = raw_play.vars
     attrs["vars_prompt"] = [
         ast.VarsPrompt(**vp, position=_get_position(vp))  # pyright: ignore[reportArgumentType]
         for vp in raw_play.vars_prompt or []
