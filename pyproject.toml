@@ -36,8 +36,8 @@ dev = [
     "pytest-cov>=4.0.0,<5",
     "pytest-mock>=3.10.0,<4",
     "types-redis>=4.3.21.6,<5",
-    "ruff>=0.11.13,<0.12",
-    "basedpyright>=1.29.4",
+    "ruff>=0.15.21",
+    "basedpyright>=1.39.9",
 ]
 
 [build-system]
