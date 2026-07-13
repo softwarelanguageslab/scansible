@@ -472,9 +472,7 @@ class ExtractionContext:
         line: int
         column: int
 
-        if isinstance(ds, ast.ASTNode) and isinstance(
-            ds.position, ast.ConcretePosition
-        ):
+        if isinstance(ds, ast.ASTNode) and not ds.position.is_synthetic:
             file = str(ds.position.file)
             line, column = ds.position.start_line, ds.position.start_column
         elif hasattr(ds, "ansible_pos"):

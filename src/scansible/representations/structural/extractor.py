@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Callable, Literal, TypedDict, TypeVar, cast, overload
+from typing import Callable, Literal, TypeVar, overload
 
 from collections.abc import Iterable, Sequence
 from functools import partial
@@ -14,32 +14,16 @@ from scansible.utils import actions
 
 from . import ansible_types as ans
 from . import ast, loaders
+from .ast import ExtractionContext
 from .helpers import (
     ProjectPath,
     capture_output,
     find_all_files,
     find_file,
+    parse_file,
     prevent_undesired_operations,
     validate_ansible_object,
 )
-
-
-class ExtractionContext:
-    """Context during extraction, to store broken files etc."""
-
-    #: Whether extraction should be lenient. If true, the extractor will skip
-    #: tasks or blocks that fail to extract, without skipping the entire file.
-    #: If false, the entire file will be skipped instead.
-    lenient: bool
-    #: List of broken files which could not be parsed/extracted.
-    broken_files: list[ast.BrokenFile]
-    #: List of broken tasks or blocks that could not be parsed/extracted.
-    broken_tasks: list[ast.BrokenTask]
-
-    def __init__(self, lenient: bool) -> None:
-        self.lenient = lenient
-        self.broken_files = []
-        self.broken_tasks = []
 
 
 def _ansible_to_dict(obj: ans.FieldAttributeBase) -> dict[str, object]:
@@ -67,15 +51,8 @@ def _ansible_to_dict(obj: ans.FieldAttributeBase) -> dict[str, object]:
 def _get_position(obj: object) -> ast.Position:
     if isinstance(obj, AnsibleBaseYAMLObject):
         file, line, column = obj.ansible_pos
-        return ast.ConcretePosition(
-            file=Path(file), start_line=line, start_column=column
-        )
-    return ast.SyntheticPosition()
-
-
-class _PlatformDict(TypedDict):
-    name: str
-    versions: Sequence[str]
+        return ast.Position(file=Path(file), start_line=line, start_column=column)
+    return ast.Position()
 
 
 def extract_role_metadata_file(
@@ -83,66 +60,15 @@ def extract_role_metadata_file(
 ) -> ast.MetaFile:
     """Extract the structural representation of a metadata file."""
 
-    ds, raw_ds = loaders.load_role_metadata(path)
+    ds = parse_file(path)
 
-    assert isinstance(ds["galaxy_info"], dict)
-    ds_platforms = cast(Sequence[_PlatformDict], ds["galaxy_info"]["platforms"])
-    ds_dependencies = cast(
-        Sequence[str | dict[str, ans.AnsibleValue]], ds["dependencies"]
-    )
-
-    platforms = [
-        ast.Platform(name=p["name"], version=v, position=_get_position(v))
-        for p in ds_platforms
-        for v in p["versions"]
-    ]
-    dependencies = [
-        dep
-        for raw_dep in ds_dependencies
-        if (dep := _extract_role_dependency(raw_dep, ctx, allow_new_style=True))
-        is not None
-    ]
-
-    metablock = ast.MetaBlock(
-        platforms=platforms, dependencies=dependencies, position=_get_position(raw_ds)
-    )
-    return ast.MetaFile(metablock=metablock, path=path.relative)
-
-
-def _extract_role_dependency(
-    ds: str | dict[str, ans.AnsibleValue],
-    ctx: ExtractionContext,
-    allow_new_style: bool = False,
-) -> ast.RoleRequirement | None:
-    try:
-        ri, src_info, _ = loaders.load_role_dependency(
-            ds, allow_new_style=allow_new_style
-        )
-    except (ans.AnsibleError, loaders.LoadError) as e:
-        if not ctx.lenient:
-            raise
-        ctx.broken_tasks.append(
-            ast.BrokenTask(raw=ds, reason=str(e), position=_get_position(ds))
-        )
-        return None
-
-    attrs = _ansible_to_dict(ri)
-
-    return ast.RoleRequirement(
-        **attrs,  # pyright: ignore[reportArgumentType]
-        params=ri._role_params,  # pyright: ignore[reportArgumentType]
-        source_info=None
-        if src_info is None
-        else ast.RoleSourceInfo(**src_info, position=_get_position(src_info)),
-        position=_get_position(ds),
-    )
+    metablock = ast.MetaBlock.model_validate(ds, context=ctx)
+    return ast.MetaFile(path=path.relative, metablock=metablock)
 
 
 def extract_variable_file(path: ProjectPath) -> ast.VariableFile:
-    ds, _ = loaders.load_variable_file(path)
-
-    varfile = ast.VariableFile(path=path.relative, variables=ds)  # pyright: ignore[reportArgumentType]
-    return varfile
+    ds = parse_file(path)
+    return ast.VariableFile.model_validate({"path": path.relative, "variables": ds})
 
 
 def extract_handler_file(path: ProjectPath, ctx: ExtractionContext) -> ast.HandlerFile:
@@ -221,9 +147,7 @@ def extract_block(
     except (ans.AnsibleError, loaders.LoadError) as e:
         if not ctx.lenient:
             raise
-        ctx.broken_tasks.append(
-            ast.BrokenTask(raw=ds, reason=str(e), position=_get_position(ds))
-        )
+        ctx.broken_tasks.append(ast.BrokenTask(raw=ds, reason=str(e)))
         return None
 
     attrs = _ansible_to_dict(raw_block)
@@ -281,9 +205,7 @@ def _extract_task(
     except (ans.AnsibleError, loaders.LoadError) as e:
         if not ctx.lenient:
             raise
-        ctx.broken_tasks.append(
-            ast.BrokenTask(raw=ds, reason=str(e), position=_get_position(ds))
-        )
+        ctx.broken_tasks.append(ast.BrokenTask(raw=ds, reason=str(e)))
         return None
 
     attrs = _ansible_to_dict(raw_task)
@@ -312,12 +234,6 @@ def extract_play(ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext) -> ast
     attrs["post_tasks"] = extract_list_of_tasks_or_blocks(
         raw_play.post_tasks or [], ctx, handlers=False
     )
-    attrs["roles"] = [
-        dep
-        for raw_dep in (raw_play.roles or [])
-        if (dep := _extract_role_dependency(raw_dep, ctx, allow_new_style=False))
-        is not None
-    ]
     attrs["vars"] = raw_play.vars
     attrs["vars_prompt"] = [
         ast.VarsPrompt(**vp, position=_get_position(vp))  # pyright: ignore[reportArgumentType]
@@ -354,11 +270,7 @@ def extract_playbook_file(
             except (ans.AnsibleError, loaders.LoadError) as e:
                 if not ctx.lenient:
                     raise
-                ctx.broken_tasks.append(
-                    ast.BrokenTask(
-                        raw=play_ds, reason=str(e), position=_get_position(play_ds)
-                    )
-                )
+                ctx.broken_tasks.append(ast.BrokenTask(raw=play_ds, reason=str(e)))
                 continue
 
             if play is not None:

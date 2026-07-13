@@ -1,17 +1,32 @@
 """AST node representations."""
 
+# pyright: reportUnknownVariableType = false
+
 # FIXME!!! Source code position information is largely broken due to Pydantic coercing Ansible types (AnsibleUnicode, AnsibleMapping, ...)
 # to plain data types (str, dict, ...), losing the custom `ansible_pos` field.
 
 from __future__ import annotations
 
-from typing import Annotated, override
+from typing import Annotated, cast, get_args, get_origin, override
 
+from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from functools import cached_property
 from pathlib import Path
 
-from pydantic import AfterValidator, BaseModel, Field
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    Field,
+    PositiveInt,
+    StringConstraints,
+    TypeAdapter,
+    ValidationError,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
+from pydantic.fields import FieldInfo
 
 from scansible.types import AnyValue, ScalarValue
 from scansible.utils import FrozenDict
@@ -42,41 +57,227 @@ type RelativePath = Annotated[Path, AfterValidator(_validate_relative_path)]
 type AbsolutePath = Annotated[Path, AfterValidator(_validate_absolute_path)]
 
 
+class ExtractionContext:
+    """Context during extraction, to store broken files etc."""
+
+    #: Whether extraction should be lenient. If true, the extractor will skip
+    #: tasks or blocks that fail to extract, without skipping the entire file.
+    #: If false, the entire file will be skipped instead.
+    lenient: bool
+    #: List of broken files which could not be parsed/extracted.
+    broken_files: list[BrokenFile]
+    #: List of broken tasks or blocks that could not be parsed/extracted.
+    broken_tasks: list[BrokenTask]
+
+    def __init__(self, lenient: bool) -> None:
+        self.lenient = lenient
+        self.broken_files = []
+        self.broken_tasks = []
+
+
+class Normalizer(ABC):
+    """Normalization logic for AST models."""
+
+    @classmethod
+    @abstractmethod
+    def normalize(
+        cls, value: object, field_info: FieldInfo, validation_info: ValidationInfo
+    ) -> object:
+        """Perform the normalization."""
+        raise NotImplementedError
+
+
+class NormalizeNone(Normalizer):
+    """Normalizer that normalizes `None` values to the field's default."""
+
+    @override
+    @classmethod
+    def normalize(
+        cls, value: object, field_info: FieldInfo, validation_info: ValidationInfo
+    ) -> object:
+        if value is not None:
+            return value
+
+        return field_info.get_default(call_default_factory=True, validated_data=value)  # pyright: ignore[reportAny]
+
+
+class Listify(Normalizer):
+    """Normalizer that normalizes single values to a list of that value."""
+
+    @override
+    @classmethod
+    def normalize(
+        cls, value: object, field_info: FieldInfo, validation_info: ValidationInfo
+    ) -> object:
+        if isinstance(value, Sequence) and not isinstance(value, str):
+            return value
+
+        return [value]
+
+
+class Stringify(Normalizer):
+    """Normalizer that normalizes non-string values to stringified values.
+
+    By default, it only normalizes int, float, and bool values, and recursively normalizes
+    entries in lists.
+    """
+
+    @override
+    @classmethod
+    def normalize(
+        cls, value: object, field_info: FieldInfo, validation_info: ValidationInfo
+    ) -> object:
+        if isinstance(value, str):
+            return value
+
+        if isinstance(value, (int, float, bool)):
+            return str(value)
+
+        if isinstance(value, Sequence):
+            return type(value)(
+                (
+                    cls.normalize(element, field_info, validation_info)
+                    for element in value
+                )  # pyright: ignore[reportCallIssue]
+            )
+
+        return value
+
+
+class LenientSequence(Normalizer):
+    """Normalizer that enables parsing in sequences to be lenient.
+
+    If the lenient flag is set in the validation context, this normalizer will catch
+    any item-specific validation errors and ignore it, omitting that item from the
+    resulting list. In non-lenient (strict) mode, the validator acts normally.
+    """
+
+    @classmethod
+    def _get_contained_type(cls, field_info: FieldInfo) -> type[ASTEntity]:
+        annotation = field_info.annotation
+
+        if (
+            annotation is None
+            or (origin := get_origin(annotation)) is None
+            or not issubclass(origin, Sequence)
+        ):
+            raise ValueError("Can only mark Sequences as LenientSequences")
+
+        (contained_type,) = get_args(annotation)  # pyright: ignore[reportAny]
+        if not issubclass(contained_type, ASTEntity):
+            raise ValueError("Can only leniently parse AST entities")
+
+        return contained_type
+
+    @override
+    @classmethod
+    def normalize(
+        cls, value: object, field_info: FieldInfo, validation_info: ValidationInfo
+    ) -> object:
+        if not isinstance(value, Sequence):
+            return value
+
+        if not isinstance(validation_info.context, ExtractionContext):
+            raise ValueError("Expected context to be an ExtractionContext")
+
+        context = validation_info.context
+        if not context.lenient:
+            return value
+
+        contained_type = cls._get_contained_type(field_info)
+
+        results: list[ASTEntity] = []
+        for raw in value:
+            try:
+                results.append(
+                    contained_type.model_validate(raw, context=validation_info.context)
+                )
+            except ValidationError as exc:
+                context.broken_tasks.append(BrokenTask(raw=raw, reason=str(exc)))
+
+        return results
+
+
+#: Raw Ansible position tuple, with validation logic.
+type RawPosition = tuple[
+    Annotated[str, StringConstraints(strict=True, min_length=1)],
+    PositiveInt,
+    PositiveInt,
+]
+
+RawPositionAdapter = TypeAdapter(RawPosition)
+
+
 class Position(BaseModel, strict=True, frozen=True, extra="forbid"):
     """Code position of an AST node."""
 
-    file: Path
-    start_line: int
-    start_column: int
-
-
-class ConcretePosition(Position, frozen=True):
-    """Code position of an AST node in a real source file."""
-
-
-class SyntheticPosition(Position, frozen=True):
-    """Mock class to represent an unknown or synthetic code position."""
-
+    # TODO: Should this be a RelativePath instead?
     file: Path = Path("unknown file")
-    start_line: int = -1
-    start_column: int = -1
+    start_line: PositiveInt = -1
+    start_column: PositiveInt = -1
+
+    @property
+    def is_synthetic(self) -> bool:
+        return self.start_line < 0
+
+    @model_validator(mode="before")
+    def _coerce_from_ansible_position(cls, value: object) -> object:
+        try:
+            file, line, column = cast(
+                RawPosition, RawPositionAdapter.validate_python(value)
+            )
+        except ValidationError:
+            return value
+        return {"file": Path(file), "start_line": line, "start_column": column}
 
 
-class ASTNode(BaseModel, strict=True, frozen=True, extra="forbid"):
-    """Base AST node inherited by all nodes."""
+class ASTEntity(BaseModel, strict=True, frozen=True, extra="forbid"):
+    """Base class inherited by all classes participating in the AST representation."""
 
-    #: The source code position of the node.
-    position: Position
+    @field_validator("*", mode="before")
+    @classmethod
+    def _normalize(cls, value: object, info: ValidationInfo) -> object:
+        """Apply the declared normalizations to field values."""
+
+        assert info.field_name is not None
+        field_info = cls.model_fields[info.field_name]
+
+        for meta in field_info.metadata:  # pyright: ignore[reportAny]
+            if isinstance(meta, Normalizer) or (
+                isinstance(meta, type) and issubclass(meta, Normalizer)
+            ):
+                value = meta.normalize(value, field_info, info)
+
+        return value
 
 
-class ASTFile(BaseModel, strict=True, frozen=True, extra="forbid"):
-    """Base class inherited by all files represented in the AST."""
+class ASTFile(ASTEntity, frozen=True):
+    """Base class inherited by all files represented by an AST."""
 
     #: The relative path to the file in the project.
     path: RelativePath
 
 
-class BrokenTask(ASTNode, frozen=True):
+class ASTNode(ASTEntity, frozen=True):
+    """Base class inherited by all nodes inside of an AST for a file."""
+
+    #: The source code position of the node.
+    position: Position = Field(default_factory=Position)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _inject_position(cls, data: object) -> object:
+        """Extract sourec code position information from Ansible objects and present it to the model for validation."""
+
+        if hasattr(data, "ansible_pos"):
+            pos = getattr(data, "ansible_pos")  # pyright: ignore[reportAny]
+            if isinstance(data, dict):
+                data["position"] = pos
+
+        return data
+
+
+class BrokenTask(ASTEntity, frozen=True):
     """Represents a task/block that could not be extracted."""
 
     #: The raw datastructure that failed to extract.
@@ -98,7 +299,25 @@ class Platform(ASTNode, frozen=True):
     #: Platform name.
     name: str
     #: Platform version.
-    version: str
+    version: str = Field(strict=False)
+
+
+class _RawPlatform(ASTNode, frozen=True):
+    """Intermediate Platform representation with a list of versions."""
+
+    #: Platform name.
+    name: str
+    #: Platform versions.
+    versions: Annotated[
+        Sequence[Annotated[str, Field(strict=False)]], Stringify, Listify
+    ]
+
+    def expand(self) -> Sequence[Platform]:
+        """Expand a single raw platform instance to a flattened list of platforms."""
+        return [
+            Platform(name=self.name, version=version, position=self.position)
+            for version in self.versions
+        ]
 
 
 class MetaFile(ASTFile, frozen=True):
@@ -108,20 +327,50 @@ class MetaFile(ASTFile, frozen=True):
     metablock: MetaBlock
 
 
-class MetaBlock(ASTNode, frozen=True):
+class MetaBlock(ASTNode, frozen=True, extra="ignore"):
     """Represents a role metadata block."""
 
     #: Platforms supported by the role
-    platforms: Sequence[Platform] = Field(default_factory=tuple)
+    platforms: Annotated[Sequence[Platform], Listify] = Field(default_factory=tuple)
     #: Role dependencies
-    dependencies: Sequence[RoleRequirement] = Field(default_factory=tuple)
+    dependencies: Annotated[Sequence[MetaRoleRequirement], LenientSequence] = Field(
+        default_factory=tuple
+    )
+
+    @field_validator("platforms", mode="before")
+    @classmethod
+    def _convert_platforms(cls, value: object) -> object:
+        """Convert the platforms list into a consistent schema before validation."""
+
+        assert isinstance(value, list)  # Should be covered by the Listify marker.
+        raw_platforms = [_RawPlatform.model_validate(platform) for platform in value]
+        return [
+            platform
+            for raw_platform in raw_platforms
+            for platform in raw_platform.expand()
+        ]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _hoist_platforms(cls, value: object) -> object:
+        """Hoist `galaxy_info.platforms` to a top-level key before validation."""
+
+        if isinstance(value, dict) and "galaxy_info" in value:
+            if not isinstance(value["galaxy_info"], dict):
+                raise ValueError("Expected `galaxy_info` to be a dict")
+            if "platforms" in value["galaxy_info"]:
+                value["platforms"] = value["galaxy_info"]["platforms"]
+
+        return value
 
 
 class VariableFile(ASTFile, frozen=True):
     """Represents a file containing variables."""
 
     #: The variables contained within the file. The order is irrelevant.
-    variables: Mapping[str, AnyValue]
+    variables: Annotated[Mapping[str, AnyValue], NormalizeNone] = Field(
+        default_factory=dict
+    )
 
 
 class LoopControl(ASTNode, frozen=True):
@@ -286,23 +535,10 @@ class Block(ASTNode, _CommonDirectives, frozen=True):
     when: Sequence[str | bool] = Field(default_factory=tuple)
 
 
-class RoleSourceInfo(ASTNode, frozen=True):
-    """Represents source info for a role requirement."""
-
-    #: Name of the role.
-    name: str | None
-    #: Source URL.
-    src: str | None
-    #: Source control management system (git, hg, ...).
-    scm: str | None
-    #: Role version.
-    version: str | None
-
-
 class RoleRequirement(ASTNode, _CommonDirectives, frozen=True):
     """Represents a role inclusion dependency.
 
-    These occur in a play's `roles` directive or a role's `dependencies` (old-style only).
+    These occur in a play's `roles` directive or a role's `dependencies`, see concrete subclasses.
     """
 
     #: The role that is depended upon.
@@ -317,11 +553,119 @@ class RoleRequirement(ASTNode, _CommonDirectives, frozen=True):
     delegate_facts: str | bool | None = None
 
     #: Optional condition on when to include a dependency.
-    when: Sequence[str | bool] = Field(default_factory=tuple)
+    when: Annotated[Sequence[str | bool], Listify] = Field(default_factory=tuple)
 
-    #: Source info for role. Possibly available for role requirements coming
-    #: from a role's meta/main.yml metadata file, but never for plays.
-    source_info: RoleSourceInfo | None = None
+    @field_validator("role", mode="after")
+    def _validate_role_name(cls, value: str) -> str:
+        # Commas in role names are only allowed in meta/main.yml dependencies, and should have
+        # been filtered out/converted already.
+        if "," in value:
+            raise ValueError(f"Invalid old-style role requirement: {value}")
+        return value
+
+    @model_validator(mode="before")
+    @classmethod
+    def _extract_parameters(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+
+        valid_attr_names = cls.model_fields.keys()
+        new_value = {"params": {}}
+        for k, v in value.items():
+            if k in valid_attr_names:
+                new_value[k] = v
+            else:
+                new_value["params"][k] = v
+        return new_value
+
+
+class PlayRoleRequirement(RoleRequirement, frozen=True):
+    """Represents a role dependency specified in a play's `roles` directive."""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _parse_from_string(cls, value: object) -> object:
+        # Ansible coerces int to str here, we'll do it too.
+        if isinstance(value, int):
+            value = str(value)
+
+        if not isinstance(value, str):
+            return value
+
+        return {"role": value}
+
+
+class MetaRoleRequirement(RoleRequirement, frozen=True):
+    """Represents a role dependency specified in a role's `meta/main.yml` file.
+
+    These differ from play-level dependencies as the role can be specified with the Ansible Galaxy
+    notation found in requirements.yml, and thus require specialised parsing.
+    """
+
+    @model_validator(mode="before")
+    @classmethod
+    def _parse(cls, value: object) -> object:
+        """Parse the AST from the raw YAML specification."""
+
+        # Need to make sure these run in the correct order.
+        value = cls._parse_from_string(value)
+        value = cls._extract_role_name(value)
+        return value
+
+    @classmethod
+    def _parse_from_string(cls, value: object) -> object:
+        # Ansible coerces int to str here, we'll do it too.
+        if isinstance(value, int):
+            value = str(value)
+
+        if not isinstance(value, str):
+            return value
+
+        # Normalize to new-style role dependency if the raw string contains a comma, otherwise to an old-style
+        # dependency. Validation as per `ansible.playbook.role.requirement`.
+        match value.split(","):
+            case [src, version, name]:
+                return {"src": src, "version": version, "name": name}
+            case [src, version]:
+                return {"src": src, "version": version}
+            case [src]:
+                return {"src": src}
+            case _:
+                raise ValueError(
+                    f"Invalid role line: {value}. Proper format is 'src[,version[,name]]'"
+                )
+
+    @classmethod
+    def _extract_role_name(cls, value: object) -> object:
+        if not isinstance(value, dict) or "role" in value:
+            return value
+
+        # Omit role soure info
+        new_value = {
+            k: v for k, v in value.items() if k not in ("src", "version", "scm")
+        }
+
+        if "name" in value:
+            new_value["role"] = value["name"]
+        elif "src" in value:
+            src = value["src"]
+            if not isinstance(src, str):
+                raise ValueError(
+                    "Expected `src` in new-style role requirement to be a str"
+                )
+
+            # Extraction per ansible.playbook.role.requirement.
+            name = (
+                src.split("/")[-1]
+                .removesuffix(".git")
+                .removesuffix(".tar.gz")
+                .split(",")[0]
+            )
+            new_value["role"] = name
+        else:
+            raise ValueError("Expected `src` or `name` in new-style role requirement")
+
+        return new_value
 
 
 class TaskFile(ASTFile, frozen=True):
@@ -469,7 +813,7 @@ class Play(ASTNode, _CommonDirectives, frozen=True):
     vars_prompt: Sequence[VarsPrompt] = Field(default_factory=tuple)
 
     #: List of roles to be imported into play.
-    roles: Sequence[RoleRequirement] = Field(default_factory=tuple)
+    roles: Sequence[PlayRoleRequirement] = Field(default_factory=tuple)
 
     #: Handlers for the play.
     handlers: Sequence[Handler] = Field(default_factory=tuple)

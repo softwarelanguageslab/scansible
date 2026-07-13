@@ -9,7 +9,7 @@ import loguru
 from loguru import logger
 
 from scansible.representations import structural as struct
-from scansible.representations.structural.ast import ConcretePosition, SyntheticPosition
+from scansible.representations.structural.ast import Position
 
 from .. import representation as rep
 from .context import ExtractionContext
@@ -105,10 +105,15 @@ class StructuralGraphExtractor:
 
     def _capture_log_message(self, message: loguru.Message) -> None:
         location = message.record.get("extra", {}).get("location")
-        if isinstance(location, ConcretePosition):
-            location = (str(location.file), location.start_line, location.start_column)
-        elif isinstance(location, SyntheticPosition):
-            location = None
+        if isinstance(location, Position):
+            if not location.is_synthetic:
+                location = (
+                    str(location.file),
+                    location.start_line,
+                    location.start_column,
+                )
+            else:
+                location = None
         if location is not None and location[0] == "unknown file":
             location = None
         reason = str(message)

@@ -9,6 +9,7 @@ from textwrap import dedent
 
 import ansible.parsing.dataloader
 import pytest
+from pydantic import ValidationError
 from pytest_describe import behaves_like
 
 from scansible.representations.structural import ansible_types as ans
@@ -33,144 +34,12 @@ def _parse_yaml_list(yaml_content: str) -> list[dict[str, ans.AnsibleValue]]:
 
 
 def describe_extracting_metadata_file() -> None:
-    def extracts_standard_metadata_without_dependencies(tmp_path: Path) -> None:
-        _ = (tmp_path / "main.yml").write_text(
-            dedent(
-                """
-            dependencies: []
-
-            galaxy_info:
-              role_name: test
-              author: test
-              platforms:
-                - name: Debian
-                  versions:
-                    - any
-                - name: Fedora
-                  versions:
-                    - 7
-                    - 8
-        """
-            )
-        )
-
-        result = ext.extract_role_metadata_file(
-            ProjectPath(tmp_path, "main.yml"), ext.ExtractionContext(False)
-        )
-
-        assert result.path == Path("main.yml")
-        assert len(result.metablock.platforms) == 3
-        assert result.metablock.platforms[0].name == "Debian"
-        assert result.metablock.platforms[0].version == "any"
-        assert result.metablock.platforms[1].name == "Fedora"
-        assert result.metablock.platforms[1].version == "7"
-        assert result.metablock.platforms[2].name == "Fedora"
-        assert result.metablock.platforms[2].version == "8"
-        assert not result.metablock.dependencies
-
-    def extracts_simple_string_dependencies(tmp_path: Path) -> None:
-        _ = (tmp_path / "main.yml").write_text(
-            dedent(
-                """
-            dependencies:
-                - testrole
-        """
-            )
-        )
-
-        result = ext.extract_role_metadata_file(
-            ProjectPath(tmp_path, "main.yml"), ext.ExtractionContext(False)
-        )
-
-        assert len(result.metablock.dependencies) == 1
-        assert result.metablock.dependencies[0].role == "testrole"
-
-    def extracts_simple_dict_dependencies_with_role_key(tmp_path: Path) -> None:
-        _ = (tmp_path / "main.yml").write_text(
-            dedent(
-                """
-            dependencies:
-                - role: testrole
-        """
-            )
-        )
-
-        result = ext.extract_role_metadata_file(
-            ProjectPath(tmp_path, "main.yml"), ext.ExtractionContext(False)
-        )
-
-        assert len(result.metablock.dependencies) == 1
-        assert result.metablock.dependencies[0].role == "testrole"
-
-    def extracts_simple_dict_dependencies_with_name_key(tmp_path: Path) -> None:
-        _ = (tmp_path / "main.yml").write_text(
-            dedent(
-                """
-            dependencies:
-                - name: testrole
-        """
-            )
-        )
-
-        result = ext.extract_role_metadata_file(
-            ProjectPath(tmp_path, "main.yml"), ext.ExtractionContext(False)
-        )
-
-        assert len(result.metablock.dependencies) == 1
-        assert result.metablock.dependencies[0].name == "testrole"
-        assert result.metablock.dependencies[0].role == "testrole"
-
-    def extracts_dependencies_with_condition(tmp_path: Path) -> None:
-        _ = (tmp_path / "main.yml").write_text(
-            dedent(
-                """
-            dependencies:
-                - role: testrole
-                  when: "{{ ansible_os_family == 'Debian' }}"
-        """
-            )
-        )
-
-        result = ext.extract_role_metadata_file(
-            ProjectPath(tmp_path, "main.yml"), ext.ExtractionContext(False)
-        )
-
-        assert len(result.metablock.dependencies) == 1
-        assert result.metablock.dependencies[0].role == "testrole"
-        assert result.metablock.dependencies[0].when == [
-            "{{ ansible_os_family == 'Debian' }}"
-        ]
-
-    def extracts_dependencies_with_multiple_conditions(tmp_path: Path) -> None:
-        _ = (tmp_path / "main.yml").write_text(
-            dedent(
-                """
-            dependencies:
-                - role: testrole
-                  when:
-                    - "{{ ansible_os_family == 'Debian' }}"
-                    - "{{ 1 + 1 == 2 }}"
-        """
-            )
-        )
-
-        result = ext.extract_role_metadata_file(
-            ProjectPath(tmp_path, "main.yml"), ext.ExtractionContext(False)
-        )
-
-        assert len(result.metablock.dependencies) == 1
-        assert result.metablock.dependencies[0].role == "testrole"
-        assert result.metablock.dependencies[0].when == [
-            "{{ ansible_os_family == 'Debian' }}",
-            "{{ 1 + 1 == 2 }}",
-        ]
-
     def rejects_empty_metadata(tmp_path: Path) -> None:
         _ = (tmp_path / "main.yml").write_text("")
 
         with pytest.raises(Exception):
             _ = ext.extract_role_metadata_file(
-                ProjectPath(tmp_path, "main.yml"), ext.ExtractionContext(False)
+                ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
             )
 
     @pytest.mark.parametrize("content", ["- hello\n- world"])  # list  # string
@@ -179,70 +48,421 @@ def describe_extracting_metadata_file() -> None:
 
         with pytest.raises(Exception):
             _ = ext.extract_role_metadata_file(
-                ProjectPath(tmp_path, "main.yml"), ext.ExtractionContext(False)
+                ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
             )
 
-    def rejects_invalid_galaxy_info(tmp_path: Path) -> None:
-        _ = (tmp_path / "main.yml").write_text(
-            dedent(
+    def describe_platforms() -> None:
+        def extracts_standard_platforms_without_dependencies(tmp_path: Path) -> None:
+            _ = (tmp_path / "main.yml").write_text(
+                dedent(
+                    """
+                dependencies: []
+
+                galaxy_info:
+                    role_name: test
+                    author: test
+                    platforms:
+                        - name: Debian
+                          versions:
+                            - any
+                        - name: Fedora
+                          versions:
+                            - 7
+                            - 8
                 """
-            galaxy_info: []
-        """
-            )
-        )
-
-        with pytest.raises(Exception):
-            _ = ext.extract_role_metadata_file(
-                ProjectPath(tmp_path, "main.yml"), ext.ExtractionContext(False)
+                )
             )
 
-    def rejects_invalid_platforms_list(tmp_path: Path) -> None:
-        _ = (tmp_path / "main.yml").write_text(
-            dedent(
+            result = ext.extract_role_metadata_file(
+                ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+            )
+
+            assert result.path == Path("main.yml")
+            assert len(result.metablock.platforms) == 3
+            assert result.metablock.platforms[0].name == "Debian"
+            assert result.metablock.platforms[0].version == "any"
+            assert result.metablock.platforms[1].name == "Fedora"
+            assert result.metablock.platforms[1].version == "7"
+            assert result.metablock.platforms[2].name == "Fedora"
+            assert result.metablock.platforms[2].version == "8"
+            assert not result.metablock.platforms[0].position.is_synthetic
+            assert result.metablock.platforms[0].position.start_line == 8
+            assert not result.metablock.dependencies
+
+        def normalises_missing_platforms_property(tmp_path: Path) -> None:
+            _ = (tmp_path / "main.yml").write_text(
                 """
-            galaxy_info:
-                platforms: yes
-        """
-            )
-        )
-
-        with pytest.raises(Exception):
-            _ = ext.extract_role_metadata_file(
-                ProjectPath(tmp_path, "main.yml"), ext.ExtractionContext(False)
+                galaxy_info:
+                  name: test
+                  author: test
+                dependencies: []
+            """
             )
 
-    def transforms_weird_platform_entry(tmp_path: Path) -> None:
-        _ = (tmp_path / "main.yml").write_text(
-            dedent(
+            result = ext.extract_role_metadata_file(
+                ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+            )
+
+            assert not result.metablock.platforms
+
+        def rejects_invalid_galaxy_info(tmp_path: Path) -> None:
+            _ = (tmp_path / "main.yml").write_text(
+                dedent(
+                    """
+                galaxy_info:
+                    - test
+                    - test2
+            """
+                )
+            )
+
+            with pytest.raises(Exception):
+                _ = ext.extract_role_metadata_file(
+                    ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+                )
+
+        def rejects_invalid_platforms_list(tmp_path: Path) -> None:
+            _ = (tmp_path / "main.yml").write_text(
+                dedent(
+                    """
+                galaxy_info:
+                    platforms: yes
+            """
+                )
+            )
+
+            with pytest.raises(Exception):
+                _ = ext.extract_role_metadata_file(
+                    ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+                )
+
+        def rejects_weird_platform_entry(tmp_path: Path) -> None:
+            _ = (tmp_path / "main.yml").write_text(
+                dedent(
+                    """
+                galaxy_info:
+                    platforms:
+                    - [hello]
+            """
+                )
+            )
+
+            with pytest.raises(ValidationError):
+                _ = ext.extract_role_metadata_file(
+                    ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+                )
+
+        def normalises_missing_galaxy_info_property(tmp_path: Path) -> None:
+            _ = (tmp_path / "main.yml").write_text(
                 """
-            galaxy_info:
-                platforms:
-                  - [hello]
-        """
-            )
-        )
-
-        result = ext.extract_role_metadata_file(
-            ProjectPath(tmp_path, "main.yml"), ext.ExtractionContext(False)
-        )
-
-        assert result.metablock.platforms == []
-
-    def ignores_malformed_dependency_in_lenient_mode(tmp_path: Path) -> None:
-        _ = (tmp_path / "main.yml").write_text(
-            dedent(
+                    dependencies: []
                 """
-            dependencies:
-                - test: nope
-        """
             )
-        )
-        ctx = ext.ExtractionContext(True)
 
-        result = ext.extract_role_metadata_file(ProjectPath(tmp_path, "main.yml"), ctx)
+            result = ext.extract_role_metadata_file(
+                ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+            )
 
-        assert result.metablock.dependencies == []
-        assert ctx.broken_tasks[0].raw == {"test": "nope"}
+            assert not result.metablock.platforms
+
+    def describe_dependencies() -> None:
+        def extracts_simple_string_dependencies(tmp_path: Path) -> None:
+            _ = (tmp_path / "main.yml").write_text(
+                dedent(
+                    """
+                dependencies:
+                    - testrole
+            """
+                )
+            )
+
+            result = ext.extract_role_metadata_file(
+                ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+            )
+
+            assert len(result.metablock.dependencies) == 1
+            assert result.metablock.dependencies[0].role == "testrole"
+
+        def extracts_simple_dict_dependencies_with_role_key(tmp_path: Path) -> None:
+            _ = (tmp_path / "main.yml").write_text(
+                dedent(
+                    """
+                dependencies:
+                    - role: testrole
+            """
+                )
+            )
+
+            result = ext.extract_role_metadata_file(
+                ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+            )
+
+            assert len(result.metablock.dependencies) == 1
+            assert result.metablock.dependencies[0].role == "testrole"
+
+        def normalises_int_role_name_to_str(tmp_path: Path) -> None:
+            _ = (tmp_path / "main.yml").write_text(
+                dedent(
+                    """
+                dependencies:
+                    - 123
+            """
+                )
+            )
+
+            result = ext.extract_role_metadata_file(
+                ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+            )
+
+            assert len(result.metablock.dependencies) == 1
+            assert result.metablock.dependencies[0].role == "123"
+
+        def extracts_simple_dict_dependencies_with_name_key(tmp_path: Path) -> None:
+            _ = (tmp_path / "main.yml").write_text(
+                dedent(
+                    """
+                dependencies:
+                    - name: testrole
+            """
+                )
+            )
+
+            result = ext.extract_role_metadata_file(
+                ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+            )
+
+            assert len(result.metablock.dependencies) == 1
+            assert result.metablock.dependencies[0].name == "testrole"
+            assert result.metablock.dependencies[0].role == "testrole"
+
+        def extracts_dependencies_with_condition(tmp_path: Path) -> None:
+            _ = (tmp_path / "main.yml").write_text(
+                dedent(
+                    """
+                dependencies:
+                    - role: testrole
+                      when: "{{ ansible_os_family == 'Debian' }}"
+            """
+                )
+            )
+
+            result = ext.extract_role_metadata_file(
+                ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+            )
+
+            assert len(result.metablock.dependencies) == 1
+            assert result.metablock.dependencies[0].role == "testrole"
+            assert result.metablock.dependencies[0].when == [
+                "{{ ansible_os_family == 'Debian' }}"
+            ]
+
+        def extracts_dependencies_with_multiple_conditions(tmp_path: Path) -> None:
+            _ = (tmp_path / "main.yml").write_text(
+                dedent(
+                    """
+                dependencies:
+                    - role: testrole
+                      when:
+                        - "{{ ansible_os_family == 'Debian' }}"
+                        - "{{ 1 + 1 == 2 }}"
+            """
+                )
+            )
+
+            result = ext.extract_role_metadata_file(
+                ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+            )
+
+            assert len(result.metablock.dependencies) == 1
+            assert result.metablock.dependencies[0].role == "testrole"
+            assert result.metablock.dependencies[0].when == [
+                "{{ ansible_os_family == 'Debian' }}",
+                "{{ 1 + 1 == 2 }}",
+            ]
+
+        def ignores_malformed_dependency_in_lenient_mode(tmp_path: Path) -> None:
+            _ = (tmp_path / "main.yml").write_text(
+                dedent(
+                    """
+                dependencies:
+                    - test: nope
+            """
+                )
+            )
+            ctx = ast.ExtractionContext(True)
+
+            result = ext.extract_role_metadata_file(
+                ProjectPath(tmp_path, "main.yml"), ctx
+            )
+
+            assert result.metablock.dependencies == []
+            assert ctx.broken_tasks[0].raw == {"test": "nope"}
+
+        def normalises_missing_dependencies_property(tmp_path: Path) -> None:
+            _ = (tmp_path / "main.yml").write_text(
+                """
+                galaxy_info:
+                  name: test
+                  author: test
+                  platforms: []
+            """
+            )
+
+            result = ext.extract_role_metadata_file(
+                ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+            )
+
+            assert not result.metablock.dependencies
+
+        def raises_on_wrong_dependencies_type(tmp_path: Path) -> None:
+            _ = (tmp_path / "main.yml").write_text(
+                """
+                    galaxy_info:
+                        platforms:
+                            - name: Debian
+                              versions:
+                                - any
+
+                    dependencies:
+                        test: x
+                """
+            )
+
+            with pytest.raises(Exception):
+                _ = ext.extract_role_metadata_file(
+                    ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+                )
+
+        def raises_on_wrong_dependency_type(tmp_path: Path) -> None:
+            _ = (tmp_path / "main.yml").write_text(
+                """
+                    galaxy_info:
+                        platforms:
+                            - name: Debian
+                              versions:
+                                - any
+
+                    dependencies:
+                        - [a, b]
+                """
+            )
+
+            with pytest.raises(Exception):
+                _ = ext.extract_role_metadata_file(
+                    ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+                )
+
+        def raises_on_missing_role_name(tmp_path: Path) -> None:
+            _ = (tmp_path / "main.yml").write_text(
+                """
+                    galaxy_info:
+                        platforms:
+                            - name: Debian
+                              versions:
+                                - any
+
+                    dependencies:
+                        - when: x is True
+                """
+            )
+
+            with pytest.raises(Exception):
+                _ = ext.extract_role_metadata_file(
+                    ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+                )
+
+        def raises_on_invalid_role_name_type(tmp_path: Path) -> None:
+            _ = (tmp_path / "main.yml").write_text(
+                """
+                    galaxy_info:
+                        platforms:
+                            - name: Debian
+                              versions:
+                                - any
+
+                    dependencies:
+                        - name: [not, a, string]
+                """
+            )
+
+            with pytest.raises(Exception):
+                _ = ext.extract_role_metadata_file(
+                    ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+                )
+
+        def considers_extra_non_directive_dependency_properties_to_be_parameters(
+            tmp_path: Path,
+        ) -> None:
+            _ = (tmp_path / "main.yml").write_text(
+                """
+                    galaxy_info:
+                        platforms:
+                            - name: Debian
+                              versions:
+                                - any
+
+                    dependencies:
+                        - role: test
+                          become: yes
+                          param_x: 123
+                """
+            )
+
+            result = ext.extract_role_metadata_file(
+                ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+            )
+
+            assert len(result.metablock.dependencies) == 1
+            assert result.metablock.dependencies[0].role == "test"
+            assert result.metablock.dependencies[0].become is True
+            assert result.metablock.dependencies[0].params == {"param_x": 123}
+
+        def supports_new_style_role_requirements(
+            tmp_path: Path,
+        ) -> None:
+            _ = (tmp_path / "main.yml").write_text(
+                """
+                    galaxy_info:
+                        platforms:
+                            - name: Debian
+                              versions:
+                                - any
+
+                    dependencies:
+                        - src: https://github.com/bennojoy/nginx
+                          version: main
+                """
+            )
+
+            result = ext.extract_role_metadata_file(
+                ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+            )
+
+            assert len(result.metablock.dependencies) == 1
+            assert result.metablock.dependencies[0].role == "nginx"
+
+        def supports_string_based_new_style_role_requirements(
+            tmp_path: Path,
+        ) -> None:
+            _ = (tmp_path / "main.yml").write_text(
+                """
+                    galaxy_info:
+                        platforms:
+                            - name: Debian
+                              versions:
+                                - any
+
+                    dependencies:
+                        - git+https://github.com/bennojoy/nginx,main,testrole
+                """
+            )
+
+            result = ext.extract_role_metadata_file(
+                ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+            )
+
+            assert len(result.metablock.dependencies) == 1
+            assert result.metablock.dependencies[0].role == "testrole"
 
 
 def describe_extracting_variables() -> None:
@@ -322,16 +542,23 @@ def describe_extracting_variables() -> None:
         assert result.path == Path("main.yml")
         assert result.variables == {}
 
-    @pytest.mark.parametrize("content", ["- hello\n- world"])  # list  # string
+    @pytest.mark.parametrize(
+        "content",
+        [
+            "- hello\n- world",  # list instead of dict
+            "test123",  # string instead of dict
+            "1: 2\nabc: def",  # non-string keys.
+        ],
+    )
     def rejects_invalid_files(tmp_path: Path, content: str) -> None:
         _ = (tmp_path / "main.yml").write_text(content)
 
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             _ = ext.extract_variable_file(ProjectPath(tmp_path, "main.yml"))
 
 
 TaskExtractor = Callable[
-    [dict[str, "ans.AnsibleValue"], ext.ExtractionContext],
+    [dict[str, "ans.AnsibleValue"], ast.ExtractionContext],
     ast.Task | ast.Handler | None,
 ]
 
@@ -352,7 +579,7 @@ def a_task_extractor() -> None:
         """
                 )
             ),
-            ext.ExtractionContext(False),
+            ast.ExtractionContext(False),
         )
 
         assert isinstance(result, task_representation)
@@ -372,7 +599,7 @@ def a_task_extractor() -> None:
         """
                 )
             ),
-            ext.ExtractionContext(False),
+            ast.ExtractionContext(False),
         )
 
         assert isinstance(result, task_representation)
@@ -395,7 +622,7 @@ def a_task_extractor() -> None:
         """
                 )
             ),
-            ext.ExtractionContext(False),
+            ast.ExtractionContext(False),
         )
 
         assert isinstance(result, task_representation)
@@ -417,7 +644,7 @@ def a_task_extractor() -> None:
         """
                 )
             ),
-            ext.ExtractionContext(False),
+            ast.ExtractionContext(False),
         )
 
         assert isinstance(result, task_representation)
@@ -439,7 +666,7 @@ def a_task_extractor() -> None:
         """
                 )
             ),
-            ext.ExtractionContext(False),
+            ast.ExtractionContext(False),
         )
 
         assert isinstance(result, task_representation)
@@ -463,7 +690,7 @@ def a_task_extractor() -> None:
         """
                 )
             ),
-            ext.ExtractionContext(False),
+            ast.ExtractionContext(False),
         )
 
         assert isinstance(result, task_representation)
@@ -487,7 +714,7 @@ def a_task_extractor() -> None:
         """
                 )
             ),
-            ext.ExtractionContext(False),
+            ast.ExtractionContext(False),
         )
 
         assert isinstance(result, task_representation)
@@ -507,7 +734,7 @@ def a_task_extractor() -> None:
         """
                 )
             ),
-            ext.ExtractionContext(False),
+            ast.ExtractionContext(False),
         )
 
         assert isinstance(result, task_representation)
@@ -533,7 +760,7 @@ def a_task_extractor() -> None:
         """
                 )
             ),
-            ext.ExtractionContext(False),
+            ast.ExtractionContext(False),
         )
 
         assert isinstance(result, task_representation)
@@ -555,7 +782,7 @@ def a_task_extractor() -> None:
         """
                 )
             ),
-            ext.ExtractionContext(False),
+            ast.ExtractionContext(False),
         )
 
         assert isinstance(result, task_representation)
@@ -579,7 +806,7 @@ def a_task_extractor() -> None:
         """
                 )
             ),
-            ext.ExtractionContext(False),
+            ast.ExtractionContext(False),
         )
 
         assert isinstance(result, task_representation)
@@ -600,7 +827,7 @@ def a_task_extractor() -> None:
         """
                 )
             ),
-            ext.ExtractionContext(False),
+            ast.ExtractionContext(False),
         )
 
         assert isinstance(result, task_representation)
@@ -619,7 +846,7 @@ def a_task_extractor() -> None:
         """
                 )
             ),
-            ext.ExtractionContext(False),
+            ast.ExtractionContext(False),
         )
 
         assert isinstance(result, task_representation)
@@ -638,7 +865,7 @@ def a_task_extractor() -> None:
         """
                 )
             ),
-            ext.ExtractionContext(False),
+            ast.ExtractionContext(False),
         )
 
         assert isinstance(result, task_representation)
@@ -658,7 +885,7 @@ def a_task_extractor() -> None:
         """
                 )
             ),
-            ext.ExtractionContext(False),
+            ast.ExtractionContext(False),
         )
 
         assert isinstance(result, task_representation)
@@ -678,7 +905,7 @@ def a_task_extractor() -> None:
             """
                     )
                 ),
-                ext.ExtractionContext(False),
+                ast.ExtractionContext(False),
             )
 
     def rejects_tasks_with_invalid_postvalidated_attribute_values(
@@ -696,7 +923,7 @@ def a_task_extractor() -> None:
             """
                     )
                 ),
-                ext.ExtractionContext(False),
+                ast.ExtractionContext(False),
             )
 
     def rejects_tasks_with_no_action(extractor: TaskExtractor) -> None:
@@ -709,7 +936,7 @@ def a_task_extractor() -> None:
             """
                     )
                 ),
-                ext.ExtractionContext(False),
+                ast.ExtractionContext(False),
             )
 
     def rejects_tasks_with_multiple_actions(extractor: TaskExtractor) -> None:
@@ -726,11 +953,11 @@ def a_task_extractor() -> None:
             """
                     )
                 ),
-                ext.ExtractionContext(False),
+                ast.ExtractionContext(False),
             )
 
     def ignores_malformed_task_in_lenient_mode(extractor: TaskExtractor) -> None:
-        ctx = ext.ExtractionContext(True)
+        ctx = ast.ExtractionContext(True)
         result = extractor(
             _parse_yaml_dict(
                 dedent(
@@ -784,7 +1011,7 @@ def describe_extracting_handlers() -> None:
         """
                 )
             ),
-            ext.ExtractionContext(False),
+            ast.ExtractionContext(False),
         )
 
         assert result is not None
@@ -807,7 +1034,7 @@ def describe_extracting_handlers() -> None:
         """
                 )
             ),
-            ext.ExtractionContext(False),
+            ast.ExtractionContext(False),
         )
 
         assert result is not None
@@ -828,7 +1055,7 @@ def describe_extracting_list_of_handlers() -> None:
         """
                 )
             ),
-            ext.ExtractionContext(False),
+            ast.ExtractionContext(False),
             handlers=True,
         )
 
@@ -851,7 +1078,7 @@ def describe_extracting_blocks() -> None:
         """
                 )
             ),
-            ext.ExtractionContext(False),
+            ast.ExtractionContext(False),
         )
 
         assert result is not None
@@ -874,7 +1101,7 @@ def describe_extracting_blocks() -> None:
     #     """
     #             )
     #         ),
-    #         ext.ExtractionContext(False),
+    #         ast.ExtractionContext(False),
     #         handlers=True,
     #     )
 
@@ -908,7 +1135,7 @@ def describe_extracting_blocks() -> None:
         """
                 )
             ),
-            ext.ExtractionContext(False),
+            ast.ExtractionContext(False),
         )
 
         assert result is not None
@@ -936,7 +1163,7 @@ def describe_extracting_blocks() -> None:
         """
                 )
             ),
-            ext.ExtractionContext(False),
+            ast.ExtractionContext(False),
         )
 
         assert result is not None
@@ -958,7 +1185,7 @@ def describe_extracting_blocks() -> None:
         """
                 )
             ),
-            ext.ExtractionContext(False),
+            ast.ExtractionContext(False),
         )
 
         assert result is not None
@@ -976,7 +1203,7 @@ def describe_extracting_blocks() -> None:
             """
                     )
                 ),
-                ext.ExtractionContext(False),
+                ast.ExtractionContext(False),
             )
 
     def rejects_blocks_without_block() -> None:
@@ -990,11 +1217,11 @@ def describe_extracting_blocks() -> None:
             """
                     )
                 ),
-                ext.ExtractionContext(False),
+                ast.ExtractionContext(False),
             )
 
     def ignores_malformed_block_in_lenient_mode() -> None:
-        ctx = ext.ExtractionContext(True)
+        ctx = ast.ExtractionContext(True)
 
         result = ext.extract_block(
             _parse_yaml_dict(
@@ -1028,7 +1255,7 @@ def describe_extracting_tasks_file() -> None:
         )
 
         result = ext.extract_tasks_file(
-            ProjectPath(tmp_path, "main.yml"), ext.ExtractionContext(False)
+            ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
         )
 
         assert result.path == Path("main.yml")
@@ -1040,7 +1267,7 @@ def describe_extracting_tasks_file() -> None:
         _ = (tmp_path / "main.yml").write_text("# just a comment")
 
         result = ext.extract_tasks_file(
-            ProjectPath(tmp_path, "main.yml"), ext.ExtractionContext(False)
+            ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
         )
 
         assert result.path == Path("main.yml")
@@ -1052,7 +1279,7 @@ def describe_extracting_tasks_file() -> None:
 
         with pytest.raises(Exception):
             _ = ext.extract_tasks_file(
-                ProjectPath(tmp_path, "main.yml"), ext.ExtractionContext(False)
+                ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
             )
 
 
@@ -1069,7 +1296,7 @@ def describe_extracting_plays() -> None:
         """
                 )
             ),
-            ext.ExtractionContext(False),
+            ast.ExtractionContext(False),
         )
 
         assert result.hosts == ["servers"]
@@ -1090,7 +1317,7 @@ def describe_extracting_plays() -> None:
         """
                 )
             ),
-            ext.ExtractionContext(False),
+            ast.ExtractionContext(False),
         )
 
         assert result.hosts == ["servers"]
@@ -1112,13 +1339,39 @@ def describe_extracting_plays() -> None:
         """
                 )
             ),
-            ext.ExtractionContext(False),
+            ast.ExtractionContext(False),
         )
 
         assert result.hosts == ["servers"]
         assert result.name == "test play"
         assert len(result.tasks) == 1
         assert isinstance(result.tasks[0], ast.Task)
+        assert result.vars == {"testvar": 123}
+
+    def extracts_play_with_roles() -> None:
+        result = ext.extract_play(
+            _parse_yaml_dict(
+                dedent(
+                    """
+            name: test play
+            hosts: servers
+            roles:
+              - testrole
+            tasks:
+              - import_tasks: test
+            vars:
+              testvar: 123
+        """
+                )
+            ),
+            ast.ExtractionContext(False),
+        )
+
+        assert result.hosts == ["servers"]
+        assert result.name == "test play"
+        assert len(result.roles) == 1
+        assert isinstance(result.roles[0], ast.PlayRoleRequirement)
+        assert result.roles[0].role == "testrole"
         assert result.vars == {"testvar": 123}
 
     def rejects_invalid_play() -> None:
@@ -1134,7 +1387,7 @@ def describe_extracting_plays() -> None:
             """
                     )
                 ),
-                ext.ExtractionContext(False),
+                ast.ExtractionContext(False),
             )
 
 
