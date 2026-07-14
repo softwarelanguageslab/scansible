@@ -9,6 +9,7 @@ from functools import partial
 from pathlib import Path
 
 from ansible.parsing.yaml.objects import AnsibleBaseYAMLObject
+from pydantic import ValidationError
 
 from scansible.utils import actions
 
@@ -67,17 +68,11 @@ def extract_variable_file(
 
 
 def extract_handler_file(path: ProjectPath, ctx: ExtractionContext) -> ast.HandlerFile:
-    ds, _ = loaders.load_tasks_file(path)
-
-    content = extract_list_of_tasks_or_blocks(ds, ctx, handlers=True)
-    return ast.HandlerFile(path=path.relative, handlers=content)
+    return ast.HandlerFile.load(path, ctx)
 
 
 def extract_tasks_file(path: ProjectPath, ctx: ExtractionContext) -> ast.TaskFile:
-    ds, _ = loaders.load_tasks_file(path)
-
-    content = extract_list_of_tasks_or_blocks(ds, ctx)
-    return ast.TaskFile(path=path.relative, tasks=content)
+    return ast.TaskFile.load(path, ctx)
 
 
 @overload
@@ -156,12 +151,6 @@ def extract_block(
     return block
 
 
-def _extract_loop_control(lc: ans.LoopControl | None) -> ast.LoopControl | None:
-    if lc is None:
-        return None
-    return ast.LoopControl.model_validate(_ansible_to_dict(lc))
-
-
 def extract_task(
     ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext
 ) -> ast.Task | None:
@@ -191,21 +180,8 @@ def _extract_task(
     ctx: ExtractionContext,
     as_handler: Literal[True, False],
 ) -> ast.Task | ast.Handler | None:
-    raw_task: ans.Task | ans.Handler
-    try:
-        raw_task, raw_ds = loaders.load_task(ds, as_handler)
-    except (ans.AnsibleError, loaders.LoadError) as e:
-        if not ctx.lenient:
-            raise
-        ctx.broken_tasks.append(ast.BrokenTask(raw=ds, reason=str(e)))
-        return None
-
-    attrs = _ansible_to_dict(raw_task)
-    attrs["loop_control"] = _extract_loop_control(raw_task.loop_control)
-
     rep_cls = ast.Handler if as_handler else ast.Task
-
-    return rep_cls(**attrs, position=_get_position(raw_ds))  # pyright: ignore[reportArgumentType]
+    return rep_cls.model_validate(ds, context=ctx)
 
 
 def extract_play(ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext) -> ast.Play:
@@ -419,7 +395,7 @@ def _safe_extract[T](
     try:
         extracted_file = extractor(file_path, ctx)
         file_dict["/".join(file_path.relative.parts[1:])] = extracted_file
-    except (ans.AnsibleError, loaders.LoadError) as e:
+    except (ans.AnsibleError, loaders.LoadError, ValidationError) as e:
         ctx.broken_files.append(ast.BrokenFile(path=file_path.relative, reason=str(e)))
 
 

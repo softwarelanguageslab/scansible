@@ -8,7 +8,6 @@ from pathlib import Path
 import pytest
 
 import scansible.representations.structural.helpers as h
-from scansible.representations.structural.loaders import _patch_modargs_parser
 
 
 def describe_project_path() -> None:
@@ -85,42 +84,6 @@ def describe_parse_file() -> None:
 
         with pytest.raises(Exception):
             h.parse_file(h.ProjectPath(tmp_path, "test.yml"))
-
-
-def describe_validate_ansible_object() -> None:
-    from ansible.playbook.task import Task
-
-    def should_normalise_objects() -> None:
-        with _patch_modargs_parser():
-            obj = Task.load({"file": {"path": "x"}, "until": "1 == 1"})  # type: ignore[dict-item]
-        assert obj.until == "1 == 1"  # type: ignore[comparison-overlap]
-
-        h.validate_ansible_object(obj)
-
-        assert obj.until == ["1 == 1"]
-
-    def should_not_postvalidate_classes() -> None:
-        with _patch_modargs_parser():
-            obj = Task.load({"file": {}, "loop_control": {"loop_var": "x"}})  # type: ignore[dict-item]
-
-        h.validate_ansible_object(obj)
-
-        assert obj.loop_control.loop_var == "x"
-
-    def should_reject_invalid_objects() -> None:
-        with _patch_modargs_parser():
-            obj = Task.load({"file": {"path": "x"}, "delay": "hello"})  # type: ignore[dict-item]
-
-        with pytest.raises(Exception):
-            h.validate_ansible_object(obj)
-
-    def does_not_validate_expression_values() -> None:
-        with _patch_modargs_parser():
-            obj = Task.load({"file": {"path": "x"}, "become": "{{ test expr }}"})  # type: ignore[dict-item]
-
-        h.validate_ansible_object(obj)
-
-        assert obj.become == "{{ test expr }}"
 
 
 def describe_find_file() -> None:

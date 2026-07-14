@@ -32,6 +32,10 @@ def is_import_include_role(action: str) -> bool:
     )
 
 
+def is_include_role(action: str) -> bool:
+    return action in constants._ACTION_INCLUDE_ROLE  # pyright: ignore
+
+
 def is_import_playbook(action: str) -> bool:
     return action in constants._ACTION_IMPORT_PLAYBOOK  # pyright: ignore
 

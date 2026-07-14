@@ -7,26 +7,17 @@ parsed data structure without modifications.
 
 from __future__ import annotations
 
-from typing import Literal, cast, final, overload
+from typing import cast, final
 
 import types
-from collections.abc import Iterator, Sequence
-from contextlib import contextmanager
+from collections.abc import Sequence
 from copy import deepcopy
 from pathlib import Path
 
 from ansible.parsing.yaml.objects import AnsibleMapping, AnsibleUnicode
-from ansible.utils.fqcn import add_internal_fqcns
-
-from scansible.representations.structural.ast import Handler, Task
-from scansible.utils import actions
 
 from . import ansible_types as ans
-from .helpers import (
-    ProjectPath,
-    parse_file,
-    validate_ansible_object,
-)
+from .helpers import ProjectPath, parse_file, validate_ansible_object
 
 
 class LoadError(Exception):
@@ -95,162 +86,6 @@ class LoadTypeError(LoadError):
         self.actual_value = actual_value
 
 
-def load_tasks_file(
-    path: ProjectPath,
-) -> tuple[list[dict[str, ans.AnsibleValue]], object]:
-    original_ds = parse_file(path)
-    ds = deepcopy(original_ds)
-
-    if ds is None:
-        ds = ans.AnsibleSequence()
-
-    if not isinstance(ds, list):
-        raise LoadTypeError("task file", list, ds, path.relative)
-
-    ds = cast(list["ans.AnsibleValue"], ds)
-    for content in ds:
-        if not isinstance(content, dict) or not all(
-            isinstance(prop, str) for prop in content
-        ):
-            raise LoadTypeError(
-                "task file content", dict[str, object], content, path.relative
-            )
-
-    return cast(list[dict[str, "ans.AnsibleValue"]], ds), original_ds
-
-
-@contextmanager
-def _patch_modargs_parser() -> Iterator[None]:
-    # Patch the ModuleArgsParser so that it doesn't verify whether the action exist.
-    # Otherwise it'll complain on non-builtin actions
-    old_mod_args_parse = ans.ModuleArgsParser.parse
-    ans.ModuleArgsParser.parse = lambda self, skip_action_validation=False: (
-        old_mod_args_parse(self, skip_action_validation=True)
-    )
-
-    try:
-        yield
-    finally:
-        ans.ModuleArgsParser.parse = old_mod_args_parse
-
-
-@contextmanager
-def _patch_lookup_loader() -> Iterator[None]:
-    # Patch the lookup_loader so that it always reports a lookup plugin as existing.
-    # Ansible does early resolution of `with_*` lookups, and since we may not
-    # have all collections installed and we're not registering custom lookup
-    # plugins, it'll complain when those are used in `with_*` directives.
-    old_loader_has_plugin = ans.PluginLoader.has_plugin
-    ans.PluginLoader.has_plugin = lambda *args, **kwargs: True  # pyright: ignore[reportUnknownLambdaType]
-    ans.PluginLoader.__contains__ = lambda *args, **kwargs: True  # pyright: ignore[reportUnknownLambdaType]
-
-    try:
-        yield
-    finally:
-        ans.PluginLoader.has_plugin = old_loader_has_plugin
-        ans.PluginLoader.__contains__ = old_loader_has_plugin
-
-
-def get_task_action(ds: dict[str, ans.AnsibleValue]) -> str:
-    action: str | None = None
-
-    # Tasks of the forms:
-    # - action: shell echo hi
-    # - action: file path=...
-    # - action: file
-    #   args:
-    #     path: ...
-    # - action:
-    #     module: file
-    #     ...
-    for action_key in ("action", "local_action"):
-        if action_key not in ds:
-            continue
-
-        if action is not None:
-            raise LoadError(
-                "task",
-                f"Conflicting action directives: Unexpected {action_key}, action already parsed.",
-                extra_msg=repr(ds),
-            )
-
-        action_val = ds[action_key]
-        if isinstance(action_val, str):
-            action = action_val.split(" ")[0]
-        elif isinstance(action_val, dict) and isinstance(
-            action_module := action_val.get("module"), str
-        ):
-            action = action_module
-        else:
-            raise LoadError(
-                "task", f"Invalid specification for {action_key}", extra_msg=repr(ds)
-            )
-
-    # Tasks of the form
-    # - debug: msg=hi
-    # - debug:
-    #     msg: hi
-    # - shell: echo hi
-    # - ping:
-    task_directives = set(Task.model_fields.keys())
-    task_directives.update(Handler.model_fields)
-    task_directives.update({"local_action", "static"})
-
-    # note: this also subtracts "action" and "args" but that's okay, they've been
-    # processed above. Also make sure to remove `with_<lookup>`.
-    extra_directives = {
-        directive
-        for directive in ds.keys()
-        if directive not in task_directives and not directive.startswith("with_")
-    }
-
-    for directive in extra_directives:
-        if action is not None:
-            raise LoadError(
-                "task",
-                f"Conflicting action directives: Unexpected {extra_directives}, action already parsed.",
-                extra_msg=repr(ds),
-            )
-
-        action = directive
-
-    if action is None:
-        raise LoadError("task", "No action found in task", extra_msg=repr(ds))
-
-    return action
-
-
-def _transform_task_include(ds: dict[str, ans.AnsibleValue], action: str) -> None:
-    # Current Ansible version crashes when the old static directive or the
-    # `include` action is used.
-    # Transform it to modern syntax, either into `import_tasks` if it's a
-    # static include, or `include_tasks` if it isn't.
-    if "static" in ds:
-        is_static = ds["static"] is not None and ans.convert_bool(ds["static"])
-        del ds["static"]
-    else:
-        is_static = None
-
-    if actions.is_bare_include(action):
-        include_names = add_internal_fqcns(["include"])
-        include_name = next(name for name in include_names if name in ds)
-        include_args = ds[include_name]
-        del ds[include_name]
-        if is_static:
-            ds["import_tasks"] = include_args
-        else:
-            # FIXME: If static is not explicitly set, Ansible will attempt to
-            # figure out whether the inclusion is static or dynamic based on
-            # context and based on whether the file exists, and fall back to
-            # dynamic inclusion if that fails. This may lead to slightly different
-            # semantics than our approximation here.
-            ds["include_tasks"] = include_args
-    elif actions.is_include_tasks(action) and is_static is True:
-        raise LoadError("task", "include_tasks with static: yes", extra_msg=repr(ds))
-    elif actions.is_import_tasks(action) and is_static is False:
-        raise LoadError("task", "import_tasks with static: no", extra_msg=repr(ds))
-
-
 def _transform_old_become(ds: dict[str, ans.AnsibleValue]) -> None:
     # Current Ansible version refuses to parse tasks that use sudo/su and their
     # derivatives (*_user, *_exe, *_flags, *_pass). Transform them like legacy
@@ -296,86 +131,6 @@ def _transform_old_become(ds: dict[str, ans.AnsibleValue]) -> None:
         variables["ansible_become_password"] = ds[pass_kw]
         ds["vars"] = variables
         del ds[pass_kw]
-
-
-def _transform_old_always_run(ds: dict[str, ans.AnsibleValue]) -> None:
-    # `always_run` is an old, now-removed directive which has since been
-    # replaced by the `check_mode: no` directive.
-    if "always_run" in ds:
-        try:
-            val = ans.convert_bool(ds["always_run"])
-        except Exception as e:
-            print(f'Could not load "always_run" value: {e}')
-            return
-
-        # if `always_run: yes` -> `check_mode: no`.
-        # not sure if `always_run: no` necessarily means `check_mode: yes` or
-        # just "use default behaviour".
-        del ds["always_run"]
-        if val:
-            ds["check_mode"] = False
-
-
-@overload
-def load_task(
-    original_ds: dict[str, ans.AnsibleValue] | None, as_handler: Literal[True]
-) -> tuple[ans.Handler, object]: ...
-
-
-@overload
-def load_task(
-    original_ds: dict[str, ans.AnsibleValue] | None, as_handler: Literal[False]
-) -> tuple[ans.Task, object]: ...
-
-
-def load_task(
-    original_ds: dict[str, ans.AnsibleValue] | None, as_handler: bool
-) -> tuple[ans.Task | ans.Handler, object]:
-    ds = deepcopy(original_ds)
-
-    # Apparently an empty Task is allowed by Ansible.
-    if ds is None:
-        ds = {}
-
-    # Need to do this before mod_args parsing, since mod_args parsing can crash
-    # because of the presence of old keywords.
-    _transform_old_become(ds)
-    _transform_old_always_run(ds)
-
-    action = get_task_action(ds)
-    is_include_tasks = actions.is_import_include_tasks(action)
-
-    if actions.is_import_playbook(action):
-        # This loader only gets called for tasks in task lists, so an
-        # import_playbook is illegal here.
-        raise LoadError(
-            "task", "import_playbook is only allowed as a top-level playbook task"
-        )
-
-    if actions.is_bare_include(action) or "static" in ds:
-        # Transform deprecated/removed ansible.builtin.include tasks and
-        # tasks with the static attribute.
-        _transform_task_include(ds, action)
-
-    # This can happen and Ansible doesn't do anything about it, it just
-    # ignores the when. Remove the directive so that defaults take over.
-    if "when" in ds and ds["when"] is None:
-        del ds["when"]
-
-    # Use the correct Ansible representation so that more validation is done.
-    ansible_cls: type[ans.Task]
-    if actions.is_import_include_role(action):
-        ansible_cls = ans.IncludeRole
-    elif not as_handler:
-        ansible_cls = ans.Task if not is_include_tasks else ans.TaskInclude
-    else:
-        ansible_cls = ans.Handler if not is_include_tasks else ans.HandlerTaskInclude
-
-    with _patch_modargs_parser(), _patch_lookup_loader():
-        raw_task = ansible_cls.load(ds)
-        validate_ansible_object(raw_task)
-
-    return raw_task, original_ds
 
 
 @final

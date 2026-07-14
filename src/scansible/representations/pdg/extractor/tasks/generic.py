@@ -140,11 +140,11 @@ class GenericTaskExtractor(TaskExtractor):
         return result
 
     def _define_registered_var(self, task: rep.Task) -> None:
-        if not self.task.register:
+        if not self.task.register_var:
             return
 
         vn = self.context.vars.define_injected_variable(
-            self.task.register, EnvironmentType.SET_FACTS_REGISTERED
+            self.task.register_var, EnvironmentType.SET_FACTS_REGISTERED
         )
         self.context.graph.add_edge(task, vn, rep.DEF)
         for condition in self.context.active_conditions:
