@@ -482,7 +482,9 @@ def describe_extracting_variables() -> None:
             )
         )
 
-        result = ext.extract_variable_file(ProjectPath(tmp_path, "main.yml"))
+        result = ext.extract_variable_file(
+            ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+        )
 
         assert result.path == Path("main.yml")
         assert result.variables == {
@@ -504,7 +506,9 @@ def describe_extracting_variables() -> None:
             )
         )
 
-        result = ext.extract_variable_file(ProjectPath(tmp_path, "main.yml"))
+        result = ext.extract_variable_file(
+            ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+        )
 
         assert result.path == Path("main.yml")
         assert result.variables == {
@@ -523,7 +527,9 @@ def describe_extracting_variables() -> None:
             )
         )
 
-        result = ext.extract_variable_file(ProjectPath(tmp_path, "main.yml"))
+        result = ext.extract_variable_file(
+            ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+        )
 
         assert result.path == Path("main.yml")
         assert result.variables == {"test": None}
@@ -537,7 +543,9 @@ def describe_extracting_variables() -> None:
             )
         )
 
-        result = ext.extract_variable_file(ProjectPath(tmp_path, "main.yml"))
+        result = ext.extract_variable_file(
+            ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+        )
 
         assert result.path == Path("main.yml")
         assert result.variables == {}
@@ -554,7 +562,9 @@ def describe_extracting_variables() -> None:
         _ = (tmp_path / "main.yml").write_text(content)
 
         with pytest.raises(ValidationError):
-            _ = ext.extract_variable_file(ProjectPath(tmp_path, "main.yml"))
+            _ = ext.extract_variable_file(
+                ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+            )
 
 
 TaskExtractor = Callable[

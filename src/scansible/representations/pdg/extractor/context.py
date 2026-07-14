@@ -202,7 +202,9 @@ class IncludeContext:
 
         try:
             with capture_output() as output, prevent_undesired_operations():
-                var_file = ast_extractor.extract_variable_file(real_path)
+                var_file = ast_extractor.extract_variable_file(
+                    real_path, ast_extractor.ExtractionContext(lenient=self.lenient)
+                )
             if logged_output := output.getvalue():
                 logger.warning(logged_output)
         except Exception as e:

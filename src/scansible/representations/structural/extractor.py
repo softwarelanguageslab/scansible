@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Callable, Literal, TypeVar, overload
+from typing import Callable, Literal, overload
 
 from collections.abc import Iterable, Sequence
 from functools import partial
@@ -20,9 +20,7 @@ from .helpers import (
     capture_output,
     find_all_files,
     find_file,
-    parse_file,
     prevent_undesired_operations,
-    validate_ansible_object,
 )
 
 
@@ -59,16 +57,13 @@ def extract_role_metadata_file(
     path: ProjectPath, ctx: ExtractionContext
 ) -> ast.MetaFile:
     """Extract the structural representation of a metadata file."""
-
-    ds = parse_file(path)
-
-    metablock = ast.MetaBlock.model_validate(ds, context=ctx)
-    return ast.MetaFile(path=path.relative, metablock=metablock)
+    return ast.MetaFile.load(path, ctx)
 
 
-def extract_variable_file(path: ProjectPath) -> ast.VariableFile:
-    ds = parse_file(path)
-    return ast.VariableFile.model_validate({"path": path.relative, "variables": ds})
+def extract_variable_file(
+    path: ProjectPath, ctx: ExtractionContext
+) -> ast.VariableFile:
+    return ast.VariableFile.load(path, ctx)
 
 
 def extract_handler_file(path: ProjectPath, ctx: ExtractionContext) -> ast.HandlerFile:
@@ -155,7 +150,6 @@ def extract_block(
     attrs["block"] = extract_list_of_tasks_or_blocks(raw_block.block, ctx)
     attrs["rescue"] = extract_list_of_tasks_or_blocks(raw_block.rescue, ctx)
     attrs["always"] = extract_list_of_tasks_or_blocks(raw_block.always, ctx)
-    attrs["vars"] = raw_block.vars
 
     block = ast.Block(**attrs, position=_get_position(raw_ds))  # pyright: ignore[reportArgumentType]
 
@@ -165,9 +159,7 @@ def extract_block(
 def _extract_loop_control(lc: ans.LoopControl | None) -> ast.LoopControl | None:
     if lc is None:
         return None
-
-    validate_ansible_object(lc)
-    return ast.LoopControl(**_ansible_to_dict(lc), position=_get_position(lc))  # pyright: ignore[reportArgumentType]
+    return ast.LoopControl.model_validate(_ansible_to_dict(lc))
 
 
 def extract_task(
@@ -209,9 +201,7 @@ def _extract_task(
         return None
 
     attrs = _ansible_to_dict(raw_task)
-    attrs["args"] = raw_task.args
     attrs["loop_control"] = _extract_loop_control(raw_task.loop_control)
-    attrs["vars"] = raw_task.vars
 
     rep_cls = ast.Handler if as_handler else ast.Task
 
@@ -334,7 +324,7 @@ def extract_role(
     with capture_output(), prevent_undesired_operations():
         meta_file_path = find_file(role_path, "meta/main")
         _safe_extract(
-            partial(extract_role_metadata_file, ctx=ctx),
+            extract_role_metadata_file,
             meta_file_path,
             meta_files,
             ctx,
@@ -345,20 +335,28 @@ def extract_role(
             get_dir = partial(ProjectPath, role_path.absolute)
 
             _safe_extract_all(
-                partial(extract_tasks_file, ctx=ctx),
+                extract_tasks_file,
                 get_dir("tasks"),
                 task_files,
                 ctx,
             )
             _safe_extract_all(
-                partial(extract_handler_file, ctx=ctx),
+                extract_handler_file,
                 get_dir("handlers"),
                 handler_files,
                 ctx,
             )
-            _safe_extract_all(extract_variable_file, get_dir("vars"), vars_files, ctx)
             _safe_extract_all(
-                extract_variable_file, get_dir("defaults"), defaults_files, ctx
+                extract_variable_file,
+                get_dir("vars"),
+                vars_files,
+                ctx,
+            )
+            _safe_extract_all(
+                extract_variable_file,
+                get_dir("defaults"),
+                defaults_files,
+                ctx,
             )
         else:
 
@@ -366,21 +364,29 @@ def extract_role(
                 return find_file(role_path.join(dirname), "main")
 
             _safe_extract(
-                partial(extract_tasks_file, ctx=ctx),
+                extract_tasks_file,
                 get_main_path("tasks"),
                 task_files,
                 ctx,
             )
             _safe_extract(
-                partial(extract_handler_file, ctx=ctx),
+                extract_handler_file,
                 get_main_path("handlers"),
                 handler_files,
                 ctx,
             )
             _safe_extract(
-                extract_variable_file, get_main_path("defaults"), defaults_files, ctx
+                extract_variable_file,
+                get_main_path("defaults"),
+                defaults_files,
+                ctx,
             )
-            _safe_extract(extract_variable_file, get_main_path("vars"), vars_files, ctx)
+            _safe_extract(
+                extract_variable_file,
+                get_main_path("vars"),
+                vars_files,
+                ctx,
+            )
 
     role = ast.Role(
         path=role_path.relative,
@@ -398,29 +404,29 @@ def extract_role(
     return ast.AST(root=role, path=path)
 
 
-ExtractedFileType = TypeVar("ExtractedFileType")
+type Extractor[T] = Callable[[ProjectPath, ExtractionContext], T]
 
 
-def _safe_extract(
-    extractor: Callable[[ProjectPath], ExtractedFileType],
+def _safe_extract[T](
+    extractor: Extractor[T],
     file_path: ProjectPath | None,
-    file_dict: dict[str, ExtractedFileType],
+    file_dict: dict[str, T],
     ctx: ExtractionContext,
 ) -> None:
     if file_path is None:
         return
 
     try:
-        extracted_file = extractor(file_path)
+        extracted_file = extractor(file_path, ctx)
         file_dict["/".join(file_path.relative.parts[1:])] = extracted_file
     except (ans.AnsibleError, loaders.LoadError) as e:
         ctx.broken_files.append(ast.BrokenFile(path=file_path.relative, reason=str(e)))
 
 
-def _safe_extract_all(
-    extractor: Callable[[ProjectPath], ExtractedFileType],
+def _safe_extract_all[T](
+    extractor: Extractor[T],
     dir_path: ProjectPath,
-    file_dict: dict[str, ExtractedFileType],
+    file_dict: dict[str, T],
     ctx: ExtractionContext,
 ) -> None:
     if not dir_path.absolute.is_dir():

@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, cast, get_args, get_origin, override
+from typing import Annotated, Self, cast, get_args, get_origin, override
 
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator, Mapping, Sequence
@@ -28,6 +28,7 @@ from pydantic import (
 )
 from pydantic.fields import FieldInfo
 
+from scansible.representations.structural.helpers import ProjectPath, parse_file
 from scansible.types import AnyValue, ScalarValue
 from scansible.utils import FrozenDict
 
@@ -144,7 +145,7 @@ class Stringify(Normalizer):
         return value
 
 
-class LenientSequence(Normalizer):
+class Lenient(Normalizer):
     """Normalizer that enables parsing in sequences to be lenient.
 
     If the lenient flag is set in the validation context, this normalizer will catch
@@ -161,7 +162,7 @@ class LenientSequence(Normalizer):
             or (origin := get_origin(annotation)) is None
             or not issubclass(origin, Sequence)
         ):
-            raise ValueError("Can only mark Sequences as LenientSequences")
+            raise ValueError("Can only mark Sequences as Lenient")
 
         (contained_type,) = get_args(annotation)  # pyright: ignore[reportAny]
         if not issubclass(contained_type, ASTEntity):
@@ -251,11 +252,17 @@ class ASTEntity(BaseModel, strict=True, frozen=True, extra="forbid"):
         return value
 
 
-class ASTFile(ASTEntity, frozen=True):
+class ASTFile(ASTEntity, ABC, frozen=True):
     """Base class inherited by all files represented by an AST."""
 
     #: The relative path to the file in the project.
     path: RelativePath
+
+    @classmethod
+    @abstractmethod
+    def load(cls: type[Self], file: ProjectPath, context: ExtractionContext) -> Self:
+        """Construct the representation for a file by parsing the given path."""
+        ...
 
 
 class ASTNode(ASTEntity, frozen=True):
@@ -292,107 +299,10 @@ class BrokenFile(ASTFile, frozen=True):
     #: The reason for failure.
     reason: str
 
-
-class Platform(ASTNode, frozen=True):
-    """Represents a platform supported by a role, as denoted in the meta file."""
-
-    #: Platform name.
-    name: str
-    #: Platform version.
-    version: str = Field(strict=False)
-
-
-class _RawPlatform(ASTNode, frozen=True):
-    """Intermediate Platform representation with a list of versions."""
-
-    #: Platform name.
-    name: str
-    #: Platform versions.
-    versions: Annotated[
-        Sequence[Annotated[str, Field(strict=False)]], Stringify, Listify
-    ]
-
-    def expand(self) -> Sequence[Platform]:
-        """Expand a single raw platform instance to a flattened list of platforms."""
-        return [
-            Platform(name=self.name, version=version, position=self.position)
-            for version in self.versions
-        ]
-
-
-class MetaFile(ASTFile, frozen=True):
-    """Represents a file containing role metadata."""
-
-    #: The metadata block contained in the file.
-    metablock: MetaBlock
-
-
-class MetaBlock(ASTNode, frozen=True, extra="ignore"):
-    """Represents a role metadata block."""
-
-    #: Platforms supported by the role
-    platforms: Annotated[Sequence[Platform], Listify] = Field(default_factory=tuple)
-    #: Role dependencies
-    dependencies: Annotated[Sequence[MetaRoleRequirement], LenientSequence] = Field(
-        default_factory=tuple
-    )
-
-    @field_validator("platforms", mode="before")
     @classmethod
-    def _convert_platforms(cls, value: object) -> object:
-        """Convert the platforms list into a consistent schema before validation."""
-
-        assert isinstance(value, list)  # Should be covered by the Listify marker.
-        raw_platforms = [_RawPlatform.model_validate(platform) for platform in value]
-        return [
-            platform
-            for raw_platform in raw_platforms
-            for platform in raw_platform.expand()
-        ]
-
-    @model_validator(mode="before")
-    @classmethod
-    def _hoist_platforms(cls, value: object) -> object:
-        """Hoist `galaxy_info.platforms` to a top-level key before validation."""
-
-        if isinstance(value, dict) and "galaxy_info" in value:
-            if not isinstance(value["galaxy_info"], dict):
-                raise ValueError("Expected `galaxy_info` to be a dict")
-            if "platforms" in value["galaxy_info"]:
-                value["platforms"] = value["galaxy_info"]["platforms"]
-
-        return value
-
-
-class VariableFile(ASTFile, frozen=True):
-    """Represents a file containing variables."""
-
-    #: The variables contained within the file. The order is irrelevant.
-    variables: Annotated[Mapping[str, AnyValue], NormalizeNone] = Field(
-        default_factory=dict
-    )
-
-
-class LoopControl(ASTNode, frozen=True):
-    """Represents the loop control directive value."""
-
-    #: The loop variable name. `item` by default.
-    loop_var: str = "item"
-    #: The index variable name.
-    index_var: str | None = None
-    #: Loop label in output. Should technically be a string only, but Ansible
-    #: doesn't complain about dicts and just templates and stringifies those.
-    label: AnyValue = None
-    #: Amount of time in seconds to pause between each iteration. Can be a
-    #: string in case this is an expression. 0 by default.
-    pause: str | int | float = 0.0
-    #: Whether to include more information in the loop items.
-    #: See https://docs.ansible.com/ansible/latest/user_guide/playbooks_loops.html#extended-loop-variables
-    extended: str | bool | None = None
-    #: Whether to include `allitems` in the extended version.
-    extended_allitems: str | bool | None = True
-    #: Conditions when to break the loop
-    break_when: Sequence[str] | None = Field(default_factory=tuple)
+    @override
+    def load(cls, file: ProjectPath, context: ExtractionContext) -> BrokenFile:
+        raise NotImplementedError("Cannot load a broken file.")
 
 
 class _CommonDirectives(BaseModel, frozen=True):
@@ -455,84 +365,31 @@ class _CommonDirectives(BaseModel, frozen=True):
     collections: Sequence[str] = Field(default_factory=tuple)
 
 
-class BaseTask(ASTNode, _CommonDirectives, frozen=True):
-    """Represents commonalities for Ansible tasks."""
+class Platform(ASTNode, frozen=True):
+    """Represents a platform supported by a role, as denoted in the meta file."""
 
-    #: Action of the task.
-    action: str
-    #: Arguments to the action.
-    args: Mapping[str, AnyValue]
-
-    #: Run task asynchronously for at most the given number of seconds.
-    async_val: str | int | None = 0
-    #: Conditional expression(s) to override "changed" status.
-    changed_when: Sequence[str | bool] = Field(default_factory=tuple)
-    #: Number of seconds to delay between retries.
-    delay: str | float | int | None = 5.0
-    #: Delegate task execution to another host.
-    delegate_to: str | None = None
-    #: Apply facts to delegated host.
-    delegate_facts: str | bool | None = None
-    #: Conditional expression(s) to override the "failed" status.
-    failed_when: Sequence[str | bool] = Field(default_factory=tuple)
-    #: Loop on the task, or None if no loop. Can be a string (an expression),
-    #: a list of arbitrary values, or, when the loop comes from `with_dict`, a
-    #: dict of arbitrary items.
-    loop: str | Sequence[AnyValue] | Mapping[ScalarValue, AnyValue] | None = None
-    #: The type of loop used in old looping syntax (`with_*`), e.g.
-    #: `with_items` -> `items`.
-    loop_with: str | None = None
-    #: Loop control defined on the task.
-    loop_control: LoopControl | None = None
-    #: List of handler names of handlers to notify.
-    notify: Sequence[str] | None = None
-    #: Polling interval for async tasks.
-    poll: str | int | None = None
-    #: Value given to the register keyword, i.e. variable name that will store
-    #: the result of this action.
-    register: str | None = None
-    #: Number of tries for failed tasks.
-    retries: str | int | None = None
-    #: Retry task until condition(s) are satisfied.
-    until: Sequence[str | bool] = Field(default_factory=tuple)
-    #: Condition on the task, or None if no condition.
-    when: Sequence[str | bool] = Field(default_factory=tuple)
+    #: Platform name.
+    name: str
+    #: Platform version.
+    version: str = Field(strict=False)
 
 
-class Task(BaseTask, frozen=True):
-    """Represents an Ansible task."""
+class _RawPlatform(ASTNode, frozen=True):
+    """Intermediate Platform representation with a list of versions."""
 
+    #: Platform name.
+    name: str
+    #: Platform versions.
+    versions: Annotated[
+        Sequence[Annotated[str, Field(strict=False)]], Stringify, Listify
+    ]
 
-class Handler(BaseTask, frozen=True):
-    """Represents an Ansible handler, a special type of task."""
-
-    #: Topics on which the handler listens
-    listen: Sequence[str] = Field(default_factory=tuple)
-
-
-class Block(ASTNode, _CommonDirectives, frozen=True):
-    """Represents an Ansible block of tasks."""
-
-    # TODO: Verify whether handlers can occur in blocks and whether there should be a separate handler block.
-
-    #: The block's main task list.
-    block: Sequence[Task | Block]
-    #: List of tasks in the block's rescue section, i.e. the tasks that will
-    #: execute when an exception occurs.
-    rescue: Sequence[Task | Block] = Field(default_factory=tuple)
-    #: List of tasks in the block's always section, like a try-catch's `finally`
-    #: handler.
-    always: Sequence[Task | Block] = Field(default_factory=tuple)
-
-    #: List of handler names of handlers to notify.
-    notify: Sequence[str] | None = None
-    #: Delegate block execution to another host.
-    delegate_to: str | None = None
-    #: Apply facts to delegated host.
-    delegate_facts: str | bool | None = None
-
-    #: Condition on the block, or None if no condition.
-    when: Sequence[str | bool] = Field(default_factory=tuple)
+    def expand(self) -> Sequence[Platform]:
+        """Expand a single raw platform instance to a flattened list of platforms."""
+        return [
+            Platform(name=self.name, version=version, position=self.position)
+            for version in self.versions
+        ]
 
 
 class RoleRequirement(ASTNode, _CommonDirectives, frozen=True):
@@ -668,11 +525,187 @@ class MetaRoleRequirement(RoleRequirement, frozen=True):
         return new_value
 
 
+class MetaBlock(ASTNode, frozen=True, extra="ignore"):
+    """Represents a role metadata block."""
+
+    #: Platforms supported by the role
+    platforms: Annotated[Sequence[Platform], Listify] = Field(default_factory=tuple)
+    #: Role dependencies
+    dependencies: Annotated[Sequence[MetaRoleRequirement], Lenient] = Field(
+        default_factory=tuple
+    )
+
+    @field_validator("platforms", mode="before")
+    @classmethod
+    def _convert_platforms(cls, value: object) -> object:
+        """Convert the platforms list into a consistent schema before validation."""
+
+        assert isinstance(value, list)  # Should be covered by the Listify marker.
+        raw_platforms = [_RawPlatform.model_validate(platform) for platform in value]
+        return [
+            platform
+            for raw_platform in raw_platforms
+            for platform in raw_platform.expand()
+        ]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _hoist_platforms(cls, value: object) -> object:
+        """Hoist `galaxy_info.platforms` to a top-level key before validation."""
+
+        if isinstance(value, dict) and "galaxy_info" in value:
+            if not isinstance(value["galaxy_info"], dict):
+                raise ValueError("Expected `galaxy_info` to be a dict")
+            if "platforms" in value["galaxy_info"]:
+                value["platforms"] = value["galaxy_info"]["platforms"]
+
+        return value
+
+
+class MetaFile(ASTFile, frozen=True):
+    """Represents a file containing role metadata."""
+
+    #: The metadata block contained in the file.
+    metablock: MetaBlock
+
+    @classmethod
+    @override
+    def load(cls, file: ProjectPath, context: ExtractionContext) -> MetaFile:
+        return cls.model_validate(
+            {"path": file.relative, "metablock": parse_file(file)}, context=context
+        )
+
+
+class VariableFile(ASTFile, frozen=True):
+    """Represents a file containing variables."""
+
+    #: The variables contained within the file. The order is irrelevant.
+    variables: Annotated[Mapping[str, AnyValue], NormalizeNone] = Field(
+        default_factory=dict
+    )
+
+    @classmethod
+    @override
+    def load(cls, file: ProjectPath, context: ExtractionContext) -> VariableFile:
+        return cls.model_validate(
+            {"path": file.relative, "variables": parse_file(file)}, context=context
+        )
+
+
+class LoopControl(ASTNode, frozen=True):
+    """Represents the loop control directive value."""
+
+    #: The loop variable name. `item` by default.
+    loop_var: str = "item"
+    #: The index variable name.
+    index_var: str | None = None
+    #: Loop label in output. Should technically be a string only, but Ansible
+    #: doesn't complain about dicts and just templates and stringifies those.
+    label: AnyValue = None
+    #: Amount of time in seconds to pause between each iteration. Can be a
+    #: string in case this is an expression. 0 by default.
+    pause: str | int | float = 0.0
+    #: Whether to include more information in the loop items.
+    #: See https://docs.ansible.com/ansible/latest/user_guide/playbooks_loops.html#extended-loop-variables
+    extended: str | bool | None = None
+    #: Whether to include `allitems` in the extended version.
+    extended_allitems: str | bool | None = True
+    #: Conditions when to break the loop
+    break_when: Sequence[str] | None = Field(default_factory=tuple)
+
+
+class BaseTask(ASTNode, _CommonDirectives, frozen=True):
+    """Represents commonalities for Ansible tasks."""
+
+    #: Action of the task.
+    action: str
+    #: Arguments to the action.
+    args: Mapping[str, AnyValue]
+
+    #: Run task asynchronously for at most the given number of seconds.
+    async_val: str | int | None = 0
+    #: Conditional expression(s) to override "changed" status.
+    changed_when: Sequence[str | bool] = Field(default_factory=tuple)
+    #: Number of seconds to delay between retries.
+    delay: str | float | int | None = 5.0
+    #: Delegate task execution to another host.
+    delegate_to: str | None = None
+    #: Apply facts to delegated host.
+    delegate_facts: str | bool | None = None
+    #: Conditional expression(s) to override the "failed" status.
+    failed_when: Sequence[str | bool] = Field(default_factory=tuple)
+    #: Loop on the task, or None if no loop. Can be a string (an expression),
+    #: a list of arbitrary values, or, when the loop comes from `with_dict`, a
+    #: dict of arbitrary items.
+    loop: str | Sequence[AnyValue] | Mapping[ScalarValue, AnyValue] | None = None
+    #: The type of loop used in old looping syntax (`with_*`), e.g.
+    #: `with_items` -> `items`.
+    loop_with: str | None = None
+    #: Loop control defined on the task.
+    loop_control: LoopControl | None = None
+    #: List of handler names of handlers to notify.
+    notify: Sequence[str] | None = None
+    #: Polling interval for async tasks.
+    poll: str | int | None = None
+    #: Value given to the register keyword, i.e. variable name that will store
+    #: the result of this action.
+    register: str | None = None
+    #: Number of tries for failed tasks.
+    retries: str | int | None = None
+    #: Retry task until condition(s) are satisfied.
+    until: Sequence[str | bool] = Field(default_factory=tuple)
+    #: Condition on the task, or None if no condition.
+    when: Sequence[str | bool] = Field(default_factory=tuple)
+
+
+class Task(BaseTask, frozen=True):
+    """Represents an Ansible task."""
+
+
+class Handler(BaseTask, frozen=True):
+    """Represents an Ansible handler, a special type of task."""
+
+    #: Topics on which the handler listens
+    listen: Sequence[str] = Field(default_factory=tuple)
+
+
+class Block(ASTNode, _CommonDirectives, frozen=True):
+    """Represents an Ansible block of tasks."""
+
+    # TODO: Verify whether handlers can occur in blocks and whether there should be a separate handler block.
+
+    #: The block's main task list.
+    block: Sequence[Task | Block]
+    #: List of tasks in the block's rescue section, i.e. the tasks that will
+    #: execute when an exception occurs.
+    rescue: Sequence[Task | Block] = Field(default_factory=tuple)
+    #: List of tasks in the block's always section, like a try-catch's `finally`
+    #: handler.
+    always: Sequence[Task | Block] = Field(default_factory=tuple)
+
+    #: List of handler names of handlers to notify.
+    notify: Sequence[str] | None = None
+    #: Delegate block execution to another host.
+    delegate_to: str | None = None
+    #: Apply facts to delegated host.
+    delegate_facts: str | bool | None = None
+
+    #: Condition on the block, or None if no condition.
+    when: Sequence[str | bool] = Field(default_factory=tuple)
+
+
 class TaskFile(ASTFile, frozen=True):
     """Represents a file containing tasks and blocks."""
 
     #: The top-level tasks or blocks contained in the file, in the order of definition.
     tasks: Sequence[Block | Task]
+
+    @classmethod
+    @override
+    def load(cls, file: ProjectPath, context: ExtractionContext) -> TaskFile:
+        return cls.model_validate(
+            {"path": file.relative, "tasks": parse_file(file)}, context=context
+        )
 
 
 class HandlerFile(ASTFile, frozen=True):
@@ -680,6 +713,13 @@ class HandlerFile(ASTFile, frozen=True):
 
     #: The top-level handlers contained in the file, in the order of definition.
     handlers: Sequence[Handler]
+
+    @classmethod
+    @override
+    def load(cls, file: ProjectPath, context: ExtractionContext) -> HandlerFile:
+        return cls.model_validate(
+            {"path": file.relative, "handlers": parse_file(file)}, context=context
+        )
 
 
 class SourceFileMap[FileType: ASTFile](Mapping[str, FileType]):
@@ -764,6 +804,12 @@ class Role(ASTFile, frozen=True, arbitrary_types_allowed=True):
         """The handlers/main.yml file."""
         return self.handler_files.get("main")
 
+    @classmethod
+    @override
+    def load(cls, file: ProjectPath, context: ExtractionContext) -> Role:
+        # FIXME: Copy-pasted but need to populate fields
+        return cls.model_validate({"path": file.relative}, context=context)
+
 
 class VarsPrompt(ASTNode, frozen=True):
     """Represents a vars_prompt entry."""
@@ -843,6 +889,14 @@ class Playbook(ASTFile, frozen=True):
     broken_tasks: Sequence[BrokenTask] = Field(default_factory=tuple)
     #: Playbook's list of broken files. Currently always empty.
     broken_files: Sequence[BrokenFile] = Field(default_factory=tuple)
+
+    @classmethod
+    @override
+    def load(cls, file: ProjectPath, context: ExtractionContext) -> Playbook:
+        # FIXME: Copy-pasted but need to populate broken_tasks and broken_files
+        return cls.model_validate(
+            {"path": file.relative, "plays": parse_file(file)}, context=context
+        )
 
 
 class AST(BaseModel, frozen=True):
