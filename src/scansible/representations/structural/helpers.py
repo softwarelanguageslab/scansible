@@ -10,7 +10,7 @@ from collections.abc import Generator
 from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
 
-from . import ansible_types as ans
+from ansible.parsing.dataloader import DataLoader
 
 
 class FatalError(Exception):
@@ -79,7 +79,7 @@ class ProjectPath:
 
 def parse_file(path: ProjectPath) -> object:
     """Parse a YAML file using Ansible's parser."""
-    loader = ans.DataLoader()
+    loader = DataLoader()
     return loader.load_from_file(str(path.absolute))
 
 
@@ -90,7 +90,7 @@ def find_file(dir_path: ProjectPath, file_name: str) -> ProjectPath | None:
     :raises     AssertionError:  When multiple files were found.
     """
     # TODO: Use `SourceFileMap`?
-    loader = ans.DataLoader()
+    loader = DataLoader()
     # DataLoader.find_vars_files is misnamed.
     found_paths = loader.find_vars_files(
         str(dir_path.absolute), file_name, allow_dir=False
@@ -114,7 +114,7 @@ def find_all_files(dir_path: ProjectPath) -> list[ProjectPath]:
         child_path = dir_path.join(child)
         if child.is_symlink():
             continue
-        if child.is_file() and child.suffix in ans.C.YAML_FILENAME_EXTENSIONS:
+        if child.is_file() and child.suffix in (".yml", ".yaml", ".json"):
             results.append(child_path)
         elif child.is_dir():
             try:

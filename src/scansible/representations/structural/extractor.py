@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from . import ansible_types as ans
 from . import ast
 from .ast import ExtractionContext
 from .helpers import ProjectPath
@@ -29,10 +28,6 @@ def extract_handler_file(path: ProjectPath, ctx: ExtractionContext) -> ast.Handl
 
 def extract_tasks_file(path: ProjectPath, ctx: ExtractionContext) -> ast.TaskFile:
     return ast.TaskFile.load(path, ctx)
-
-
-def extract_play(ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext) -> ast.Play:
-    return ast.Play.model_validate(ds, context=ctx)
 
 
 def extract_playbook_file(pb_path: ProjectPath, ctx: ExtractionContext) -> ast.Playbook:

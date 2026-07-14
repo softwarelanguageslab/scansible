@@ -8,11 +8,13 @@ from collections import defaultdict
 from collections.abc import Generator, Iterable, Mapping, Sequence
 from contextlib import contextmanager
 
+from ansible.module_utils.facts.system.distribution import Distribution
+from ansible.parsing.dataloader import DataLoader
+from ansible.template import Templar
 from icontract import require
 from loguru import logger
 
 from scansible.representations import structural as struct
-from scansible.representations.structural import ansible_types as ans
 from scansible.types import VaultValue
 from scansible.utils import SENTINEL, Sentinel, first, make_immutable
 
@@ -388,7 +390,7 @@ class VarContext:
     def is_template(
         self, expr: struct.AnyValue | Sentinel
     ) -> TypeGuard[TemplatableType]:
-        templar = ans.Templar(ans.DataLoader())
+        templar = Templar(DataLoader())
         return templar.is_template(expr)
 
     def define_initialised_variable(
@@ -635,14 +637,14 @@ class VarContext:
         if name == "ansible_os_family":
             distribution = constraints.get("ansible_distribution")
             if distribution and isinstance(distribution, str):
-                values = [ans.Distribution.OS_FAMILY[distribution]]
+                values = [Distribution.OS_FAMILY[distribution]]
             else:
-                values = ans.Distribution.OS_FAMILY_MAP.keys()
+                values = Distribution.OS_FAMILY_MAP.keys()
         elif name == "ansible_distribution":
             os_family = constraints.get("ansible_os_family")
             if os_family and isinstance(os_family, str):
-                values = ans.Distribution.OS_FAMILY_MAP[os_family]
+                values = Distribution.OS_FAMILY_MAP[os_family]
             else:
-                values = ans.Distribution.OS_FAMILY.keys()
+                values = Distribution.OS_FAMILY.keys()
 
         return [(value, [f'{name} == "{value}"']) for value in values]

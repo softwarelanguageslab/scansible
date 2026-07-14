@@ -9,21 +9,20 @@ import ansible.parsing.dataloader
 import pytest
 from pydantic import ValidationError
 
-from scansible.representations.structural import ansible_types as ans
 from scansible.representations.structural import ast
 from scansible.representations.structural import extractor as ext
 from scansible.representations.structural.helpers import ProjectPath
-from scansible.types import VaultValue
+from scansible.types import AnyValue, VaultValue
 
 
-def _parse_yaml_dict(yaml_content: str) -> dict[str, ans.AnsibleValue]:
+def _parse_yaml_dict(yaml_content: str) -> dict[str, AnyValue]:
     loader = ansible.parsing.dataloader.DataLoader()
     result = loader.load(data=yaml_content)
     assert isinstance(result, dict)
     return result
 
 
-def _parse_yaml_list(yaml_content: str) -> list[dict[str, ans.AnsibleValue]]:
+def _parse_yaml_list(yaml_content: str) -> list[dict[str, AnyValue]]:
     loader = ansible.parsing.dataloader.DataLoader()
     result = loader.load(data=yaml_content)
     assert isinstance(result, list)
@@ -665,19 +664,15 @@ def describe_extracting_tasks_file() -> None:
 
 def describe_extracting_plays() -> None:
     def extracts_simple_play() -> None:
-        result = ext.extract_play(
-            _parse_yaml_dict(
-                dedent(
-                    """
+        yaml = """
             name: test play
             hosts: servers
             tasks:
               - import_tasks: test
         """
-                )
-            ),
-            ast.ExtractionContext(False),
-        )
+        ctx = ast.ExtractionContext(False)
+
+        result = ast.Play.model_validate(_parse_yaml_dict(yaml), context=ctx)
 
         assert result.hosts == ["servers"]
         assert result.name == "test play"
@@ -685,20 +680,16 @@ def describe_extracting_plays() -> None:
         assert isinstance(result.tasks[0], ast.Task)
 
     def extracts_play_with_block() -> None:
-        result = ext.extract_play(
-            _parse_yaml_dict(
-                dedent(
-                    """
+        yaml = """
             name: test play
             hosts: servers
             tasks:
               - block:
                 - import_tasks: test
         """
-                )
-            ),
-            ast.ExtractionContext(False),
-        )
+        ctx = ast.ExtractionContext(False)
+
+        result = ast.Play.model_validate(_parse_yaml_dict(yaml), context=ctx)
 
         assert result.hosts == ["servers"]
         assert result.name == "test play"
@@ -706,10 +697,7 @@ def describe_extracting_plays() -> None:
         assert isinstance(result.tasks[0], ast.Block)
 
     def extracts_play_with_vars() -> None:
-        result = ext.extract_play(
-            _parse_yaml_dict(
-                dedent(
-                    """
+        yaml = """
             name: test play
             hosts: servers
             tasks:
@@ -717,10 +705,9 @@ def describe_extracting_plays() -> None:
             vars:
               testvar: 123
         """
-                )
-            ),
-            ast.ExtractionContext(False),
-        )
+        ctx = ast.ExtractionContext(False)
+
+        result = ast.Play.model_validate(_parse_yaml_dict(yaml), context=ctx)
 
         assert result.hosts == ["servers"]
         assert result.name == "test play"
@@ -729,10 +716,7 @@ def describe_extracting_plays() -> None:
         assert result.vars == {"testvar": 123}
 
     def extracts_play_with_roles() -> None:
-        result = ext.extract_play(
-            _parse_yaml_dict(
-                dedent(
-                    """
+        yaml = """
             name: test play
             hosts: servers
             roles:
@@ -742,10 +726,9 @@ def describe_extracting_plays() -> None:
             vars:
               testvar: 123
         """
-                )
-            ),
-            ast.ExtractionContext(False),
-        )
+        ctx = ast.ExtractionContext(False)
+
+        result = ast.Play.model_validate(_parse_yaml_dict(yaml), context=ctx)
 
         assert result.hosts == ["servers"]
         assert result.name == "test play"
@@ -755,20 +738,16 @@ def describe_extracting_plays() -> None:
         assert result.vars == {"testvar": 123}
 
     def rejects_invalid_play() -> None:
+        # missing hosts
+        yaml = """
+            name: test play
+            tasks:
+                - import_tasks: hello
+        """
+        ctx = ast.ExtractionContext(False)
+
         with pytest.raises(Exception):
-            # missing hosts
-            _ = ext.extract_play(
-                _parse_yaml_dict(
-                    dedent(
-                        """
-                name: test play
-                tasks:
-                  - import_tasks: hello
-            """
-                    )
-                ),
-                ast.ExtractionContext(False),
-            )
+            _ = ast.Play.model_validate(_parse_yaml_dict(yaml), context=ctx)
 
 
 def describe_extract_playbook() -> None:
