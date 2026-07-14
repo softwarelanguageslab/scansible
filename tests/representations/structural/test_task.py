@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Callable
-
 from textwrap import dedent
 
 import ansible.parsing.dataloader
@@ -11,11 +9,6 @@ import pytest
 from pydantic import ValidationError
 
 from scansible.representations.structural.ast import ExtractionContext, Handler, Task
-
-TaskExtractor = Callable[
-    [dict[str, object], ExtractionContext],
-    Task | Handler | None,
-]
 
 
 def _parse_yaml_dict(yaml_content: str) -> dict[str, object]:

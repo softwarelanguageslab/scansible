@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from collections.abc import Callable
 from pathlib import Path
@@ -29,29 +29,6 @@ def load_pb(tmp_path: Path) -> LoadPlaybookType:
 # shorthand for cast
 def _as_ansible(obj: dict[str, Any]) -> dict[str, ans.AnsibleValue]:
     return obj
-
-
-def describe_load_block() -> None:
-    def loads_correct_block() -> None:
-        block_ds = _as_ansible(
-            {
-                "block": [{"file": {}}],
-                "rescue": [{"file": {}}],
-            }
-        )
-
-        result, orig_ds = loaders.load_block(block_ds)
-
-        assert result.block == [{"file": {}}]
-        assert result.rescue == [{"file": {}}]
-        assert result.always == []
-        assert orig_ds == block_ds
-
-    def raises_if_not_a_block() -> None:
-        with pytest.raises(LoadError, match="Not a block"):
-            ds = _as_ansible({"file": {}})
-
-            loaders.load_block(ds)
 
 
 def describe_load_play() -> None:

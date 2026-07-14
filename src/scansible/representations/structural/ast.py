@@ -1071,10 +1071,17 @@ class Block(ASTNode, _CommonDirectives, frozen=True):
     #: Condition on the block, or None if no condition.
     when: Annotated[Sequence[str | bool], Listify] = Field(default_factory=tuple)
 
+    @model_validator(mode="after")
+    def _validate_task_lists(self) -> Self:
+        """Validate that rescue and always are not used in empty blocks."""
+        if (self.rescue or self.always) and not self.block:
+            raise ValueError("`rescue` and `always` cannot be used in empty blocks")
+        return self
+
 
 def _distinguish_task_vs_block(obj: object) -> Literal["task", "block"] | None:
     if isinstance(obj, dict):
-        if "block" in obj:
+        if "block" in obj or "rescue" in obj or "always" in obj:
             return "block"
         return "task"
     if isinstance(obj, Task):

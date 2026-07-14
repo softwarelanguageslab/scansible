@@ -132,23 +132,7 @@ def extract_task_or_block(
 def extract_block(
     ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext
 ) -> ast.Block | None:
-    try:
-        raw_block, raw_ds = loaders.load_block(ds)
-    except (ans.AnsibleError, loaders.LoadError) as e:
-        if not ctx.lenient:
-            raise
-        ctx.broken_tasks.append(ast.BrokenTask(raw=ds, reason=str(e)))
-        return None
-
-    attrs = _ansible_to_dict(raw_block)
-
-    attrs["block"] = extract_list_of_tasks_or_blocks(raw_block.block, ctx)
-    attrs["rescue"] = extract_list_of_tasks_or_blocks(raw_block.rescue, ctx)
-    attrs["always"] = extract_list_of_tasks_or_blocks(raw_block.always, ctx)
-
-    block = ast.Block(**attrs, position=_get_position(raw_ds))  # pyright: ignore[reportArgumentType]
-
-    return block
+    return ast.Block.model_validate(ds, context=ctx)
 
 
 def extract_task(

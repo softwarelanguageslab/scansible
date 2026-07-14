@@ -134,48 +134,6 @@ def _transform_old_become(ds: dict[str, ans.AnsibleValue]) -> None:
 
 
 @final
-class _PatchedBlock(ans.Block):
-    block: Sequence[dict[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
-    rescue: Sequence[dict[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
-    always: Sequence[dict[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
-
-    def __init__(self, *args: object, **kwargs: object) -> None:
-        super().__init__(*args, **kwargs)
-        # Remove the loaders from the block implementation, since they dispatch
-        # to ansible.playbook.helpers.load_list_of_tasks, which does eager
-        # loading of import_* tasks and inlines the imported roles/tasks into
-        # the block. We don't want that to happen.
-        self._load_block = None
-        self._load_rescue = None
-        self._load_always = None
-
-
-# Workaround for error messages using the wrong class name.
-_PatchedBlock.__name__ = "Block"
-
-
-def load_block(
-    original_ds: dict[str, ans.AnsibleValue],
-) -> tuple[_PatchedBlock, object]:
-    ds = deepcopy(original_ds)
-
-    _transform_old_become(ds)
-
-    if not _PatchedBlock.is_block(ds):
-        raise LoadError(
-            "block",
-            "Not a block",
-            extra_msg=f'Expected block to contain "block" keyword, but it does not.\n\n{ds!r}',
-        )
-
-    raw_block = _PatchedBlock(ds)
-    _ = raw_block.load_data(ds)
-    validate_ansible_object(raw_block)
-
-    return raw_block, ds
-
-
-@final
 class _PatchedPlay(ans.Play):
     tasks: Sequence[dict[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]
     handlers: Sequence[dict[str, ans.AnsibleValue]]  # pyright: ignore[reportIncompatibleVariableOverride]

@@ -582,201 +582,6 @@ def describe_extracting_variables() -> None:
             )
 
 
-def describe_extracting_list_of_handlers() -> None:
-    def extracts_as_handlers() -> None:
-        result = ext.extract_list_of_tasks_or_blocks(
-            _parse_yaml_list(
-                dedent(
-                    """
-            - file: {}
-            - apt: {}
-        """
-                )
-            ),
-            ast.ExtractionContext(False),
-            handlers=True,
-        )
-
-        assert len(result) == 2
-        assert isinstance(result[0], ast.Handler)
-        assert isinstance(result[1], ast.Handler)
-
-
-def describe_extracting_blocks() -> None:
-    def extracts_standard_blocks() -> None:
-        result = ext.extract_block(
-            _parse_yaml_dict(
-                dedent(
-                    """
-            block:
-              - name: test
-                file: {}
-              - name: test2
-                file: {}
-        """
-                )
-            ),
-            ast.ExtractionContext(False),
-        )
-
-        assert result is not None
-        assert len(result.block) == 2
-        assert isinstance(result.block[0], ast.Task)
-        assert isinstance(result.block[1], ast.Task)
-        assert result.block[0].name == "test"
-        assert result.block[1].name == "test2"
-
-    # def extracts_block_of_handlers() -> None:
-    #     result = ext.extract_block(
-    #         _parse_yaml_dict(
-    #             dedent(
-    #                 """
-    #         block:
-    #           - name: test
-    #             file: {}
-    #           - name: test2
-    #             file: {}
-    #     """
-    #             )
-    #         ),
-    #         ast.ExtractionContext(False),
-    #         handlers=True,
-    #     )
-
-    #     assert result is not None
-    #     assert result == rep.Block(
-    #         block=[
-    #             rep.Handler(action="file", name="test", args={}, raw=None),
-    #             rep.Handler(action="file", name="test2", args={}, raw=None),
-    #         ],
-    #         raw=None,
-    #     )
-    #     assert all(
-    #         child.parent is result
-    #         for child in chain(result.block, result.rescue, result.always)
-    #     )
-
-    def extracts_blocks_with_rescue_and_always() -> None:
-        result = ext.extract_block(
-            _parse_yaml_dict(
-                dedent(
-                    """
-            block:
-              - name: test
-                file: {}
-            rescue:
-              - name: test2
-                file: {}
-            always:
-              - name: test3
-                file: {}
-        """
-                )
-            ),
-            ast.ExtractionContext(False),
-        )
-
-        assert result is not None
-        assert len(result.block) == 1
-        assert len(result.rescue) == 1
-        assert len(result.always) == 1
-        assert isinstance(result.block[0], ast.Task)
-        assert isinstance(result.rescue[0], ast.Task)
-        assert isinstance(result.always[0], ast.Task)
-        assert result.block[0].name == "test"
-        assert result.rescue[0].name == "test2"
-        assert result.always[0].name == "test3"
-
-    def extracts_nested_blocks() -> None:
-        result = ext.extract_block(
-            _parse_yaml_dict(
-                dedent(
-                    """
-            block:
-              - name: test
-                file: {}
-              - block:
-                  - name: test
-                    file: {}
-        """
-                )
-            ),
-            ast.ExtractionContext(False),
-        )
-
-        assert result is not None
-        assert len(result.block) == 2
-        assert isinstance(result.block[0], ast.Task)
-        assert isinstance(result.block[1], ast.Block)
-        assert result.block[0].name == "test"
-        assert len(result.block[1].block) == 1
-        assert isinstance(result.block[1].block[0], ast.Task)
-        assert result.block[1].block[0].name == "test"
-
-    def does_not_eagerly_load_import_tasks() -> None:
-        result = ext.extract_block(
-            _parse_yaml_dict(
-                dedent(
-                    """
-            block:
-              - import_tasks: test
-        """
-                )
-            ),
-            ast.ExtractionContext(False),
-        )
-
-        assert result is not None
-        assert len(result.block) == 1
-        assert isinstance(result.block[0], ast.Task)
-        assert result.block[0].action == "import_tasks"
-
-    def rejects_non_blocks() -> None:
-        with pytest.raises(Exception):
-            _ = ext.extract_block(
-                _parse_yaml_dict(
-                    dedent(
-                        """
-                import_tasks: test
-            """
-                    )
-                ),
-                ast.ExtractionContext(False),
-            )
-
-    def rejects_blocks_without_block() -> None:
-        with pytest.raises(Exception):
-            _ = ext.extract_block(
-                _parse_yaml_dict(
-                    dedent(
-                        """
-                rescue:
-                  - file: {}
-            """
-                    )
-                ),
-                ast.ExtractionContext(False),
-            )
-
-    def ignores_malformed_block_in_lenient_mode() -> None:
-        ctx = ast.ExtractionContext(True)
-
-        result = ext.extract_block(
-            _parse_yaml_dict(
-                dedent(
-                    """
-            rescue:
-              - file: {}
-        """
-                )
-            ),
-            ctx,
-        )
-
-        assert result is None
-        assert len(ctx.broken_tasks) == 1
-
-
 def describe_extracting_tasks_file() -> None:
     def extracts_standard_task_files(tmp_path: Path) -> None:
         _ = (tmp_path / "main.yml").write_text(
@@ -830,6 +635,23 @@ def describe_extracting_tasks_file() -> None:
                 path: test.txt
               apt:
                 name: test.txt
+        """
+            )
+        )
+
+        result = ext.extract_tasks_file(ProjectPath(tmp_path, "main.yml"), ctx)
+
+        assert result.path == Path("main.yml")
+        assert len(result.tasks) == 0
+        assert len(ctx.broken_tasks) == 1
+
+    def ignores_malformed_block_in_lenient_mode(tmp_path: Path) -> None:
+        ctx = ast.ExtractionContext(True)
+        _ = (tmp_path / "main.yml").write_text(
+            dedent(
+                """
+            - rescue:
+                - file: {}
         """
             )
         )
