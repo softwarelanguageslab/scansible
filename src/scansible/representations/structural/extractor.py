@@ -7,7 +7,6 @@ from typing import Callable
 from functools import partial
 from pathlib import Path
 
-from ansible.parsing.yaml.objects import AnsibleBaseYAMLObject
 from pydantic import ValidationError
 
 from scansible.utils import actions
@@ -22,35 +21,6 @@ from .helpers import (
     find_file,
     prevent_undesired_operations,
 )
-
-
-def _ansible_to_dict(obj: ans.FieldAttributeBase) -> dict[str, object]:
-    """Convert an Ansible object to a dictionary of its attributes.
-
-    Used so that we can initialise the representation objects without having to
-    manually specify each directive, while also being able to transform certain
-    directive values.
-    """
-
-    attrs = obj.fattributes
-    # For `include_role` actions, we can't use the field attributes since they
-    # include action arguments, which we don't store specially. We'll instead
-    # take them from its superclass.
-    if isinstance(obj, ans.IncludeRole):
-        attrs = ans.TaskInclude.fattributes
-
-    attr_names = {
-        attr_name for attr_name, attr in attrs.items() if attr_name != attr.alias
-    }
-
-    return {attr_name: getattr(obj, attr_name) for attr_name in attr_names}
-
-
-def _get_position(obj: object) -> ast.Position:
-    if isinstance(obj, AnsibleBaseYAMLObject):
-        file, line, column = obj.ansible_pos
-        return ast.Position(file=Path(file), start_line=line, start_column=column)
-    return ast.Position()
 
 
 def extract_role_metadata_file(
@@ -72,24 +42,6 @@ def extract_handler_file(path: ProjectPath, ctx: ExtractionContext) -> ast.Handl
 
 def extract_tasks_file(path: ProjectPath, ctx: ExtractionContext) -> ast.TaskFile:
     return ast.TaskFile.load(path, ctx)
-
-
-def extract_block(
-    ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext
-) -> ast.Block | None:
-    return ast.Block.model_validate(ds, context=ctx)
-
-
-def extract_task(
-    ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext
-) -> ast.Task | None:
-    return ast.Task.model_validate(ds, context=ctx)
-
-
-def extract_handler(
-    ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext
-) -> ast.Handler | None:
-    return ast.Handler.model_validate(ds, context=ctx)
 
 
 def extract_play(ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext) -> ast.Play:
