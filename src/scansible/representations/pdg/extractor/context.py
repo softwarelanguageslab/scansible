@@ -20,7 +20,6 @@ from scansible.representations.structural.helpers import (
     capture_output,
     find_all_files,
     find_file,
-    prevent_undesired_operations,
 )
 from scansible.utils import join_sequences
 
@@ -131,9 +130,9 @@ class IncludeContext:
             yield None
             return
 
-        struct_ctx = ast_extractor.ExtractionContext(lenient=self.lenient)
+        struct_ctx = ast.ExtractionContext(lenient=self.lenient)
         try:
-            with capture_output() as output, prevent_undesired_operations():
+            with capture_output() as output:
                 task_file = ast_extractor.extract_tasks_file(real_path, struct_ctx)
             if logged_output := output.getvalue():
                 logger.warning(logged_output)
@@ -171,13 +170,12 @@ class IncludeContext:
             yield None
             return
 
-        role = cast(ast.Role, model.root)
-
-        for bt in role.broken_tasks:
+        for bt in model.broken_tasks:
             logger.error(bt.reason)
-        for bf in role.broken_files:
+        for bf in model.broken_files:
             logger.error(f"Could not extract {bf.path}: {bf.reason}")
 
+        role = cast(ast.Role, model.root)
         with self._enter_role(role, real_path, includer_location):
             yield role
 
@@ -201,9 +199,9 @@ class IncludeContext:
             return
 
         try:
-            with capture_output() as output, prevent_undesired_operations():
+            with capture_output() as output:
                 var_file = ast_extractor.extract_variable_file(
-                    real_path, ast_extractor.ExtractionContext(lenient=self.lenient)
+                    real_path, ast.ExtractionContext(lenient=self.lenient)
                 )
             if logged_output := output.getvalue():
                 logger.warning(logged_output)

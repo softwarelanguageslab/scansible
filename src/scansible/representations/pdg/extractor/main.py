@@ -78,9 +78,9 @@ class StructuralGraphExtractor:
         self.model = model
         graph = rep.Graph()
 
-        for bt in model.root.broken_tasks:
+        for bt in model.broken_tasks:
             logger.error(bt.reason)
-        for bf in model.root.broken_files:
+        for bf in model.broken_files:
             logger.bind(location=bf.path).error(bf.reason)
 
         self.context = ExtractionContext(

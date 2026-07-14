@@ -319,11 +319,12 @@ def flatten_tasks(ts: Sequence[Task | Block]) -> Iterable[Task]:
 
 
 def try_extract_pb_or_tasks_file(f: Path) -> Playbook | TaskFile | None:
+    ctx = ExtractionContext(False)
     try:
-        return extract_tasks_file(ProjectPath.from_root(f), ExtractionContext(False))
+        return extract_tasks_file(ProjectPath.from_root(f), ctx)
     except:
         try:
-            return extract_playbook_file(ProjectPath.from_root(f), False)[0]
+            return extract_playbook_file(ProjectPath.from_root(f), ctx)
         except:
             return None
 

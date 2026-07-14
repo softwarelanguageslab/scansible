@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import (
     Annotated,
+    Callable,
     ClassVar,
     Literal,
     Self,
@@ -42,7 +43,12 @@ from pydantic import (
 )
 from pydantic.fields import FieldInfo
 
-from scansible.representations.structural.helpers import ProjectPath, parse_file
+from scansible.representations.structural.helpers import (
+    ProjectPath,
+    find_all_files,
+    find_file,
+    parse_file,
+)
 from scansible.types import AnyValue, ScalarValue
 from scansible.utils import FrozenDict, actions
 
@@ -302,7 +308,7 @@ class ASTFile(ASTEntity, ABC, frozen=True):
 
     @classmethod
     @abstractmethod
-    def load(cls: type[Self], file: ProjectPath, context: ExtractionContext) -> Self:
+    def load(cls: type[Self], path: ProjectPath, context: ExtractionContext) -> Self:
         """Construct the representation for a file by parsing the given path."""
         ...
 
@@ -343,7 +349,7 @@ class BrokenFile(ASTFile, frozen=True):
 
     @classmethod
     @override
-    def load(cls, file: ProjectPath, context: ExtractionContext) -> BrokenFile:
+    def load(cls, path: ProjectPath, context: ExtractionContext) -> BrokenFile:
         raise NotImplementedError("Cannot load a broken file.")
 
 
@@ -695,9 +701,9 @@ class MetaFile(ASTFile, frozen=True):
 
     @classmethod
     @override
-    def load(cls, file: ProjectPath, context: ExtractionContext) -> MetaFile:
+    def load(cls, path: ProjectPath, context: ExtractionContext) -> MetaFile:
         return cls.model_validate(
-            {"path": file.relative, "metablock": parse_file(file)}, context=context
+            {"path": path.relative, "metablock": parse_file(path)}, context=context
         )
 
 
@@ -711,9 +717,9 @@ class VariableFile(ASTFile, frozen=True):
 
     @classmethod
     @override
-    def load(cls, file: ProjectPath, context: ExtractionContext) -> VariableFile:
+    def load(cls, path: ProjectPath, context: ExtractionContext) -> VariableFile:
         return cls.model_validate(
-            {"path": file.relative, "variables": parse_file(file)}, context=context
+            {"path": path.relative, "variables": parse_file(path)}, context=context
         )
 
 
@@ -1108,9 +1114,9 @@ class TaskFile(ASTFile, frozen=True):
 
     @classmethod
     @override
-    def load(cls, file: ProjectPath, context: ExtractionContext) -> TaskFile:
+    def load(cls, path: ProjectPath, context: ExtractionContext) -> TaskFile:
         return cls.model_validate(
-            {"path": file.relative, "tasks": parse_file(file)}, context=context
+            {"path": path.relative, "tasks": parse_file(path)}, context=context
         )
 
 
@@ -1124,9 +1130,9 @@ class HandlerFile(ASTFile, frozen=True):
 
     @classmethod
     @override
-    def load(cls, file: ProjectPath, context: ExtractionContext) -> HandlerFile:
+    def load(cls, path: ProjectPath, context: ExtractionContext) -> HandlerFile:
         return cls.model_validate(
-            {"path": file.relative, "handlers": parse_file(file)}, context=context
+            {"path": path.relative, "handlers": parse_file(path)}, context=context
         )
 
 
@@ -1169,6 +1175,28 @@ class SourceFileMap[FileType: ASTFile](Mapping[str, FileType]):
         return iter(self._mapping)
 
 
+type Extractor[T] = Callable[[ProjectPath, ExtractionContext], T]
+
+
+def _safe_extract[T](
+    extractor: Extractor[T], file_path: ProjectPath, ctx: ExtractionContext
+) -> T | None:
+    try:
+        return extractor(file_path, ctx)
+    except ValidationError as e:
+        ctx.broken_files.append(BrokenFile(path=file_path.relative, reason=str(e)))
+
+
+def _safe_extract_all[T](
+    extractor: Extractor[T], file_paths: Sequence[ProjectPath], ctx: ExtractionContext
+) -> Sequence[T]:
+    results: list[T] = []
+    for file_path in file_paths:
+        if (result := _safe_extract(extractor, file_path, ctx)) is not None:
+            results.append(result)
+    return results
+
+
 # Need arbitrary_types_allowed=True to put SourceFileMap into the model.
 class Role(ASTFile, frozen=True, arbitrary_types_allowed=True):
     """Represents an Ansible role."""
@@ -1187,10 +1215,6 @@ class Role(ASTFile, frozen=True, arbitrary_types_allowed=True):
     #: Role's task files in the handlers/* subdirectory, indexed by file name
     #: without directory prefix.
     handler_files: SourceFileMap[HandlerFile]
-    #: Role's list of broken files.
-    broken_files: Sequence[BrokenFile]
-    #: Role's list of broken tasks.
-    broken_tasks: Sequence[BrokenTask]
 
     @cached_property
     def main_defaults_file(self) -> VariableFile | None:
@@ -1214,9 +1238,43 @@ class Role(ASTFile, frozen=True, arbitrary_types_allowed=True):
 
     @classmethod
     @override
-    def load(cls, file: ProjectPath, context: ExtractionContext) -> Role:
-        # FIXME: Copy-pasted but need to populate fields
-        return cls.model_validate({"path": file.relative}, context=context)
+    def load(
+        cls, path: ProjectPath, context: ExtractionContext, extract_all: bool = False
+    ) -> Role:
+        # Extract all constituents
+        meta_file = None
+        if (meta_file_path := find_file(path, "meta/main")) is not None:
+            meta_file = _safe_extract(MetaFile.load, meta_file_path, context)
+
+        if extract_all:
+            gather_files = find_all_files
+        else:
+
+            def gather_files(dir_path: ProjectPath) -> Sequence[ProjectPath]:
+                main_file = find_file(dir_path, "main")
+                return [main_file] if main_file is not None else []
+
+        task_files = _safe_extract_all(
+            TaskFile.load, gather_files(path.join("tasks")), context
+        )
+        handler_files = _safe_extract_all(
+            HandlerFile.load, gather_files(path.join("handlers")), context
+        )
+        vars_files = _safe_extract_all(
+            VariableFile.load, gather_files(path.join("vars")), context
+        )
+        defaults_files = _safe_extract_all(
+            VariableFile.load, gather_files(path.join("defaults")), context
+        )
+
+        return Role(
+            path=path.relative,
+            task_files=SourceFileMap(task_files, prefix="tasks/"),
+            handler_files=SourceFileMap(handler_files, prefix="handlers/"),
+            role_var_files=SourceFileMap(vars_files, prefix="vars/"),
+            default_var_files=SourceFileMap(defaults_files, prefix="defaults/"),
+            meta_file=meta_file,
+        )
 
 
 class VarsPrompt(ASTNode, frozen=True):
@@ -1329,18 +1387,13 @@ class Playbook(ASTFile, frozen=True):
     """Represents an Ansible playbook."""
 
     #: List of plays defined in this playbook.
-    plays: Sequence[Play]
-    #: Playbook's list of broken tasks.
-    broken_tasks: Sequence[BrokenTask] = Field(default_factory=tuple)
-    #: Playbook's list of broken files. Currently always empty.
-    broken_files: Sequence[BrokenFile] = Field(default_factory=tuple)
+    plays: Annotated[Sequence[Play], Lenient]
 
     @classmethod
     @override
-    def load(cls, file: ProjectPath, context: ExtractionContext) -> Playbook:
-        # FIXME: Copy-pasted but need to populate broken_tasks and broken_files
+    def load(cls, path: ProjectPath, context: ExtractionContext) -> Playbook:
         return cls.model_validate(
-            {"path": file.relative, "plays": parse_file(file)}, context=context
+            {"path": path.relative, "plays": parse_file(path)}, context=context
         )
 
 
@@ -1352,6 +1405,11 @@ class AST(BaseModel, frozen=True):
     path: AbsolutePath
     #: The model root.
     root: Role | Playbook
+
+    #: List of broken files that were omitted in lenient mode. Empty in strict mode.
+    broken_files: Sequence[BrokenFile]
+    #: List of broken tasks that were omitted in lenient mode. Empty in strict mode.
+    broken_tasks: Sequence[BrokenTask]
 
     @property
     def is_role(self) -> bool:

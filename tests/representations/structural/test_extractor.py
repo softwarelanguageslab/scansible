@@ -788,7 +788,7 @@ def describe_extract_playbook() -> None:
         )
         _ = (tmp_path / "pb.yml").write_text(pb_content)
 
-        result = ext.extract_playbook(tmp_path / "pb.yml")
+        result = ext.extract_playbook(tmp_path / "pb.yml", lenient=False)
 
         assert result.is_playbook
         assert not result.is_role
@@ -797,8 +797,8 @@ def describe_extract_playbook() -> None:
         assert result.root.path == Path("pb.yml")
         assert len(result.root.plays) == 1
         assert isinstance(result.root.plays[0], ast.Play)
-        assert not result.root.broken_files
-        assert not result.root.broken_tasks
+        assert not result.broken_files
+        assert not result.broken_tasks
 
     def extracts_playbooks_with_multiple_plays(tmp_path: Path) -> None:
         pb_content = dedent(
@@ -819,7 +819,7 @@ def describe_extract_playbook() -> None:
         )
         _ = (tmp_path / "pb.yml").write_text(pb_content)
 
-        result = ext.extract_playbook(tmp_path / "pb.yml")
+        result = ext.extract_playbook(tmp_path / "pb.yml", lenient=False)
 
         assert result.is_playbook
         assert not result.is_role
@@ -829,14 +829,30 @@ def describe_extract_playbook() -> None:
         assert len(result.root.plays) == 2
         assert isinstance(result.root.plays[0], ast.Play)
         assert isinstance(result.root.plays[1], ast.Play)
-        assert not result.root.broken_files
-        assert not result.root.broken_tasks
+        assert not result.broken_files
+        assert not result.broken_tasks
 
     def rejects_empty_playbooks(tmp_path: Path) -> None:
         _ = (tmp_path / "pb.yml").write_text("")
 
         with pytest.raises(Exception):
-            _ = ext.extract_playbook(tmp_path / "pb.yml")
+            _ = ext.extract_playbook(tmp_path / "pb.yml", lenient=False)
+
+    def ignores_malformed_plays_in_lenient_mode(tmp_path: Path) -> None:
+        pb_content = dedent(
+            """
+            ---
+            - name: config servers
+              tasks: []
+        """
+        )
+        _ = (tmp_path / "pb.yml").write_text(pb_content)
+
+        result = ext.extract_playbook(tmp_path / "pb.yml", lenient=True)
+
+        assert isinstance(result.root, ast.Playbook)
+        assert len(result.root.plays) == 0
+        assert len(result.broken_tasks) == 1
 
 
 def describe_extracting_roles() -> None:
@@ -898,8 +914,8 @@ def describe_extracting_roles() -> None:
         assert isinstance(result.root, ast.Role)
         assert result.path == tmp_path
         assert result.root.path == Path(".")
-        assert not result.root.broken_files
-        assert not result.root.broken_tasks
+        assert not result.broken_files
+        assert not result.broken_tasks
 
         tf = result.root.main_tasks_file
         assert tf is not None
@@ -971,8 +987,8 @@ def describe_extracting_roles() -> None:
         assert isinstance(result.root, ast.Role)
         assert result.path == tmp_path
         assert result.root.path == Path(".")
-        assert not result.root.broken_files
-        assert not result.root.broken_tasks
+        assert not result.broken_files
+        assert not result.broken_tasks
 
         assert len(result.root.task_files) == 1
         assert len(result.root.default_var_files) == 1
@@ -1012,7 +1028,7 @@ def describe_extracting_roles() -> None:
         assert isinstance(result.root, ast.Role)
         assert result.path == tmp_path
         assert result.root.path == Path(".")
-        assert not result.root.broken_tasks
+        assert not result.broken_tasks
 
         assert len(result.root.task_files) == 0
         assert len(result.root.default_var_files) == 1
@@ -1024,8 +1040,8 @@ def describe_extracting_roles() -> None:
         assert result.root.main_vars_file is None
         assert result.root.main_handlers_file is None
 
-        assert len(result.root.broken_files) == 1
-        assert result.root.broken_files[0].path == Path("tasks/main.yml")
+        assert len(result.broken_files) == 1
+        assert result.broken_files[0].path == Path("tasks/main.yml")
 
     def extracts_roles_with_non_main_files(tmp_path: Path) -> None:
         for dirname in ("meta", "tasks", "vars", "defaults", "handlers"):
@@ -1063,8 +1079,8 @@ def describe_extracting_roles() -> None:
         assert isinstance(result.root, ast.Role)
         assert result.path == tmp_path
         assert result.root.path == Path(".")
-        assert not result.root.broken_files
-        assert not result.root.broken_tasks
+        assert not result.broken_files
+        assert not result.broken_tasks
 
         assert len(result.root.task_files) == 2
         assert len(result.root.default_var_files) == 1

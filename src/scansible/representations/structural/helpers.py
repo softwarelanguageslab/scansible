@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import NoReturn, Protocol, override
+from typing import override
 
 import io
 import os.path
@@ -146,39 +146,3 @@ def capture_output() -> Generator[io.StringIO]:
         _ = stack.enter_context(redirect_stderr(buffer))
         _ = stack.enter_context(redirect_stdout(buffer))
         yield buffer
-
-
-class _Intercepter(Protocol):
-    def __call__(self, *_args: object, **_kwargs: object) -> NoReturn: ...
-
-
-@contextmanager
-def prevent_undesired_operations() -> Generator[None]:
-    """
-    Context manager which, while active, blocks Ansible from performing
-    undesired operations such as evaluating template expressions or eagerly
-    loading included files.
-    """
-    from ansible.playbook import helpers
-    from ansible.template import Templar
-
-    old_load_list_of_tasks = helpers.load_list_of_tasks
-    old_templar_do_template = Templar.do_template
-    old_templar_template = Templar.template
-
-    def raise_if_called(name: str) -> _Intercepter:
-        def raiser(*_args: object, **_kwargs: object) -> NoReturn:
-            raise FatalError(f"{name} was called when it was not supposed to be called")
-
-        return raiser
-
-    helpers.load_list_of_tasks = raise_if_called("load_list_of_tasks")
-    Templar.do_template = raise_if_called("Templar.do_template")
-    Templar.template = raise_if_called("Templar.template")
-
-    try:
-        yield
-    finally:
-        helpers.load_list_of_tasks = old_load_list_of_tasks
-        Templar.do_template = old_templar_do_template
-        Templar.template = old_templar_template
