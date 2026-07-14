@@ -5,8 +5,6 @@
 # FIXME!!! Source code position information is largely broken due to Pydantic coercing Ansible types (AnsibleUnicode, AnsibleMapping, ...)
 # to plain data types (str, dict, ...), losing the custom `ansible_pos` field.
 
-# TODO: Validate that variable names are valid identifiers.
-
 from __future__ import annotations
 
 from typing import (
@@ -20,6 +18,7 @@ from typing import (
     override,
 )
 
+import keyword
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from functools import cached_property
@@ -80,11 +79,25 @@ def _validate_absolute_path(path: Path) -> Path:
     return path
 
 
+def _validate_identifier(value: str) -> str:
+    """Validate whether the given value is a valid identifier.
+
+    Logic mirrors Ansible's own logic in `ansible.utils.vars.isidentifier`.
+    """
+    if not (value.isascii() and value.isidentifier()):
+        raise ValueError(f"Expected a valid identifier, got {value}")
+    if keyword.iskeyword(value):
+        raise ValueError(f"{value} is a reserved keyword")
+    return value
+
+
 #: Relative paths in the project
 type RelativePath = Annotated[Path, AfterValidator(_validate_relative_path)]
 
 #: Absolute paths in the project
 type AbsolutePath = Annotated[Path, AfterValidator(_validate_absolute_path)]
+
+type Identifier = Annotated[str, AfterValidator(_validate_identifier)]
 
 
 class ExtractionContext:
@@ -351,7 +364,7 @@ class _CommonDirectives(BaseModel, frozen=True):
     remote_user: str | None = None
 
     #: Variables defined on the entity.
-    vars: Mapping[str, AnyValue] = Field(default_factory=FrozenDict)
+    vars: Mapping[Identifier, AnyValue] = Field(default_factory=FrozenDict)
 
     #: Specify default arguments to modules in this entity.
     module_defaults: Sequence[Mapping[str, Mapping[str, AnyValue]]] | None = None
@@ -692,7 +705,7 @@ class VariableFile(ASTFile, frozen=True):
     """Represents a file containing variables."""
 
     #: The variables contained within the file. The order is irrelevant.
-    variables: Annotated[Mapping[str, AnyValue], NormalizeNone] = Field(
+    variables: Annotated[Mapping[Identifier, AnyValue], NormalizeNone] = Field(
         default_factory=dict
     )
 
@@ -708,9 +721,9 @@ class LoopControl(ASTNode, frozen=True):
     """Represents the loop control directive value."""
 
     #: The loop variable name. `item` by default.
-    loop_var: str = "item"
+    loop_var: Identifier = "item"
     #: The index variable name.
-    index_var: str | None = None
+    index_var: Identifier | None = None
     #: Loop label in output. Should technically be a string only, but Ansible
     #: doesn't complain about dicts and just templates and stringifies those.
     label: AnyValue = None
@@ -784,7 +797,8 @@ class BaseTask(ASTNode, _CommonDirectives, frozen=True):
     poll: str | int | None = None
     #: Value given to the register keyword, i.e. variable name that will store
     #: the result of this action. Renamed due to naming conflicts with base classes.
-    register_var: str | None = Field(default=None, alias="register")
+    # FIXME: Distinguish between expr and identifier.
+    register_var: Identifier | str | None = Field(default=None, alias="register")
     #: Number of tries for failed tasks.
     retries: str | int | None = None
     #: Retry task until condition(s) are satisfied.
@@ -1202,7 +1216,7 @@ class VarsPrompt(ASTNode, frozen=True):
     """Represents a vars_prompt entry."""
 
     #: Name of the variable.
-    name: str
+    name: Identifier
     #: Prompt to show.
     prompt: str | None = None
     #: Default value.

@@ -563,6 +563,24 @@ def describe_extracting_variables() -> None:
                 ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
             )
 
+    @pytest.mark.parametrize(
+        "identifier",
+        ["123test", "un¡code™", "def", "for"],
+    )
+    def rejects_invalid_identifiers(tmp_path: Path, identifier: str) -> None:
+        _ = (tmp_path / "main.yml").write_text(
+            dedent(
+                f"""
+            {identifier}: 123
+        """
+            )
+        )
+
+        with pytest.raises(ValidationError):
+            _ = ext.extract_variable_file(
+                ProjectPath(tmp_path, "main.yml"), ast.ExtractionContext(False)
+            )
+
 
 def describe_extracting_list_of_handlers() -> None:
     def extracts_as_handlers() -> None:
