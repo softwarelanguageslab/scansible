@@ -31,22 +31,6 @@ def _as_ansible(obj: dict[str, Any]) -> dict[str, ans.AnsibleValue]:
     return obj
 
 
-def describe_load_play() -> None:
-    def loads_correct_play() -> None:
-        ds = _as_ansible(
-            {
-                "hosts": "hello",
-                "tasks": [],
-            }
-        )
-
-        result, orig_ds = loaders.load_play(ds)
-
-        assert result.hosts == ["hello"]
-        assert result.tasks == []
-        assert ds == orig_ds
-
-
 def describe_load_playbook() -> None:
     def loads_correct_playbook(load_pb: LoadPlaybookType) -> None:
         result = load_pb(

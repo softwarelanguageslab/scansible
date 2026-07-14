@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from typing import NoReturn, Protocol, cast, override
+from typing import NoReturn, Protocol, override
 
 import io
 import os.path
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
 
@@ -83,50 +83,6 @@ def parse_file(path: ProjectPath) -> object:
     return loader.load_from_file(str(path.absolute))
 
 
-def validate_ansible_object(obj: ans.FieldAttributeBase) -> None:
-    """Validate and normalise the given Ansible object.
-
-    Uses Ansible's own validators. Normalises the object by setting default
-    values for attributes that don't have values, or by normalising the values
-    of certain attributes (e.g. normalising to a list when a value can be an
-    atomic string or a list of strings).
-    """
-
-    # We have to reimplement Ansible's logic because it eagerly templates certain
-    # expressions. We don't want that.
-    templar = ans.Templar(ans.DataLoader())
-    for name, attribute in obj.fattributes.items():
-        value = cast(object, getattr(obj, name))
-        if value is None:
-            continue
-        if attribute.isa == "class":
-            assert isinstance(value, ans.FieldAttributeBase)
-            validate_ansible_object(value)
-            continue
-
-        # We need to ensure we don't retrieve the validated value if the
-        # original value is an expression. Ansible usually eagerly evaluates
-        # those, we don't. We only care when it's a string, to prevent Ansible
-        # from attempting to e.g. convert an expression into a boolean. If it's
-        # a list containing expressions and Ansible wants to convert it to a
-        # boolean, there's something wrong anyway.
-        if isinstance(value, str) and templar.is_template(value):
-            continue
-
-        # templar argument is only used when attribute.isa is a class, which we
-        # handle specially above.
-        try:
-            validated_value = obj.get_validated_value(name, attribute, value, None)
-        except (TypeError, ValueError) as e:
-            # Re-raise these errors like Ansible's base post_validate does.
-            raise ans.AnsibleParserError(
-                f"the field '{name}' has an invalid value ({value}), and could not be converted to an {attribute.isa}. The error was: {e}",
-                obj=obj.get_ds(),
-                orig_exc=e,
-            )
-        setattr(obj, name, validated_value)
-
-
 def find_file(dir_path: ProjectPath, file_name: str) -> ProjectPath | None:
     """
     Find a YAML file in a project directory, regardless of file extension.
@@ -172,7 +128,7 @@ def find_all_files(dir_path: ProjectPath) -> list[ProjectPath]:
 
 
 @contextmanager
-def capture_output() -> Iterator[io.StringIO]:
+def capture_output() -> Generator[io.StringIO]:
     """Context manager which, while active, captures all printed output.
 
     Useful to capture Ansible logs that otherwise get printed to the terminal.
@@ -197,7 +153,7 @@ class _Intercepter(Protocol):
 
 
 @contextmanager
-def prevent_undesired_operations() -> Iterator[None]:
+def prevent_undesired_operations() -> Generator[None]:
     """
     Context manager which, while active, blocks Ansible from performing
     undesired operations such as evaluating template expressions or eagerly

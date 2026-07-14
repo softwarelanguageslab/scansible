@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Callable, Literal, overload
+from typing import Callable
 
-from collections.abc import Iterable, Sequence
 from functools import partial
 from pathlib import Path
 
@@ -75,60 +74,6 @@ def extract_tasks_file(path: ProjectPath, ctx: ExtractionContext) -> ast.TaskFil
     return ast.TaskFile.load(path, ctx)
 
 
-@overload
-def extract_list_of_tasks_or_blocks(
-    ds: Sequence[dict[str, ans.AnsibleValue]],
-    ctx: ExtractionContext,
-    handlers: Literal[True],
-) -> Sequence[ast.Handler]: ...
-
-
-@overload
-def extract_list_of_tasks_or_blocks(
-    ds: Sequence[dict[str, ans.AnsibleValue]],
-    ctx: ExtractionContext,
-    handlers: Literal[False] = ...,
-) -> Sequence[ast.Task | ast.Block]: ...
-
-
-def extract_list_of_tasks_or_blocks(
-    ds: Sequence[dict[str, ans.AnsibleValue]],
-    ctx: ExtractionContext,
-    handlers: Literal[True, False] = False,
-) -> Sequence[ast.Task | ast.Block] | Sequence[ast.Handler]:
-    if handlers:
-        return list(_extract_handler_list(ds, ctx))
-    else:
-        return list(_extract_block_list(ds, ctx))
-
-
-def _extract_handler_list(
-    ds: Sequence[dict[str, ans.AnsibleValue]], ctx: ExtractionContext
-) -> Iterable[ast.Handler]:
-    for inner_ds in ds:
-        inner_result = extract_handler(inner_ds, ctx)
-        if inner_result is not None:
-            yield inner_result
-
-
-def _extract_block_list(
-    ds: Sequence[dict[str, ans.AnsibleValue]], ctx: ExtractionContext
-) -> Iterable[ast.Task | ast.Block]:
-    for inner_ds in ds:
-        inner_result = extract_task_or_block(inner_ds, ctx)
-        if inner_result is not None:
-            yield inner_result
-
-
-def extract_task_or_block(
-    ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext
-) -> ast.Task | ast.Block | None:
-    if ans.Block.is_block(ds):
-        return extract_block(ds, ctx)
-
-    return extract_task(ds, ctx)
-
-
 def extract_block(
     ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext
 ) -> ast.Block | None:
@@ -138,60 +83,17 @@ def extract_block(
 def extract_task(
     ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext
 ) -> ast.Task | None:
-    return _extract_task(ds, ctx, as_handler=False)
+    return ast.Task.model_validate(ds, context=ctx)
 
 
 def extract_handler(
     ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext
 ) -> ast.Handler | None:
-    return _extract_task(ds, ctx, as_handler=True)
-
-
-@overload
-def _extract_task(
-    ds: dict[str, ans.AnsibleValue],
-    ctx: ExtractionContext,
-    as_handler: Literal[True],
-) -> ast.Handler | None: ...
-@overload
-def _extract_task(
-    ds: dict[str, ans.AnsibleValue],
-    ctx: ExtractionContext,
-    as_handler: Literal[False],
-) -> ast.Task | None: ...
-def _extract_task(
-    ds: dict[str, ans.AnsibleValue],
-    ctx: ExtractionContext,
-    as_handler: Literal[True, False],
-) -> ast.Task | ast.Handler | None:
-    rep_cls = ast.Handler if as_handler else ast.Task
-    return rep_cls.model_validate(ds, context=ctx)
+    return ast.Handler.model_validate(ds, context=ctx)
 
 
 def extract_play(ds: dict[str, ans.AnsibleValue], ctx: ExtractionContext) -> ast.Play:
-    raw_play, raw_ds = loaders.load_play(ds)
-
-    attrs = _ansible_to_dict(raw_play)
-    attrs["tasks"] = extract_list_of_tasks_or_blocks(
-        raw_play.tasks or [], ctx, handlers=False
-    )
-    attrs["handlers"] = extract_list_of_tasks_or_blocks(
-        raw_play.handlers or [], ctx, handlers=True
-    )
-    attrs["pre_tasks"] = extract_list_of_tasks_or_blocks(
-        raw_play.pre_tasks or [], ctx, handlers=False
-    )
-    attrs["post_tasks"] = extract_list_of_tasks_or_blocks(
-        raw_play.post_tasks or [], ctx, handlers=False
-    )
-    attrs["vars"] = raw_play.vars
-    attrs["vars_prompt"] = [
-        ast.VarsPrompt(**vp, position=_get_position(vp))  # pyright: ignore[reportArgumentType]
-        for vp in raw_play.vars_prompt or []
-    ]
-
-    play = ast.Play(**attrs, position=_get_position(raw_ds))  # pyright: ignore[reportArgumentType]
-    return play
+    return ast.Play.model_validate(ds, context=ctx)
 
 
 def extract_playbook_child(

@@ -1246,7 +1246,7 @@ class Play(ASTNode, _CommonDirectives, frozen=True):
     """Represents an Ansible play contained within a playbook."""
 
     #: The play's targetted hosts.
-    hosts: Sequence[str]
+    hosts: Annotated[Sequence[str], Listify]
     #: The play's list of blocks.
     tasks: Sequence[TaskOrBlock] = Field(default_factory=tuple)
 
@@ -1261,7 +1261,9 @@ class Play(ASTNode, _CommonDirectives, frozen=True):
     fact_path: str | None = None
 
     #: List of files with variables to include into play.
-    vars_files: Sequence[str | Sequence[str]] = Field(default_factory=tuple)
+    vars_files: Annotated[Sequence[Sequence[str]], NormalizeNone] = Field(
+        default_factory=tuple
+    )
     #: List of variables to prompt user for. List of mappings, `name` key
     #: contains variable name.
     vars_prompt: Sequence[VarsPrompt] = Field(default_factory=tuple)
@@ -1286,6 +1288,41 @@ class Play(ASTNode, _CommonDirectives, frozen=True):
     strategy: str | None = None
     #: How hosts should be sorted in execution order.
     order: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_play(cls, value: object) -> object:
+        """Perform normalization of play directives."""
+        if not isinstance(value, dict):
+            return value
+
+        value = cast(RawDirectives, value.copy())
+
+        # remove the "accelerate" key if present. It was removed in 2.4
+        _ = value.pop("accelerate", None)
+
+        return value
+
+    @field_validator("vars_files", mode="before")
+    @classmethod
+    def _normalize_vars_files(cls, value: object) -> object:
+        """Normalize vars_files into nested sequences."""
+        if not isinstance(value, Sequence) or isinstance(value, str):
+            value = [value]
+        new_value = []
+        for entry in value:
+            if not isinstance(entry, Sequence) or isinstance(entry, str):
+                entry = [entry]
+            new_value.append(entry)  # pyright: ignore[reportUnknownMemberType]
+        return new_value
+
+    @field_validator("hosts", mode="after")
+    @classmethod
+    def _validate_hosts(cls, value: Sequence[str]) -> Sequence[str]:
+        """Validate the value of the `hosts` field."""
+        if not value:
+            raise ValueError("Play `hosts` cannot be empty")
+        return value
 
 
 class Playbook(ASTFile, frozen=True):
