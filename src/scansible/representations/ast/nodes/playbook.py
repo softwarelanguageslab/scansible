@@ -16,6 +16,7 @@ from .._validators import Identifier
 from ..common import ExtractionContext, RawDirectives, parse_file
 from .base import ASTFile, ASTNode
 from .directives import CommonDirectives
+from .expression import Expression
 from .role_meta import RoleRequirement
 from .task import Handler, TaskOrBlock
 
@@ -30,17 +31,17 @@ class VarsPrompt(ASTNode, frozen=True):
     #: Default value.
     default: AnyValue | None = None
     #: Whether to hide the input on the terminal (e.g. for passwords).
-    private: str | bool | None = None
+    private: bool | Expression | None = None
     #: Whether the user needs to re-enter to confirm.
-    confirm: str | bool = False
+    confirm: bool | Expression = False
     #: Encryption algorithm to use on the value.
     encrypt: str | None = None
     #: Salt size to use in encryption.
-    salt_size: str | int | None = None
+    salt_size: int | Expression | None = None
     #: Salt to use in encryption.
     salt: str | None = None
     #: Whether the user input is unsafe and should not be templated.
-    unsafe: str | bool | None = None
+    unsafe: bool | Expression | None = None
 
 
 class PlayRoleRequirement(RoleRequirement, frozen=True):
@@ -69,12 +70,12 @@ class Play(ASTNode, CommonDirectives, frozen=True):
     tasks: Sequence[TaskOrBlock] = Field(default_factory=tuple)
 
     #: Whether to gather facts from the remote hosts.
-    gather_facts: bool | str | None = None
+    gather_facts: bool | Expression | None = None
 
     #: Subset of facts to gather from remote hosts.
     gather_subset: Annotated[Sequence[str], Listify] = Field(default_factory=tuple)
     #: Timeout for fact gathering.
-    gather_timeout: str | int | None = None
+    gather_timeout: int | Expression | None = None
     #: Fact path option for fact gathering.
     fact_path: str | None = None
 
@@ -97,9 +98,9 @@ class Play(ASTNode, CommonDirectives, frozen=True):
     post_tasks: Sequence[TaskOrBlock] = Field(default_factory=tuple)
 
     #: Force handler notification.
-    force_handlers: bool | str | None = None
+    force_handlers: bool | Expression | None = None
     #: Maximum percentage of hosts that are allowed to fail before aborting play.
-    max_fail_percentage: int | str | float | None = None
+    max_fail_percentage: int | float | Expression | None = None
     #: Define how Ansible batches execution on hosts.
     serial: Annotated[Sequence[str | int], Listify] = Field(default_factory=tuple)
     #: Execution strategy related to parallel host execution.

@@ -24,6 +24,7 @@ from .._validators import Identifier
 from ..common import ExtractionContext, RawDirectives, parse_file
 from .base import ASTFile, ASTNode
 from .directives import CommonDirectives
+from .expression import Condition, Expression
 
 # Adapted from ansible.constants
 #: Unqualified names of actions that take freeform (unparsed) arguments.
@@ -54,14 +55,14 @@ class LoopControl(ASTNode, frozen=True):
     label: AnyValue = None
     #: Amount of time in seconds to pause between each iteration. Can be a
     #: string in case this is an expression. 0 by default.
-    pause: str | int | float = 0.0
+    pause: int | float | Expression = 0.0
     #: Whether to include more information in the loop items.
     #: See https://docs.ansible.com/ansible/latest/user_guide/playbooks_loops.html#extended-loop-variables
-    extended: str | bool | None = None
+    extended: bool | Expression | None = None
     #: Whether to include `allitems` in the extended version.
-    extended_allitems: str | bool | None = True
+    extended_allitems: bool | Expression | None = True
     #: Conditions when to break the loop.
-    break_when: Annotated[Sequence[str], Listify] = Field(default_factory=tuple)
+    break_when: Annotated[Sequence[Condition], Listify] = Field(default_factory=tuple)
 
 
 class BaseTask(ASTNode, CommonDirectives, frozen=True):
@@ -95,23 +96,25 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
     args: Mapping[str, AnyValue]
 
     #: Run task asynchronously for at most the given number of seconds.
-    async_val: str | int | None = 0
+    async_val: int | Expression | None = 0
     #: Conditional expression(s) to override "changed" status.
-    changed_when: Annotated[Sequence[str | bool], Listify] = Field(
+    changed_when: Annotated[Sequence[Condition | bool], Listify] = Field(
         default_factory=tuple
     )
     #: Number of seconds to delay between retries.
-    delay: str | float | int | None = 5.0
+    delay: float | int | Expression | None = 5.0
     #: Delegate task execution to another host.
     delegate_to: str | None = None
     #: Apply facts to delegated host.
-    delegate_facts: str | bool | None = None
+    delegate_facts: bool | Expression | None = None
     #: Conditional expression(s) to override the "failed" status.
-    failed_when: Annotated[Sequence[str | bool], Listify] = Field(default_factory=tuple)
+    failed_when: Annotated[Sequence[Condition | bool], Listify] = Field(
+        default_factory=tuple
+    )
     #: Loop on the task, or None if no loop. Can be a string (an expression),
     #: a list of arbitrary values, or, when the loop comes from `with_dict`, a
     #: dict of arbitrary items.
-    loop: str | Sequence[AnyValue] | Mapping[ScalarValue, AnyValue] | None = None
+    loop: Sequence[AnyValue] | Expression | Mapping[ScalarValue, AnyValue] | None = None
     #: The type of loop used in old looping syntax (`with_*`), e.g.
     #: `with_items` -> `items`.
     loop_with: str | None = None
@@ -120,17 +123,16 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
     #: List of handler names of handlers to notify.
     notify: Annotated[Sequence[str], Listify] = Field(default_factory=tuple)
     #: Polling interval for async tasks.
-    poll: str | int | None = None
+    poll: int | Expression | None = None
     #: Value given to the register keyword, i.e. variable name that will store
     #: the result of this action. Renamed due to naming conflicts with base classes.
-    # FIXME: Distinguish between expr and identifier.
-    register_var: Identifier | str | None = Field(default=None, alias="register")
+    register_var: Identifier | Expression | None = Field(default=None, alias="register")
     #: Number of tries for failed tasks.
-    retries: str | int | None = None
+    retries: int | Expression | None = None
     #: Retry task until condition(s) are satisfied.
-    until: Annotated[Sequence[str | bool], Listify] = Field(default_factory=tuple)
+    until: Annotated[Sequence[Condition | bool], Listify] = Field(default_factory=tuple)
     #: Condition on the task, or None if no condition.
-    when: Annotated[Sequence[str | bool], NormalizeNone, Listify] = Field(
+    when: Annotated[Sequence[Condition | bool], NormalizeNone, Listify] = Field(
         default_factory=tuple
     )
 
@@ -408,10 +410,10 @@ class Block(ASTNode, CommonDirectives, frozen=True):
     #: Delegate block execution to another host.
     delegate_to: str | None = None
     #: Apply facts to delegated host.
-    delegate_facts: str | bool | None = None
+    delegate_facts: bool | Expression | None = None
 
     #: Condition on the block, or None if no condition.
-    when: Annotated[Sequence[str | bool], Listify] = Field(default_factory=tuple)
+    when: Annotated[Sequence[Condition | bool], Listify] = Field(default_factory=tuple)
 
     @model_validator(mode="after")
     def _validate_task_lists(self) -> Self:

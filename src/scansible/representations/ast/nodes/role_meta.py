@@ -17,6 +17,7 @@ from .._normalizers import Lenient, Listify, Stringify
 from ..common import ExtractionContext, parse_file
 from .base import ASTFile, ASTNode
 from .directives import CommonDirectives
+from .expression import Condition, Expression
 
 
 class Platform(ASTNode, frozen=True):
@@ -61,10 +62,10 @@ class RoleRequirement(ASTNode, CommonDirectives, frozen=True):
     #: Delegate execution to another host.
     delegate_to: str | None = None
     #: Apply facts to delegated host.
-    delegate_facts: str | bool | None = None
+    delegate_facts: bool | Expression | None = None
 
     #: Optional condition on when to include a dependency.
-    when: Annotated[Sequence[str | bool], Listify] = Field(default_factory=tuple)
+    when: Annotated[Sequence[Condition | bool], Listify] = Field(default_factory=tuple)
 
     @field_validator("role", mode="after")
     def _validate_role_name(cls, value: str) -> str:

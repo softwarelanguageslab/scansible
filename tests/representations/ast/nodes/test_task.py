@@ -85,6 +85,17 @@ def describe_extracting_tasks():
         assert result.name == "test"
         assert result.loop == "{{ somelist }}"
 
+    def rejects_task_with_string_literal_loop():
+        yaml = """
+            name: test
+            debug: msg={{ item }}
+            loop: somelist
+        """
+        ctx = ExtractionContext(False)
+
+        with pytest.raises(ValidationError):
+            _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
+
     def extracts_task_with_loop_control():
         yaml = """
             name: test

@@ -16,6 +16,7 @@ from scansible.utils import FrozenDict
 from .._normalizers import Listify
 from .._validators import Identifier
 from ..common import RawDirectives
+from .expression import Expression
 
 
 class CommonDirectives(BaseModel, frozen=True):
@@ -27,7 +28,7 @@ class CommonDirectives(BaseModel, frozen=True):
     #: The connection plugin to use in this task, block, or play.
     connection: str | None = None
     #: Override default port in connection.
-    port: int | None = None
+    port: int | Expression | None = None
     #: Remote user name.
     remote_user: str | None = None
 
@@ -44,29 +45,29 @@ class CommonDirectives(BaseModel, frozen=True):
         default_factory=tuple
     )
     #: To disable logging of action.
-    no_log: bool | str | None = None
+    no_log: bool | Expression | None = None
     #: Run on a single host only.
-    run_once: bool | str | None = None
+    run_once: bool | Expression | None = None
     #: Ignore task failures.
-    ignore_errors: bool | str | None = None
+    ignore_errors: bool | Expression | None = None
     #: Ignore task failures due to unreachable host.
-    ignore_unreachable: bool | str | None = None
+    ignore_unreachable: bool | Expression | None = None
     #: Toggle check mode (dry run).
-    check_mode: bool | str | None = None
+    check_mode: bool | Expression | None = None
     #: Toggle returning diff information from task.
-    diff: bool | str | None = None
+    diff: bool | Expression | None = None
     #: End play once one task fails for one host.
-    any_errors_fatal: bool | str | None = None
+    any_errors_fatal: bool | Expression | None = None
     #: Max amount of hosts to operate on in parallel.
-    throttle: str | int | None = None
+    throttle: int | Expression | None = None
     #: Task timeout.
-    timeout: str | int | None = None
+    timeout: int | Expression | None = None
 
     #: Set debugger state.
     debugger: str | None = None
 
     #: Whether to perform privilege escalation.
-    become: str | bool | None = None
+    become: bool | Expression | None = None
     #: How to perform privilege escalation (sudo, su, ...)
     become_method: str | None = None
     #: User to escalate to.
