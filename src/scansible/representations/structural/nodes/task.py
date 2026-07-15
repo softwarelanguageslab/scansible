@@ -223,8 +223,26 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
         # args have lower priority than specially-parsed arguments on the action.
         # Add from lowest to highest priority, will be combined at the end.
         arg_list: list[AnyValue] = [cls._parse_task_level_args(ds)]
-        action = ds.pop("action")
+        action, action_args = cls._flatten_old_style_action_and_arguments(
+            ds.pop("action")
+        )
+        arg_list.extend(action_args)
 
+        # action could be "xyz" or "xyz a=b c=d", split it.
+        [action, *freeform_args] = split_args(action)
+        arg_list.append(" ".join(freeform_args))
+
+        ds["action"] = action
+        ds["args"] = cls._combine_args(action, *arg_list)
+
+        return ds
+
+    @classmethod
+    def _flatten_old_style_action_and_arguments(
+        cls, action: AnyValue
+    ) -> tuple[str, list[AnyValue]]:
+        """Given an old-style action specification, extract the action and separate the arguments."""
+        arg_list: list[AnyValue] = []
         if isinstance(action, dict):
             # action is like { module: "xyz", a: b, ... }
             if "module" not in action:
@@ -239,15 +257,7 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
         if not isinstance(action, str):
             raise ValueError("Expected action to be a string")
 
-        # action is now for sure like "xyz" or "xyz a=b c=d"
-        assert isinstance(action, str)
-        [action, *action_args] = split_args(action)
-        ds["action"] = action
-        arg_list.append(" ".join(action_args))
-
-        ds["args"] = cls._combine_args(action, *arg_list)
-
-        return ds
+        return action, arg_list
 
     @classmethod
     def _parse_new_style_module_arguments(cls, ds: RawDirectives) -> RawDirectives:

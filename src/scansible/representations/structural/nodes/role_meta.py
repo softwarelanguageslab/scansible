@@ -154,18 +154,22 @@ class MetaRoleRequirement(RoleRequirement, frozen=True):
                     "Expected `src` in new-style role requirement to be a str"
                 )
 
-            # Extraction per ansible.playbook.role.requirement.
-            name = (
-                src.split("/")[-1]
-                .removesuffix(".git")
-                .removesuffix(".tar.gz")
-                .split(",")[0]
-            )
-            new_value["role"] = name
+            new_value["role"] = cls._extract_name_from_src(src)
         else:
             raise ValueError("Expected `src` or `name` in new-style role requirement")
 
         return new_value
+
+    @classmethod
+    def _extract_name_from_src(cls, src: str) -> str:
+        """Extract the role name from its src specification."""
+        # Extraction per ansible.playbook.role.requirement.
+        return (
+            src.split("/")[-1]
+            .removesuffix(".git")
+            .removesuffix(".tar.gz")
+            .split(",")[0]
+        )
 
 
 class MetaBlock(ASTNode, frozen=True, extra="ignore"):
@@ -196,11 +200,14 @@ class MetaBlock(ASTNode, frozen=True, extra="ignore"):
     def _hoist_platforms(cls, value: object) -> object:
         """Hoist `galaxy_info.platforms` to a top-level key before validation."""
 
-        if isinstance(value, dict) and "galaxy_info" in value:
-            if not isinstance(value["galaxy_info"], dict):
-                raise ValueError("Expected `galaxy_info` to be a dict")
-            if "platforms" in value["galaxy_info"]:
-                value["platforms"] = value["galaxy_info"]["platforms"]
+        if not (isinstance(value, dict) and "galaxy_info" in value):
+            return value
+
+        galaxy_info = value["galaxy_info"]
+        if not isinstance(galaxy_info, dict):
+            raise ValueError("Expected `galaxy_info` to be a dict")
+        if "platforms" in galaxy_info:
+            value["platforms"] = galaxy_info["platforms"]
 
         return value
 
