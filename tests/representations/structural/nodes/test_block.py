@@ -2,23 +2,14 @@
 
 from __future__ import annotations
 
-from textwrap import dedent
-
-import ansible.parsing.dataloader
 import pytest
+from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImport]
 
 from scansible.representations.structural import Block, ExtractionContext, Task
 
 
-def _parse_yaml_dict(yaml_content: str) -> dict[str, object]:
-    loader = ansible.parsing.dataloader.DataLoader()
-    result = loader.load(data=dedent(yaml_content))
-    assert isinstance(result, dict)
-    return result
-
-
-def describe_extracting_blocks() -> None:
-    def extracts_standard_blocks() -> None:
+def describe_extracting_blocks():
+    def extracts_standard_blocks():
         yaml = """
             block:
               - name: test
@@ -28,7 +19,7 @@ def describe_extracting_blocks() -> None:
         """
         ctx = ExtractionContext(False)
 
-        result = Block.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        result = Block.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result is not None
         assert len(result.block) == 2
@@ -37,7 +28,7 @@ def describe_extracting_blocks() -> None:
         assert result.block[0].name == "test"
         assert result.block[1].name == "test2"
 
-    def extracts_blocks_with_rescue_and_always() -> None:
+    def extracts_blocks_with_rescue_and_always():
         yaml = """
             block:
               - name: test
@@ -51,7 +42,7 @@ def describe_extracting_blocks() -> None:
         """
         ctx = ExtractionContext(False)
 
-        result = Block.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        result = Block.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result is not None
         assert len(result.block) == 1
@@ -64,7 +55,7 @@ def describe_extracting_blocks() -> None:
         assert result.rescue[0].name == "test2"
         assert result.always[0].name == "test3"
 
-    def extracts_nested_blocks() -> None:
+    def extracts_nested_blocks():
         yaml = """
             block:
               - name: test
@@ -75,7 +66,7 @@ def describe_extracting_blocks() -> None:
         """
         ctx = ExtractionContext(False)
 
-        result = Block.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        result = Block.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result is not None
         assert len(result.block) == 2
@@ -86,30 +77,30 @@ def describe_extracting_blocks() -> None:
         assert isinstance(result.block[1].block[0], Task)
         assert result.block[1].block[0].name == "test"
 
-    def does_not_eagerly_load_import_tasks() -> None:
+    def does_not_eagerly_load_import_tasks():
         yaml = """
             block:
               - import_tasks: test
         """
         ctx = ExtractionContext(False)
 
-        result = Block.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        result = Block.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result is not None
         assert len(result.block) == 1
         assert isinstance(result.block[0], Task)
         assert result.block[0].action == "import_tasks"
 
-    def rejects_non_blocks() -> None:
+    def rejects_non_blocks():
         yaml = """
             import_tasks: test
         """
         ctx = ExtractionContext(False)
 
         with pytest.raises(Exception):
-            _ = Block.model_validate(_parse_yaml_dict(yaml), context=ctx)
+            _ = Block.model_validate(parse_yaml_dict(yaml), context=ctx)
 
-    def rejects_blocks_without_block() -> None:
+    def rejects_blocks_without_block():
         yaml = """
             rescue:
                 - file: {}
@@ -117,9 +108,9 @@ def describe_extracting_blocks() -> None:
         ctx = ExtractionContext(False)
 
         with pytest.raises(Exception):
-            _ = Block.model_validate(_parse_yaml_dict(yaml), context=ctx)
+            _ = Block.model_validate(parse_yaml_dict(yaml), context=ctx)
 
-    def rejects_rescue_with_empty_block() -> None:
+    def rejects_rescue_with_empty_block():
         yaml = """
             block: []
             rescue:
@@ -128,4 +119,4 @@ def describe_extracting_blocks() -> None:
         ctx = ExtractionContext(False)
 
         with pytest.raises(Exception):
-            _ = Block.model_validate(_parse_yaml_dict(yaml), context=ctx)
+            _ = Block.model_validate(parse_yaml_dict(yaml), context=ctx)

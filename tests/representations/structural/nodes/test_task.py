@@ -2,20 +2,11 @@
 
 from __future__ import annotations
 
-from textwrap import dedent
-
-import ansible.parsing.dataloader
 import pytest
+from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImport]
 from pydantic import ValidationError
 
 from scansible.representations.structural import ExtractionContext, Handler, Task
-
-
-def _parse_yaml_dict(yaml_content: str) -> dict[str, object]:
-    loader = ansible.parsing.dataloader.DataLoader()
-    result = loader.load(data=dedent(yaml_content))
-    assert isinstance(result, dict)
-    return result
 
 
 def describe_extracting_tasks():
@@ -28,7 +19,7 @@ def describe_extracting_tasks():
         """
         ctx = ExtractionContext(False)
 
-        result = Task.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "file"
         assert result.args == {"path": "test.txt", "state": "present"}
@@ -41,7 +32,7 @@ def describe_extracting_tasks():
         """
         ctx = ExtractionContext(False)
 
-        result = Task.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "file"
         assert result.args == {"path": "test.txt", "state": "present"}
@@ -57,7 +48,7 @@ def describe_extracting_tasks():
         """
         ctx = ExtractionContext(False)
 
-        result = Task.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "file"
         assert result.args == {"path": "{{ file_path }}"}
@@ -72,7 +63,7 @@ def describe_extracting_tasks():
         """
         ctx = ExtractionContext(False)
 
-        result = Task.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "debug"
         assert result.args == {"msg": "{{ item }}"}
@@ -87,7 +78,7 @@ def describe_extracting_tasks():
         """
         ctx = ExtractionContext(False)
 
-        result = Task.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "debug"
         assert result.args == {"msg": "{{ item }}"}
@@ -104,7 +95,7 @@ def describe_extracting_tasks():
         """
         ctx = ExtractionContext(False)
 
-        result = Task.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "debug"
         assert result.args == {"msg": "{{ myvar }}"}
@@ -121,7 +112,7 @@ def describe_extracting_tasks():
         """
         ctx = ExtractionContext(False)
 
-        result = Task.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "debug"
         assert result.args == {"msg": "{{ myvar }}"}
@@ -134,7 +125,7 @@ def describe_extracting_tasks():
         """
         ctx = ExtractionContext(False)
 
-        result = Task.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "import_tasks"
         assert result.args == {"_raw_params": "tasks.yml"}
@@ -150,7 +141,7 @@ def describe_extracting_tasks():
         """
         ctx = ExtractionContext(False)
 
-        result = Task.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "debug"
         assert result.args == {"msg": "hello"}
@@ -165,7 +156,7 @@ def describe_extracting_tasks():
         """
         ctx = ExtractionContext(False)
 
-        result = Task.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "action_that_doesnt_exist"
         assert result.args == {"msg": "hello"}
@@ -179,56 +170,56 @@ def describe_extracting_tasks():
         """
         ctx = ExtractionContext(False)
 
-        result = Task.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "include_role"
         assert result.args == {"name": "testrole", "public": True}
 
     def rejects_tasks_with_invalid_attribute_values():
-        with pytest.raises(ValidationError):
-            yaml = """
-                name: test
-                file:
-                    path: test.txt
-                vars: 0
-            """
-            ctx = ExtractionContext(False)
+        yaml = """
+            name: test
+            file:
+                path: test.txt
+            vars: 0
+        """
+        ctx = ExtractionContext(False)
 
-            _ = Task.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        with pytest.raises(ValidationError):
+            _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def rejects_tasks_with_invalid_postvalidated_attribute_values():
-        with pytest.raises(ValidationError):
-            yaml = """
-                name: test
-                file:
-                    path: test.txt
-                loop_control: 0
-            """
-            ctx = ExtractionContext(False)
+        yaml = """
+            name: test
+            file:
+                path: test.txt
+            loop_control: 0
+        """
+        ctx = ExtractionContext(False)
 
-            _ = Task.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        with pytest.raises(ValidationError):
+            _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def rejects_tasks_with_no_action():
-        with pytest.raises(ValidationError):
-            yaml = """
-                name: test
-            """
-            ctx = ExtractionContext(False)
+        yaml = """
+            name: test
+        """
+        ctx = ExtractionContext(False)
 
-            _ = Task.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        with pytest.raises(ValidationError):
+            _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def rejects_tasks_with_multiple_actions():
-        with pytest.raises(ValidationError):
-            yaml = """
-                name: test
-                file:
-                    path: test.txt
-                apt:
-                    name: test.txt
-            """
-            ctx = ExtractionContext(False)
+        yaml = """
+            name: test
+            file:
+                path: test.txt
+            apt:
+                name: test.txt
+        """
+        ctx = ExtractionContext(False)
 
-            _ = Task.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        with pytest.raises(ValidationError):
+            _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
 
 def describe_extracting_handlers():
@@ -241,7 +232,7 @@ def describe_extracting_handlers():
         """
         ctx = ExtractionContext(False)
 
-        result = Handler.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        result = Handler.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result is not None
         assert result.action == "file"
@@ -260,7 +251,7 @@ def describe_extracting_handlers():
         """
         ctx = ExtractionContext(False)
 
-        result = Handler.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        result = Handler.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result is not None
         assert result.action == "file"
@@ -435,7 +426,7 @@ def describe_normalization():
         """
         ctx = ExtractionContext(False)
 
-        result = Task.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.when == ()
 
@@ -449,7 +440,7 @@ def describe_normalization():
         """
         ctx = ExtractionContext(False)
 
-        result = Task.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.check_mode is False
 
@@ -465,7 +456,7 @@ def describe_normalization():
         """
         ctx = ExtractionContext(False)
 
-        result = Task.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "file"
         assert result.become is True
@@ -488,7 +479,7 @@ def describe_normalization():
         """
         ctx = ExtractionContext(False)
 
-        result = Task.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "file"
         assert result.become is True
@@ -512,7 +503,7 @@ def describe_normalization():
         ctx = ExtractionContext(False)
 
         with pytest.raises(ValidationError, match="Invalid mix of directives"):
-            _ = Task.model_validate(_parse_yaml_dict(yaml), context=ctx)
+            _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def transforms_deprecated_with_keyword():
         yaml = """
@@ -525,7 +516,7 @@ def describe_normalization():
         """
         ctx = ExtractionContext(False)
 
-        result = Task.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "file"
         assert result.args == {"path": "{{ item }}"}
@@ -539,7 +530,7 @@ def describe_normalization():
         """
         ctx = ExtractionContext(False)
 
-        result = Task.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "include_tasks"
         assert result.args == {"_raw_params": "test.yml"}
@@ -551,7 +542,7 @@ def describe_normalization():
         """
         ctx = ExtractionContext(False)
 
-        result = Task.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "import_tasks"
         assert result.args == {"_raw_params": "test.yml"}
@@ -563,7 +554,7 @@ def describe_normalization():
         """
         ctx = ExtractionContext(False)
 
-        result = Task.model_validate(_parse_yaml_dict(yaml), context=ctx)
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "include_tasks"
         assert result.args == {"_raw_params": "test.yml"}

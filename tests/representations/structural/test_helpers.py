@@ -10,36 +10,36 @@ import pytest
 import scansible.representations.structural.helpers as h
 
 
-def describe_project_path() -> None:
-    def describe_ctor() -> None:
+def describe_project_path():
+    def describe_ctor():
         @pytest.mark.parametrize(
             "child_path",
             ["meta/main.yml", Path("meta/main.yml"), Path("meta/main.yml").absolute()],
         )
-        def should_support_various_types_of_child_paths(child_path: str | Path) -> None:
+        def should_support_various_types_of_child_paths(child_path: str | Path):
             pp = h.ProjectPath(Path().absolute(), child_path)
 
             assert pp.root == Path().absolute()
             assert pp.relative == Path("meta/main.yml")
             assert pp.absolute == Path("meta/main.yml").absolute()
 
-        def should_reject_relative_root_paths() -> None:
+        def should_reject_relative_root_paths():
             with pytest.raises(Exception):
-                h.ProjectPath(Path("."), "test.yml")
+                _ = h.ProjectPath(Path("."), "test.yml")
 
-    def describe_from_root() -> None:
-        def should_construct_correct_path() -> None:
+    def describe_from_root():
+        def should_construct_correct_path():
             pp = h.ProjectPath.from_root(Path().absolute())
 
             assert pp.root == Path().absolute()
             assert pp.absolute == Path().absolute()
             assert pp.relative == Path(".")
 
-    def describe_join() -> None:
+    def describe_join():
         @pytest.mark.parametrize(
             "child_path", ["main.yml", Path("main.yml"), Path("main.yml").absolute()]
         )
-        def should_support_various_types_of_child_paths(child_path: str | Path) -> None:
+        def should_support_various_types_of_child_paths(child_path: str | Path):
             rpp = h.ProjectPath.from_root(Path().absolute())
             pp = rpp.join(child_path)
 
@@ -47,7 +47,7 @@ def describe_project_path() -> None:
             assert pp.relative == Path("main.yml")
             assert pp.absolute == Path("main.yml").absolute()
 
-        def should_remember_root_path() -> None:
+        def should_remember_root_path():
             rpp = h.ProjectPath.from_root(Path().absolute())
             pp1 = rpp.join("meta")
             pp2 = pp1.join("main.yml")
@@ -56,13 +56,13 @@ def describe_project_path() -> None:
             assert pp2.relative == Path("meta/main.yml")
 
         @pytest.mark.xfail(reason="not implemented any longer")
-        def should_reject_child_with_different_parent() -> None:
+        def should_reject_child_with_different_parent():
+            rpp = h.ProjectPath.from_root(Path("meta").absolute())
             with pytest.raises(Exception):
-                rpp = h.ProjectPath.from_root(Path("meta").absolute())
-                rpp.join(Path("tasks/main.yml").absolute())
+                _ = rpp.join(Path("tasks/main.yml").absolute())
 
 
-def describe_parse_file() -> None:
+def describe_parse_file():
     @pytest.mark.parametrize(
         "yaml_content,expected",
         [
@@ -72,37 +72,37 @@ def describe_parse_file() -> None:
     )
     def should_parse_valid_yaml(
         tmp_path: Path, yaml_content: str, expected: object
-    ) -> None:
-        (tmp_path / "test.yml").write_text(yaml_content)
+    ):
+        _ = (tmp_path / "test.yml").write_text(yaml_content)
 
         result = h.parse_file(h.ProjectPath(tmp_path, "test.yml"))
 
         assert result == expected
 
-    def should_raise_on_invalid_yaml(tmp_path: Path) -> None:
-        (tmp_path / "test.yml").write_text("hello:\n-world")
+    def should_raise_on_invalid_yaml(tmp_path: Path):
+        _ = (tmp_path / "test.yml").write_text("hello:\n-world")
 
         with pytest.raises(Exception):
-            h.parse_file(h.ProjectPath(tmp_path, "test.yml"))
+            _ = h.parse_file(h.ProjectPath(tmp_path, "test.yml"))
 
 
-def describe_find_file() -> None:
+def describe_find_file():
     @pytest.mark.parametrize("ext", ["yml", "yaml", "json"])
-    def should_find_valid_files(tmp_path: Path, ext: str) -> None:
+    def should_find_valid_files(tmp_path: Path, ext: str):
         (tmp_path / f"test.{ext}").touch()
 
         result = h.find_file(h.ProjectPath.from_root(tmp_path), "test")
 
         assert result and result.relative == Path(f"test.{ext}")
 
-    def should_not_find_files_that_dont_exist(tmp_path: Path) -> None:
+    def should_not_find_files_that_dont_exist(tmp_path: Path):
         result = h.find_file(h.ProjectPath.from_root(tmp_path), "test")
 
         assert result is None
 
 
-def describe_find_all_files() -> None:
-    def should_find_all_files(tmp_path: Path) -> None:
+def describe_find_all_files():
+    def should_find_all_files(tmp_path: Path):
         (tmp_path / "test.yml").touch()
         (tmp_path / "main.yml").touch()
         rp = h.ProjectPath.from_root(tmp_path)
@@ -114,7 +114,7 @@ def describe_find_all_files() -> None:
             rp.absolute / "main.yml",
         }
 
-    def should_find_files_in_nested_dirs(tmp_path: Path) -> None:
+    def should_find_files_in_nested_dirs(tmp_path: Path):
         (tmp_path / "test.yml").touch()
         (tmp_path / "tasks").mkdir()
         (tmp_path / "tasks" / "main.yml").touch()
@@ -127,7 +127,7 @@ def describe_find_all_files() -> None:
             rp.absolute / "tasks" / "main.yml",
         }
 
-    def should_ignore_files_with_unknown_extensions(tmp_path: Path) -> None:
+    def should_ignore_files_with_unknown_extensions(tmp_path: Path):
         (tmp_path / "test.txt").touch()
         rp = h.ProjectPath.from_root(tmp_path)
 
@@ -136,20 +136,20 @@ def describe_find_all_files() -> None:
         assert not result
 
 
-def describe_capture_output() -> None:
-    def should_capture_output_to_stdout() -> None:
+def describe_capture_output():
+    def should_capture_output_to_stdout():
         with h.capture_output() as out:
             print("hello world")
 
         assert out.getvalue() == "hello world\n"
 
-    def should_capture_output_to_stderr() -> None:
+    def should_capture_output_to_stderr():
         with h.capture_output() as out:
             print("hello world", file=sys.stderr)
 
         assert out.getvalue() == "hello world\n"
 
-    def should_capture_output_to_stdout_and_stderr() -> None:
+    def should_capture_output_to_stdout_and_stderr():
         with h.capture_output() as out:
             print("hello", file=sys.stderr)
             print("world")

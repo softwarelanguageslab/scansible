@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import pytest
+from graph_matchers import (  # pyright: ignore[reportImplicitRelativeImport]
+    assert_graphs_match,
+    create_graph,
+)
 
 from scansible.representations.pdg import (
     DEF,
@@ -15,7 +19,6 @@ from scansible.representations.pdg import (
     Task,
     Variable,
 )
-from test_utils.graph_matchers import assert_graphs_match, create_graph
 
 
 def describe_assert_graphs_match() -> None:

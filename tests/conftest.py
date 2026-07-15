@@ -5,10 +5,10 @@ from typing import Any
 import sys
 
 import pytest
+from graph_matchers import create_graph  # pyright: ignore[reportImplicitRelativeImport]
 from loguru import logger
 
 from scansible.representations.pdg import Graph
-from test_utils.graph_matchers import create_graph
 
 logger.remove()
 logger.add(sys.stderr, format="{level} {message}", level="DEBUG")

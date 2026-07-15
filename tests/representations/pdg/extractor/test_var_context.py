@@ -7,6 +7,10 @@ from typing import Callable
 from pathlib import Path
 
 import pytest
+from graph_matchers import (  # pyright: ignore[reportImplicitRelativeImport]
+    assert_graphs_match,
+    create_graph,
+)
 from pytest_mock import MockerFixture
 
 from scansible.representations.pdg import (
@@ -23,7 +27,6 @@ from scansible.representations.pdg.extractor.expressions import (
     EnvironmentType,
     VarContext,
 )
-from test_utils.graph_matchers import assert_graphs_match, create_graph
 
 ContextCreator = Callable[[], tuple[VarContext, Graph]]
 
