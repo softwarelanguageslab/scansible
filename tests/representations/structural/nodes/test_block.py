@@ -77,6 +77,25 @@ def describe_extracting_blocks():
         assert isinstance(result.block[1].block[0], Task)
         assert result.block[1].block[0].name == "test"
 
+    def extracts_block_directives():
+        yaml = """
+            block:
+              - name: test
+                file: {}
+            when: some_condition
+            notify: a handler
+            delegate_to: otherhost
+            delegate_facts: yes
+        """
+        ctx = ExtractionContext(False)
+
+        result = Block.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+        assert result.when == ["some_condition"]
+        assert result.notify == ["a handler"]
+        assert result.delegate_to == "otherhost"
+        assert result.delegate_facts is True
+
     def does_not_eagerly_load_import_tasks():
         yaml = """
             block:

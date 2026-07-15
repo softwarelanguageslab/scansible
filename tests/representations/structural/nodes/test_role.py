@@ -104,6 +104,28 @@ def describe_extracting_roles():
         assert len(ctx.broken_files) == 1
         assert ctx.broken_files[0].path == Path("tasks/main.yml")
 
+    def extracts_roles_with_broken_meta_file(tmp_path: Path):
+        broken_meta = """
+            galaxy_info:
+                - test
+                - test2
+        """
+        for dirname in ("meta", "tasks", "vars", "defaults", "handlers"):
+            (tmp_path / dirname).mkdir()
+        _ = (tmp_path / "meta" / "main.yml").write_text(dedent(broken_meta))
+        _ = (tmp_path / "tasks" / "main.yml").write_text(TASKS)
+        _ = (tmp_path / "defaults" / "main.yml").write_text(DEFAULTS)
+        ctx = ExtractionContext(lenient=False)
+
+        result = Role.load(ProjectPath.from_root(tmp_path), ctx)
+
+        assert result.path == Path(".")
+        assert result.meta_file is None
+        assert len(result.task_files) == 1
+        assert len(result.default_var_files) == 1
+        assert len(ctx.broken_files) == 1
+        assert ctx.broken_files[0].path == Path("meta/main.yml")
+
     def extracts_roles_with_non_main_files(tmp_path: Path):
         tasks_1 = """
             - file:

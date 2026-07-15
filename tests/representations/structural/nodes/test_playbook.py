@@ -7,6 +7,7 @@ from textwrap import dedent
 
 import pytest
 from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImport]
+from pydantic import ValidationError
 
 from scansible.representations.structural import (
     Block,
@@ -105,6 +106,162 @@ def describe_extracting_plays():
 
         with pytest.raises(Exception):
             _ = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+    def rejects_play_with_empty_hosts():
+        yaml = """
+            name: test play
+            hosts: []
+            tasks:
+                - import_tasks: hello
+        """
+        ctx = ExtractionContext(False)
+
+        with pytest.raises(ValidationError, match="cannot be empty"):
+            _ = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+    def extracts_play_with_vars_prompt():
+        yaml = """
+            name: test play
+            hosts: servers
+            vars_prompt:
+              - name: my_var
+                prompt: Enter a value
+                default: hello
+            tasks:
+              - import_tasks: test
+        """
+        ctx = ExtractionContext(False)
+
+        result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+        assert len(result.vars_prompt) == 1
+        assert result.vars_prompt[0].name == "my_var"
+        assert result.vars_prompt[0].prompt == "Enter a value"
+        assert result.vars_prompt[0].default == "hello"
+
+    @pytest.mark.parametrize(
+        ["vars_files_value", "expected"],
+        [
+            pytest.param("a.yml", [["a.yml"]], id="bare string"),
+            pytest.param(["a.yml", "b.yml"], [["a.yml"], ["b.yml"]], id="flat list"),
+            pytest.param([["a.yml", "b.yml"]], [["a.yml", "b.yml"]], id="nested list"),
+        ],
+    )
+    def normalizes_vars_files(vars_files_value: object, expected: list[list[str]]):
+        ctx = ExtractionContext(False)
+
+        result = Play.model_validate(
+            {
+                "name": "test play",
+                "hosts": "servers",
+                "tasks": [{"import_tasks": "test"}],
+                "vars_files": vars_files_value,
+            },
+            context=ctx,
+        )
+
+        assert result.vars_files == expected
+
+    def extracts_play_with_pre_and_post_tasks():
+        yaml = """
+            name: test play
+            hosts: servers
+            pre_tasks:
+              - import_tasks: pre
+            tasks:
+              - import_tasks: test
+            post_tasks:
+              - import_tasks: post
+            handlers:
+              - name: restart x
+                service:
+                    name: test
+        """
+        ctx = ExtractionContext(False)
+
+        result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+        assert len(result.pre_tasks) == 1
+        assert len(result.post_tasks) == 1
+        assert len(result.handlers) == 1
+
+    def ignores_removed_accelerate_directive():
+        yaml = """
+            name: test play
+            hosts: servers
+            accelerate: yes
+            tasks:
+              - import_tasks: test
+        """
+        ctx = ExtractionContext(False)
+
+        result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+        assert result.hosts == ["servers"]
+
+    def extracts_play_with_int_role():
+        yaml = """
+            name: test play
+            hosts: servers
+            roles:
+              - 123
+            tasks:
+              - import_tasks: test
+        """
+        ctx = ExtractionContext(False)
+
+        result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+        assert len(result.roles) == 1
+        assert result.roles[0].role == "123"
+
+    def normalizes_single_gather_subset():
+        yaml = """
+            name: test play
+            hosts: servers
+            gather_subset: network
+            tasks:
+              - import_tasks: test
+        """
+        ctx = ExtractionContext(False)
+
+        result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+        assert result.gather_subset == ["network"]
+
+    def normalizes_single_serial_value():
+        yaml = """
+            name: test play
+            hosts: servers
+            serial: 1
+            tasks:
+              - import_tasks: test
+        """
+        ctx = ExtractionContext(False)
+
+        result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+        assert result.serial == [1]
+
+    def normalizes_single_vars_prompt():
+        yaml = """
+            name: test play
+            hosts: servers
+            vars_prompt:
+                name: my_var
+                prompt: Enter a value
+                default: hello
+            tasks:
+              - import_tasks: test
+        """
+        ctx = ExtractionContext(False)
+
+        result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+        assert len(result.vars_prompt) == 1
+        assert result.vars_prompt[0].name == "my_var"
+        assert result.vars_prompt[0].prompt == "Enter a value"
+        assert result.vars_prompt[0].default == "hello"
 
 
 def describe_extracting_playbook():

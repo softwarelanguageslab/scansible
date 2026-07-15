@@ -72,7 +72,7 @@ class Play(ASTNode, CommonDirectives, frozen=True):
     gather_facts: bool | str | None = None
 
     #: Subset of facts to gather from remote hosts.
-    gather_subset: Sequence[str] | None = None
+    gather_subset: Annotated[Sequence[str], Listify] = Field(default_factory=tuple)
     #: Timeout for fact gathering.
     gather_timeout: str | int | None = None
     #: Fact path option for fact gathering.
@@ -84,7 +84,7 @@ class Play(ASTNode, CommonDirectives, frozen=True):
     )
     #: List of variables to prompt user for. List of mappings, `name` key
     #: contains variable name.
-    vars_prompt: Sequence[VarsPrompt] = Field(default_factory=tuple)
+    vars_prompt: Annotated[Sequence[VarsPrompt], Listify] = Field(default_factory=tuple)
 
     #: List of roles to be imported into play.
     roles: Sequence[PlayRoleRequirement] = Field(default_factory=tuple)
@@ -101,7 +101,7 @@ class Play(ASTNode, CommonDirectives, frozen=True):
     #: Maximum percentage of hosts that are allowed to fail before aborting play.
     max_fail_percentage: int | str | float | None = None
     #: Define how Ansible batches execution on hosts.
-    serial: Sequence[str | int] = Field(default_factory=tuple)
+    serial: Annotated[Sequence[str | int], Listify] = Field(default_factory=tuple)
     #: Execution strategy related to parallel host execution.
     strategy: str | None = None
     #: How hosts should be sorted in execution order.

@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import cast
+from typing import Annotated, cast
 
 from collections.abc import Mapping, Sequence
 
@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field, model_validator
 from scansible.types import AnyValue
 from scansible.utils import FrozenDict
 
+from .._normalizers import Listify
 from .._validators import Identifier
 from ..common import RawDirectives
 
@@ -34,10 +35,14 @@ class CommonDirectives(BaseModel, frozen=True):
     vars: Mapping[Identifier, AnyValue] = Field(default_factory=FrozenDict)
 
     #: Specify default arguments to modules in this entity.
-    module_defaults: Sequence[Mapping[str, Mapping[str, AnyValue]]] | None = None
+    module_defaults: Annotated[
+        Sequence[Mapping[str, Mapping[str, AnyValue]]], Listify
+    ] = Field(default_factory=tuple)
 
     #: Dictionary converted into environment variables.
-    environment: Sequence[Mapping[str, str] | str] | None = None
+    environment: Annotated[Sequence[Mapping[str, str] | str], Listify] = Field(
+        default_factory=tuple
+    )
     #: To disable logging of action.
     no_log: bool | str | None = None
     #: Run on a single host only.
@@ -72,9 +77,9 @@ class CommonDirectives(BaseModel, frozen=True):
     become_exe: str | None = None
 
     #: Tags on the entity.
-    tags: Sequence[str | int] = Field(default_factory=tuple)
+    tags: Annotated[Sequence[str | int], Listify] = Field(default_factory=tuple)
     #: List of collections to search for modules in this entity.
-    collections: Sequence[str] = Field(default_factory=tuple)
+    collections: Annotated[Sequence[str], Listify] = Field(default_factory=tuple)
 
     @model_validator(mode="before")
     @classmethod

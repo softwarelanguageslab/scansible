@@ -104,6 +104,33 @@ def describe_extracting_tasks():
         assert result.loop_control is not None
         assert result.loop_control.loop_var == "myvar"
 
+    def extracts_task_with_full_loop_control():
+        yaml = """
+            name: test
+            debug: msg={{ myvar }}
+            loop: [hello, world]
+            loop_control:
+                loop_var: myvar
+                index_var: myidx
+                label: "{{ myvar }}"
+                pause: 2
+                extended: yes
+                extended_allitems: no
+                break_when: "{{ myvar == 'world' }}"
+        """
+        ctx = ExtractionContext(False)
+
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+        assert result.loop_control is not None
+        assert result.loop_control.loop_var == "myvar"
+        assert result.loop_control.index_var == "myidx"
+        assert result.loop_control.label == "{{ myvar }}"
+        assert result.loop_control.pause == 2
+        assert result.loop_control.extended is True
+        assert result.loop_control.extended_allitems is False
+        assert result.loop_control.break_when == ["{{ myvar == 'world' }}"]
+
     def extracts_task_with_literal_boolean_when():
         yaml = """
             name: test
@@ -558,3 +585,104 @@ def describe_normalization():
 
         assert result.action == "include_tasks"
         assert result.args == {"_raw_params": "test.yml"}
+
+
+def describe_validation():
+    def rejects_import_playbook_action():
+        yaml = """
+            import_playbook: site.yml
+        """
+        ctx = ExtractionContext(False)
+
+        with pytest.raises(ValidationError):
+            _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+    def rejects_include_tasks_marked_static():
+        yaml = """
+            include_tasks: test.yml
+            static: yes
+        """
+        ctx = ExtractionContext(False)
+
+        with pytest.raises(ValidationError, match="include_tasks with static: yes"):
+            _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+    def rejects_import_tasks_marked_nonstatic():
+        yaml = """
+            import_tasks: test.yml
+            static: no
+        """
+        ctx = ExtractionContext(False)
+
+        with pytest.raises(ValidationError, match="import_tasks with static: no"):
+            _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+    def rejects_duplicate_loop_statements():
+        yaml = """
+            file:
+            loop: [hello, world]
+            with_items: [hello, world]
+        """
+        ctx = ExtractionContext(False)
+
+        with pytest.raises(ValidationError, match="duplicate loop statements"):
+            _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+    def rejects_unsupported_directive_on_include_tasks():
+        yaml = """
+            include_tasks: test.yml
+            become: yes
+        """
+        ctx = ExtractionContext(False)
+
+        with pytest.raises(ValidationError, match="Unsupported directives"):
+            _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+
+def describe_common_directives():
+    def normalizes_single_tag():
+        yaml = """
+            file: {}
+            tags: web
+        """
+        ctx = ExtractionContext(False)
+
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+        assert result.tags == ["web"]
+
+    def normalizes_single_collection():
+        yaml = """
+            file: {}
+            collections: community.general
+        """
+        ctx = ExtractionContext(False)
+
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+        assert result.collections == ["community.general"]
+
+    def normalizes_single_module_defaults_entry():
+        yaml = """
+            file: {}
+            module_defaults:
+                file:
+                    mode: "0644"
+        """
+        ctx = ExtractionContext(False)
+
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+        assert result.module_defaults == [{"file": {"mode": "0644"}}]
+
+    def normalizes_single_environment_entry():
+        yaml = """
+            file: {}
+            environment:
+                PATH: /custom/bin
+        """
+        ctx = ExtractionContext(False)
+
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+        assert result.environment == [{"PATH": "/custom/bin"}]

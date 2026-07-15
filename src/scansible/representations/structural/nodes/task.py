@@ -62,7 +62,7 @@ class LoopControl(ASTNode, frozen=True):
     #: Whether to include `allitems` in the extended version.
     extended_allitems: str | bool | None = True
     #: Conditions when to break the loop.
-    break_when: Sequence[str] | None = Field(default_factory=tuple)
+    break_when: Annotated[Sequence[str], Listify] = Field(default_factory=tuple)
 
 
 class BaseTask(ASTNode, CommonDirectives, frozen=True):
@@ -119,7 +119,7 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
     #: Loop control defined on the task.
     loop_control: LoopControl | None = None
     #: List of handler names of handlers to notify.
-    notify: Sequence[str] | None = None
+    notify: Annotated[Sequence[str], Listify] = Field(default_factory=tuple)
     #: Polling interval for async tasks.
     poll: str | int | None = None
     #: Value given to the register keyword, i.e. variable name that will store
@@ -405,7 +405,7 @@ class Block(ASTNode, CommonDirectives, frozen=True):
     always: Sequence[TaskOrBlock] = Field(default_factory=tuple)
 
     #: List of handler names of handlers to notify.
-    notify: Sequence[str] | None = None
+    notify: Annotated[Sequence[str], Listify] = Field(default_factory=tuple)
     #: Delegate block execution to another host.
     delegate_to: str | None = None
     #: Apply facts to delegated host.
