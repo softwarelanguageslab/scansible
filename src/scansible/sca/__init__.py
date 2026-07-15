@@ -20,10 +20,6 @@ from scansible.representations.ast import (
     Position,
     TaskFile,
 )
-from scansible.representations.ast.extractor import (
-    extract_playbook_file,
-    extract_tasks_file,
-)
 from scansible.representations.ast.helpers import ProjectPath
 from scansible.representations.pdg.extractor.main import extract_pdg
 from scansible.sca.constants import (
@@ -321,10 +317,10 @@ def flatten_tasks(ts: Sequence[Task | Block]) -> Iterable[Task]:
 def try_extract_pb_or_tasks_file(f: Path) -> Playbook | TaskFile | None:
     ctx = ExtractionContext(False)
     try:
-        return extract_tasks_file(ProjectPath.from_root(f), ctx)
+        return TaskFile.load(ProjectPath.from_root(f), ctx)
     except:
         try:
-            return extract_playbook_file(ProjectPath.from_root(f), ctx)
+            return Playbook.load(ProjectPath.from_root(f), ctx)
         except:
             return None
 

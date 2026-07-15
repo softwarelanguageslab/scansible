@@ -61,18 +61,6 @@ wheels = [
 ]
 
 [[package]]
-name = "attrs-strict"
-version = "1.0.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "attrs" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/9a/11/f753d21da36bc7218930d423f10c284530e316058ffbe9e1691651ce7b25/attrs_strict-1.0.0.tar.gz", hash = "sha256:6326c1e51c4fd2fffc9dd607dec06c31add64eedbd37a651ea88f663a37c3f18", size = 25097, upload-time = "2021-12-28T23:10:04.426Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f6/83/e055b3b99fb8e29c95659d6b637d004b7b562f9b4d0c27f02a85f8e8c427/attrs_strict-1.0.0-py3-none-any.whl", hash = "sha256:c7a4d9e4521d6706906ea96204f05b95acd45c3f0fc0130837f0a33bc9678c0f", size = 14098, upload-time = "2021-12-28T23:10:02.878Z" },
-]
-
-[[package]]
 name = "basedpyright"
 version = "1.39.9"
 source = { registry = "https://pypi.org/simple" }
@@ -593,8 +581,6 @@ source = { editable = "." }
 dependencies = [
     { name = "ansible" },
     { name = "ansible-core" },
-    { name = "attrs" },
-    { name = "attrs-strict" },
     { name = "click" },
     { name = "graphviz" },
     { name = "icontract" },
@@ -627,8 +613,6 @@ dev = [
 requires-dist = [
     { name = "ansible" },
     { name = "ansible-core", specifier = "<3" },
-    { name = "attrs", specifier = ">=22.1.0,<23" },
-    { name = "attrs-strict", specifier = ">=1.0.0,<2" },
     { name = "click", specifier = ">=8.1.3,<9" },
     { name = "graphviz", specifier = ">=0.20.1,<0.21" },
     { name = "icontract", specifier = ">=2.7.3" },

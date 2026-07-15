@@ -13,12 +13,6 @@ from pathlib import Path
 from ansible.parsing.dataloader import DataLoader
 
 
-class FatalError(Exception):
-    """Fatal error to stop all extraction."""
-
-    pass
-
-
 class ProjectPath:
     """Represents a path in a project.
 

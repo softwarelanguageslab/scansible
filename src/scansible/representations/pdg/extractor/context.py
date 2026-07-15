@@ -133,7 +133,7 @@ class IncludeContext:
         struct_ctx = ast.ExtractionContext(lenient=self.lenient)
         try:
             with capture_output() as output:
-                task_file = ast_extractor.extract_tasks_file(real_path, struct_ctx)
+                task_file = ast.TaskFile.load(real_path, struct_ctx)
             if logged_output := output.getvalue():
                 logger.warning(logged_output)
         except Exception as e:
@@ -200,7 +200,7 @@ class IncludeContext:
 
         try:
             with capture_output() as output:
-                var_file = ast_extractor.extract_variable_file(
+                var_file = ast.VariableFile.load(
                     real_path, ast.ExtractionContext(lenient=self.lenient)
                 )
             if logged_output := output.getvalue():
