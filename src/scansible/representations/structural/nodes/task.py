@@ -1,0 +1,448 @@
+# pyright: reportUnknownVariableType = false
+
+from __future__ import annotations
+
+from typing import Annotated, ClassVar, Literal, Self, cast, override
+
+from collections.abc import Mapping, Sequence
+
+from ansible.parsing.splitter import parse_kv, split_args
+from ansible.utils.fqcn import add_internal_fqcns
+from pydantic import Discriminator, Field, Tag, field_validator, model_validator
+
+from scansible.types import AnyValue, ScalarValue
+from scansible.utils import actions
+
+from .._normalizers import Lenient, Listify, NormalizeNone
+from .._validators import Identifier
+from ..common import ExtractionContext, RawDirectives
+from ..helpers import ProjectPath, parse_file
+from .base import ASTFile, ASTNode
+from .directives import CommonDirectives
+
+# Adapted from ansible.constants
+FREEFORM_ACTIONS_SIMPLE = (
+    "command",
+    "raw",
+    "script",
+    "shell",
+    "win_command",
+    "win_shell",
+)
+FREEFORM_ACTIONS = frozenset(
+    tuple(add_internal_fqcns(FREEFORM_ACTIONS_SIMPLE))
+    + ("ansible.windows.win_command", "ansible.windows.win_shell")
+)
+
+
+class LoopControl(ASTNode, frozen=True):
+    """Represents the loop control directive value."""
+
+    #: The loop variable name. `item` by default.
+    loop_var: Identifier = "item"
+    #: The index variable name.
+    index_var: Identifier | None = None
+    #: Loop label in output. Should technically be a string only, but Ansible
+    #: doesn't complain about dicts and just templates and stringifies those.
+    label: AnyValue = None
+    #: Amount of time in seconds to pause between each iteration. Can be a
+    #: string in case this is an expression. 0 by default.
+    pause: str | int | float = 0.0
+    #: Whether to include more information in the loop items.
+    #: See https://docs.ansible.com/ansible/latest/user_guide/playbooks_loops.html#extended-loop-variables
+    extended: str | bool | None = None
+    #: Whether to include `allitems` in the extended version.
+    extended_allitems: str | bool | None = True
+    #: Conditions when to break the loop
+    break_when: Sequence[str] | None = Field(default_factory=tuple)
+
+
+class BaseTask(ASTNode, CommonDirectives, frozen=True):
+    """Represents commonalities for Ansible tasks."""
+
+    VALID_INCLUDE_DIRECTIVES: ClassVar[frozenset[str]] = frozenset(
+        (
+            "action",
+            "args",
+            "collections",
+            "debugger",
+            "ignore_errors",
+            "loop",
+            "loop_control",
+            "loop_with",
+            "name",
+            "no_log",
+            "register",
+            "run_once",
+            "tags",
+            "timeout",
+            "vars",
+            "when",
+        )
+    )
+
+    #: Action of the task.
+    action: str
+    #: Arguments to the action.
+    args: Mapping[str, AnyValue]
+
+    #: Run task asynchronously for at most the given number of seconds.
+    async_val: str | int | None = 0
+    #: Conditional expression(s) to override "changed" status.
+    changed_when: Annotated[Sequence[str | bool], Listify] = Field(
+        default_factory=tuple
+    )
+    #: Number of seconds to delay between retries.
+    delay: str | float | int | None = 5.0
+    #: Delegate task execution to another host.
+    delegate_to: str | None = None
+    #: Apply facts to delegated host.
+    delegate_facts: str | bool | None = None
+    #: Conditional expression(s) to override the "failed" status.
+    failed_when: Annotated[Sequence[str | bool], Listify] = Field(default_factory=tuple)
+    #: Loop on the task, or None if no loop. Can be a string (an expression),
+    #: a list of arbitrary values, or, when the loop comes from `with_dict`, a
+    #: dict of arbitrary items.
+    loop: str | Sequence[AnyValue] | Mapping[ScalarValue, AnyValue] | None = None
+    #: The type of loop used in old looping syntax (`with_*`), e.g.
+    #: `with_items` -> `items`.
+    loop_with: str | None = None
+    #: Loop control defined on the task.
+    loop_control: LoopControl | None = None
+    #: List of handler names of handlers to notify.
+    notify: Sequence[str] | None = None
+    #: Polling interval for async tasks.
+    poll: str | int | None = None
+    #: Value given to the register keyword, i.e. variable name that will store
+    #: the result of this action. Renamed due to naming conflicts with base classes.
+    # FIXME: Distinguish between expr and identifier.
+    register_var: Identifier | str | None = Field(default=None, alias="register")
+    #: Number of tries for failed tasks.
+    retries: str | int | None = None
+    #: Retry task until condition(s) are satisfied.
+    until: Annotated[Sequence[str | bool], Listify] = Field(default_factory=tuple)
+    #: Condition on the task, or None if no condition.
+    when: Annotated[Sequence[str | bool], NormalizeNone, Listify] = Field(
+        default_factory=tuple
+    )
+
+    @field_validator("action", mode="after")
+    @classmethod
+    def _reject_import_playbook(cls, action: str) -> str:
+        """Reject import_playbook actions that are not top-level in a playbook."""
+        # This AST node only gets constructed for tasks in task lists, so an
+        # import_playbook is illegal here.
+        if actions.is_import_playbook(action):
+            raise ValueError(
+                "import_playbook is only allowed as a top-level playbook task"
+            )
+        return action
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_task(cls, value: object) -> object:
+        """Perform normalization of task directives."""
+        if not isinstance(value, dict):
+            return value
+
+        value = cast(RawDirectives, value.copy())
+        value = cls._normalize_common_directives(value)
+        value = cls._parse_task_action(value)
+        value = cls._transform_includes(value)
+        value = cls._transform_loop(value)
+        value = cls._validate_include_directives(value)
+
+        return value
+
+    @classmethod
+    def _parse_task_action(cls, ds: RawDirectives) -> RawDirectives:
+        """Parse module action from a task.
+
+        After successful invocation, the result is guaranteed to contain an `action` key.
+        Parsing logic mirrors Ansible's own logic as specified in ModuleArgsParser.
+        """
+        if "action" in ds and "local_action" in ds:
+            raise ValueError("action and local_action are mutually exclusive")
+
+        # We distinguish between two styles:
+        # - Old style: Using `action: xyz` or `local_action: xyz`
+        # - New style: Using `xyz: args`
+        old_style = True
+        if "local_action" in ds:
+            ds["action"] = ds.pop("local_action")
+            # This unconditionally overrides any other delegation set.
+            ds["delegate_to"] = "localhost"
+
+        # Find action from unrecognized directives
+        for k in list(ds.keys()):
+            if cls._is_task_directive(k):
+                continue
+            if "action" in ds:
+                raise ValueError(
+                    f"Conflicting action statements: {k} vs {ds['action']}"
+                )
+            old_style = False
+            ds["action"] = k
+
+        if "action" not in ds:
+            raise ValueError("No action found in task")
+
+        # Parse the arguments, depending on whether they're old style or new style.
+        if old_style:
+            ds = cls._parse_old_style_module_arguments(ds)
+        else:
+            ds = cls._parse_new_style_module_arguments(ds)
+
+        return ds
+
+    @classmethod
+    def _parse_old_style_module_arguments(cls, ds: RawDirectives) -> RawDirectives:
+        """Parse arguments from an old-style task variant.
+
+        - action: shell echo hi
+        - action: copy src=a dest=b
+        - action:
+            module: copy
+            args:
+              src: a
+              dest: b
+        - action:
+            module: copy
+            src: a
+            dest: b
+        """
+        # args have lower priority than specially-parsed arguments on the action.
+        # Add from lowest to highest priority, will be combined at the end.
+        arg_list: list[AnyValue] = [cls._parse_task_level_args(ds)]
+        action = ds.pop("action")
+
+        if isinstance(action, dict):
+            # action is like { module: "xyz", a: b, ... }
+            if "module" not in action:
+                raise ValueError("No action detected in old-style task")
+            args = action
+            action = args.pop("module")
+            arg_list.append(args)
+            if "args" in args:
+                # { module: "xyz", args: { ... }}
+                arg_list.append(args.pop("args"))
+
+        if not isinstance(action, str):
+            raise ValueError("Expected action to be a string")
+
+        # action is now for sure like "xyz" or "xyz a=b c=d"
+        assert isinstance(action, str)
+        [action, *action_args] = split_args(action)
+        ds["action"] = action
+        arg_list.append(" ".join(action_args))
+
+        ds["args"] = cls._combine_args(action, *arg_list)
+
+        return ds
+
+    @classmethod
+    def _parse_new_style_module_arguments(cls, ds: RawDirectives) -> RawDirectives:
+        """Parse arguments from a new-style task variant.
+
+        - shell: echo hi
+        - shell: echo hi
+          args:
+            chdir: /
+        - copy:
+            src: a
+            dest: b
+        - copy: src=a dest=b
+        """
+        # args have lower priority than specially-parsed arguments on the action
+        task_args = cls._parse_task_level_args(ds)
+        action = cast(str, ds["action"])
+        action_args = ds.pop(action)
+
+        ds["args"] = cls._combine_args(action, task_args, action_args)
+
+        return ds
+
+    @classmethod
+    def _parse_args(cls, action: str, args: str) -> Mapping[ScalarValue, AnyValue]:
+        check_raw = action in FREEFORM_ACTIONS
+        return parse_kv(args, check_raw)  # pyright: ignore[reportReturnType]
+
+    @classmethod
+    def _parse_task_level_args(
+        cls, ds: RawDirectives
+    ) -> Mapping[ScalarValue, AnyValue]:
+        task_args = ds.pop("args", {})
+        if isinstance(task_args, str):
+            task_args = {"_variable_params": task_args}
+        return task_args  # pyright: ignore[reportReturnType]
+
+    @classmethod
+    def _combine_args(cls, action: str, *arg_list: AnyValue) -> AnyValue:
+        combined_args = {}
+        for args in arg_list:
+            if isinstance(args, str):
+                args = cls._parse_args(action, args)
+            if args is None:
+                args = {}
+            if not isinstance(args, dict):
+                raise ValueError("Expected args to be a dictionary")
+            combined_args.update(args)  # pyright: ignore[reportUnknownMemberType]
+
+        return combined_args
+
+    @classmethod
+    def _is_task_directive(cls, key: str) -> bool:
+        return (
+            key in cls.model_fields
+            or key == "static"
+            or key == "register"  # Aliased in model_fields
+            or key.startswith("with_")
+        )
+
+    @classmethod
+    def _transform_includes(cls, ds: RawDirectives) -> RawDirectives:
+        """Transform bare `include` actions and the `static` directive."""
+        if "static" in ds:
+            is_static = bool(ds.pop("static"))
+        else:
+            is_static = None
+
+        action = ds["action"]
+        assert isinstance(action, str)
+
+        if actions.is_bare_include(action):
+            # FIXME: If static is not explicitly set, Ansible will attempt to
+            # figure out whether the inclusion is static or dynamic based on
+            # context and based on whether the file exists, and fall back to
+            # dynamic inclusion if that fails. This may lead to slightly different
+            # semantics than our approximation here.
+            ds["action"] = "import_tasks" if is_static else "include_tasks"
+        elif actions.is_include_tasks(action) and is_static is True:
+            raise ValueError("include_tasks with static: yes")
+        elif actions.is_import_tasks(action) and is_static is False:
+            raise ValueError("import_tasks with static: no")
+
+        return ds
+
+    @classmethod
+    def _transform_loop(cls, ds: RawDirectives) -> RawDirectives:
+        for k in set(ds):
+            if not k.startswith("with_"):
+                continue
+            loop_name = k.removeprefix("with_")
+            if "loop" in ds or "loop_with" in ds:
+                raise ValueError("duplicate loop statements")
+            ds["loop"] = ds.pop(k)
+            ds["loop_with"] = loop_name
+
+        return ds
+
+    @classmethod
+    def _validate_include_directives(cls, value: RawDirectives) -> RawDirectives:
+        """Validate that include_* actions only include valid keywords."""
+        action = cast(str, value["action"])
+        if actions.is_include_tasks(action) or actions.is_include_role(action):
+            diff = value.keys() - cls.VALID_INCLUDE_DIRECTIVES
+            if diff:
+                raise ValueError(
+                    f"Unsupported directives for {value['action']} tasks: {', '.join(diff)}"
+                )
+        return value
+
+
+class Task(BaseTask, frozen=True):
+    """Represents an Ansible task."""
+
+
+class Handler(BaseTask, frozen=True):
+    """Represents an Ansible handler, a special type of task."""
+
+    VALID_INCLUDE_DIRECTIVES: ClassVar[frozenset[str]] = (
+        BaseTask.VALID_INCLUDE_DIRECTIVES | {"listen"}
+    )
+
+    #: Topics on which the handler listens
+    listen: Annotated[Sequence[str], Listify] = Field(default_factory=tuple)
+
+
+class Block(ASTNode, CommonDirectives, frozen=True):
+    """Represents an Ansible block of tasks."""
+
+    # TODO: Verify whether handlers can occur in blocks and whether there should be a separate handler block.
+
+    #: The block's main task list.
+    block: Sequence[TaskOrBlock]
+    #: List of tasks in the block's rescue section, i.e. the tasks that will
+    #: execute when an exception occurs.
+    rescue: Sequence[TaskOrBlock] = Field(default_factory=tuple)
+    #: List of tasks in the block's always section, like a try-catch's `finally`
+    #: handler.
+    always: Sequence[TaskOrBlock] = Field(default_factory=tuple)
+
+    #: List of handler names of handlers to notify.
+    notify: Sequence[str] | None = None
+    #: Delegate block execution to another host.
+    delegate_to: str | None = None
+    #: Apply facts to delegated host.
+    delegate_facts: str | bool | None = None
+
+    #: Condition on the block, or None if no condition.
+    when: Annotated[Sequence[str | bool], Listify] = Field(default_factory=tuple)
+
+    @model_validator(mode="after")
+    def _validate_task_lists(self) -> Self:
+        """Validate that rescue and always are not used in empty blocks."""
+        if (self.rescue or self.always) and not self.block:
+            raise ValueError("`rescue` and `always` cannot be used in empty blocks")
+        return self
+
+
+def _distinguish_task_vs_block(obj: object) -> Literal["task", "block"] | None:
+    if isinstance(obj, dict):
+        if "block" in obj or "rescue" in obj or "always" in obj:
+            return "block"
+        return "task"
+    if isinstance(obj, Task):
+        return "task"
+    if isinstance(obj, Block):
+        return "block"
+
+    raise ValueError("Expected block or task to be a dictionary")
+
+
+type TaskOrBlock = Annotated[
+    Annotated[Task, Tag("task")] | Annotated[Block, Tag("block")],
+    Discriminator(_distinguish_task_vs_block),
+]
+
+
+class TaskFile(ASTFile, frozen=True):
+    """Represents a file containing tasks and blocks."""
+
+    #: The top-level tasks or blocks contained in the file, in the order of definition.
+    tasks: Annotated[Sequence[TaskOrBlock], NormalizeNone, Lenient] = Field(
+        default_factory=tuple
+    )
+
+    @classmethod
+    @override
+    def load(cls, path: ProjectPath, context: ExtractionContext) -> TaskFile:
+        return cls.model_validate(
+            {"path": path.relative, "tasks": parse_file(path)}, context=context
+        )
+
+
+class HandlerFile(ASTFile, frozen=True):
+    """Represents a file containing handlers."""
+
+    #: The top-level handlers contained in the file, in the order of definition.
+    handlers: Annotated[Sequence[Handler], NormalizeNone, Lenient] = Field(
+        default_factory=tuple
+    )
+
+    @classmethod
+    @override
+    def load(cls, path: ProjectPath, context: ExtractionContext) -> HandlerFile:
+        return cls.model_validate(
+            {"path": path.relative, "handlers": parse_file(path)}, context=context
+        )

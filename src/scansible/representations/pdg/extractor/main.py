@@ -9,7 +9,7 @@ import loguru
 from loguru import logger
 
 from scansible.representations import structural as struct
-from scansible.representations.structural.ast import Position
+from scansible.representations.structural import Position
 
 from .. import representation as rep
 from .context import ExtractionContext

@@ -8,8 +8,7 @@ from contextlib import contextmanager
 
 from loguru import logger
 
-from scansible.representations.structural import BaseTask
-from scansible.representations.structural.ast import LoopControl
+from scansible.representations.structural import BaseTask, LoopControl
 
 from ... import representation as rep
 from ..context import ExtractionContext

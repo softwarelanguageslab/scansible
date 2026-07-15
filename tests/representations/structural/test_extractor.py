@@ -9,9 +9,10 @@ import ansible.parsing.dataloader
 import pytest
 from pydantic import ValidationError
 
-from scansible.representations.structural import ast
+from scansible.representations import structural as ast
 from scansible.representations.structural import extractor as ext
 from scansible.representations.structural.helpers import ProjectPath
+from scansible.representations.structural.nodes.playbook import PlayRoleRequirement
 from scansible.types import AnyValue, VaultValue
 
 
@@ -733,7 +734,7 @@ def describe_extracting_plays() -> None:
         assert result.hosts == ["servers"]
         assert result.name == "test play"
         assert len(result.roles) == 1
-        assert isinstance(result.roles[0], ast.PlayRoleRequirement)
+        assert isinstance(result.roles[0], PlayRoleRequirement)
         assert result.roles[0].role == "testrole"
         assert result.vars == {"testvar": 123}
 

@@ -4,37 +4,41 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from . import ast
-from .ast import ExtractionContext
+from . import nodes
+from .common import ExtractionContext
 from .helpers import ProjectPath
 
 
 def extract_role_metadata_file(
     path: ProjectPath, ctx: ExtractionContext
-) -> ast.MetaFile:
+) -> nodes.MetaFile:
     """Extract the structural representation of a metadata file."""
-    return ast.MetaFile.load(path, ctx)
+    return nodes.MetaFile.load(path, ctx)
 
 
 def extract_variable_file(
     path: ProjectPath, ctx: ExtractionContext
-) -> ast.VariableFile:
-    return ast.VariableFile.load(path, ctx)
+) -> nodes.VariableFile:
+    return nodes.VariableFile.load(path, ctx)
 
 
-def extract_handler_file(path: ProjectPath, ctx: ExtractionContext) -> ast.HandlerFile:
-    return ast.HandlerFile.load(path, ctx)
+def extract_handler_file(
+    path: ProjectPath, ctx: ExtractionContext
+) -> nodes.HandlerFile:
+    return nodes.HandlerFile.load(path, ctx)
 
 
-def extract_tasks_file(path: ProjectPath, ctx: ExtractionContext) -> ast.TaskFile:
-    return ast.TaskFile.load(path, ctx)
+def extract_tasks_file(path: ProjectPath, ctx: ExtractionContext) -> nodes.TaskFile:
+    return nodes.TaskFile.load(path, ctx)
 
 
-def extract_playbook_file(pb_path: ProjectPath, ctx: ExtractionContext) -> ast.Playbook:
-    return ast.Playbook.load(pb_path, ctx)
+def extract_playbook_file(
+    pb_path: ProjectPath, ctx: ExtractionContext
+) -> nodes.Playbook:
+    return nodes.Playbook.load(pb_path, ctx)
 
 
-def extract_playbook(path: Path, lenient: bool = True) -> ast.AST:
+def extract_playbook(path: Path, lenient: bool = True) -> nodes.AST:
     """Extract an AST for a playbook.
 
     :param      path:     The path to the playbook.
@@ -45,14 +49,14 @@ def extract_playbook(path: Path, lenient: bool = True) -> ast.AST:
     ctx = ExtractionContext(lenient)
     pb = extract_playbook_file(pb_path, ctx)
 
-    return ast.AST(
+    return nodes.AST(
         root=pb, path=path, broken_files=ctx.broken_files, broken_tasks=ctx.broken_tasks
     )
 
 
 def extract_role(
     path: Path, extract_all: bool = False, lenient: bool = True
-) -> ast.AST:
+) -> nodes.AST:
     """Extract an AST for a role.
 
     :param      path:         The path to the role.
@@ -64,9 +68,9 @@ def extract_role(
 
     role_path = ProjectPath.from_root(path)
     ctx = ExtractionContext(lenient)
-    role = ast.Role.load(role_path, ctx, extract_all)
+    role = nodes.Role.load(role_path, ctx, extract_all)
 
-    return ast.AST(
+    return nodes.AST(
         root=role,
         path=path,
         broken_files=ctx.broken_files,

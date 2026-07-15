@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from scansible.representations.structural.ast import SourceFileMap, TaskFile
+from scansible.representations.structural import TaskFile
+from scansible.utils import SourceFileMap
 
 
 def describe_source_file_map() -> None:
@@ -30,7 +31,7 @@ def describe_source_file_map() -> None:
     def describe_populated_file_map() -> None:
         f1 = TaskFile(path=Path("main.yml"), tasks=[])
         f2 = TaskFile(path=Path("other.yml"), tasks=[])
-        map = SourceFileMap[TaskFile]([f1, f2])
+        map = SourceFileMap[TaskFile]([("main.yml", f1), ("other.yaml", f2)])
 
         def should_have_length() -> None:
             assert len(map) == 2
@@ -52,7 +53,7 @@ def describe_source_file_map() -> None:
     def describe_file_map_with_mixed_extensions() -> None:
         f1 = TaskFile(path=Path("main.yml"), tasks=[])
         f2 = TaskFile(path=Path("other.yaml"), tasks=[])
-        map = SourceFileMap[TaskFile]([f1, f2])
+        map = SourceFileMap[TaskFile]([("main.yml", f1), ("other.yaml", f2)])
 
         def should_contain_both_keys() -> None:
             assert "main" in map
@@ -68,7 +69,7 @@ def describe_source_file_map() -> None:
     def describe_file_map_with_conflicting_extensions() -> None:
         f1 = TaskFile(path=Path("main.yml"), tasks=[])
         f2 = TaskFile(path=Path("main.yaml"), tasks=[])
-        map = SourceFileMap[TaskFile]([f1, f2])
+        map = SourceFileMap[TaskFile]([("main.yml", f1), ("main.yaml", f2)])
 
         def should_have_length() -> None:
             assert len(map) == 2
@@ -89,7 +90,9 @@ def describe_source_file_map() -> None:
     def describe_file_map_with_subdirectory() -> None:
         f1 = TaskFile(path=Path("tasks/main.yml"), tasks=[])
         f2 = TaskFile(path=Path("tasks/other.yaml"), tasks=[])
-        map = SourceFileMap[TaskFile]([f1, f2])
+        map = SourceFileMap[TaskFile](
+            [("tasks/main.yml", f1), ("tasks/other.yaml", f2)]
+        )
 
         def should_contain_both_keys() -> None:
             assert "tasks/main" in map
@@ -102,7 +105,9 @@ def describe_source_file_map() -> None:
     def describe_file_map_with_subdirectory_and_prefix() -> None:
         f1 = TaskFile(path=Path("tasks/main.yml"), tasks=[])
         f2 = TaskFile(path=Path("tasks/other.yaml"), tasks=[])
-        map = SourceFileMap[TaskFile]([f1, f2], prefix="tasks/")
+        map = SourceFileMap[TaskFile](
+            [("tasks/main.yml", f1), ("tasks/other.yaml", f2)], prefix="tasks/"
+        )
 
         def should_contain_both_keys() -> None:
             assert "main" in map

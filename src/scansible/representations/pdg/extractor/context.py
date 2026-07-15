@@ -13,7 +13,7 @@ from pathlib import Path
 
 from loguru import logger
 
-from scansible.representations.structural import ast
+from scansible.representations import structural as ast
 from scansible.representations.structural import extractor as ast_extractor
 from scansible.representations.structural.helpers import (
     ProjectPath,

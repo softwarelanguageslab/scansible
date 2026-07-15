@@ -8,7 +8,7 @@ import ansible.parsing.dataloader
 import pytest
 from pydantic import ValidationError
 
-from scansible.representations.structural.ast import ExtractionContext, Handler, Task
+from scansible.representations.structural import ExtractionContext, Handler, Task
 
 
 def _parse_yaml_dict(yaml_content: str) -> dict[str, object]:
