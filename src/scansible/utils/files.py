@@ -1,16 +1,57 @@
-"""Helpers for AST extraction."""
+"""Utilities related to file systems and project directories."""
 
 from __future__ import annotations
 
 from typing import override
 
-import io
-import os.path
-from collections.abc import Generator
-from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
+import os
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
 
 from ansible.parsing.dataloader import DataLoader
+
+from .collections import FrozenDict
+
+
+class SourceFileMap[FileType](Mapping[str, FileType]):
+    """A collection of source files of a certain type, supporting stem-based indexing.
+
+    This provides a convenient API to find source files without needing to take the concrete
+    extension (.yml, .yaml, or .json) into account.
+
+    Can optionally be given a search prefix. When provided, each lookup will attempt to resolve
+    a prefixed file name, and fall back to unprefixed search later. This can be useful when all
+    files in the map are in the same root directory. For instance, a file map for role task files
+    can use "tasks/" as a prefix, allowing individual task files to be accessed without prefixing
+    "tasks/" in the lookup.
+    """
+
+    def __init__(
+        self, file_list: Iterable[tuple[str, FileType]], *, prefix: str = ""
+    ) -> None:
+        self._mapping: Mapping[str, FileType] = FrozenDict(
+            {path: file for path, file in file_list}
+        )
+        # If prefix is given, prioritise with the prefix but try without the prefix afterwards.
+        self._prefixes: Sequence[str] = (prefix, "") if prefix else ("",)
+
+    @override
+    def __getitem__(self, key: str) -> FileType:
+        for prefix in self._prefixes:
+            for ext in (".yml", ".yaml", ".json", ""):
+                file_name = f"{prefix}{key}{ext}"
+                if file_name in self._mapping:
+                    return self._mapping[file_name]
+
+        raise KeyError(f"No file named {key}")
+
+    @override
+    def __len__(self) -> int:
+        return len(self._mapping)
+
+    @override
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._mapping)
 
 
 class ProjectPath:
@@ -70,12 +111,6 @@ class ProjectPath:
         return (self.root / self.relative).resolve()
 
 
-def parse_file(path: ProjectPath) -> object:
-    """Parse a YAML file using Ansible's parser."""
-    loader = DataLoader()
-    return loader.load_from_file(str(path.absolute))
-
-
 def find_file(dir_path: ProjectPath, file_name: str) -> ProjectPath | None:
     """Find a YAML file in a project directory, regardless of file extension.
 
@@ -117,26 +152,3 @@ def find_all_files(dir_path: ProjectPath) -> list[ProjectPath]:
                 pass
 
     return results
-
-
-@contextmanager
-def capture_output() -> Generator[io.StringIO]:
-    r"""Context manager which, while active, captures all printed output.
-
-    Useful to capture Ansible logs that otherwise get printed to the terminal.
-    The captured output will be available as the variable in the `with`
-    statement.
-
-    Example:
-        ```python
-        with capture_output() as output:
-            print("hello world")
-            sys.stderr.write("test\n")
-        output.getvalue()  # "hello world\ntest\n"
-        ```
-    """
-    buffer = io.StringIO()
-    with ExitStack() as stack:
-        _ = stack.enter_context(redirect_stderr(buffer))
-        _ = stack.enter_context(redirect_stdout(buffer))
-        yield buffer

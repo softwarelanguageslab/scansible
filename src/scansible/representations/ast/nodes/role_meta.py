@@ -11,11 +11,10 @@ from collections.abc import Mapping, Sequence
 from pydantic import Field, field_validator, model_validator
 
 from scansible.types import AnyValue
-from scansible.utils import FrozenDict
+from scansible.utils import FrozenDict, ProjectPath
 
 from .._normalizers import Lenient, Listify, Stringify
-from ..common import ExtractionContext
-from ..helpers import ProjectPath, parse_file
+from ..common import ExtractionContext, parse_file
 from .base import ASTFile, ASTNode
 from .directives import CommonDirectives
 

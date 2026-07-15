@@ -9,10 +9,9 @@ from functools import cached_property
 
 from pydantic import ValidationError
 
-from scansible.utils import SourceFileMap
+from scansible.utils import ProjectPath, SourceFileMap, find_all_files, find_file
 
 from ..common import BrokenFile, ExtractionContext
-from ..helpers import ProjectPath, find_all_files, find_file
 from .base import ASTFile
 from .role_meta import MetaFile
 from .task import HandlerFile, TaskFile

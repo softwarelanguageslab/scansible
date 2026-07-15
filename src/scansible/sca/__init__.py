@@ -20,13 +20,13 @@ from scansible.representations.ast import (
     Position,
     TaskFile,
 )
-from scansible.representations.ast.helpers import ProjectPath
 from scansible.representations.pdg.extractor.main import extract_pdg
 from scansible.sca.constants import (
     ANSIBLE_ROLE_INCLUDE_MODULES,
     ANSIBLE_TRIVIAL_MODULES,
     CONSOLE,
 )
+from scansible.utils import ProjectPath
 from scansible.utils.entrypoints import find_entrypoints
 
 from .collection_info import ModuleInfo, get_collection_index

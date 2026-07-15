@@ -9,11 +9,11 @@ from collections.abc import Mapping
 from pydantic import Field
 
 from scansible.types import AnyValue
+from scansible.utils import ProjectPath
 
 from .._normalizers import NormalizeNone
 from .._validators import Identifier
-from ..common import ExtractionContext
-from ..helpers import ProjectPath, parse_file
+from ..common import ExtractionContext, parse_file
 from .base import ASTFile
 
 

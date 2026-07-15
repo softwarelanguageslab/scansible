@@ -9,11 +9,11 @@ from collections.abc import Sequence
 from pydantic import Field, field_validator, model_validator
 
 from scansible.types import AnyValue
+from scansible.utils import ProjectPath
 
 from .._normalizers import Lenient, Listify, NormalizeNone
 from .._validators import Identifier
-from ..common import ExtractionContext, RawDirectives
-from ..helpers import ProjectPath, parse_file
+from ..common import ExtractionContext, RawDirectives, parse_file
 from .base import ASTFile, ASTNode
 from .directives import CommonDirectives
 from .role_meta import RoleRequirement

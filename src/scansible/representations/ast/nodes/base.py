@@ -8,10 +8,11 @@ from abc import ABC, abstractmethod
 
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
+from scansible.utils import ProjectPath
+
 from .._normalizers import Normalizer
 from .._validators import RelativePath
 from ..common import ExtractionContext, Position
-from ..helpers import ProjectPath
 
 
 class ASTEntity(BaseModel, strict=True, frozen=True, extra="forbid"):

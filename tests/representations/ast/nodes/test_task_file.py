@@ -8,7 +8,7 @@ from textwrap import dedent
 import pytest
 
 from scansible.representations.ast import Block, ExtractionContext, Task, TaskFile
-from scansible.representations.ast.helpers import ProjectPath
+from scansible.utils import ProjectPath
 
 
 def describe_extracting_tasks_file():

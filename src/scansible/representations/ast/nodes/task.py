@@ -17,12 +17,11 @@ from ansible.utils.fqcn import add_internal_fqcns
 from pydantic import Discriminator, Field, Tag, field_validator, model_validator
 
 from scansible.types import AnyValue, ScalarValue
-from scansible.utils import actions
+from scansible.utils import ProjectPath, actions
 
 from .._normalizers import Lenient, Listify, NormalizeNone
 from .._validators import Identifier
-from ..common import ExtractionContext, RawDirectives
-from ..helpers import ProjectPath, parse_file
+from ..common import ExtractionContext, RawDirectives, parse_file
 from .base import ASTFile, ASTNode
 from .directives import CommonDirectives
 

@@ -15,13 +15,13 @@ from loguru import logger
 
 from scansible.representations import ast
 from scansible.representations.ast import extractor as ast_extractor
-from scansible.representations.ast.helpers import (
+from scansible.utils import (
     ProjectPath,
     capture_output,
     find_all_files,
     find_file,
+    join_sequences,
 )
-from scansible.utils import join_sequences
 
 from .. import representation as rep
 from .expressions import VarContext

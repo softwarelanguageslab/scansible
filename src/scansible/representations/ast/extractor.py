@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from scansible.utils import ProjectPath
+
 from . import nodes
 from .common import ExtractionContext
-from .helpers import ProjectPath
 
 
 def extract_playbook(path: Path, lenient: bool = True) -> nodes.AST:

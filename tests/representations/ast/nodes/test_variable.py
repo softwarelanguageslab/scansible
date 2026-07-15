@@ -9,8 +9,8 @@ import pytest
 from pydantic import ValidationError
 
 from scansible.representations.ast import ExtractionContext, VariableFile
-from scansible.representations.ast.helpers import ProjectPath
 from scansible.types import VaultValue
+from scansible.utils import ProjectPath
 
 
 def describe_extracting_variables():

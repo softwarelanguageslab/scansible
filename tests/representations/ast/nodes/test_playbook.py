@@ -10,8 +10,8 @@ from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImpo
 from pydantic import ValidationError
 
 from scansible.representations.ast import Block, ExtractionContext, Play, Playbook, Task
-from scansible.representations.ast.helpers import ProjectPath
 from scansible.representations.ast.nodes.playbook import PlayRoleRequirement
+from scansible.utils import ProjectPath
 
 
 def describe_extracting_plays():

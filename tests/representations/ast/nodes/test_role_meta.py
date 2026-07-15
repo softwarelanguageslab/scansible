@@ -9,7 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from scansible.representations.ast import ExtractionContext, MetaFile
-from scansible.representations.ast.helpers import ProjectPath
+from scansible.utils import ProjectPath
 
 
 def describe_extracting_metadata_file():

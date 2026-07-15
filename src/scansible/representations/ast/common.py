@@ -8,6 +8,7 @@ from typing import Annotated, cast
 
 from pathlib import Path
 
+from ansible.parsing.dataloader import DataLoader
 from pydantic import (
     BaseModel,
     PositiveInt,
@@ -18,6 +19,7 @@ from pydantic import (
 )
 
 from scansible.types import AnyValue
+from scansible.utils import ProjectPath
 
 from ._validators import RelativePath
 
@@ -97,3 +99,9 @@ class BrokenFile(BaseModel, frozen=True):
     path: RelativePath
     #: The reason for failure.
     reason: str
+
+
+def parse_file(path: ProjectPath) -> object:
+    """Parse a YAML file using Ansible's parser."""
+    loader = DataLoader()
+    return loader.load_from_file(str(path.absolute))
