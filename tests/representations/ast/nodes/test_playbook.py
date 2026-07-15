@@ -9,15 +9,9 @@ import pytest
 from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImport]
 from pydantic import ValidationError
 
-from scansible.representations.structural import (
-    Block,
-    ExtractionContext,
-    Play,
-    Playbook,
-    Task,
-)
-from scansible.representations.structural.helpers import ProjectPath
-from scansible.representations.structural.nodes.playbook import PlayRoleRequirement
+from scansible.representations.ast import Block, ExtractionContext, Play, Playbook, Task
+from scansible.representations.ast.helpers import ProjectPath
+from scansible.representations.ast.nodes.playbook import PlayRoleRequirement
 
 
 def describe_extracting_plays():

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImport]
 
-from scansible.representations.structural import Block, ExtractionContext, Task
+from scansible.representations.ast import Block, ExtractionContext, Task
 
 
 def describe_extracting_blocks():

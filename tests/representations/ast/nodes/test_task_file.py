@@ -7,13 +7,8 @@ from textwrap import dedent
 
 import pytest
 
-from scansible.representations.structural import (
-    Block,
-    ExtractionContext,
-    Task,
-    TaskFile,
-)
-from scansible.representations.structural.helpers import ProjectPath
+from scansible.representations.ast import Block, ExtractionContext, Task, TaskFile
+from scansible.representations.ast.helpers import ProjectPath
 
 
 def describe_extracting_tasks_file():

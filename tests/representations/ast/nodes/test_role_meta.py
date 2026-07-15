@@ -8,8 +8,8 @@ from textwrap import dedent
 import pytest
 from pydantic import ValidationError
 
-from scansible.representations.structural import ExtractionContext, MetaFile
-from scansible.representations.structural.helpers import ProjectPath
+from scansible.representations.ast import ExtractionContext, MetaFile
+from scansible.representations.ast.helpers import ProjectPath
 
 
 def describe_extracting_metadata_file():

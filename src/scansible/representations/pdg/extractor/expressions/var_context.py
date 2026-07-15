@@ -14,8 +14,7 @@ from ansible.template import Templar
 from icontract import require
 from loguru import logger
 
-from scansible.representations import structural as struct
-from scansible.types import VaultValue
+from scansible.types import AnyValue, VaultValue
 from scansible.utils import SENTINEL, Sentinel, first, make_immutable
 
 from ... import representation as rep
@@ -192,7 +191,7 @@ class VarContext:
         yield
         self._envs.exit_scope()
 
-    def build_expression(self, expr: struct.AnyValue) -> rep.DataNode:
+    def build_expression(self, expr: AnyValue) -> rep.DataNode:
         return self._build_expression(wrap_expression(expr)).data_node
 
     def build_condition(self, expr: str | bool) -> rep.DataNode:
@@ -387,14 +386,12 @@ class VarContext:
         self.extraction_ctx.graph.add_edge(tr.expr_node, iv, rep.DEF)
         return tr.__replace__(data_node=iv)  # type: ignore[return-value]
 
-    def is_template(
-        self, expr: struct.AnyValue | Sentinel
-    ) -> TypeGuard[TemplatableType]:
+    def is_template(self, expr: AnyValue | Sentinel) -> TypeGuard[TemplatableType]:
         templar = Templar(DataLoader())
         return templar.is_template(expr)
 
     def define_initialised_variable(
-        self, name: str, env_type: EnvironmentType, initialiser: struct.AnyValue
+        self, name: str, env_type: EnvironmentType, initialiser: AnyValue
     ) -> rep.Variable:
         """Define a variable with an initialiser which is lazily evaluated."""
         return self._define_variable(name, env_type, initialiser, False)
@@ -403,7 +400,7 @@ class VarContext:
         self,
         name: str,
         env_type: EnvironmentType,
-        initialiser_expr: struct.AnyValue,
+        initialiser_expr: AnyValue,
         initialiser_node: rep.DataNode,
     ) -> rep.Variable:
         """Define a fact initialised with an eagerly-evaluated expression."""
@@ -421,7 +418,7 @@ class VarContext:
         self,
         name: str,
         env_type: EnvironmentType,
-        initialiser: struct.AnyValue | Sentinel,
+        initialiser: AnyValue | Sentinel,
         eager: bool,
     ) -> rep.Variable:
         """Declare a variable, initialized with the given expression.
@@ -601,8 +598,8 @@ class VarContext:
         return vval
 
     def get_initialisers(
-        self, name: str, constraints: Mapping[str, struct.AnyValue]
-    ) -> Sequence[tuple[struct.AnyValue, Mapping[str, struct.AnyValue], Sequence[str]]]:
+        self, name: str, constraints: Mapping[str, AnyValue]
+    ) -> Sequence[tuple[AnyValue, Mapping[str, AnyValue], Sequence[str]]]:
         """Get possible initialisers for `name`, adhering to any prior
         initialiser constraints.
         Returns tuples of initialisers, new constraints, and new conditions."""
@@ -628,7 +625,7 @@ class VarContext:
         return []
 
     def _get_constrained_magic_initialisers(
-        self, name: str, constraints: Mapping[str, struct.AnyValue]
+        self, name: str, constraints: Mapping[str, AnyValue]
     ) -> Sequence[tuple[str, list[str]]]:
         if name not in ("ansible_os_family", "ansible_distribution"):
             return []

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-import scansible.representations.structural.helpers as h
+import scansible.representations.ast.helpers as h
 
 
 def describe_project_path():
@@ -70,9 +70,7 @@ def describe_parse_file():
             ("- test\n- test2", ["test", "test2"]),
         ],
     )
-    def should_parse_valid_yaml(
-        tmp_path: Path, yaml_content: str, expected: object
-    ):
+    def should_parse_valid_yaml(tmp_path: Path, yaml_content: str, expected: object):
         _ = (tmp_path / "test.yml").write_text(yaml_content)
 
         result = h.parse_file(h.ProjectPath(tmp_path, "test.yml"))

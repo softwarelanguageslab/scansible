@@ -7,12 +7,8 @@ from textwrap import dedent
 
 import pytest
 
-from scansible.representations.structural import (
-    ExtractionContext,
-    Handler,
-    HandlerFile,
-)
-from scansible.representations.structural.helpers import ProjectPath
+from scansible.representations.ast import ExtractionContext, Handler, HandlerFile
+from scansible.representations.ast.helpers import ProjectPath
 
 
 def describe_extracting_handler_files():

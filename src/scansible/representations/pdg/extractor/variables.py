@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from scansible.representations import structural as struct
+from scansible.types import AnyValue
 
 from .. import representation as rep
 from .context import ExtractionContext
@@ -12,7 +12,7 @@ from .result import ExtractionResult
 
 class VariablesExtractor:
     def __init__(
-        self, context: ExtractionContext, variables: Mapping[str, struct.AnyValue]
+        self, context: ExtractionContext, variables: Mapping[str, AnyValue]
     ) -> None:
         self.context = context
         self.variables = variables

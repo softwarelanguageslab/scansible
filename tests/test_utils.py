@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from scansible.representations.structural import TaskFile
+from scansible.representations.ast import TaskFile
 from scansible.utils import SourceFileMap
 
 

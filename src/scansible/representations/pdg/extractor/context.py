@@ -13,9 +13,9 @@ from pathlib import Path
 
 from loguru import logger
 
-from scansible.representations import structural as ast
-from scansible.representations.structural import extractor as ast_extractor
-from scansible.representations.structural.helpers import (
+from scansible.representations import ast
+from scansible.representations.ast import extractor as ast_extractor
+from scansible.representations.ast.helpers import (
     ProjectPath,
     capture_output,
     find_all_files,

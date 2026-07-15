@@ -14,8 +14,8 @@ from _constants import (  # pyright: ignore[reportImplicitRelativeImport]
     TASKS,
 )
 
-from scansible.representations.structural import ExtractionContext, Role
-from scansible.representations.structural.helpers import ProjectPath
+from scansible.representations.ast import ExtractionContext, Role
+from scansible.representations.ast.helpers import ProjectPath
 
 
 def describe_extracting_roles():

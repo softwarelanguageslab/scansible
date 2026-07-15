@@ -8,8 +8,8 @@ from textwrap import dedent
 import pytest
 from pydantic import ValidationError
 
-from scansible.representations.structural import ExtractionContext, VariableFile
-from scansible.representations.structural.helpers import ProjectPath
+from scansible.representations.ast import ExtractionContext, VariableFile
+from scansible.representations.ast.helpers import ProjectPath
 from scansible.types import VaultValue
 
 

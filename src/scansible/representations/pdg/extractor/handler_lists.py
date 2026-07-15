@@ -4,7 +4,7 @@ from typing import Sequence
 
 from loguru import logger
 
-from scansible.representations.structural import Block, Handler
+from scansible.representations.ast import Block, Handler
 
 from .. import representation as rep
 from .blocks import BlockExtractor

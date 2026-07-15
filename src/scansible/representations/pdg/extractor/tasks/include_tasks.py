@@ -6,7 +6,7 @@ from collections.abc import Sequence
 
 from loguru import logger
 
-from scansible.representations.structural import Block, Task, TaskFile
+from scansible.representations.ast import Block, Task, TaskFile
 from scansible.types import AnyValue
 from scansible.utils import actions
 

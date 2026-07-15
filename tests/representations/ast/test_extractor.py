@@ -13,7 +13,7 @@ from _constants import (  # pyright: ignore[reportImplicitRelativeImport]
     TASKS,
 )
 
-from scansible.representations.structural import (
+from scansible.representations.ast import (
     Play,
     Playbook,
     Role,

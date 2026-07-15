@@ -6,7 +6,7 @@ import pytest
 from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImport]
 from pydantic import ValidationError
 
-from scansible.representations.structural import ExtractionContext, Handler, Task
+from scansible.representations.ast import ExtractionContext, Handler, Task
 
 
 def describe_extracting_tasks():

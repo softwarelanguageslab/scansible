@@ -4,7 +4,7 @@ from typing import Sequence
 
 from loguru import logger
 
-from scansible.representations.structural import RoleRequirement
+from scansible.representations.ast import RoleRequirement
 
 from .. import representation as rep
 from .context import ExtractionContext

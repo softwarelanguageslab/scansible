@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Sequence
 
-from scansible.representations.structural import Block, Task
+from scansible.representations.ast import Block, Task
 
 from .. import representation as rep
 from .blocks import BlockExtractor

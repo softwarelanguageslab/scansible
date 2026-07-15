@@ -8,8 +8,7 @@ from pathlib import Path
 import loguru
 from loguru import logger
 
-from scansible.representations import structural as struct
-from scansible.representations.structural import Position
+from scansible.representations import ast
 
 from .. import representation as rep
 from .context import ExtractionContext
@@ -47,9 +46,9 @@ def extract_pdg(
         as_pb = not _project_is_role(path)
 
     if as_pb:
-        model = struct.extract_playbook(path, lenient=lenient)
+        model = ast.extract_playbook(path, lenient=lenient)
     else:
-        model = struct.extract_role(path, lenient=lenient, extract_all=False)
+        model = ast.extract_role(path, lenient=lenient, extract_all=False)
 
     return StructuralGraphExtractor(model, role_search_paths, lenient).extract()
 
@@ -71,7 +70,7 @@ def _project_is_role(path: Path) -> bool:
 class StructuralGraphExtractor:
     def __init__(
         self,
-        model: struct.AST,
+        model: ast.AST,
         role_search_paths: Sequence[Path],
         lenient: bool,
     ) -> None:
@@ -105,7 +104,7 @@ class StructuralGraphExtractor:
 
     def _capture_log_message(self, message: loguru.Message) -> None:
         location = message.record.get("extra", {}).get("location")
-        if isinstance(location, Position):
+        if isinstance(location, ast.Position):
             if not location.is_synthetic:
                 location = (
                     str(location.file),
@@ -122,11 +121,11 @@ class StructuralGraphExtractor:
     def _extract_role(self) -> None:
         _ = RoleExtractor(
             self.context,
-            cast(struct.Role, self.model.root),
+            cast(ast.Role, self.model.root),
         ).extract_role()
 
     def _extract_playbook(self) -> None:
         PlaybookExtractor(
             self.context,
-            cast(struct.Playbook, self.model.root),
+            cast(ast.Playbook, self.model.root),
         ).extract()

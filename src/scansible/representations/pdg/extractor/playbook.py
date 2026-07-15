@@ -4,12 +4,7 @@ from typing import Sequence
 
 from loguru import logger
 
-from scansible.representations.structural import (
-    Block,
-    Handler,
-    Playbook,
-    RoleRequirement,
-)
+from scansible.representations.ast import Block, Handler, Playbook, RoleRequirement
 
 from .context import ExtractionContext
 from .expressions import EnvironmentType

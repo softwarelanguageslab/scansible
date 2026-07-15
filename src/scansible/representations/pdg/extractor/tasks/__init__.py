@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from scansible.representations.structural import BaseTask
+from scansible.representations.ast import BaseTask
 from scansible.utils import actions
 
 from ..context import ExtractionContext

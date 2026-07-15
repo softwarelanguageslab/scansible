@@ -7,7 +7,7 @@ to perform quality assurance operations for Ansible.
 
 - The Ansible Program Dependence Graph (PDG), a graph-based representation capturing
   the control flow and data flow of Ansible playbooks and roles.
-- The Ansible “structural model”, an Abstract Syntax Tree (AST) of Ansible code.
+- A validated, normalized, and typed Abstract Syntax Tree (AST) of Ansible code.
 - GASEL, the Graph-based Ansible SEcurity Linter, a _security smell_ detector
   for Ansible playbooks and roles containing checks for 7 generic security weaknesses.
 - A Software Composition Analysis (SCA) which identifies dependencies on third-party

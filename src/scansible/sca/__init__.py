@@ -11,21 +11,21 @@ from rich.markup import escape
 
 from scansible.checks.security import run_all_checks
 from scansible.checks.security.rules.base import RuleResult
-from scansible.representations.pdg.extractor.main import extract_pdg
-from scansible.representations.structural.ast import BaseTask as Task
-from scansible.representations.structural.ast import (
+from scansible.representations.ast import BaseTask as Task
+from scansible.representations.ast import (
     Block,
+    ExtractionContext,
     Play,
     Playbook,
     Position,
     TaskFile,
 )
-from scansible.representations.structural.extractor import (
-    ExtractionContext,
+from scansible.representations.ast.extractor import (
     extract_playbook_file,
     extract_tasks_file,
 )
-from scansible.representations.structural.helpers import ProjectPath
+from scansible.representations.ast.helpers import ProjectPath
+from scansible.representations.pdg.extractor.main import extract_pdg
 from scansible.sca.constants import (
     ANSIBLE_ROLE_INCLUDE_MODULES,
     ANSIBLE_TRIVIAL_MODULES,

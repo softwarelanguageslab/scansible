@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from scansible.representations.structural import Position
+from scansible.representations.ast import Position
 
 
 def describe_position():
