@@ -1,4 +1,4 @@
-"""Helpers for structural model extraction."""
+"""Helpers for AST extraction."""
 
 from __future__ import annotations
 
@@ -20,9 +20,10 @@ class FatalError(Exception):
 
 
 class ProjectPath:
-    """
-    Represents a path in a project, storing the project root path and the
-    relative path to a file or directory in the project.
+    """Represents a path in a project.
+
+    Stores the project root path and the relative path to a file or
+    directory in the project.
     """
 
     #: The project's root path. Must be a directory.
@@ -49,22 +50,20 @@ class ProjectPath:
 
     @classmethod
     def from_root(cls, root_path: Path) -> ProjectPath:
-        """
-        Construct a ProjectPath instance for the project root.
-        If given a file, will set the root the the parent of the file.
+        """Construct a ProjectPath instance for the project root.
 
-        :param      root_path:  The root path to the project.
-        :type       root_path:  Path
+        If given a file, will set the root to the parent of the file.
+
+        :param root_path: The root path to the project.
         """
         if root_path.is_file():
             return cls(root_path.parent, root_path.name)
         return cls(root_path, ".")
 
     def join(self, other: Path | str) -> ProjectPath:
-        """
-        Join the current path with another path.
+        """Join the current path with another path.
 
-        :raises     AssertionError:  When the two project paths have different roots.
+        :raises AssertionError: When the two project paths have different roots.
         """
         if isinstance(other, str):
             other = Path(other)
@@ -84,10 +83,9 @@ def parse_file(path: ProjectPath) -> object:
 
 
 def find_file(dir_path: ProjectPath, file_name: str) -> ProjectPath | None:
-    """
-    Find a YAML file in a project directory, regardless of file extension.
+    """Find a YAML file in a project directory, regardless of file extension.
 
-    :raises     AssertionError:  When multiple files were found.
+    :raises AssertionError: When multiple files were found.
     """
     # TODO: Use `SourceFileMap`?
     loader = DataLoader()
@@ -129,17 +127,19 @@ def find_all_files(dir_path: ProjectPath) -> list[ProjectPath]:
 
 @contextmanager
 def capture_output() -> Generator[io.StringIO]:
-    """Context manager which, while active, captures all printed output.
+    r"""Context manager which, while active, captures all printed output.
 
     Useful to capture Ansible logs that otherwise get printed to the terminal.
     The captured output will be available as the variable in the `with`
     statement.
 
     Example:
-      with capture_output() as output:
-        print("hello world")
-        sys.stderr.write('test\n')
-      output.getvalue()  # hello world\ntest\n
+        ```python
+        with capture_output() as output:
+            print("hello world")
+            sys.stderr.write("test\n")
+        output.getvalue()  # "hello world\ntest\n"
+        ```
     """
     buffer = io.StringIO()
     with ExitStack() as stack:

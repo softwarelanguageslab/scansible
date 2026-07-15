@@ -1,5 +1,7 @@
 # pyright: reportUnknownVariableType = false
 
+"""AST nodes for role metadata (`meta/main.yml`) files."""
+
 from __future__ import annotations
 
 from typing import Annotated, override
@@ -28,7 +30,7 @@ class Platform(ASTNode, frozen=True):
 
 
 class _RawPlatform(ASTNode, frozen=True):
-    """Intermediate Platform representation with a list of versions."""
+    """Represents an intermediate representation of a platform, with an unexpanded list of versions."""
 
     #: Platform name.
     name: str
@@ -67,6 +69,7 @@ class RoleRequirement(ASTNode, CommonDirectives, frozen=True):
 
     @field_validator("role", mode="after")
     def _validate_role_name(cls, value: str) -> str:
+        """Reject comma-separated role names, valid only in raw `meta/main.yml` dependency strings."""
         # Commas in role names are only allowed in meta/main.yml dependencies, and should have
         # been filtered out/converted already.
         if "," in value:
@@ -76,6 +79,7 @@ class RoleRequirement(ASTNode, CommonDirectives, frozen=True):
     @model_validator(mode="before")
     @classmethod
     def _extract_parameters(cls, value: object) -> object:
+        """Move directives not recognized as model fields into `params`."""
         if not isinstance(value, dict):
             return value
 
@@ -108,6 +112,7 @@ class MetaRoleRequirement(RoleRequirement, frozen=True):
 
     @classmethod
     def _parse_from_string(cls, value: object) -> object:
+        """Parse an old-style `src[,version[,name]]` dependency string into its fields."""
         # Ansible coerces int to str here, we'll do it too.
         if isinstance(value, int):
             value = str(value)
@@ -131,6 +136,7 @@ class MetaRoleRequirement(RoleRequirement, frozen=True):
 
     @classmethod
     def _extract_role_name(cls, value: object) -> object:
+        """Derive the `role` field from `name`/`src`."""
         if not isinstance(value, dict) or "role" in value:
             return value
 
@@ -165,9 +171,9 @@ class MetaRoleRequirement(RoleRequirement, frozen=True):
 class MetaBlock(ASTNode, frozen=True, extra="ignore"):
     """Represents a role metadata block."""
 
-    #: Platforms supported by the role
+    #: Platforms supported by the role.
     platforms: Annotated[Sequence[Platform], Listify] = Field(default_factory=tuple)
-    #: Role dependencies
+    #: Role dependencies.
     dependencies: Annotated[Sequence[MetaRoleRequirement], Lenient] = Field(
         default_factory=tuple
     )
@@ -208,6 +214,7 @@ class MetaFile(ASTFile, frozen=True):
     @classmethod
     @override
     def load(cls, path: ProjectPath, context: ExtractionContext) -> MetaFile:
+        """Load and parse a role metadata file from the given path."""
         return cls.model_validate(
             {"path": path.relative, "metablock": parse_file(path)}, context=context
         )

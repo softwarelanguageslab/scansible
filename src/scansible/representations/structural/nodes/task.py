@@ -1,5 +1,11 @@
 # pyright: reportUnknownVariableType = false
 
+"""AST nodes for tasks, blocks, and handlers.
+
+These nodes include the parsing and normalization of task directives
+from Ansible's various shorthand and obsoleted syntaxes.
+"""
+
 from __future__ import annotations
 
 from typing import Annotated, ClassVar, Literal, Self, cast, override
@@ -21,6 +27,7 @@ from .base import ASTFile, ASTNode
 from .directives import CommonDirectives
 
 # Adapted from ansible.constants
+#: Unqualified names of actions that take freeform (unparsed) arguments.
 FREEFORM_ACTIONS_SIMPLE = (
     "command",
     "raw",
@@ -29,6 +36,7 @@ FREEFORM_ACTIONS_SIMPLE = (
     "win_command",
     "win_shell",
 )
+#: `FREEFORM_ACTIONS_SIMPLE`, expanded with their fully-qualified collection names.
 FREEFORM_ACTIONS = frozenset(
     tuple(add_internal_fqcns(FREEFORM_ACTIONS_SIMPLE))
     + ("ansible.windows.win_command", "ansible.windows.win_shell")
@@ -53,13 +61,14 @@ class LoopControl(ASTNode, frozen=True):
     extended: str | bool | None = None
     #: Whether to include `allitems` in the extended version.
     extended_allitems: str | bool | None = True
-    #: Conditions when to break the loop
+    #: Conditions when to break the loop.
     break_when: Sequence[str] | None = Field(default_factory=tuple)
 
 
 class BaseTask(ASTNode, CommonDirectives, frozen=True):
     """Represents commonalities for Ansible tasks."""
 
+    #: Directives permitted on `include_tasks`/`import_tasks`/`include_role` tasks.
     VALID_INCLUDE_DIRECTIVES: ClassVar[frozenset[str]] = frozenset(
         (
             "action",
@@ -264,6 +273,7 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
 
     @classmethod
     def _parse_args(cls, action: str, args: str) -> Mapping[ScalarValue, AnyValue]:
+        """Parse a raw `key=value` argument string, treating `action` specially if it's a freeform action."""
         check_raw = action in FREEFORM_ACTIONS
         return parse_kv(args, check_raw)  # pyright: ignore[reportReturnType]
 
@@ -271,6 +281,7 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
     def _parse_task_level_args(
         cls, ds: RawDirectives
     ) -> Mapping[ScalarValue, AnyValue]:
+        """Pop and normalize the task-level `args` directive."""
         task_args = ds.pop("args", {})
         if isinstance(task_args, str):
             task_args = {"_variable_params": task_args}
@@ -278,6 +289,7 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
 
     @classmethod
     def _combine_args(cls, action: str, *arg_list: AnyValue) -> AnyValue:
+        """Merge multiple argument sources into one dict, lowest to highest priority."""
         combined_args = {}
         for args in arg_list:
             if isinstance(args, str):
@@ -292,6 +304,7 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
 
     @classmethod
     def _is_task_directive(cls, key: str) -> bool:
+        """Whether `key` is a recognized task directive rather than a module action."""
         return (
             key in cls.model_fields
             or key == "static"
@@ -326,6 +339,7 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
 
     @classmethod
     def _transform_loop(cls, ds: RawDirectives) -> RawDirectives:
+        """Translate legacy `with_*` loop directives into `loop`/`loop_with`."""
         for k in set(ds):
             if not k.startswith("with_"):
                 continue
@@ -357,11 +371,12 @@ class Task(BaseTask, frozen=True):
 class Handler(BaseTask, frozen=True):
     """Represents an Ansible handler, a special type of task."""
 
+    #: Directives permitted on `include_tasks`/`import_tasks`/`include_role` handlers.
     VALID_INCLUDE_DIRECTIVES: ClassVar[frozenset[str]] = (
         BaseTask.VALID_INCLUDE_DIRECTIVES | {"listen"}
     )
 
-    #: Topics on which the handler listens
+    #: Topics on which the handler listens.
     listen: Annotated[Sequence[str], Listify] = Field(default_factory=tuple)
 
 
@@ -410,6 +425,8 @@ def _distinguish_task_vs_block(obj: object) -> Literal["task", "block"] | None:
     raise ValueError("Expected block or task to be a dictionary")
 
 
+#: A task-list entry: either a `Task` or a `Block`, discriminated by whether
+#: the raw data contains `block`/`rescue`/`always` keys.
 type TaskOrBlock = Annotated[
     Annotated[Task, Tag("task")] | Annotated[Block, Tag("block")],
     Discriminator(_distinguish_task_vs_block),
@@ -427,6 +444,7 @@ class TaskFile(ASTFile, frozen=True):
     @classmethod
     @override
     def load(cls, path: ProjectPath, context: ExtractionContext) -> TaskFile:
+        """Load and parse a tasks file from the given path."""
         return cls.model_validate(
             {"path": path.relative, "tasks": parse_file(path)}, context=context
         )
@@ -443,6 +461,7 @@ class HandlerFile(ASTFile, frozen=True):
     @classmethod
     @override
     def load(cls, path: ProjectPath, context: ExtractionContext) -> HandlerFile:
+        """Load and parse a handlers file from the given path."""
         return cls.model_validate(
             {"path": path.relative, "handlers": parse_file(path)}, context=context
         )

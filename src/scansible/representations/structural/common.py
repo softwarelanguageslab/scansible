@@ -1,5 +1,7 @@
 # pyright: reportUnknownVariableType = false
 
+"""Shared types used across the AST representation."""
+
 from __future__ import annotations
 
 from typing import Annotated, cast
@@ -55,16 +57,21 @@ class Position(BaseModel, strict=True, frozen=True, extra="forbid"):
     """Code position of an AST node."""
 
     # TODO: Should this be a RelativePath instead?
+    #: Path to the file containing the node.
     file: Path = Path("unknown file")
+    #: Line number, 1-indexed.
     start_line: PositiveInt = -1
+    #: Column number, 1-indexed.
     start_column: PositiveInt = -1
 
     @property
     def is_synthetic(self) -> bool:
+        """Whether the position is a placeholder, i.e. not derived from an actual source location."""
         return self.start_line < 0
 
     @model_validator(mode="before")
     def _coerce_from_ansible_position(cls, value: object) -> object:
+        """Coerce Ansible's raw `(file, line, column)` position tuple into the model's fields."""
         try:
             file, line, column = cast(
                 RawPosition, RawPositionAdapter.validate_python(value)

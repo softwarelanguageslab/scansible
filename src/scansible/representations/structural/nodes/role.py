@@ -1,3 +1,5 @@
+"""AST nodes for roles."""
+
 from __future__ import annotations
 
 from typing import Callable, override
@@ -16,12 +18,14 @@ from .role_meta import MetaFile
 from .task import HandlerFile, TaskFile
 from .variable import VariableFile
 
+#: Signature of a function that loads an `ASTFile` from a project path.
 type Extractor[T] = Callable[[ProjectPath, ExtractionContext], T]
 
 
 def _safe_extract[T: ASTFile](
     extractor: Extractor[T], file_path: ProjectPath, ctx: ExtractionContext
 ) -> T | None:
+    """Run `extractor`, recording a `BrokenFile` and returning `None` on validation failure instead of raising."""
     try:
         return extractor(file_path, ctx)
     except ValidationError as e:
@@ -31,6 +35,7 @@ def _safe_extract[T: ASTFile](
 def _safe_extract_all[T: ASTFile](
     extractor: Extractor[T], file_paths: Sequence[ProjectPath], ctx: ExtractionContext
 ) -> Sequence[tuple[str, T]]:
+    """Run `_safe_extract` over multiple paths, returning only the successes, keyed by path."""
     results: list[T] = []
     for file_path in file_paths:
         if (result := _safe_extract(extractor, file_path, ctx)) is not None:
@@ -40,7 +45,7 @@ def _safe_extract_all[T: ASTFile](
 
 # Need arbitrary_types_allowed=True to put SourceFileMap into the model.
 class Role(ASTFile, frozen=True, arbitrary_types_allowed=True):
-    """Represents an Ansible role."""
+    """Represents an Ansible role, assembling its constituent files into a single tree."""
 
     #: Role's main metadata file.
     meta_file: MetaFile | None
@@ -82,6 +87,12 @@ class Role(ASTFile, frozen=True, arbitrary_types_allowed=True):
     def load(
         cls, path: ProjectPath, context: ExtractionContext, extract_all: bool = False
     ) -> Role:
+        """Load and parse a role from the given path.
+
+        :param extract_all: Whether to extract every YAML file found under
+            `tasks/`, `handlers/`, `vars/`, and `defaults/`. If `False`
+            (the default), only each directory's `main` file is extracted.
+        """
         # Extract all constituents
         meta_file = None
         if (meta_file_path := find_file(path, "meta/main")) is not None:

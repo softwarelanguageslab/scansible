@@ -1,3 +1,5 @@
+"""Reusable validation constraints for use as model field types."""
+
 from __future__ import annotations
 
 from typing import Annotated
@@ -38,10 +40,10 @@ def _validate_identifier(value: str) -> str:
     return value
 
 
-#: Relative paths in the project
+#: Relative paths in the project.
 type RelativePath = Annotated[Path, AfterValidator(_validate_relative_path)]
 
-#: Absolute paths in the project
+#: Absolute paths in the project.
 type AbsolutePath = Annotated[Path, AfterValidator(_validate_absolute_path)]
 
 #: Identifiers in Ansible files, e.g., variable names.

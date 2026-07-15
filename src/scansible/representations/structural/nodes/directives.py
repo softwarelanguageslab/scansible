@@ -1,5 +1,7 @@
 # pyright: reportUnknownVariableType = false
 
+"""Common Ansible directives (`vars`, `become`, `tags`, ...) shared by tasks, blocks, and plays."""
+
 from __future__ import annotations
 
 from typing import cast
@@ -99,6 +101,7 @@ class CommonDirectives(BaseModel, frozen=True):
 
     @classmethod
     def _transform_old_become(cls, ds: RawDirectives) -> RawDirectives:
+        """Translate legacy `sudo`/`su` directives, and their derivatives, to `become`."""
         # Tasks that use sudo/su and their derivatives (*_user, *_exe, *_flags, *_pass) are no
         # longer supported in recent Ansible versions. Transform them like legacy Ansible versions used to do.
         # https://github.com/ansible/ansible/commit/e40832df847bc7dcc94f41c491618de665c0b9e5
@@ -143,6 +146,7 @@ class CommonDirectives(BaseModel, frozen=True):
 
     @classmethod
     def _transform_old_always_run(cls, ds: RawDirectives) -> RawDirectives:
+        """Translate the removed `always_run` directive to `check_mode`."""
         # `always_run` is an old, now-removed directive which has since been
         # replaced by the `check_mode: no` directive.
         if "always_run" in ds:

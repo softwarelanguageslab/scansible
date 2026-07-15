@@ -1,3 +1,5 @@
+"""AST nodes for playbooks and the plays they contain."""
+
 from __future__ import annotations
 
 from typing import Annotated, cast, override
@@ -47,6 +49,7 @@ class PlayRoleRequirement(RoleRequirement, frozen=True):
     @model_validator(mode="before")
     @classmethod
     def _parse_from_string(cls, value: object) -> object:
+        """Normalize a bare string/int role reference into `{"role": ...}`."""
         # Ansible coerces int to str here, we'll do it too.
         if isinstance(value, int):
             value = str(value)
@@ -149,6 +152,7 @@ class Playbook(ASTFile, frozen=True):
     @classmethod
     @override
     def load(cls, path: ProjectPath, context: ExtractionContext) -> Playbook:
+        """Load and parse a playbook from the given path."""
         return cls.model_validate(
             {"path": path.relative, "plays": parse_file(path)}, context=context
         )

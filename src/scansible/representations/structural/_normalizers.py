@@ -1,3 +1,10 @@
+"""Reusable field-normalization logic.
+
+Each `Normalizer` implements one normalization rule (e.g. wrapping a scalar into a single-element list).
+Normalizers are attached to a model field via `Annotated[T, SomeNormalizer]` and are applied by
+`ASTEntity` before Pydantic validates the field's value.
+"""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, get_args, get_origin, override
@@ -34,6 +41,7 @@ class NormalizeNone(Normalizer):
     def normalize(
         cls, value: object, field_info: FieldInfo, validation_info: ValidationInfo
     ) -> object:
+        """Return the field's default if `value` is `None`."""
         if value is not None:
             return value
 
@@ -48,6 +56,7 @@ class Listify(Normalizer):
     def normalize(
         cls, value: object, field_info: FieldInfo, validation_info: ValidationInfo
     ) -> object:
+        """Wrap `value` in a list unless it already is one."""
         if isinstance(value, Sequence) and not isinstance(value, str):
             return value
 
@@ -66,6 +75,7 @@ class Stringify(Normalizer):
     def normalize(
         cls, value: object, field_info: FieldInfo, validation_info: ValidationInfo
     ) -> object:
+        """Stringify `value` (recursively over sequences)."""
         if isinstance(value, str):
             return value
 
@@ -93,6 +103,7 @@ class Lenient(Normalizer):
 
     @classmethod
     def _get_contained_type(cls, field_info: FieldInfo) -> type[object]:
+        """Extract the element type from a `Sequence[...]` field annotation."""
         annotation = field_info.annotation
 
         if (
@@ -109,6 +120,7 @@ class Lenient(Normalizer):
     def normalize(
         cls, value: object, field_info: FieldInfo, validation_info: ValidationInfo
     ) -> object:
+        """Validate each item, dropping ones that fail when lenient."""
         if not isinstance(value, Sequence):
             return value
 

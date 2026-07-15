@@ -1,4 +1,4 @@
-"""Extraction logic for structural model."""
+"""Extraction logic for the AST."""
 
 from __future__ import annotations
 
@@ -12,37 +12,41 @@ from .helpers import ProjectPath
 def extract_role_metadata_file(
     path: ProjectPath, ctx: ExtractionContext
 ) -> nodes.MetaFile:
-    """Extract the structural representation of a metadata file."""
+    """Extract the AST representation of a metadata file."""
     return nodes.MetaFile.load(path, ctx)
 
 
 def extract_variable_file(
     path: ProjectPath, ctx: ExtractionContext
 ) -> nodes.VariableFile:
+    """Extract the AST representation of a variable file."""
     return nodes.VariableFile.load(path, ctx)
 
 
 def extract_handler_file(
     path: ProjectPath, ctx: ExtractionContext
 ) -> nodes.HandlerFile:
+    """Extract the AST representation of a handlers file."""
     return nodes.HandlerFile.load(path, ctx)
 
 
 def extract_tasks_file(path: ProjectPath, ctx: ExtractionContext) -> nodes.TaskFile:
+    """Extract the AST representation of a tasks file."""
     return nodes.TaskFile.load(path, ctx)
 
 
 def extract_playbook_file(
     pb_path: ProjectPath, ctx: ExtractionContext
 ) -> nodes.Playbook:
+    """Extract the AST representation of a playbook file."""
     return nodes.Playbook.load(pb_path, ctx)
 
 
 def extract_playbook(path: Path, lenient: bool = True) -> nodes.AST:
-    """Extract an AST for a playbook.
+    """Extract the AST representation of a playbook.
 
-    :param      path:     The path to the playbook.
-    :param      lenient:  Whether extraction should be lenient, i.e. ignoring broken tasks/blocks.
+    :param path: The path to the playbook.
+    :param lenient: Whether extraction should be lenient, i.e. ignoring broken tasks/blocks.
     """
 
     pb_path = ProjectPath.from_root(path)
@@ -57,13 +61,13 @@ def extract_playbook(path: Path, lenient: bool = True) -> nodes.AST:
 def extract_role(
     path: Path, extract_all: bool = False, lenient: bool = True
 ) -> nodes.AST:
-    """Extract an AST for a role.
+    """Extract the AST representation of a role.
 
-    :param      path:         The path to the role.
-    :param      extract_all:  Whether to extract all available files, or just the main files.
-                              Defaults to `False`. Additional files can still be extracted using
-                              `extract_task_file` or `extract_variable_file`.
-    :param      lenient:      Whether extracting should be lenient, i.e. ignoring broken tasks/blocks.
+    :param path: The path to the role.
+    :param extract_all: Whether to extract all available files, or just the main files.
+        Defaults to `False`. Additional files can still be extracted using
+        `extract_task_file` or `extract_variable_file`.
+    :param lenient: Whether extracting should be lenient, i.e. ignoring broken tasks/blocks.
     """
 
     role_path = ProjectPath.from_root(path)

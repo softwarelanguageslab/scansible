@@ -1,3 +1,5 @@
+"""Base classes shared by all AST nodes."""
+
 from __future__ import annotations
 
 from typing import Self
@@ -54,7 +56,7 @@ class ASTNode(ASTEntity, frozen=True):
     @model_validator(mode="before")
     @classmethod
     def _inject_position(cls, data: object) -> object:
-        """Extract sourec code position information from Ansible objects and present it to the model for validation."""
+        """Extract source code position information from Ansible objects and present it to the model for validation."""
 
         if hasattr(data, "ansible_pos"):
             pos = getattr(data, "ansible_pos")  # pyright: ignore[reportAny]
