@@ -2,21 +2,22 @@
 
 from __future__ import annotations
 
-from typing import Annotated, cast, override
+from typing import Annotated, Literal, cast, override
 
 from collections.abc import Sequence
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Discriminator, Field, Tag, field_validator, model_validator
 
 from scansible.types import AnyValue
 from scansible.utils import ProjectPath
+from scansible.utils.actions import is_import_playbook
 
-from .._normalizers import Lenient, Listify, NormalizeNone
+from .._normalizers import Lenient, Listify
 from .._validators import Identifier
 from ..common import ExtractionContext, RawDirectives, parse_file
 from .base import ASTFile, ASTNode
 from .directives import CommonDirectives
-from .expression import Expression
+from .expression import Condition, Expression
 from .role_meta import RoleRequirement
 from .task import Handler, TaskOrBlock
 
@@ -67,7 +68,7 @@ class Play(ASTNode, CommonDirectives, frozen=True):
     #: The play's targetted hosts.
     hosts: Annotated[Sequence[str], Listify]
     #: The play's list of blocks.
-    tasks: Sequence[TaskOrBlock] = Field(default_factory=tuple)
+    tasks: Annotated[Sequence[TaskOrBlock], Lenient] = Field(default_factory=tuple)
 
     #: Whether to gather facts from the remote hosts.
     gather_facts: bool | Expression | None = None
@@ -80,22 +81,22 @@ class Play(ASTNode, CommonDirectives, frozen=True):
     fact_path: str | None = None
 
     #: List of files with variables to include into play.
-    vars_files: Annotated[Sequence[Sequence[str]], NormalizeNone] = Field(
-        default_factory=tuple
-    )
+    vars_files: Sequence[Sequence[str]] = Field(default_factory=tuple)
     #: List of variables to prompt user for. List of mappings, `name` key
     #: contains variable name.
     vars_prompt: Annotated[Sequence[VarsPrompt], Listify] = Field(default_factory=tuple)
 
     #: List of roles to be imported into play.
-    roles: Sequence[PlayRoleRequirement] = Field(default_factory=tuple)
+    roles: Annotated[Sequence[PlayRoleRequirement], Lenient] = Field(
+        default_factory=tuple
+    )
 
     #: Handlers for the play.
-    handlers: Sequence[Handler] = Field(default_factory=tuple)
+    handlers: Annotated[Sequence[Handler], Lenient] = Field(default_factory=tuple)
     #: Tasks to be run before the roles in `roles`.
-    pre_tasks: Sequence[TaskOrBlock] = Field(default_factory=tuple)
+    pre_tasks: Annotated[Sequence[TaskOrBlock], Lenient] = Field(default_factory=tuple)
     #: Tasks to be run after the main tasks.
-    post_tasks: Sequence[TaskOrBlock] = Field(default_factory=tuple)
+    post_tasks: Annotated[Sequence[TaskOrBlock], Lenient] = Field(default_factory=tuple)
 
     #: Force handler notification.
     force_handlers: bool | Expression | None = None
@@ -120,7 +121,21 @@ class Play(ASTNode, CommonDirectives, frozen=True):
         # remove the "accelerate" key if present. It was removed in 2.4
         _ = value.pop("accelerate", None)
 
+        value = cls._normalize_user(value)
+
         return value
+
+    @classmethod
+    def _normalize_user(cls, ds: RawDirectives) -> RawDirectives:
+        """Normalize the deprecated `user` directive to `remote_user`"""
+        if "user" not in ds:
+            return ds
+
+        if "remote_user" in ds:
+            raise ValueError("`user` and `remote_user` are mutually exclusive")
+
+        ds["remote_user"] = ds.pop("user")
+        return ds
 
     @field_validator("vars_files", mode="before")
     @classmethod
@@ -144,11 +159,63 @@ class Play(ASTNode, CommonDirectives, frozen=True):
         return value
 
 
+class ImportPlaybook(ASTNode, CommonDirectives, frozen=True):
+    """Represents import_playbook Ansible tasks present in a playbook at the top level."""
+
+    import_playbook: str
+    when: Annotated[Sequence[Condition | bool], Listify] = Field(default_factory=tuple)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_keyword(cls, value: object) -> object:
+        """Normalize fully-qualified `import_playbook` action name."""
+        if not isinstance(value, dict):
+            return value
+
+        value = cast(dict[object, object], value.copy())
+        for fqn in (
+            "ansible.builtin.import_playbook",
+            "ansible.legacy.import_playbook",
+        ):
+            if fqn not in value:
+                continue
+            if "import_playbook" in value:
+                raise ValueError("Conflicting `import_playbook` directives")
+            value["import_playbook"] = value.pop(fqn)
+
+        return value
+
+
+def _distinguish_import_vs_play(obj: object) -> Literal["import", "play"] | None:
+    if isinstance(obj, dict):
+        if any(
+            isinstance(key, str) and is_import_playbook(key)
+            for key in cast(dict[object, object], obj)
+        ):
+            return "import"
+        return "play"
+    if isinstance(obj, Play):
+        return "play"
+    if isinstance(obj, ImportPlaybook):
+        return "import"
+
+    raise ValueError("Expected import_playbook and play to be a dictionary")
+
+
+#: A playbook entry: either a `Play` or an `ImportPlaybook`.
+#: `ImportPlaybook` takes precedence: If an `import_playbook` is present,
+#: it should be parsed as an `ImportPlaybook` instead of a `Play`.
+type PlaybookChild = Annotated[
+    Annotated[ImportPlaybook, Tag("import")] | Annotated[Play, Tag("play")],
+    Discriminator(_distinguish_import_vs_play),
+]
+
+
 class Playbook(ASTFile, frozen=True):
     """Represents an Ansible playbook."""
 
     #: List of plays defined in this playbook.
-    plays: Annotated[Sequence[Play], Lenient]
+    plays: Annotated[Sequence[PlaybookChild], Lenient]
 
     @classmethod
     @override

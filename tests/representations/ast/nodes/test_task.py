@@ -85,17 +85,6 @@ def describe_extracting_tasks():
         assert result.name == "test"
         assert result.loop == "{{ somelist }}"
 
-    def rejects_task_with_string_literal_loop():
-        yaml = """
-            name: test
-            debug: msg={{ item }}
-            loop: somelist
-        """
-        ctx = ExtractionContext(False)
-
-        with pytest.raises(ValidationError):
-            _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
-
     def extracts_task_with_loop_control():
         yaml = """
             name: test
@@ -141,6 +130,17 @@ def describe_extracting_tasks():
         assert result.loop_control.extended is True
         assert result.loop_control.extended_allitems is False
         assert result.loop_control.break_when == ["{{ myvar == 'world' }}"]
+
+    def rejects_task_with_string_literal_poll():
+        yaml = """
+            name: test
+            debug: msg={{ item }}
+            poll: not_an_int
+        """
+        ctx = ExtractionContext(False)
+
+        with pytest.raises(ValidationError):
+            _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def extracts_task_with_literal_boolean_when():
         yaml = """
@@ -662,6 +662,19 @@ def describe_common_directives():
 
         assert result.tags == ["web"]
 
+    def ignores_None_tag():
+        yaml = """
+            file: {}
+            tags:
+                - web
+                -
+        """
+        ctx = ExtractionContext(False)
+
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+        assert result.tags == ["web"]
+
     def normalizes_single_collection():
         yaml = """
             file: {}
@@ -697,3 +710,34 @@ def describe_common_directives():
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.environment == [{"PATH": "/custom/bin"}]
+
+    def allows_environment_value_types():
+        # ARTbio/GalaxyKickStart/roles/copy_additional_files/tasks/main.yml
+        yaml = """
+            shell: echo $PYTHONPATH $VIRTUAL_ENV
+            environment:
+                PYTHONPATH: null
+                VIRTUAL_ENV: "{{ test }}"
+        """
+        ctx = ExtractionContext(False)
+
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+        assert result.environment == [{"PYTHONPATH": None, "VIRTUAL_ENV": "{{ test }}"}]
+
+
+def describe_vars():
+    @pytest.mark.parametrize(
+        "identifier",
+        ["123test", "un¡code™", "def", "for"],
+    )
+    def rejects_invalid_identifiers(identifier: str):
+        yaml = f"""
+            file: {{}}
+            vars:
+                {identifier}: 123
+        """
+        ctx = ExtractionContext(False)
+
+        with pytest.raises(ValidationError):
+            _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)

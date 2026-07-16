@@ -33,19 +33,19 @@ class Normalizer(ABC):
         raise NotImplementedError
 
 
-class NormalizeNone(Normalizer):
-    """Normalizer that normalizes `None` values to the field's default."""
+class OmitNone(Normalizer):
+    """Normalizer that omits `None` values from a sequence."""
 
     @override
     @classmethod
     def normalize(
         cls, value: object, field_info: FieldInfo, validation_info: ValidationInfo
     ) -> object:
-        """Return the field's default if `value` is `None`."""
-        if value is not None:
+        """Return the field value with `None` values omitted if it's a sequence"""
+        if not isinstance(value, Sequence) or isinstance(value, str):
             return value
 
-        return field_info.get_default(call_default_factory=True, validated_data=value)  # pyright: ignore[reportAny]
+        return type(value)(element for element in value if element is not None)  # pyright: ignore[reportCallIssue]
 
 
 class Listify(Normalizer):
@@ -144,6 +144,6 @@ class Lenient(Normalizer):
                     adapter.validate_python(raw, context=validation_info.context)  # pyright: ignore[reportArgumentType] -- bad type defs?
                 )
             except ValidationError as exc:
-                context.broken_tasks.append(BrokenTask(raw=raw, reason=str(exc)))
+                context.broken_tasks.append(BrokenTask(raw=raw, reason=exc))
 
         return results

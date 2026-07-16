@@ -19,12 +19,12 @@ from pydantic import Discriminator, Field, Tag, field_validator, model_validator
 from scansible.types import AnyValue, ScalarValue
 from scansible.utils import ProjectPath, actions
 
-from .._normalizers import Lenient, Listify, NormalizeNone
+from .._normalizers import Lenient, Listify
 from .._validators import Identifier
 from ..common import ExtractionContext, RawDirectives, parse_file
 from .base import ASTFile, ASTNode
 from .directives import CommonDirectives
-from .expression import Condition, Expression
+from .expression import BareExpression, Condition, Expression
 
 # Adapted from ansible.constants
 #: Unqualified names of actions that take freeform (unparsed) arguments.
@@ -96,7 +96,7 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
     args: Mapping[str, AnyValue]
 
     #: Run task asynchronously for at most the given number of seconds.
-    async_val: int | Expression | None = 0
+    async_val: int | Expression | None = Field(default=0, alias="async")
     #: Conditional expression(s) to override "changed" status.
     changed_when: Annotated[Sequence[Condition | bool], Listify] = Field(
         default_factory=tuple
@@ -114,7 +114,13 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
     #: Loop on the task, or None if no loop. Can be a string (an expression),
     #: a list of arbitrary values, or, when the loop comes from `with_dict`, a
     #: dict of arbitrary items.
-    loop: Sequence[AnyValue] | Expression | Mapping[ScalarValue, AnyValue] | None = None
+    loop: (
+        Sequence[AnyValue]
+        | Expression
+        | BareExpression
+        | Mapping[ScalarValue, AnyValue]
+        | None
+    ) = None
     #: The type of loop used in old looping syntax (`with_*`), e.g.
     #: `with_items` -> `items`.
     loop_with: str | None = None
@@ -132,9 +138,7 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
     #: Retry task until condition(s) are satisfied.
     until: Annotated[Sequence[Condition | bool], Listify] = Field(default_factory=tuple)
     #: Condition on the task, or None if no condition.
-    when: Annotated[Sequence[Condition | bool], NormalizeNone, Listify] = Field(
-        default_factory=tuple
-    )
+    when: Annotated[Sequence[Condition | bool], Listify] = Field(default_factory=tuple)
 
     @field_validator("action", mode="after")
     @classmethod
@@ -314,13 +318,15 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
         return combined_args
 
     @classmethod
+    def _all_directives(cls) -> set[str]:
+        """Return the set of directives that exist on this entity."""
+        return {field.alias or name for name, field in cls.model_fields.items()}
+
+    @classmethod
     def _is_task_directive(cls, key: str) -> bool:
         """Whether `key` is a recognized task directive rather than a module action."""
         return (
-            key in cls.model_fields
-            or key == "static"
-            or key == "register"  # Aliased in model_fields
-            or key.startswith("with_")
+            key in cls._all_directives() or key == "static" or key.startswith("with_")
         )
 
     @classmethod
@@ -448,9 +454,7 @@ class TaskFile(ASTFile, frozen=True):
     """Represents a file containing tasks and blocks."""
 
     #: The top-level tasks or blocks contained in the file, in the order of definition.
-    tasks: Annotated[Sequence[TaskOrBlock], NormalizeNone, Lenient] = Field(
-        default_factory=tuple
-    )
+    tasks: Annotated[Sequence[TaskOrBlock], Lenient] = Field(default_factory=tuple)
 
     @classmethod
     @override
@@ -465,9 +469,7 @@ class HandlerFile(ASTFile, frozen=True):
     """Represents a file containing handlers."""
 
     #: The top-level handlers contained in the file, in the order of definition.
-    handlers: Annotated[Sequence[Handler], NormalizeNone, Lenient] = Field(
-        default_factory=tuple
-    )
+    handlers: Annotated[Sequence[Handler], Lenient] = Field(default_factory=tuple)
 
     @classmethod
     @override

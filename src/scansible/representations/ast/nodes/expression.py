@@ -6,6 +6,8 @@ In the future, they may become full-fledged `ASTNode` instances with parsed expr
 
 from __future__ import annotations
 
+from typing import Self
+
 from ansible.parsing.dataloader import DataLoader
 from ansible.template import Templar
 from pydantic import GetCoreSchemaHandler
@@ -34,17 +36,14 @@ class Expression(str):
         )
 
 
-class Condition(str):
-    """AST node representing an Ansible condition.
-
-    Ansible conditions are Jinja2 expressions without surrounding braces.
-    """
+class BareExpression(str):
+    """AST node representing an Ansible expression without surrounding braces."""
 
     @classmethod
     def __get_pydantic_core_schema__(
         cls, source_type: object, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
-        def validate(value: str) -> Condition:
+        def validate(value: str) -> Self:
             # FIXME: We need validation here to make sure it's a correct condition, but
             # the validation is complex and currently lives in the PDG builder.
             # When doing such validation, we may as well parse the expressions/conditions too.
@@ -53,3 +52,10 @@ class Condition(str):
         return core_schema.no_info_after_validator_function(
             validate, core_schema.str_schema()
         )
+
+
+class Condition(BareExpression):
+    """AST node representing an Ansible condition.
+
+    Ansible conditions are Jinja2 expressions without surrounding braces.
+    """

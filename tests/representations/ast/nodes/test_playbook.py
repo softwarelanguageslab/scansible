@@ -10,7 +10,10 @@ from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImpo
 from pydantic import ValidationError
 
 from scansible.representations.ast import Block, ExtractionContext, Play, Playbook, Task
-from scansible.representations.ast.nodes.playbook import PlayRoleRequirement
+from scansible.representations.ast.nodes.playbook import (
+    ImportPlaybook,
+    PlayRoleRequirement,
+)
 from scansible.utils import ProjectPath
 
 
@@ -88,6 +91,46 @@ def describe_extracting_plays():
         assert isinstance(result.roles[0], PlayRoleRequirement)
         assert result.roles[0].role == "testrole"
         assert result.vars == {"testvar": 123}
+
+    def extracts_play_with_dict_role():
+        yaml = """
+            name: test play
+            hosts: servers
+            roles:
+              - role: testrole
+                vars:
+                  testvar: 123
+            tasks:
+              - import_tasks: test
+        """
+        ctx = ExtractionContext(False)
+
+        result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+        assert len(result.roles) == 1
+        assert isinstance(result.roles[0], PlayRoleRequirement)
+        assert result.roles[0].role == "testrole"
+        assert result.roles[0].vars == {"testvar": 123}
+
+    def extracts_play_with_dict_role_with_name():
+        yaml = """
+            name: test play
+            hosts: servers
+            roles:
+              - name: testrole
+                vars:
+                  testvar: 123
+            tasks:
+              - import_tasks: test
+        """
+        ctx = ExtractionContext(False)
+
+        result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+        assert len(result.roles) == 1
+        assert isinstance(result.roles[0], PlayRoleRequirement)
+        assert result.roles[0].role == "testrole"
+        assert result.roles[0].vars == {"testvar": 123}
 
     def rejects_invalid_play():
         # missing hosts
@@ -179,6 +222,26 @@ def describe_extracting_plays():
         assert len(result.post_tasks) == 1
         assert len(result.handlers) == 1
 
+    def normalizes_none_task_lists():
+        yaml = """
+            name: test play
+            hosts: servers
+            pre_tasks:
+            tasks:
+            post_tasks:
+            handlers:
+            roles:
+        """
+        ctx = ExtractionContext(False)
+
+        result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+        assert len(result.pre_tasks) == 0
+        assert len(result.tasks) == 0
+        assert len(result.post_tasks) == 0
+        assert len(result.handlers) == 0
+        assert len(result.roles) == 0
+
     def ignores_removed_accelerate_directive():
         yaml = """
             name: test play
@@ -192,6 +255,34 @@ def describe_extracting_plays():
         result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.hosts == ["servers"]
+
+    def normalizes_deprecated_user():
+        yaml = """
+            name: test play
+            hosts: servers
+            user: testuser
+            tasks:
+                - debug: msg=test
+        """
+        ctx = ExtractionContext(False)
+
+        result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+        assert result.remote_user == "testuser"
+
+    def rejects_play_with_user_and_remoteuser():
+        yaml = """
+            name: test play
+            hosts: servers
+            user: testuser
+            remote_user: testuser
+            tasks:
+                - debug: msg=test
+        """
+        ctx = ExtractionContext(False)
+
+        with pytest.raises(ValidationError, match="mutually exclusive"):
+            _ = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def extracts_play_with_int_role():
         yaml = """
@@ -258,6 +349,55 @@ def describe_extracting_plays():
         assert result.vars_prompt[0].default == "hello"
 
 
+def describe_extracting_import_playbook():
+    def extracts_simple_import():
+        yaml = """
+            import_playbook: other.yml
+        """
+        ctx = ExtractionContext(False)
+
+        result = ImportPlaybook.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+        assert result.import_playbook == "other.yml"
+
+    def extracts_import_with_directives():
+        yaml = """
+            import_playbook: other.yml
+            vars:
+                x: 123
+            when: condition is True
+        """
+        ctx = ExtractionContext(False)
+
+        result = ImportPlaybook.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+        assert result.import_playbook == "other.yml"
+        assert result.vars == {"x": 123}
+        assert result.when == ["condition is True"]
+
+    @pytest.mark.parametrize("collection", ("ansible.legacy", "ansible.builtin"))
+    def normalizes_fully_qualified_names(collection: str):
+        yaml = f"""
+            {collection}.import_playbook: other.yml
+        """
+        ctx = ExtractionContext(False)
+
+        result = ImportPlaybook.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+        assert result.import_playbook == "other.yml"
+
+    def rejects_missing_action():
+        yaml = """
+            vars:
+                x: 123
+            when: condition is True
+        """
+        ctx = ExtractionContext(False)
+
+        with pytest.raises(ValidationError):
+            _ = ImportPlaybook.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+
 def describe_extracting_playbook():
     def extracts_correct_playbook(tmp_path: Path):
         yaml = """
@@ -304,6 +444,27 @@ def describe_extracting_playbook():
         assert len(result.plays) == 2
         assert isinstance(result.plays[0], Play)
         assert isinstance(result.plays[1], Play)
+
+    def extracts_playbooks_with_import(tmp_path: Path):
+        yaml = """
+            ---
+            - hosts: servers
+              name: config servers
+              tasks:
+                - file:
+                    path: test.txt
+                    state: present
+            - import_playbook: other.yml
+        """
+        _ = (tmp_path / "pb.yml").write_text(dedent(yaml))
+        ctx = ExtractionContext(lenient=False)
+
+        result = Playbook.load(ProjectPath(tmp_path, "pb.yml"), ctx)
+
+        assert result.path == Path("pb.yml")
+        assert len(result.plays) == 2
+        assert isinstance(result.plays[0], Play)
+        assert isinstance(result.plays[1], ImportPlaybook)
 
     def rejects_empty_playbooks(tmp_path: Path):
         _ = (tmp_path / "pb.yml").write_text("")

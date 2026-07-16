@@ -35,7 +35,7 @@ CREATE REL TABLE e_Input(FROM IntermediateValue TO Expression, FROM ScalarLitera
 CREATE REL TABLE e_Keyword(FROM IntermediateValue TO Task, FROM ScalarLiteral TO Task, FROM CompositeLiteral TO Task, keyword STRING);
 CREATE REL TABLE e_Composition(FROM IntermediateValue TO CompositeLiteral, FROM ScalarLiteral TO CompositeLiteral, FROM CompositeLiteral TO CompositeLiteral, index STRING);
 CREATE REL TABLE e_Def(FROM Task TO Variable, FROM Expression TO IntermediateValue, FROM IntermediateValue TO Variable, FROM ScalarLiteral TO Variable, FROM CompositeLiteral TO Variable);
-CREATE REL TABLE e_DefLoopItem(FROM IntermediateValue TO Variable, FROM CompositeLiteral TO Variable, loop_with STRING);
+CREATE REL TABLE e_DefLoopItem(FROM IntermediateValue TO Variable, FROM CompositeLiteral TO Variable, FROM ScalarLiteral TO Variable, loop_with STRING);
 """
 
 

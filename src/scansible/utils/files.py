@@ -69,7 +69,7 @@ class ProjectPath:
     def __init__(self, root_path: Path, file_path: Path | str) -> None:
         assert root_path.is_absolute()
         assert root_path.is_dir()
-        self.root = root_path
+        self.root = root_path.resolve()
 
         if not isinstance(file_path, Path):
             file_path = Path(file_path)

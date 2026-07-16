@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Self
+from typing import Self, cast
 
 from abc import ABC, abstractmethod
 
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
+from pydantic_core import PydanticUndefined
 
 from scansible.utils import ProjectPath
 
@@ -25,6 +26,18 @@ class ASTEntity(BaseModel, strict=True, frozen=True, extra="forbid"):
 
         assert info.field_name is not None
         field_info = cls.model_fields[info.field_name]
+
+        # If given an explicit `None`, always convert it to the directive's default.
+        # This is what Ansible seem to do _most_ of the time. It's possible that Ansible
+        # rejects some `None` values in certain cases, in such cases Scansible is possibly
+        # slightly more lenient, but that's okay.
+        if value is None:
+            default = cast(
+                object,
+                field_info.get_default(call_default_factory=True, validated_data=value),
+            )
+            if default is not PydanticUndefined:
+                value = default
 
         for meta in field_info.metadata:  # pyright: ignore[reportAny]
             if isinstance(meta, Normalizer) or (

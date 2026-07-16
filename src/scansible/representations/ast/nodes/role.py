@@ -7,6 +7,7 @@ from typing import Callable, override
 from collections.abc import Sequence
 from functools import cached_property
 
+from ansible.errors import AnsibleParserError
 from pydantic import ValidationError
 
 from scansible.utils import ProjectPath, SourceFileMap, find_all_files, find_file
@@ -27,8 +28,8 @@ def _safe_extract[T: ASTFile](
     """Run `extractor`, recording a `BrokenFile` and returning `None` on validation failure instead of raising."""
     try:
         return extractor(file_path, ctx)
-    except ValidationError as e:
-        ctx.broken_files.append(BrokenFile(path=file_path.relative, reason=str(e)))
+    except (ValidationError, AnsibleParserError) as e:
+        ctx.broken_files.append(BrokenFile(path=file_path.relative, reason=e))
 
 
 def _safe_extract_all[T: ASTFile](
@@ -97,11 +98,13 @@ class Role(ASTFile, frozen=True, arbitrary_types_allowed=True):
         if (meta_file_path := find_file(path, "meta/main")) is not None:
             meta_file = _safe_extract(MetaFile.load, meta_file_path, context)
 
-        if extract_all:
-            gather_files = find_all_files
-        else:
+        def gather_files(dir_path: ProjectPath) -> Sequence[ProjectPath]:
+            if not dir_path.absolute.exists():
+                return []
 
-            def gather_files(dir_path: ProjectPath) -> Sequence[ProjectPath]:
+            if extract_all:
+                return find_all_files(dir_path)
+            else:
                 main_file = find_file(dir_path, "main")
                 return [main_file] if main_file is not None else []
 

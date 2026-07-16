@@ -63,7 +63,7 @@ def describe_extracting_roles():
         assert len(hf.handlers) == 1
 
     def extracts_roles_with_files_missing(tmp_path: Path):
-        for dirname in ("meta", "tasks", "vars", "defaults", "handlers"):
+        for dirname in ("tasks", "defaults"):
             (tmp_path / dirname).mkdir()
         _ = (tmp_path / "tasks" / "main.yml").write_text(TASKS)
         _ = (tmp_path / "defaults" / "main.yml").write_text(DEFAULTS)
@@ -83,7 +83,7 @@ def describe_extracting_roles():
         assert result.main_handlers_file is None
 
     def extracts_roles_with_broken_files(tmp_path: Path):
-        for dirname in ("meta", "tasks", "vars", "defaults", "handlers"):
+        for dirname in ("tasks", "defaults"):
             (tmp_path / dirname).mkdir()
         _ = (tmp_path / "tasks" / "main.yml").write_text(BROKEN_TASKS)
         _ = (tmp_path / "defaults" / "main.yml").write_text(DEFAULTS)
@@ -110,7 +110,7 @@ def describe_extracting_roles():
                 - test
                 - test2
         """
-        for dirname in ("meta", "tasks", "vars", "defaults", "handlers"):
+        for dirname in ("meta", "tasks", "defaults"):
             (tmp_path / dirname).mkdir()
         _ = (tmp_path / "meta" / "main.yml").write_text(dedent(broken_meta))
         _ = (tmp_path / "tasks" / "main.yml").write_text(TASKS)
@@ -136,7 +136,7 @@ def describe_extracting_roles():
             - apt:
                 name: test
         """
-        for dirname in ("meta", "tasks", "vars", "defaults", "handlers"):
+        for dirname in ("tasks", "defaults"):
             (tmp_path / dirname).mkdir()
         _ = (tmp_path / "tasks" / "main.yml").write_text(dedent(tasks_1))
         _ = (tmp_path / "tasks" / "other.yml").write_text(dedent(tasks_2))

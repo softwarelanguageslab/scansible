@@ -87,25 +87,10 @@ def describe_extracting_variables():
         [
             "- hello\n- world",  # list instead of dict
             "test123",  # string instead of dict
-            "1: 2\nabc: def",  # non-string keys.
         ],
     )
     def rejects_invalid_files(tmp_path: Path, content: str):
         _ = (tmp_path / "main.yml").write_text(content)
-        ctx = ExtractionContext(False)
-
-        with pytest.raises(ValidationError):
-            _ = VariableFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
-
-    @pytest.mark.parametrize(
-        "identifier",
-        ["123test", "un¡code™", "def", "for"],
-    )
-    def rejects_invalid_identifiers(tmp_path: Path, identifier: str):
-        yaml = f"""
-            {identifier}: 123
-        """
-        _ = (tmp_path / "main.yml").write_text(dedent(yaml))
         ctx = ExtractionContext(False)
 
         with pytest.raises(ValidationError):

@@ -122,6 +122,20 @@ def describe_extracting_metadata_file():
 
             assert not result.metablock.platforms
 
+        def ignores_malformed_platform_in_lenient_mode(tmp_path: Path):
+            yaml = """
+                galaxy_info:
+                    platforms:
+                        - CentOS6
+            """
+            _ = (tmp_path / "main.yml").write_text(dedent(yaml))
+            ctx = ExtractionContext(True)
+
+            result = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
+
+            assert result.metablock.platforms == []
+            assert ctx.broken_tasks[0].raw == "CentOS6"
+
     def describe_dependencies():
         def extracts_simple_string_dependencies(tmp_path: Path):
             yaml = """

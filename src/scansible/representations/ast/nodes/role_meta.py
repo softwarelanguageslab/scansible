@@ -1,20 +1,26 @@
-# pyright: reportUnknownVariableType = false
+# pyright: reportUnknownVariableType = false, reportUnknownMemberType = false
 
 """AST nodes for role metadata (`meta/main.yml`) files."""
 
 from __future__ import annotations
 
-from typing import Annotated, override
+from typing import Annotated, cast, override
 
 from collections.abc import Mapping, Sequence
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import (
+    Field,
+    ValidationError,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 from scansible.types import AnyValue
 from scansible.utils import FrozenDict, ProjectPath
 
 from .._normalizers import Lenient, Listify, Stringify
-from ..common import ExtractionContext, parse_file
+from ..common import BrokenTask, ExtractionContext, parse_file
 from .base import ASTFile, ASTNode
 from .directives import CommonDirectives
 from .expression import Condition, Expression
@@ -92,6 +98,19 @@ class RoleRequirement(ASTNode, CommonDirectives, frozen=True):
                 new_value["params"][k] = v
         return new_value
 
+    @model_validator(mode="before")
+    @classmethod
+    def _extract_role_name(cls, value: object) -> object:
+        """Derive the `role` field from `name`."""
+        if not isinstance(value, dict) or "role" in value:
+            return value
+
+        value = value.copy()
+        if "name" in value:
+            value["role"] = value["name"]
+
+        return value
+
 
 class MetaRoleRequirement(RoleRequirement, frozen=True):
     """Represents a role dependency specified in a role's `meta/main.yml` file.
@@ -107,7 +126,7 @@ class MetaRoleRequirement(RoleRequirement, frozen=True):
 
         # Need to make sure these run in the correct order.
         value = cls._parse_from_string(value)
-        value = cls._extract_role_name(value)
+        value = cls._extract_role_name_from_src(value)
         return value
 
     @classmethod
@@ -124,7 +143,7 @@ class MetaRoleRequirement(RoleRequirement, frozen=True):
         # dependency. Validation as per `ansible.playbook.role.requirement`.
         match value.split(","):
             case [src, version, name]:
-                return {"src": src, "version": version, "name": name}
+                return {"src": src, "version": version, "role": name}
             case [src, version]:
                 return {"src": src, "version": version}
             case [src]:
@@ -135,30 +154,22 @@ class MetaRoleRequirement(RoleRequirement, frozen=True):
                 )
 
     @classmethod
-    def _extract_role_name(cls, value: object) -> object:
+    def _extract_role_name_from_src(cls, value: object) -> object:
         """Derive the `role` field from `name`/`src`."""
-        if not isinstance(value, dict) or "role" in value:
+        if not isinstance(value, dict) or "role" in value or "src" not in value:
             return value
 
+        src = value.pop("src")
+        if not isinstance(src, str):
+            raise ValueError("Expected `src` in new-style role requirement to be a str")
+
         # Omit role soure info
-        new_value = {
-            k: v for k, v in value.items() if k not in ("src", "version", "scm")
-        }
+        _ = value.pop("version", None)
+        _ = value.pop("scm", None)
 
-        if "name" in value:
-            new_value["role"] = value["name"]
-        elif "src" in value:
-            src = value["src"]
-            if not isinstance(src, str):
-                raise ValueError(
-                    "Expected `src` in new-style role requirement to be a str"
-                )
+        value["role"] = cls._extract_name_from_src(src)
 
-            new_value["role"] = cls._extract_name_from_src(src)
-        else:
-            raise ValueError("Expected `src` or `name` in new-style role requirement")
-
-        return new_value
+        return value
 
     @classmethod
     def _extract_name_from_src(cls, src: str) -> str:
@@ -176,7 +187,7 @@ class MetaBlock(ASTNode, frozen=True, extra="ignore"):
     """Represents a role metadata block."""
 
     #: Platforms supported by the role.
-    platforms: Annotated[Sequence[Platform], Listify] = Field(default_factory=tuple)
+    platforms: Sequence[Platform] = Field(default_factory=tuple)
     #: Role dependencies.
     dependencies: Annotated[Sequence[MetaRoleRequirement], Lenient] = Field(
         default_factory=tuple
@@ -184,11 +195,29 @@ class MetaBlock(ASTNode, frozen=True, extra="ignore"):
 
     @field_validator("platforms", mode="before")
     @classmethod
-    def _convert_platforms(cls, value: object) -> object:
+    def _convert_platforms(cls, value: object, info: ValidationInfo) -> object:
         """Convert the platforms list into a consistent schema before validation."""
 
-        assert isinstance(value, list)  # Should be covered by the Listify marker.
-        raw_platforms = [_RawPlatform.model_validate(platform) for platform in value]
+        lenient = isinstance(info.context, ExtractionContext) and info.context.lenient
+
+        # Cannot rely on Listify as that normalization only occurs after this validator is ran.
+        if not isinstance(value, Sequence) or isinstance(value, str):
+            value = [value]
+
+        raw_platforms: list[_RawPlatform] = []
+        for raw in value:
+            try:
+                raw_platforms.append(
+                    _RawPlatform.model_validate(raw, context=info.context)
+                )
+            except ValidationError as exc:
+                if not lenient:
+                    raise
+
+                cast(ExtractionContext, info.context).broken_tasks.append(
+                    BrokenTask(raw=raw, reason=exc)  # pyright: ignore[reportUnknownArgumentType]
+                )
+
         return [
             platform
             for raw_platform in raw_platforms

@@ -83,22 +83,22 @@ class Position(BaseModel, strict=True, frozen=True, extra="forbid"):
         return {"file": Path(file), "start_line": line, "start_column": column}
 
 
-class BrokenTask(BaseModel, frozen=True):
+class BrokenTask(BaseModel, frozen=True, arbitrary_types_allowed=True):
     """Represents a task/block that could not be extracted."""
 
     #: The raw datastructure that failed to extract.
     raw: object
     #: The reason for failure.
-    reason: str
+    reason: ValidationError
 
 
-class BrokenFile(BaseModel, frozen=True):
+class BrokenFile(BaseModel, frozen=True, arbitrary_types_allowed=True):
     """Represents a file that could not be parsed or extracted."""
 
     #: The relative path to the file in the project.
     path: RelativePath
     #: The reason for failure.
-    reason: str
+    reason: Exception
 
 
 def parse_file(path: ProjectPath) -> object:

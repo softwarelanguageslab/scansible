@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, model_validator
 from scansible.types import AnyValue
 from scansible.utils import FrozenDict
 
-from .._normalizers import Listify
+from .._normalizers import Listify, OmitNone
 from .._validators import Identifier
 from ..common import RawDirectives
 from .expression import Expression
@@ -41,9 +41,10 @@ class CommonDirectives(BaseModel, frozen=True):
     ] = Field(default_factory=tuple)
 
     #: Dictionary converted into environment variables.
-    environment: Annotated[Sequence[Mapping[str, str] | str], Listify] = Field(
-        default_factory=tuple
+    environment: Annotated[Sequence[Mapping[str, AnyValue] | Expression], Listify] = (
+        Field(default_factory=tuple)
     )
+    # FIXME: Ansible coerces non-bool scalars into booleans, we should do this too.
     #: To disable logging of action.
     no_log: bool | Expression | None = None
     #: Run on a single host only.
@@ -78,7 +79,9 @@ class CommonDirectives(BaseModel, frozen=True):
     become_exe: str | None = None
 
     #: Tags on the entity.
-    tags: Annotated[Sequence[str | int], Listify] = Field(default_factory=tuple)
+    tags: Annotated[Sequence[str | int], Listify, OmitNone] = Field(
+        default_factory=tuple
+    )
     #: List of collections to search for modules in this entity.
     collections: Annotated[Sequence[str], Listify] = Field(default_factory=tuple)
 
