@@ -14,7 +14,7 @@ from scansible.utils.actions import is_import_playbook
 
 from .._normalizers import Lenient, Listify
 from .._validators import Identifier
-from ..common import ExtractionContext, RawDirectives, parse_file
+from ..common import ExtractionContext, RawDirectives, copy_dict, parse_file
 from .base import ASTFile, ASTNode
 from .directives import CommonDirectives
 from .expression import Condition, Expression
@@ -116,7 +116,7 @@ class Play(ASTNode, CommonDirectives, frozen=True):
         if not isinstance(value, dict):
             return value
 
-        value = cast(RawDirectives, value.copy())
+        value = cast(RawDirectives, copy_dict(value))  # pyright: ignore[reportUnknownArgumentType]
 
         # remove the "accelerate" key if present. It was removed in 2.4
         _ = value.pop("accelerate", None)
@@ -172,7 +172,7 @@ class ImportPlaybook(ASTNode, CommonDirectives, frozen=True):
         if not isinstance(value, dict):
             return value
 
-        value = cast(dict[object, object], value.copy())
+        value = cast(RawDirectives, copy_dict(value))  # pyright: ignore[reportUnknownArgumentType]
         for fqn in (
             "ansible.builtin.import_playbook",
             "ansible.legacy.import_playbook",

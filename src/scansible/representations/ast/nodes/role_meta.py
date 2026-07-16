@@ -20,7 +20,7 @@ from scansible.types import AnyValue
 from scansible.utils import FrozenDict, ProjectPath
 
 from .._normalizers import Lenient, Listify, Stringify
-from ..common import BrokenTask, ExtractionContext, parse_file
+from ..common import BrokenTask, ExtractionContext, RawDirectives, copy_dict, parse_file
 from .base import ASTFile, ASTNode
 from .directives import CommonDirectives
 from .expression import Condition, Expression
@@ -105,7 +105,7 @@ class RoleRequirement(ASTNode, CommonDirectives, frozen=True):
         if not isinstance(value, dict) or "role" in value:
             return value
 
-        value = value.copy()
+        value = cast(RawDirectives, copy_dict(value))  # pyright: ignore[reportUnknownArgumentType]
         if "name" in value:
             value["role"] = value["name"]
 
@@ -215,7 +215,7 @@ class MetaBlock(ASTNode, frozen=True, extra="ignore"):
                     raise
 
                 cast(ExtractionContext, info.context).broken_tasks.append(
-                    BrokenTask(raw=raw, reason=exc)  # pyright: ignore[reportUnknownArgumentType]
+                    BrokenTask(raw=raw, reason=exc)
                 )
 
         return [

@@ -9,6 +9,7 @@ from typing import Annotated, cast
 from pathlib import Path
 
 from ansible.parsing.dataloader import DataLoader
+from ansible.parsing.yaml.objects import AnsibleMapping
 from pydantic import (
     BaseModel,
     PositiveInt,
@@ -105,3 +106,14 @@ def parse_file(path: ProjectPath) -> object:
     """Parse a YAML file using Ansible's parser."""
     loader = DataLoader()
     return loader.load_from_file(str(path.absolute))
+
+
+def copy_dict[K, V](value: dict[K, V]) -> dict[K, V]:
+    """Copy an Ansible parsed dict while retaining the `ansible_pos` property."""
+    if isinstance(value, AnsibleMapping):
+        copy = AnsibleMapping(value)
+        copy.ansible_pos = value.ansible_pos
+    else:
+        copy = value.copy()
+
+    return copy  # pyright: ignore[reportReturnType]

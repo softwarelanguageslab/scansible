@@ -15,7 +15,7 @@ from scansible.utils import FrozenDict
 
 from .._normalizers import Listify, OmitNone
 from .._validators import Identifier
-from ..common import RawDirectives
+from ..common import RawDirectives, copy_dict
 from .expression import Expression
 
 
@@ -95,7 +95,7 @@ class CommonDirectives(BaseModel, frozen=True):
         if not isinstance(value, dict):
             return value
 
-        value = cast(RawDirectives, value.copy())
+        value = cast(RawDirectives, copy_dict(value))  # pyright: ignore[reportUnknownArgumentType]
         return cls._normalize_common_directives(value)
 
     @classmethod

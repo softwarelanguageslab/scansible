@@ -21,7 +21,7 @@ from scansible.utils import ProjectPath, actions
 
 from .._normalizers import Lenient, Listify
 from .._validators import Identifier
-from ..common import ExtractionContext, RawDirectives, parse_file
+from ..common import ExtractionContext, RawDirectives, copy_dict, parse_file
 from .base import ASTFile, ASTNode
 from .directives import CommonDirectives
 from .expression import BareExpression, Condition, Expression
@@ -159,7 +159,7 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
         if not isinstance(value, dict):
             return value
 
-        value = cast(RawDirectives, value.copy())
+        value = cast(RawDirectives, copy_dict(value))  # pyright: ignore[reportUnknownArgumentType]
         value = cls._normalize_common_directives(value)
         value = cls._parse_task_action(value)
         value = cls._transform_includes(value)

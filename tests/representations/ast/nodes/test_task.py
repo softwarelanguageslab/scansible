@@ -24,6 +24,9 @@ def describe_extracting_tasks():
         assert result.action == "file"
         assert result.args == {"path": "test.txt", "state": "present"}
         assert result.name == "Ensure file exists"
+        assert not result.position.is_synthetic
+        assert result.position.start_line == 2
+        assert result.position.start_column == 1
 
     def extracts_standard_task_with_action_shorthand():
         yaml = """
