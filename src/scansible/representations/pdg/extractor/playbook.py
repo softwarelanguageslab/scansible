@@ -4,7 +4,13 @@ from typing import Sequence
 
 from loguru import logger
 
-from scansible.representations.ast import Block, Handler, Playbook, RoleRequirement
+from scansible.representations.ast import (
+    Block,
+    Handler,
+    Play,
+    Playbook,
+    RoleRequirement,
+)
 
 from .context import ExtractionContext
 from .expressions import EnvironmentType
@@ -27,6 +33,10 @@ class PlaybookExtractor:
         # for all hosts, whereas the other files are for specific hosts.
 
         for play in self.playbook.plays:
+            if not isinstance(play, Play):
+                # Skip ImportPlaybook
+                continue
+
             with (
                 self.context.vars.enter_scope(EnvironmentType.PLAY_VARS),
                 self.context.vars.enter_scope(EnvironmentType.PLAY_VARS_PROMPT),
