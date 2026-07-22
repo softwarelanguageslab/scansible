@@ -113,6 +113,8 @@ class StructuralGraphExtractor:
                 )
             else:
                 location = None
+        if not isinstance(location, tuple):
+            location = None
         if location is not None and location[0] == "unknown file":
             location = None
         reason = str(message)
