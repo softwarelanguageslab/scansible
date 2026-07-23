@@ -1,54 +1,24 @@
 from __future__ import annotations
 
-from typing import NamedTuple, Protocol, override
+from typing import override
 
 from collections.abc import Iterable
 from datetime import date, datetime
 
-from ruamel.yaml import StreamMark
+from scansible.utils import Position, Positioned
 
 
-class LineColumn(NamedTuple):
-    """Pair of line and column numbers."""
-
-    #: Line number, 1-indexed.
-    line: int
-    #: Column number, 1-indexed.
-    column: int
-
-    @classmethod
-    def from_yaml_mark(cls, mark: StreamMark) -> LineColumn:
-        return cls(line=mark.line + 1, column=mark.column + 1)
-
-
-class Position(NamedTuple):
-    """Source code position of an entity."""
-
-    #: Relative path to the file in which this entity occurs.
-    path: str
-    #: Start position.
-    start: LineColumn
-    #: End position.
-    end: LineColumn
-
-
-class Positioned(Protocol):
-    """Mixin for elements with a code position."""
+class YamlNode(Positioned):
+    """Base class for YAML nodes."""
 
     __position__: Position
-
-
-class YamlNode:
-    """Base class for YAML nodes."""
 
     pass
 
 
 ## Custom YAML subclasses
-class YamlStr(str, YamlNode, Positioned):
+class YamlStr(str, YamlNode):
     """String originating from a YAML document, with position information."""
-
-    __position__: Position
 
     def __new__(cls, value: str, position: Position) -> YamlStr:
         obj = str.__new__(cls, value)
@@ -56,10 +26,8 @@ class YamlStr(str, YamlNode, Positioned):
         return obj
 
 
-class YamlInt(int, YamlNode, Positioned):
+class YamlInt(int, YamlNode):
     """Integer originating from a YAML document, with position information."""
-
-    __position__: Position
 
     def __new__(cls, value: int, position: Position) -> YamlInt:
         obj = int.__new__(cls, value)
@@ -67,7 +35,7 @@ class YamlInt(int, YamlNode, Positioned):
         return obj
 
 
-class YamlBool(YamlNode, Positioned):
+class YamlBool(YamlNode):
     """Boolean originating from a YAML document, with position information.
 
     Note that this is NOT a subclass of `bool`.
@@ -85,6 +53,10 @@ class YamlBool(YamlNode, Positioned):
         return self._real_bool
 
     @override
+    def __str__(self) -> str:
+        return str(self._real_bool)
+
+    @override
     def __eq__(self, other: object) -> bool:
         if isinstance(other, YamlBool):
             return self._real_bool == other._real_bool
@@ -95,10 +67,8 @@ class YamlBool(YamlNode, Positioned):
         return hash(self._real_bool)
 
 
-class YamlFloat(float, YamlNode, Positioned):
+class YamlFloat(float, YamlNode):
     """Float originating from a YAML document, with position information."""
-
-    __position__: Position
 
     def __new__(cls, value: float, position: Position) -> YamlFloat:
         obj = float.__new__(cls, value)
@@ -106,10 +76,8 @@ class YamlFloat(float, YamlNode, Positioned):
         return obj
 
 
-class YamlDate(date, YamlNode, Positioned):
+class YamlDate(date, YamlNode):
     """Date originating from a YAML document, with position information."""
-
-    __position__: Position
 
     def __new__(cls, value: date, position: Position) -> YamlDate:
         obj = date.__new__(cls, value.year, value.month, value.day)
@@ -117,10 +85,8 @@ class YamlDate(date, YamlNode, Positioned):
         return obj
 
 
-class YamlDatetime(datetime, YamlNode, Positioned):
+class YamlDatetime(datetime, YamlNode):
     """Datetime originating from a YAML document, with position information."""
-
-    __position__: Position
 
     def __new__(cls, value: datetime, position: Position) -> YamlDatetime:
         obj = datetime.__new__(
@@ -138,10 +104,8 @@ class YamlDatetime(datetime, YamlNode, Positioned):
         return obj
 
 
-class YamlVaultValue(str, YamlNode, Positioned):
+class YamlVaultValue(str, YamlNode):
     """Vault-encrypted value originating from a YAML document, with position information."""
-
-    __position__: Position
 
     def __new__(cls, value: str, position: Position) -> YamlVaultValue:
         obj = str.__new__(cls, value)
@@ -149,12 +113,10 @@ class YamlVaultValue(str, YamlNode, Positioned):
         return obj
 
 
-class YamlUnsafeStr(str, YamlNode, Positioned):
+class YamlUnsafeStr(str, YamlNode):
     """Unsafe string originating from a YAML document, with position information.
 
     Unsafe strings should not be templated."""
-
-    __position__: Position
 
     def __new__(cls, value: str, position: Position) -> YamlUnsafeStr:
         obj = str.__new__(cls, value)
@@ -162,7 +124,7 @@ class YamlUnsafeStr(str, YamlNode, Positioned):
         return obj
 
 
-class YamlNone(YamlNode, Positioned):
+class YamlNone(YamlNode):
     """Null value originating from a YAML document, with position information.
 
     Note that this is NOT a subclass of `NoneType` (impossible in Python).
@@ -178,6 +140,10 @@ class YamlNone(YamlNode, Positioned):
         return False
 
     @override
+    def __str__(self) -> str:
+        return "None"
+
+    @override
     def __eq__(self, other: object) -> bool:
         return other is None or isinstance(other, YamlNone)
 
@@ -186,7 +152,7 @@ class YamlNone(YamlNode, Positioned):
         return hash(None)
 
 
-class YamlSeq[T: YamlValue](list[T], YamlNode, Positioned):
+class YamlSeq[T: YamlValue](list[T], YamlNode):
     """Sequence originating from a YAML document, with position information."""
 
     __position__: Position
@@ -199,7 +165,7 @@ class YamlSeq[T: YamlValue](list[T], YamlNode, Positioned):
         self.__position__ = position
 
 
-class YamlMap[K: YamlScalar, V: YamlValue](dict[K, V], YamlNode, Positioned):
+class YamlMap[K: YamlScalar, V: YamlValue](dict[K, V], YamlNode):
     """Mapping originating from a YAML document, with position information."""
 
     __position__: Position
@@ -212,6 +178,10 @@ class YamlMap[K: YamlScalar, V: YamlValue](dict[K, V], YamlNode, Positioned):
         else:
             super().__init__()
         self.__position__ = position
+
+    @override
+    def copy(self) -> YamlMap[K, V]:
+        return YamlMap(self.items(), position=self.__position__)
 
 
 #: Type union of scalar values originating from YAML documents.

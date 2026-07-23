@@ -473,8 +473,8 @@ class ExtractionContext:
         column: int
 
         if isinstance(ds, ast.ASTNode) and not ds.position.is_synthetic:
-            file = str(ds.position.file)
-            line, column = ds.position.start_line, ds.position.start_column
+            file = str(ds.position.path)
+            line, column = ds.position.start.line, ds.position.start.column
         elif hasattr(ds, "ansible_pos"):
             file, line, column = ds.ansible_pos  # type: ignore[attr-defined]
         elif hasattr(ds, "location"):

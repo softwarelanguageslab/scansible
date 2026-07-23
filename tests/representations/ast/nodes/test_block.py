@@ -6,6 +6,7 @@ import pytest
 from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImport]
 
 from scansible.representations.ast import Block, ExtractionContext, Task
+from scansible.representations.ast.nodes.expression import BoolLiteral
 
 
 def describe_extracting_blocks():
@@ -70,12 +71,14 @@ def describe_extracting_blocks():
 
         assert result is not None
         assert len(result.block) == 2
-        assert isinstance(result.block[0], Task)
-        assert isinstance(result.block[1], Block)
-        assert result.block[0].name == "test"
-        assert len(result.block[1].block) == 1
-        assert isinstance(result.block[1].block[0], Task)
-        assert result.block[1].block[0].name == "test"
+        c1 = result.block[0]
+        c2 = result.block[1]
+        assert isinstance(c1, Task)
+        assert isinstance(c2, Block)
+        assert c1.name == "test"
+        assert len(c2.block) == 1
+        assert isinstance(c2.block[0], Task)
+        assert c2.block[0].name == "test"
 
     def extracts_block_directives():
         yaml = """
@@ -91,10 +94,10 @@ def describe_extracting_blocks():
 
         result = Block.model_validate(parse_yaml_dict(yaml), context=ctx)
 
-        assert result.when == ["some_condition"]
-        assert result.notify == ["a handler"]
+        assert result.when == ("some_condition",)
+        assert result.notify == ("a handler",)
         assert result.delegate_to == "otherhost"
-        assert result.delegate_facts is True
+        assert result.delegate_facts == BoolLiteral(True)
 
     def does_not_eagerly_load_import_tasks():
         yaml = """
@@ -107,8 +110,9 @@ def describe_extracting_blocks():
 
         assert result is not None
         assert len(result.block) == 1
-        assert isinstance(result.block[0], Task)
-        assert result.block[0].action == "import_tasks"
+        c = result.block[0]
+        assert isinstance(c, Task)
+        assert c.action == "import_tasks"
 
     def rejects_non_blocks():
         yaml = """

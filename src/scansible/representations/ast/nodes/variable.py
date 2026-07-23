@@ -4,15 +4,14 @@ from __future__ import annotations
 
 from typing import override
 
-from collections.abc import Mapping
-
 from pydantic import Field
 
-from scansible.types import AnyValue, ScalarValue
-from scansible.utils import FrozenDict, ProjectPath
+from scansible.representations.cst import parse_file
+from scansible.utils import ProjectPath
 
-from ..common import ExtractionContext, parse_file
+from ..common import ExtractionContext
 from .base import ASTFile
+from .expression import AnyExpression, MapLiteral, ScalarLiteral
 
 
 class VariableFile(ASTFile, frozen=True):
@@ -21,8 +20,8 @@ class VariableFile(ASTFile, frozen=True):
     #: The variables contained within the file. The order is irrelevant. Note that, contrary to play/task/block vars,
     #: variable names in variable files are not validated as identifiers, and Ansible accepts any scalar value as the
     #: variable name.
-    variables: Mapping[ScalarValue, AnyValue] = Field(
-        default_factory=FrozenDict[ScalarValue, AnyValue]
+    variables: MapLiteral[ScalarLiteral, AnyExpression] = Field(
+        default_factory=MapLiteral
     )
 
     @classmethod

@@ -33,66 +33,6 @@ class Normalizer(ABC):
         raise NotImplementedError
 
 
-class OmitNone(Normalizer):
-    """Normalizer that omits `None` values from a sequence."""
-
-    @override
-    @classmethod
-    def normalize(
-        cls, value: object, field_info: FieldInfo, validation_info: ValidationInfo
-    ) -> object:
-        """Return the field value with `None` values omitted if it's a sequence"""
-        if not isinstance(value, Sequence) or isinstance(value, str):
-            return value
-
-        return type(value)(element for element in value if element is not None)  # pyright: ignore[reportCallIssue]
-
-
-class Listify(Normalizer):
-    """Normalizer that normalizes single values to a list of that value."""
-
-    @override
-    @classmethod
-    def normalize(
-        cls, value: object, field_info: FieldInfo, validation_info: ValidationInfo
-    ) -> object:
-        """Wrap `value` in a list unless it already is one."""
-        if isinstance(value, Sequence) and not isinstance(value, str):
-            return value
-
-        return [value]
-
-
-class Stringify(Normalizer):
-    """Normalizer that normalizes non-string values to stringified values.
-
-    By default, it only normalizes int, float, and bool values, and recursively normalizes
-    entries in lists.
-    """
-
-    @override
-    @classmethod
-    def normalize(
-        cls, value: object, field_info: FieldInfo, validation_info: ValidationInfo
-    ) -> object:
-        """Stringify `value` (recursively over sequences)."""
-        if isinstance(value, str):
-            return value
-
-        if isinstance(value, (int, float, bool)):
-            return str(value)
-
-        if isinstance(value, Sequence):
-            return type(value)(
-                (
-                    cls.normalize(element, field_info, validation_info)
-                    for element in value
-                )  # pyright: ignore[reportCallIssue]
-            )
-
-        return value
-
-
 class Lenient(Normalizer):
     """Normalizer that enables parsing in sequences to be lenient.
 
@@ -121,8 +61,12 @@ class Lenient(Normalizer):
         cls, value: object, field_info: FieldInfo, validation_info: ValidationInfo
     ) -> object:
         """Validate each item, dropping ones that fail when lenient."""
-        if not isinstance(value, Sequence):
+        if value == None:  # noqa: E711 -- could be YamlNone
             return value
+
+        if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+            # Not exactly lenient, but all usages of lenient sequence expect real sequences (e.g., a task sequence does not accept a single task).
+            raise ValueError("Expected a sequence")
 
         if validation_info.context is None:
             return value

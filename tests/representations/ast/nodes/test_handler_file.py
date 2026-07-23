@@ -34,7 +34,7 @@ def describe_extracting_handler_files():
         assert isinstance(result.handlers[0], Handler)
         assert isinstance(result.handlers[1], Handler)
         assert result.handlers[0].name == "restart service"
-        assert result.handlers[1].listen == ["a topic"]
+        assert result.handlers[1].listen == ("a topic",)
 
     def allows_handler_files_to_be_empty(tmp_path: Path):
         yaml = "# just a comment"

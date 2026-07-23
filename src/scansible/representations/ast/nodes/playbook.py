@@ -8,16 +8,25 @@ from collections.abc import Sequence
 
 from pydantic import Discriminator, Field, Tag, field_validator, model_validator
 
-from scansible.types import AnyValue
+from scansible.representations.cst import parse_file
 from scansible.utils import ProjectPath
 from scansible.utils.actions import is_import_playbook
 
-from .._normalizers import Lenient, Listify
-from .._validators import Identifier
-from ..common import ExtractionContext, RawDirectives, copy_dict, parse_file
+from .._normalizers import Lenient
+from ..common import ExtractionContext, RawDirectives
 from .base import ASTFile, ASTNode
 from .directives import CommonDirectives
-from .expression import Condition, Expression
+from .expression import (
+    AnyExpression,
+    BoolLiteral,
+    Condition,
+    Expression,
+    Identifier,
+    IntLiteral,
+    PercentLiteral,
+    SeqLiteral,
+    StrLiteral,
+)
 from .role_meta import RoleRequirement
 from .task import Handler, TaskOrBlock
 
@@ -28,21 +37,21 @@ class VarsPrompt(ASTNode, frozen=True):
     #: Name of the variable.
     name: Identifier
     #: Prompt to show.
-    prompt: str | None = None
+    prompt: StrLiteral | None = None
     #: Default value.
-    default: AnyValue | None = None
+    default: AnyExpression | None = None
     #: Whether to hide the input on the terminal (e.g. for passwords).
-    private: bool | Expression | None = None
+    private: BoolLiteral | Expression | None = None
     #: Whether the user needs to re-enter to confirm.
-    confirm: bool | Expression = False
+    confirm: BoolLiteral | Expression = BoolLiteral(False)
     #: Encryption algorithm to use on the value.
-    encrypt: str | None = None
+    encrypt: StrLiteral | None = None
     #: Salt size to use in encryption.
-    salt_size: int | Expression | None = None
+    salt_size: IntLiteral | Expression | None = None
     #: Salt to use in encryption.
-    salt: str | None = None
+    salt: StrLiteral | None = None
     #: Whether the user input is unsafe and should not be templated.
-    unsafe: bool | Expression | None = None
+    unsafe: BoolLiteral | Expression | None = None
 
 
 class PlayRoleRequirement(RoleRequirement, frozen=True):
@@ -66,48 +75,56 @@ class Play(ASTNode, CommonDirectives, frozen=True):
     """Represents an Ansible play contained within a playbook."""
 
     #: The play's targetted hosts.
-    hosts: Annotated[Sequence[str], Listify]
+    hosts: SeqLiteral[StrLiteral]
     #: The play's list of blocks.
-    tasks: Annotated[Sequence[TaskOrBlock], Lenient] = Field(default_factory=tuple)
+    tasks: Annotated[SeqLiteral[TaskOrBlock], Lenient] = Field(
+        default_factory=SeqLiteral
+    )
 
     #: Whether to gather facts from the remote hosts.
-    gather_facts: bool | Expression | None = None
+    gather_facts: BoolLiteral | Expression | None = None
 
     #: Subset of facts to gather from remote hosts.
-    gather_subset: Annotated[Sequence[str], Listify] = Field(default_factory=tuple)
+    gather_subset: SeqLiteral[StrLiteral] = Field(default_factory=SeqLiteral)
     #: Timeout for fact gathering.
-    gather_timeout: int | Expression | None = None
+    gather_timeout: IntLiteral | Expression | None = None
     #: Fact path option for fact gathering.
-    fact_path: str | None = None
+    fact_path: StrLiteral | None = None
 
     #: List of files with variables to include into play.
-    vars_files: Sequence[Sequence[str]] = Field(default_factory=tuple)
+    vars_files: SeqLiteral[SeqLiteral[StrLiteral]] = Field(default_factory=SeqLiteral)
     #: List of variables to prompt user for. List of mappings, `name` key
     #: contains variable name.
-    vars_prompt: Annotated[Sequence[VarsPrompt], Listify] = Field(default_factory=tuple)
+    vars_prompt: SeqLiteral[VarsPrompt] = Field(default_factory=SeqLiteral)
 
     #: List of roles to be imported into play.
-    roles: Annotated[Sequence[PlayRoleRequirement], Lenient] = Field(
-        default_factory=tuple
+    roles: Annotated[SeqLiteral[PlayRoleRequirement], Lenient] = Field(
+        default_factory=SeqLiteral
     )
 
     #: Handlers for the play.
-    handlers: Annotated[Sequence[Handler], Lenient] = Field(default_factory=tuple)
+    handlers: Annotated[SeqLiteral[Handler], Lenient] = Field(
+        default_factory=SeqLiteral
+    )
     #: Tasks to be run before the roles in `roles`.
-    pre_tasks: Annotated[Sequence[TaskOrBlock], Lenient] = Field(default_factory=tuple)
+    pre_tasks: Annotated[SeqLiteral[TaskOrBlock], Lenient] = Field(
+        default_factory=SeqLiteral
+    )
     #: Tasks to be run after the main tasks.
-    post_tasks: Annotated[Sequence[TaskOrBlock], Lenient] = Field(default_factory=tuple)
+    post_tasks: Annotated[SeqLiteral[TaskOrBlock], Lenient] = Field(
+        default_factory=SeqLiteral
+    )
 
     #: Force handler notification.
-    force_handlers: bool | Expression | None = None
+    force_handlers: BoolLiteral | Expression | None = None
     #: Maximum percentage of hosts that are allowed to fail before aborting play.
-    max_fail_percentage: int | float | Expression | None = None
+    max_fail_percentage: PercentLiteral | Expression | None = None
     #: Define how Ansible batches execution on hosts.
-    serial: Annotated[Sequence[str | int], Listify] = Field(default_factory=tuple)
+    serial: SeqLiteral[IntLiteral | StrLiteral] = Field(default_factory=SeqLiteral)
     #: Execution strategy related to parallel host execution.
-    strategy: str | None = None
+    strategy: StrLiteral | None = None
     #: How hosts should be sorted in execution order.
-    order: str | None = None
+    order: StrLiteral | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -116,7 +133,7 @@ class Play(ASTNode, CommonDirectives, frozen=True):
         if not isinstance(value, dict):
             return value
 
-        value = cast(RawDirectives, copy_dict(value))  # pyright: ignore[reportUnknownArgumentType]
+        value = cast(RawDirectives, value.copy())
 
         # remove the "accelerate" key if present. It was removed in 2.4
         _ = value.pop("accelerate", None)
@@ -162,8 +179,8 @@ class Play(ASTNode, CommonDirectives, frozen=True):
 class ImportPlaybook(ASTNode, CommonDirectives, frozen=True):
     """Represents import_playbook Ansible tasks present in a playbook at the top level."""
 
-    import_playbook: str
-    when: Annotated[Sequence[Condition | bool], Listify] = Field(default_factory=tuple)
+    import_playbook: StrLiteral
+    when: SeqLiteral[Condition | BoolLiteral] = Field(default_factory=SeqLiteral)
 
     @model_validator(mode="before")
     @classmethod
@@ -172,7 +189,7 @@ class ImportPlaybook(ASTNode, CommonDirectives, frozen=True):
         if not isinstance(value, dict):
             return value
 
-        value = cast(RawDirectives, copy_dict(value))  # pyright: ignore[reportUnknownArgumentType]
+        value = cast(RawDirectives, value.copy())
         for fqn in (
             "ansible.builtin.import_playbook",
             "ansible.legacy.import_playbook",
@@ -215,7 +232,7 @@ class Playbook(ASTFile, frozen=True):
     """Represents an Ansible playbook."""
 
     #: List of plays defined in this playbook.
-    plays: Annotated[Sequence[PlaybookChild], Lenient]
+    plays: Annotated[SeqLiteral[PlaybookChild], Lenient]
 
     @classmethod
     @override

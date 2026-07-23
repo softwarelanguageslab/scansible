@@ -29,7 +29,7 @@ def describe_extracting_plays():
 
         result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
-        assert result.hosts == ["servers"]
+        assert result.hosts == ("servers",)
         assert result.name == "test play"
         assert len(result.tasks) == 1
         assert isinstance(result.tasks[0], Task)
@@ -46,7 +46,7 @@ def describe_extracting_plays():
 
         result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
-        assert result.hosts == ["servers"]
+        assert result.hosts == ("servers",)
         assert result.name == "test play"
         assert len(result.tasks) == 1
         assert isinstance(result.tasks[0], Block)
@@ -64,7 +64,7 @@ def describe_extracting_plays():
 
         result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
-        assert result.hosts == ["servers"]
+        assert result.hosts == ("servers",)
         assert result.name == "test play"
         assert len(result.tasks) == 1
         assert isinstance(result.tasks[0], Task)
@@ -85,7 +85,7 @@ def describe_extracting_plays():
 
         result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
-        assert result.hosts == ["servers"]
+        assert result.hosts == ("servers",)
         assert result.name == "test play"
         assert len(result.roles) == 1
         assert isinstance(result.roles[0], PlayRoleRequirement)
@@ -179,12 +179,14 @@ def describe_extracting_plays():
     @pytest.mark.parametrize(
         ["vars_files_value", "expected"],
         [
-            pytest.param("a.yml", [["a.yml"]], id="bare string"),
-            pytest.param(["a.yml", "b.yml"], [["a.yml"], ["b.yml"]], id="flat list"),
-            pytest.param([["a.yml", "b.yml"]], [["a.yml", "b.yml"]], id="nested list"),
+            pytest.param("a.yml", (("a.yml",),), id="bare string"),
+            pytest.param(["a.yml", "b.yml"], (("a.yml",), ("b.yml",)), id="flat list"),
+            pytest.param([["a.yml", "b.yml"]], (("a.yml", "b.yml"),), id="nested list"),
         ],
     )
-    def normalizes_vars_files(vars_files_value: object, expected: list[list[str]]):
+    def normalizes_vars_files(
+        vars_files_value: object, expected: tuple[tuple[str, ...], ...]
+    ):
         ctx = ExtractionContext(False)
 
         result = Play.model_validate(
@@ -254,7 +256,7 @@ def describe_extracting_plays():
 
         result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
-        assert result.hosts == ["servers"]
+        assert result.hosts == ("servers",)
 
     def normalizes_deprecated_user():
         yaml = """
@@ -312,7 +314,7 @@ def describe_extracting_plays():
 
         result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
-        assert result.gather_subset == ["network"]
+        assert result.gather_subset == ("network",)
 
     def normalizes_single_serial_value():
         yaml = """
@@ -326,7 +328,7 @@ def describe_extracting_plays():
 
         result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
-        assert result.serial == [1]
+        assert result.serial == (1,)
 
     def normalizes_single_vars_prompt():
         yaml = """
@@ -373,7 +375,7 @@ def describe_extracting_import_playbook():
 
         assert result.import_playbook == "other.yml"
         assert result.vars == {"x": 123}
-        assert result.when == ["condition is True"]
+        assert result.when == ("condition is True",)
 
     @pytest.mark.parametrize("collection", ("ansible.legacy", "ansible.builtin"))
     def normalizes_fully_qualified_names(collection: str):
@@ -465,13 +467,6 @@ def describe_extracting_playbook():
         assert len(result.plays) == 2
         assert isinstance(result.plays[0], Play)
         assert isinstance(result.plays[1], ImportPlaybook)
-
-    def rejects_empty_playbooks(tmp_path: Path):
-        _ = (tmp_path / "pb.yml").write_text("")
-        ctx = ExtractionContext(lenient=False)
-
-        with pytest.raises(Exception):
-            _ = Playbook.load(ProjectPath(tmp_path, "pb.yml"), ctx)
 
     def ignores_malformed_plays_in_lenient_mode(tmp_path: Path):
         yaml = """

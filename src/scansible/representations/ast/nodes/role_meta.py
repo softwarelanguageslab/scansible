@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Annotated, cast, override
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 
 from pydantic import (
     Field,
@@ -16,34 +16,40 @@ from pydantic import (
     model_validator,
 )
 
-from scansible.types import AnyValue
-from scansible.utils import FrozenDict, ProjectPath
+from scansible.representations.cst import parse_file
+from scansible.utils import ProjectPath
 
-from .._normalizers import Lenient, Listify, Stringify
-from ..common import BrokenTask, ExtractionContext, RawDirectives, copy_dict, parse_file
+from .._normalizers import Lenient
+from ..common import BrokenTask, ExtractionContext, RawDirectives
 from .base import ASTFile, ASTNode
 from .directives import CommonDirectives
-from .expression import Condition, Expression
+from .expression import (
+    AnyExpression,
+    BoolLiteral,
+    Condition,
+    Expression,
+    MapLiteral,
+    SeqLiteral,
+    StrLiteral,
+)
 
 
 class Platform(ASTNode, frozen=True):
     """Represents a platform supported by a role, as denoted in the meta file."""
 
     #: Platform name.
-    name: str
+    name: StrLiteral
     #: Platform version.
-    version: str = Field(strict=False)
+    version: StrLiteral
 
 
 class _RawPlatform(ASTNode, frozen=True):
     """Represents an intermediate representation of a platform, with an unexpanded list of versions."""
 
     #: Platform name.
-    name: str
+    name: StrLiteral
     #: Platform versions.
-    versions: Annotated[
-        Sequence[Annotated[str, Field(strict=False)]], Stringify, Listify
-    ]
+    versions: SeqLiteral[StrLiteral]
 
     def expand(self) -> Sequence[Platform]:
         """Expand a single raw platform instance to a flattened list of platforms."""
@@ -60,18 +66,18 @@ class RoleRequirement(ASTNode, CommonDirectives, frozen=True):
     """
 
     #: The role that is depended upon.
-    role: str
+    role: StrLiteral
 
     #: The role include parameters.
-    params: Mapping[str, AnyValue] = Field(default_factory=FrozenDict)
+    params: MapLiteral[StrLiteral, AnyExpression] = Field(default_factory=MapLiteral)
 
     #: Delegate execution to another host.
-    delegate_to: str | None = None
+    delegate_to: StrLiteral | None = None
     #: Apply facts to delegated host.
-    delegate_facts: bool | Expression | None = None
+    delegate_facts: BoolLiteral | Expression | None = None
 
     #: Optional condition on when to include a dependency.
-    when: Annotated[Sequence[Condition | bool], Listify] = Field(default_factory=tuple)
+    when: SeqLiteral[Condition | BoolLiteral] = Field(default_factory=SeqLiteral)
 
     @field_validator("role", mode="after")
     def _validate_role_name(cls, value: str) -> str:
@@ -105,7 +111,7 @@ class RoleRequirement(ASTNode, CommonDirectives, frozen=True):
         if not isinstance(value, dict) or "role" in value:
             return value
 
-        value = cast(RawDirectives, copy_dict(value))  # pyright: ignore[reportUnknownArgumentType]
+        value = cast(RawDirectives, value.copy())
         if "name" in value:
             value["role"] = value["name"]
 
@@ -187,10 +193,10 @@ class MetaBlock(ASTNode, frozen=True, extra="ignore"):
     """Represents a role metadata block."""
 
     #: Platforms supported by the role.
-    platforms: Sequence[Platform] = Field(default_factory=tuple)
+    platforms: SeqLiteral[Platform] = Field(default_factory=SeqLiteral)
     #: Role dependencies.
-    dependencies: Annotated[Sequence[MetaRoleRequirement], Lenient] = Field(
-        default_factory=tuple
+    dependencies: Annotated[SeqLiteral[MetaRoleRequirement], Lenient] = Field(
+        default_factory=SeqLiteral
     )
 
     @field_validator("platforms", mode="before")

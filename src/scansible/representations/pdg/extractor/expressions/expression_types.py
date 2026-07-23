@@ -73,6 +73,15 @@ _ANSIBLE_TYPE_NAME_TO_BUILTIN_NAME: dict[str, ValidTypeStr] = {
     "AnsibleUnsafeText": "str",
     "FrozenDict": "dict",
     "tuple": "list",
+    # FIXME this can likely be parsed better, and the above shouldn't occur anymore
+    "IntLiteral": "int",
+    "StrLiteral": "str",
+    "SeqLiteral": "list",
+    "MapLiteral": "dict",
+    "FloatLiteral": "float",
+    "BoolLiteral": "bool",
+    "DateLiteral": "date",
+    "DatetimeLiteral": "datetime",
 }
 
 

@@ -4,86 +4,85 @@
 
 from __future__ import annotations
 
-from typing import Annotated, cast
-
-from collections.abc import Mapping, Sequence
+from typing import cast
 
 from pydantic import BaseModel, Field, model_validator
 
-from scansible.types import AnyValue
-from scansible.utils import FrozenDict
-
-from .._normalizers import Listify, OmitNone
-from .._validators import Identifier
-from ..common import RawDirectives, copy_dict
-from .expression import Expression
+from ..common import RawDirectives
+from .expression import (
+    AnyExpression,
+    BoolLiteral,
+    Expression,
+    Identifier,
+    IntLiteral,
+    MapLiteral,
+    SeqLiteral,
+    StrLiteral,
+)
 
 
 class CommonDirectives(BaseModel, frozen=True):
     """Mixin for AST nodes that contain the common Ansible directives."""
 
     #: Name of a task, block, or play.
-    name: str | None = None
+    name: StrLiteral | None = None
 
     #: The connection plugin to use in this task, block, or play.
-    connection: str | None = None
+    connection: StrLiteral | None = None
     #: Override default port in connection.
-    port: int | Expression | None = None
+    port: IntLiteral | Expression | None = None
     #: Remote user name.
-    remote_user: str | None = None
+    remote_user: StrLiteral | None = None
 
     #: Variables defined on the entity.
-    vars: Mapping[Identifier, AnyValue] = Field(default_factory=FrozenDict)
+    vars: MapLiteral[Identifier, AnyExpression] = Field(default_factory=MapLiteral)
 
     #: Specify default arguments to modules in this entity.
-    module_defaults: Annotated[
-        Sequence[Mapping[str, Mapping[str, AnyValue]]], Listify
-    ] = Field(default_factory=tuple)
+    module_defaults: SeqLiteral[
+        MapLiteral[StrLiteral, MapLiteral[StrLiteral, AnyExpression]]
+    ] = Field(default_factory=SeqLiteral)
 
     #: Dictionary converted into environment variables.
-    environment: Annotated[Sequence[Mapping[str, AnyValue] | Expression], Listify] = (
-        Field(default_factory=tuple)
+    environment: SeqLiteral[MapLiteral[StrLiteral, AnyExpression] | Expression] = Field(
+        default_factory=SeqLiteral
     )
-    # FIXME: Ansible coerces non-bool scalars into booleans, we should do this too.
     #: To disable logging of action.
-    no_log: bool | Expression | None = None
+    no_log: BoolLiteral | Expression | None = None
     #: Run on a single host only.
-    run_once: bool | Expression | None = None
+    run_once: BoolLiteral | Expression | None = None
     #: Ignore task failures.
-    ignore_errors: bool | Expression | None = None
+    ignore_errors: BoolLiteral | Expression | None = None
     #: Ignore task failures due to unreachable host.
-    ignore_unreachable: bool | Expression | None = None
+    ignore_unreachable: BoolLiteral | Expression | None = None
     #: Toggle check mode (dry run).
-    check_mode: bool | Expression | None = None
+    check_mode: BoolLiteral | Expression | None = None
     #: Toggle returning diff information from task.
-    diff: bool | Expression | None = None
+    diff: BoolLiteral | Expression | None = None
     #: End play once one task fails for one host.
-    any_errors_fatal: bool | Expression | None = None
+    any_errors_fatal: BoolLiteral | Expression | None = None
     #: Max amount of hosts to operate on in parallel.
-    throttle: int | Expression | None = None
+    throttle: IntLiteral | Expression | None = None
     #: Task timeout.
-    timeout: int | Expression | None = None
+    timeout: IntLiteral | Expression | None = None
 
     #: Set debugger state.
-    debugger: str | None = None
+    debugger: StrLiteral | None = None
 
     #: Whether to perform privilege escalation.
-    become: bool | Expression | None = None
+    become: BoolLiteral | Expression | None = None
     #: How to perform privilege escalation (sudo, su, ...)
-    become_method: str | None = None
+    become_method: StrLiteral | None = None
     #: User to escalate to.
-    become_user: str | None = None
+    become_user: StrLiteral | None = None
     #: Flags to pass to privilege escalation program.
-    become_flags: str | None = None
+    become_flags: StrLiteral | None = None
     #: Path to privilege escalation executable.
-    become_exe: str | None = None
+    become_exe: StrLiteral | None = None
 
     #: Tags on the entity.
-    tags: Annotated[Sequence[str | int], Listify, OmitNone] = Field(
-        default_factory=tuple
-    )
+    tags: SeqLiteral[StrLiteral | IntLiteral] = Field(default_factory=SeqLiteral)
     #: List of collections to search for modules in this entity.
-    collections: Annotated[Sequence[str], Listify] = Field(default_factory=tuple)
+    collections: SeqLiteral[StrLiteral] = Field(default_factory=SeqLiteral)
 
     @model_validator(mode="before")
     @classmethod
@@ -95,7 +94,7 @@ class CommonDirectives(BaseModel, frozen=True):
         if not isinstance(value, dict):
             return value
 
-        value = cast(RawDirectives, copy_dict(value))  # pyright: ignore[reportUnknownArgumentType]
+        value = cast(RawDirectives, value.copy())
         return cls._normalize_common_directives(value)
 
     @classmethod

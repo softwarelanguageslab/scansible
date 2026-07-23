@@ -10,21 +10,33 @@ from __future__ import annotations
 
 from typing import Annotated, ClassVar, Literal, Self, cast, override
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 
 from ansible.parsing.splitter import parse_kv, split_args
 from ansible.utils.fqcn import add_internal_fqcns
 from pydantic import Discriminator, Field, Tag, field_validator, model_validator
 
+from scansible.representations.cst import parse_file
 from scansible.types import AnyValue, ScalarValue
 from scansible.utils import ProjectPath, actions
 
-from .._normalizers import Lenient, Listify
-from .._validators import Identifier
-from ..common import ExtractionContext, RawDirectives, copy_dict, parse_file
+from .._normalizers import Lenient
+from ..common import ExtractionContext, RawDirectives
 from .base import ASTFile, ASTNode
 from .directives import CommonDirectives
-from .expression import BareExpression, Condition, Expression
+from .expression import (
+    AnyExpression,
+    BoolLiteral,
+    Condition,
+    Expression,
+    FloatLiteral,
+    Identifier,
+    IntLiteral,
+    MapLiteral,
+    ScalarLiteral,
+    SeqLiteral,
+    StrLiteral,
+)
 
 # Adapted from ansible.constants
 #: Unqualified names of actions that take freeform (unparsed) arguments.
@@ -47,22 +59,21 @@ class LoopControl(ASTNode, frozen=True):
     """Represents the loop control directive value."""
 
     #: The loop variable name. `item` by default.
-    loop_var: Identifier = "item"
+    loop_var: Identifier = Identifier("item")
     #: The index variable name.
     index_var: Identifier | None = None
-    #: Loop label in output. Should technically be a string only, but Ansible
-    #: doesn't complain about dicts and just templates and stringifies those.
-    label: AnyValue = None
+    #: Loop label in output.
+    label: StrLiteral | None = None
     #: Amount of time in seconds to pause between each iteration. Can be a
     #: string in case this is an expression. 0 by default.
-    pause: int | float | Expression = 0.0
+    pause: FloatLiteral | Expression = FloatLiteral(0.0)
     #: Whether to include more information in the loop items.
     #: See https://docs.ansible.com/ansible/latest/user_guide/playbooks_loops.html#extended-loop-variables
-    extended: bool | Expression | None = None
+    extended: BoolLiteral | Expression | None = None
     #: Whether to include `allitems` in the extended version.
-    extended_allitems: bool | Expression | None = True
+    extended_allitems: BoolLiteral | Expression | None = BoolLiteral(True)
     #: Conditions when to break the loop.
-    break_when: Annotated[Sequence[Condition], Listify] = Field(default_factory=tuple)
+    break_when: SeqLiteral[Condition] = Field(default_factory=SeqLiteral)
 
 
 class BaseTask(ASTNode, CommonDirectives, frozen=True):
@@ -91,54 +102,53 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
     )
 
     #: Action of the task.
-    action: str
+    action: StrLiteral
     #: Arguments to the action.
-    args: Mapping[str, AnyValue]
+    args: MapLiteral[StrLiteral, AnyExpression]
 
     #: Run task asynchronously for at most the given number of seconds.
-    async_val: int | Expression | None = Field(default=0, alias="async")
+    async_val: IntLiteral | Expression | None = Field(
+        default=IntLiteral(0), alias="async"
+    )
     #: Conditional expression(s) to override "changed" status.
-    changed_when: Annotated[Sequence[Condition | bool], Listify] = Field(
-        default_factory=tuple
+    changed_when: SeqLiteral[Condition | BoolLiteral] = Field(
+        default_factory=SeqLiteral
     )
     #: Number of seconds to delay between retries.
-    delay: float | int | Expression | None = 5.0
+    delay: FloatLiteral | Expression | None = FloatLiteral(5.0)
     #: Delegate task execution to another host.
-    delegate_to: str | None = None
+    delegate_to: StrLiteral | None = None
     #: Apply facts to delegated host.
-    delegate_facts: bool | Expression | None = None
+    delegate_facts: BoolLiteral | Expression | None = None
     #: Conditional expression(s) to override the "failed" status.
-    failed_when: Annotated[Sequence[Condition | bool], Listify] = Field(
-        default_factory=tuple
-    )
+    failed_when: SeqLiteral[Condition | BoolLiteral] = Field(default_factory=SeqLiteral)
     #: Loop on the task, or None if no loop. Can be a string (an expression),
     #: a list of arbitrary values, or, when the loop comes from `with_dict`, a
     #: dict of arbitrary items.
     loop: (
-        Sequence[AnyValue]
-        | Expression
-        | BareExpression
-        | Mapping[ScalarValue, AnyValue]
+        Expression
+        | SeqLiteral[AnyExpression]
+        | MapLiteral[ScalarLiteral, AnyExpression]
         | None
     ) = None
     #: The type of loop used in old looping syntax (`with_*`), e.g.
     #: `with_items` -> `items`.
-    loop_with: str | None = None
+    loop_with: StrLiteral | None = None
     #: Loop control defined on the task.
     loop_control: LoopControl | None = None
     #: List of handler names of handlers to notify.
-    notify: Annotated[Sequence[str], Listify] = Field(default_factory=tuple)
+    notify: SeqLiteral[StrLiteral] = Field(default_factory=SeqLiteral)
     #: Polling interval for async tasks.
-    poll: int | Expression | None = None
+    poll: IntLiteral | Expression | None = None
     #: Value given to the register keyword, i.e. variable name that will store
     #: the result of this action. Renamed due to naming conflicts with base classes.
     register_var: Identifier | Expression | None = Field(default=None, alias="register")
     #: Number of tries for failed tasks.
-    retries: int | Expression | None = None
+    retries: IntLiteral | Expression | None = None
     #: Retry task until condition(s) are satisfied.
-    until: Annotated[Sequence[Condition | bool], Listify] = Field(default_factory=tuple)
+    until: SeqLiteral[Condition | BoolLiteral] = Field(default_factory=SeqLiteral)
     #: Condition on the task, or None if no condition.
-    when: Annotated[Sequence[Condition | bool], Listify] = Field(default_factory=tuple)
+    when: SeqLiteral[Condition | BoolLiteral] = Field(default_factory=SeqLiteral)
 
     @field_validator("action", mode="after")
     @classmethod
@@ -159,7 +169,7 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
         if not isinstance(value, dict):
             return value
 
-        value = cast(RawDirectives, copy_dict(value))  # pyright: ignore[reportUnknownArgumentType]
+        value = cast(RawDirectives, value.copy())
         value = cls._normalize_common_directives(value)
         value = cls._parse_task_action(value)
         value = cls._transform_includes(value)
@@ -309,7 +319,7 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
         for args in arg_list:
             if isinstance(args, str):
                 args = cls._parse_args(action, args)
-            if args is None:
+            if args == None:  # noqa: E711 -- could be YamlNone
                 args = {}
             if not isinstance(args, dict):
                 raise ValueError("Expected args to be a dictionary")
@@ -394,7 +404,7 @@ class Handler(BaseTask, frozen=True):
     )
 
     #: Topics on which the handler listens.
-    listen: Annotated[Sequence[str], Listify] = Field(default_factory=tuple)
+    listen: SeqLiteral[StrLiteral] = Field(default_factory=SeqLiteral)
 
 
 class Block(ASTNode, CommonDirectives, frozen=True):
@@ -403,23 +413,23 @@ class Block(ASTNode, CommonDirectives, frozen=True):
     # TODO: Verify whether handlers can occur in blocks and whether there should be a separate handler block.
 
     #: The block's main task list.
-    block: Sequence[TaskOrBlock]
+    block: SeqLiteral[TaskOrBlock]
     #: List of tasks in the block's rescue section, i.e. the tasks that will
     #: execute when an exception occurs.
-    rescue: Sequence[TaskOrBlock] = Field(default_factory=tuple)
+    rescue: SeqLiteral[TaskOrBlock] = Field(default_factory=SeqLiteral)
     #: List of tasks in the block's always section, like a try-catch's `finally`
     #: handler.
-    always: Sequence[TaskOrBlock] = Field(default_factory=tuple)
+    always: SeqLiteral[TaskOrBlock] = Field(default_factory=SeqLiteral)
 
     #: List of handler names of handlers to notify.
-    notify: Annotated[Sequence[str], Listify] = Field(default_factory=tuple)
+    notify: SeqLiteral[StrLiteral] = Field(default_factory=SeqLiteral)
     #: Delegate block execution to another host.
-    delegate_to: str | None = None
+    delegate_to: StrLiteral | None = None
     #: Apply facts to delegated host.
-    delegate_facts: bool | Expression | None = None
+    delegate_facts: BoolLiteral | Expression | None = None
 
     #: Condition on the block, or None if no condition.
-    when: Annotated[Sequence[Condition | bool], Listify] = Field(default_factory=tuple)
+    when: SeqLiteral[Condition | BoolLiteral] = Field(default_factory=SeqLiteral)
 
     @model_validator(mode="after")
     def _validate_task_lists(self) -> Self:
@@ -454,7 +464,9 @@ class TaskFile(ASTFile, frozen=True):
     """Represents a file containing tasks and blocks."""
 
     #: The top-level tasks or blocks contained in the file, in the order of definition.
-    tasks: Annotated[Sequence[TaskOrBlock], Lenient] = Field(default_factory=tuple)
+    tasks: Annotated[SeqLiteral[TaskOrBlock], Lenient] = Field(
+        default_factory=SeqLiteral
+    )
 
     @classmethod
     @override
@@ -469,7 +481,9 @@ class HandlerFile(ASTFile, frozen=True):
     """Represents a file containing handlers."""
 
     #: The top-level handlers contained in the file, in the order of definition.
-    handlers: Annotated[Sequence[Handler], Lenient] = Field(default_factory=tuple)
+    handlers: Annotated[SeqLiteral[Handler], Lenient] = Field(
+        default_factory=SeqLiteral
+    )
 
     @classmethod
     @override

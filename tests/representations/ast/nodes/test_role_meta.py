@@ -9,6 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from scansible.representations.ast import ExtractionContext, MetaFile
+from scansible.representations.ast.nodes.expression import BoolLiteral
 from scansible.utils import ProjectPath
 
 
@@ -59,7 +60,7 @@ def describe_extracting_metadata_file():
             assert result.metablock.platforms[2].name == "Fedora"
             assert result.metablock.platforms[2].version == "8"
             assert not result.metablock.platforms[0].position.is_synthetic
-            assert result.metablock.platforms[0].position.start_line == 8
+            assert result.metablock.platforms[0].position.start.line == 8
             assert not result.metablock.dependencies
 
         def normalizes_missing_platforms_property(tmp_path: Path):
@@ -133,7 +134,7 @@ def describe_extracting_metadata_file():
 
             result = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
-            assert result.metablock.platforms == []
+            assert result.metablock.platforms == ()
             assert ctx.broken_tasks[0].raw == "CentOS6"
 
     def describe_dependencies():
@@ -203,9 +204,9 @@ def describe_extracting_metadata_file():
 
             assert len(result.metablock.dependencies) == 1
             assert result.metablock.dependencies[0].role == "testrole"
-            assert result.metablock.dependencies[0].when == [
-                "{{ ansible_os_family == 'Debian' }}"
-            ]
+            assert result.metablock.dependencies[0].when == (
+                "{{ ansible_os_family == 'Debian' }}",
+            )
 
         def extracts_dependencies_with_multiple_conditions(tmp_path: Path):
             yaml = """
@@ -222,10 +223,10 @@ def describe_extracting_metadata_file():
 
             assert len(result.metablock.dependencies) == 1
             assert result.metablock.dependencies[0].role == "testrole"
-            assert result.metablock.dependencies[0].when == [
+            assert result.metablock.dependencies[0].when == (
                 "{{ ansible_os_family == 'Debian' }}",
                 "{{ 1 + 1 == 2 }}",
-            ]
+            )
 
         def ignores_malformed_dependency_in_lenient_mode(tmp_path: Path):
             yaml = """
@@ -237,7 +238,7 @@ def describe_extracting_metadata_file():
 
             result = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
-            assert result.metablock.dependencies == []
+            assert result.metablock.dependencies == ()
             assert ctx.broken_tasks[0].raw == {"test": "nope"}
 
         def normalizes_missing_dependencies_property(tmp_path: Path):
@@ -344,7 +345,7 @@ def describe_extracting_metadata_file():
 
             assert len(result.metablock.dependencies) == 1
             assert result.metablock.dependencies[0].role == "test"
-            assert result.metablock.dependencies[0].become is True
+            assert result.metablock.dependencies[0].become == BoolLiteral(True)
             assert result.metablock.dependencies[0].params == {"param_x": 123}
 
         def supports_new_style_role_requirements(

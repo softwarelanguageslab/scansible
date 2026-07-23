@@ -63,7 +63,6 @@ from . import extractor as extractor
 from .common import BrokenFile as BrokenFile
 from .common import BrokenTask as BrokenTask
 from .common import ExtractionContext as ExtractionContext
-from .common import Position as Position
 from .extractor import extract_playbook as extract_playbook
 from .extractor import extract_role as extract_role
 from .nodes import AST as AST

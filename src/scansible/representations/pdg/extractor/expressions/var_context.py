@@ -14,7 +14,8 @@ from ansible.template import Templar
 from icontract import require
 from loguru import logger
 
-from scansible.types import AnyValue, VaultValue
+from scansible.representations.ast.nodes.expression import BoolLiteral, StrLiteral
+from scansible.types import AnyValue
 from scansible.utils import SENTINEL, Sentinel, first, make_immutable
 
 from ... import representation as rep
@@ -269,10 +270,14 @@ class VarContext:
     def _build_scalar_literal(self, expr: ScalarLiteral) -> TemplateResult:
         location = self.extraction_ctx.get_location(expr.value)
 
-        lit: rep.Literal
-        if isinstance(expr.value, VaultValue):
+        # FIXME: Hack
+        if isinstance(expr.value, BoolLiteral):
             lit = rep.ScalarLiteral(
-                type=expr.type, value=str(expr.value), location=location
+                type=expr.type, value=bool(expr.value), location=location
+            )
+        elif isinstance(expr.value, StrLiteral) and expr.value.is_vaulted:
+            lit = rep.ScalarLiteral(
+                type="VaultValue", value=expr.value, location=location
             )
         else:
             lit = rep.ScalarLiteral(type=expr.type, value=expr.value, location=location)

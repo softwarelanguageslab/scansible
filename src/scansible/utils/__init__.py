@@ -18,6 +18,8 @@ from .files import ProjectPath as ProjectPath
 from .files import SourceFileMap as SourceFileMap
 from .files import find_all_files as find_all_files
 from .files import find_file as find_file
+from .position import Position as Position
+from .position import Positioned as Positioned
 
 
 class Sentinel:

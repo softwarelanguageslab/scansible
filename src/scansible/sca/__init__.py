@@ -17,7 +17,6 @@ from scansible.representations.ast import (
     ExtractionContext,
     Play,
     Playbook,
-    Position,
     TaskFile,
 )
 from scansible.representations.pdg.extractor.main import extract_pdg
@@ -26,7 +25,7 @@ from scansible.sca.constants import (
     ANSIBLE_TRIVIAL_MODULES,
     CONSOLE,
 )
-from scansible.utils import ProjectPath
+from scansible.utils import Position, ProjectPath
 from scansible.utils.entrypoints import find_entrypoints
 
 from .collection_info import ModuleInfo, get_collection_index

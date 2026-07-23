@@ -7,6 +7,7 @@ from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImpo
 from pydantic import ValidationError
 
 from scansible.representations.ast import ExtractionContext, Handler, Task
+from scansible.representations.ast.nodes.expression import BoolLiteral, StrLiteral
 
 
 def describe_extracting_tasks():
@@ -25,8 +26,25 @@ def describe_extracting_tasks():
         assert result.args == {"path": "test.txt", "state": "present"}
         assert result.name == "Ensure file exists"
         assert not result.position.is_synthetic
-        assert result.position.start_line == 2
-        assert result.position.start_column == 1
+        assert result.position.start.line == 2
+        assert result.position.start.column == 1
+
+    def retains_position():
+        yaml = """
+            name: Ensure file exists
+            file:
+                path: test.txt
+        """
+        ctx = ExtractionContext(False)
+
+        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+        assert result.action.__position__ == ("test.yaml", (3, 1), (3, 5))
+        [(arg_name, arg_value)] = result.args.items()
+        assert isinstance(arg_name, StrLiteral)
+        assert arg_name.__position__ == ("test.yaml", (4, 5), (4, 9))
+        assert isinstance(arg_value, StrLiteral)
+        assert arg_value.__position__ == ("test.yaml", (4, 11), (4, 19))
 
     def extracts_standard_task_with_action_shorthand():
         yaml = """
@@ -71,7 +89,7 @@ def describe_extracting_tasks():
         assert result.action == "debug"
         assert result.args == {"msg": "{{ item }}"}
         assert result.name == "test"
-        assert result.loop == ["hello", "world"]
+        assert result.loop == ("hello", "world")
 
     def extracts_task_with_expr_loop():
         yaml = """
@@ -103,7 +121,7 @@ def describe_extracting_tasks():
         assert result.action == "debug"
         assert result.args == {"msg": "{{ myvar }}"}
         assert result.name == "test"
-        assert result.loop == ["hello", "world"]
+        assert result.loop == ("hello", "world")
         assert result.loop_control is not None
         assert result.loop_control.loop_var == "myvar"
 
@@ -130,9 +148,9 @@ def describe_extracting_tasks():
         assert result.loop_control.index_var == "myidx"
         assert result.loop_control.label == "{{ myvar }}"
         assert result.loop_control.pause == 2
-        assert result.loop_control.extended is True
-        assert result.loop_control.extended_allitems is False
-        assert result.loop_control.break_when == ["{{ myvar == 'world' }}"]
+        assert result.loop_control.extended == BoolLiteral(True)
+        assert result.loop_control.extended_allitems == BoolLiteral(False)
+        assert result.loop_control.break_when == ("{{ myvar == 'world' }}",)
 
     def rejects_task_with_string_literal_poll():
         yaml = """
@@ -158,7 +176,7 @@ def describe_extracting_tasks():
         assert result.action == "debug"
         assert result.args == {"msg": "{{ myvar }}"}
         assert result.name == "test"
-        assert result.when == [True]
+        assert result.when == (True,)
 
     def does_not_eagerly_evaluate_imports():
         yaml = """
@@ -279,7 +297,7 @@ def describe_extracting_handlers():
         assert result.action == "file"
         assert result.name == "Ensure file exists"
         assert result.args == {"path": "{{ file_path }}"}
-        assert result.listen == ["a topic"]
+        assert result.listen == ("a topic",)
 
     def extracts_handler_with_list_of_listens():
         yaml = """
@@ -298,7 +316,7 @@ def describe_extracting_handlers():
         assert result.action == "file"
         assert result.name == "Ensure file exists"
         assert result.args == {"path": "{{ file_path }}"}
-        assert result.listen == ["a topic", "another topic"]
+        assert result.listen == ("a topic", "another topic")
 
 
 def describe_parsing_action():
@@ -483,7 +501,7 @@ def describe_normalization():
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
-        assert result.check_mode is False
+        assert result.check_mode == BoolLiteral(False)
 
     @pytest.mark.parametrize("method", ["su", "sudo"])
     def transforms_old_become(method: str):
@@ -500,7 +518,7 @@ def describe_normalization():
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "file"
-        assert result.become is True
+        assert result.become == BoolLiteral(True)
         assert result.become_user == "me"
         assert result.become_exe == "test"
         assert result.become_flags == "--flag"
@@ -523,7 +541,7 @@ def describe_normalization():
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "file"
-        assert result.become is True
+        assert result.become == BoolLiteral(True)
         assert result.become_user == "me"
         assert result.become_exe == "test"
         assert result.become_flags == "--flag"
@@ -562,7 +580,7 @@ def describe_normalization():
         assert result.action == "file"
         assert result.args == {"path": "{{ item }}"}
         assert result.name == "test"
-        assert result.loop == ["hello", "world"]
+        assert result.loop == ("hello", "world")
         assert result.loop_with == "items"
 
     def transforms_include_task():
@@ -663,9 +681,9 @@ def describe_common_directives():
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
-        assert result.tags == ["web"]
+        assert result.tags == ("web",)
 
-    def ignores_None_tag():
+    def normalizes_None_tag():
         yaml = """
             file: {}
             tags:
@@ -676,7 +694,7 @@ def describe_common_directives():
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
-        assert result.tags == ["web"]
+        assert result.tags == ("web", "None")
 
     def normalizes_single_collection():
         yaml = """
@@ -687,7 +705,7 @@ def describe_common_directives():
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
-        assert result.collections == ["community.general"]
+        assert result.collections == ("community.general",)
 
     def normalizes_single_module_defaults_entry():
         yaml = """
@@ -700,7 +718,7 @@ def describe_common_directives():
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
-        assert result.module_defaults == [{"file": {"mode": "0644"}}]
+        assert result.module_defaults == ({"file": {"mode": "0644"}},)
 
     def normalizes_single_environment_entry():
         yaml = """
@@ -712,7 +730,7 @@ def describe_common_directives():
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
-        assert result.environment == [{"PATH": "/custom/bin"}]
+        assert result.environment == ({"PATH": "/custom/bin"},)
 
     def allows_environment_value_types():
         # ARTbio/GalaxyKickStart/roles/copy_additional_files/tasks/main.yml
@@ -726,7 +744,9 @@ def describe_common_directives():
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
-        assert result.environment == [{"PYTHONPATH": None, "VIRTUAL_ENV": "{{ test }}"}]
+        assert result.environment == (
+            {"PYTHONPATH": None, "VIRTUAL_ENV": "{{ test }}"},
+        )
 
 
 def describe_vars():
