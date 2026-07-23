@@ -16,6 +16,7 @@ from loguru import logger
 from scansible.representations import ast
 from scansible.representations.ast import extractor as ast_extractor
 from scansible.utils import (
+    Positioned,
     ProjectPath,
     capture_output,
     find_all_files,
@@ -472,11 +473,9 @@ class ExtractionContext:
         line: int
         column: int
 
-        if isinstance(ds, ast.ASTNode) and not ds.position.is_synthetic:
-            file = str(ds.position.path)
-            line, column = ds.position.start.line, ds.position.start.column
-        elif hasattr(ds, "ansible_pos"):
-            file, line, column = ds.ansible_pos  # type: ignore[attr-defined]
+        if isinstance(ds, Positioned) and not ds.__position__.is_synthetic:
+            file = str(ds.__position__.path)
+            line, column = ds.__position__.start.line, ds.__position__.start.column
         elif hasattr(ds, "location"):
             file, line, column = ds.location  # type: ignore[attr-defined]
         else:

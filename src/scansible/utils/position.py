@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import NamedTuple, Protocol
+from typing import NamedTuple, Protocol, runtime_checkable
 
 from ruamel.yaml import StreamMark
 
@@ -40,6 +40,7 @@ class Position(NamedTuple):
         return self.path == "<unknown>"
 
 
+@runtime_checkable
 class Positioned(Protocol):
     """Mixin for elements with a code position."""
 

@@ -25,8 +25,7 @@ from pydantic import BeforeValidator, Discriminator, GetCoreSchemaHandler, Tag
 from pydantic_core import core_schema
 
 from scansible.representations.cst import YamlNode, YamlUnsafeStr, YamlVaultValue
-from scansible.representations.cst.nodes import Position, Positioned
-from scansible.utils import FrozenDict
+from scansible.utils import FrozenDict, Position, Positioned
 
 
 def _is_template(expr: str) -> bool:

@@ -55,6 +55,11 @@ class ASTNode(ASTEntity, frozen=True):
     #: The source code position of the node.
     position: Position = Field(default_factory=Position.synthetic)
 
+    @property
+    def __position__(self) -> Position:
+        # Cannot use Pydantic property starting with __, so need property instead.
+        return self.position
+
     @model_validator(mode="before")
     @classmethod
     def _inject_position(cls, data: object) -> object:
