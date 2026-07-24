@@ -43,13 +43,6 @@ types themselves (`StrLiteral`, `SeqLiteral`, ...), see
 `nodes/expression.py`. Reusable validation constraints are likewise
 provided via custom type aliases in `_validators.py`.
 
-Normalization that needs access to the validation context rather than
-just the raw value is instead implemented as a `Normalizer` attached to a
-field via `Annotated` metadata, see `_normalizers.py`. This is a niche
-need: `Lenient`, which drops individually-invalid sequence items instead
-of failing the whole field when extraction is lenient, is currently the
-only one.
-
 Beyond field-level normalization, Ansible also has various shorthand and
 legacy syntactical forms at the directive level, such as the many ways in
 which modules and arguments can be specified, or the obsolete `sudo`/`su`

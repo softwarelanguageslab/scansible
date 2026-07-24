@@ -20,7 +20,6 @@ from scansible.representations.cst import parse_file
 from scansible.types import AnyValue, ScalarValue
 from scansible.utils import ProjectPath, actions
 
-from .._normalizers import Lenient
 from ..common import ExtractionContext, RawDirectives
 from .base import ASTFile, ASTNode
 from .directives import CommonDirectives
@@ -32,6 +31,7 @@ from .expression import (
     FloatLiteral,
     Identifier,
     IntLiteral,
+    LenientSeqLiteral,
     MapLiteral,
     ScalarLiteral,
     SeqLiteral,
@@ -463,9 +463,7 @@ class TaskFile(ASTFile, frozen=True):
     """Represents a file containing tasks and blocks."""
 
     #: The top-level tasks or blocks contained in the file, in the order of definition.
-    tasks: Annotated[SeqLiteral[TaskOrBlock], Lenient] = Field(
-        default_factory=SeqLiteral
-    )
+    tasks: LenientSeqLiteral[TaskOrBlock] = Field(default_factory=LenientSeqLiteral)
 
     @classmethod
     @override
@@ -480,9 +478,7 @@ class HandlerFile(ASTFile, frozen=True):
     """Represents a file containing handlers."""
 
     #: The top-level handlers contained in the file, in the order of definition.
-    handlers: Annotated[SeqLiteral[Handler], Lenient] = Field(
-        default_factory=SeqLiteral
-    )
+    handlers: LenientSeqLiteral[Handler] = Field(default_factory=LenientSeqLiteral)
 
     @classmethod
     @override

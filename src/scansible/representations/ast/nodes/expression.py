@@ -26,6 +26,7 @@ from pydantic import (
     Discriminator,
     GetCoreSchemaHandler,
     Tag,
+    ValidationError,
     model_validator,
 )
 from pydantic_core import core_schema
@@ -33,6 +34,7 @@ from pydantic_core import core_schema
 from scansible.representations.cst import YamlNode, YamlUnsafeStr, YamlVaultValue
 from scansible.utils import FrozenDict, Position, Positioned
 
+from ..common import BrokenTask, ExtractionContext
 from .base import ASTNode
 
 _JINJA_ENV = Environment(cache_size=0)
@@ -426,6 +428,60 @@ class SeqLiteral[T](tuple[T, ...], Literal):
         return core_schema.no_info_wrap_validator_function(validate, list_schema)
 
 
+class LenientSeqLiteral[T](SeqLiteral[T]):
+    """Sequence literal that drops invalid items in lenient mode, instead of failing the whole sequence.
+
+    Unlike `SeqLiteral`, a bare non-sequence value is never coerced into a one-item sequence:
+    none of the fields using this type accept a lone item as shorthand for a one-item list.
+    """
+
+    @classmethod
+    @override
+    def _validate(cls, value: object) -> Sequence[object]:
+        if value == None:  # noqa: E711 -- could be YamlNone
+            return ()
+        if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+            raise ValueError("Expected a sequence")
+        return value
+
+    @classmethod
+    @override
+    def __get_pydantic_core_schema__(
+        cls, source_type: object, handler: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        (item_type,) = get_args(source_type)  # pyright: ignore[reportAny]
+        item_schema = handler.generate_schema(item_type)
+        list_schema = core_schema.list_schema(item_schema)
+
+        def validate(
+            value: object,
+            inner: core_schema.ValidatorFunctionWrapHandler,
+            info: core_schema.ValidationInfo,
+        ) -> Self:
+            coerced = cls._validate(value)
+            context = info.context
+
+            if context is not None and not isinstance(context, ExtractionContext):
+                raise ValueError("Expected context to be an ExtractionContext")
+
+            if context is None or not context.lenient:
+                validated_items = inner(list(coerced))  # pyright: ignore[reportAny]
+                return cls._construct_and_wrap(value, tuple(validated_items))  # pyright: ignore[reportAny]
+
+            results: list[object] = []
+            for raw in coerced:
+                try:
+                    (validated,) = inner([raw])  # pyright: ignore[reportAny]
+                except ValidationError as exc:
+                    context.broken_tasks.append(BrokenTask(raw=raw, reason=exc))
+                else:
+                    results.append(validated)  # pyright: ignore[reportAny]
+
+            return cls._construct_and_wrap(value, tuple(results))
+
+        return core_schema.with_info_wrap_validator_function(validate, list_schema)
+
+
 class MapLiteral[K, V](FrozenDict[K, V], Literal):
     """AST node representing a literal mapping."""
 
@@ -519,6 +575,7 @@ __all__ = [
     "DateLiteral",
     "DatetimeLiteral",
     "SeqLiteral",
+    "LenientSeqLiteral",
     "MapLiteral",
     "ScalarLiteral",
     "CompositeLiteral",

@@ -12,7 +12,6 @@ from scansible.representations.cst import parse_file
 from scansible.utils import ProjectPath
 from scansible.utils.actions import is_import_playbook
 
-from .._normalizers import Lenient
 from ..common import ExtractionContext, RawDirectives
 from .base import ASTFile, ASTNode
 from .directives import CommonDirectives
@@ -23,6 +22,7 @@ from .expression import (
     Expression,
     Identifier,
     IntLiteral,
+    LenientSeqLiteral,
     PercentLiteral,
     SeqLiteral,
     StrLiteral,
@@ -77,9 +77,7 @@ class Play(ASTNode, CommonDirectives, frozen=True):
     #: The play's targetted hosts.
     hosts: SeqLiteral[StrLiteral]
     #: The play's list of blocks.
-    tasks: Annotated[SeqLiteral[TaskOrBlock], Lenient] = Field(
-        default_factory=SeqLiteral
-    )
+    tasks: LenientSeqLiteral[TaskOrBlock] = Field(default_factory=LenientSeqLiteral)
 
     #: Whether to gather facts from the remote hosts.
     gather_facts: BoolLiteral | Expression | None = None
@@ -98,21 +96,19 @@ class Play(ASTNode, CommonDirectives, frozen=True):
     vars_prompt: SeqLiteral[VarsPrompt] = Field(default_factory=SeqLiteral)
 
     #: List of roles to be imported into play.
-    roles: Annotated[SeqLiteral[PlayRoleRequirement], Lenient] = Field(
-        default_factory=SeqLiteral
+    roles: LenientSeqLiteral[PlayRoleRequirement] = Field(
+        default_factory=LenientSeqLiteral
     )
 
     #: Handlers for the play.
-    handlers: Annotated[SeqLiteral[Handler], Lenient] = Field(
-        default_factory=SeqLiteral
-    )
+    handlers: LenientSeqLiteral[Handler] = Field(default_factory=LenientSeqLiteral)
     #: Tasks to be run before the roles in `roles`.
-    pre_tasks: Annotated[SeqLiteral[TaskOrBlock], Lenient] = Field(
-        default_factory=SeqLiteral
+    pre_tasks: LenientSeqLiteral[TaskOrBlock] = Field(
+        default_factory=LenientSeqLiteral
     )
     #: Tasks to be run after the main tasks.
-    post_tasks: Annotated[SeqLiteral[TaskOrBlock], Lenient] = Field(
-        default_factory=SeqLiteral
+    post_tasks: LenientSeqLiteral[TaskOrBlock] = Field(
+        default_factory=LenientSeqLiteral
     )
 
     #: Force handler notification.
@@ -232,7 +228,7 @@ class Playbook(ASTFile, frozen=True):
     """Represents an Ansible playbook."""
 
     #: List of plays defined in this playbook.
-    plays: Annotated[SeqLiteral[PlaybookChild], Lenient]
+    plays: LenientSeqLiteral[PlaybookChild]
 
     @classmethod
     @override

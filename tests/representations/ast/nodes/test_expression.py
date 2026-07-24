@@ -9,6 +9,7 @@ from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImpo
 from jinja2 import nodes as j2_nodes
 from pydantic import TypeAdapter, ValidationError
 
+from scansible.representations.ast import ExtractionContext, Task
 from scansible.representations.ast.nodes.expression import (
     BoolLiteral,
     Condition,
@@ -18,6 +19,7 @@ from scansible.representations.ast.nodes.expression import (
     FloatLiteral,
     Identifier,
     IntLiteral,
+    LenientSeqLiteral,
     MapLiteral,
     PercentLiteral,
     SeqLiteral,
@@ -279,6 +281,75 @@ def describe_literals():
 
         def passes_through_a_real_sequence():
             assert TypeAdapter(SeqLiteral[int]).validate_python([1, 2, 3]) == (1, 2, 3)
+
+    def describe_lenient_seq_literal():
+        def coerces_none_to_an_empty_tuple():
+            assert TypeAdapter(LenientSeqLiteral[int]).validate_python(None) == ()
+
+        def rejects_a_bare_scalar():
+            with pytest.raises(ValidationError):
+                _ = TypeAdapter(LenientSeqLiteral[int]).validate_python(5)
+
+        def passes_through_a_real_sequence():
+            result = TypeAdapter(LenientSeqLiteral[int]).validate_python([1, 2, 3])
+
+            assert result == (1, 2, 3)
+
+        def raises_on_invalid_items_when_strict():
+            ctx = ExtractionContext(lenient=False)
+
+            with pytest.raises(ValidationError):
+                _ = TypeAdapter(LenientSeqLiteral[int]).validate_python(
+                    [1, "nope", 3],
+                    context=ctx,  # pyright: ignore[reportArgumentType]
+                )
+
+        def drops_invalid_items_when_lenient():
+            ctx = ExtractionContext(lenient=True)
+
+            result = TypeAdapter(LenientSeqLiteral[int]).validate_python(
+                [1, "nope", 3],
+                context=ctx,  # pyright: ignore[reportArgumentType]
+            )
+
+            assert result == (1, 3)
+            assert len(ctx.broken_tasks) == 1
+            assert ctx.broken_tasks[0].raw == "nope"
+
+        def validates_real_ast_node_items():
+            yaml = """
+                name: hello world
+                file:
+                    path: test.txt
+            """
+            valid_task = parse_yaml_dict(yaml)
+
+            result = TypeAdapter(LenientSeqLiteral[Task]).validate_python(
+                [valid_task]
+            )
+
+            assert len(result) == 1
+            assert isinstance(result[0], Task)
+            assert result[0].action == "file"
+
+        def drops_invalid_ast_node_items_when_lenient():
+            yaml = """
+                name: hello world
+                file:
+                    path: test.txt
+            """
+            valid_task = parse_yaml_dict(yaml)
+            ctx = ExtractionContext(lenient=True)
+
+            result = TypeAdapter(LenientSeqLiteral[Task]).validate_python(
+                [valid_task, "not a task"],
+                context=ctx,  # pyright: ignore[reportArgumentType]
+            )
+
+            assert len(result) == 1
+            assert isinstance(result[0], Task)
+            assert len(ctx.broken_tasks) == 1
+            assert ctx.broken_tasks[0].raw == "not a task"
 
     def describe_map_literal():
         def coerces_none_to_an_empty_dict():

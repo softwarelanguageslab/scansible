@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, cast, override
+from typing import cast, override
 
 from collections.abc import Sequence
 
@@ -19,7 +19,6 @@ from pydantic import (
 from scansible.representations.cst import parse_file
 from scansible.utils import ProjectPath
 
-from .._normalizers import Lenient
 from ..common import BrokenTask, ExtractionContext, RawDirectives
 from .base import ASTFile, ASTNode
 from .directives import CommonDirectives
@@ -28,6 +27,7 @@ from .expression import (
     BoolLiteral,
     Condition,
     Expression,
+    LenientSeqLiteral,
     MapLiteral,
     SeqLiteral,
     StrLiteral,
@@ -195,8 +195,8 @@ class MetaBlock(ASTNode, frozen=True, extra="ignore"):
     #: Platforms supported by the role.
     platforms: SeqLiteral[Platform] = Field(default_factory=SeqLiteral)
     #: Role dependencies.
-    dependencies: Annotated[SeqLiteral[MetaRoleRequirement], Lenient] = Field(
-        default_factory=SeqLiteral
+    dependencies: LenientSeqLiteral[MetaRoleRequirement] = Field(
+        default_factory=LenientSeqLiteral
     )
 
     @field_validator("platforms", mode="before")

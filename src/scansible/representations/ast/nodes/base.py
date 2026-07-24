@@ -6,34 +6,17 @@ from typing import Self
 
 from abc import ABC, abstractmethod
 
-from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from scansible.representations.cst import YamlMap
 from scansible.utils import Position, ProjectPath
 
-from .._normalizers import Normalizer
 from .._validators import RelativePath
 from ..common import ExtractionContext
 
 
 class ASTEntity(BaseModel, strict=True, frozen=True, extra="forbid"):
     """Base class inherited by all classes participating in the AST representation."""
-
-    @field_validator("*", mode="before")
-    @classmethod
-    def _normalize(cls, value: object, info: ValidationInfo) -> object:
-        """Apply the declared normalizations to field values."""
-
-        assert info.field_name is not None
-        field_info = cls.model_fields[info.field_name]
-
-        for meta in field_info.metadata:  # pyright: ignore[reportAny]
-            if isinstance(meta, Normalizer) or (
-                isinstance(meta, type) and issubclass(meta, Normalizer)
-            ):
-                value = meta.normalize(value, field_info, info)
-
-        return value
 
 
 class ASTFile(ASTEntity, ABC, frozen=True):
