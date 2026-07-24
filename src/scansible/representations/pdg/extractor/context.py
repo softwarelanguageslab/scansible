@@ -14,7 +14,6 @@ from pathlib import Path
 from loguru import logger
 
 from scansible.representations import ast
-from scansible.representations.ast import extractor as ast_extractor
 from scansible.utils import (
     Positioned,
     ProjectPath,
@@ -165,7 +164,7 @@ class IncludeContext:
             return
 
         try:
-            model = ast_extractor.extract_role(real_path.absolute, lenient=self.lenient)
+            model = ast.extract_role(real_path.absolute, lenient=self.lenient)
         except Exception as e:
             logger.error(e)
             yield None

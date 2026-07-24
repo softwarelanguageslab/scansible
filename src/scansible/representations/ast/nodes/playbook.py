@@ -241,3 +241,13 @@ class Playbook(ASTFile, frozen=True):
         return cls.model_validate(
             {"path": path.relative, "plays": parse_file(path)}, context=context
         )
+
+
+__all__ = [
+    "VarsPrompt",
+    "PlayRoleRequirement",
+    "Play",
+    "ImportPlaybook",
+    "Playbook",
+    "PlaybookChild",
+]

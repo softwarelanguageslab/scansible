@@ -45,6 +45,9 @@ build-backend = "hatchling.build"
 
 [tool.ruff.lint]
 extend-select = ["I"]
+# F403/F405 complain about star imports and being unable to resolve them,
+# ignore these as they're handled properly by basedpyright
+extend-ignore = ["F403", "F405"]
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/*" = ["D", "INP001", "S101", "PLR2004", "FBT001"]

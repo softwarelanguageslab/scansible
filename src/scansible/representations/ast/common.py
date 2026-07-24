@@ -48,3 +48,10 @@ class BrokenFile(BaseModel, frozen=True, arbitrary_types_allowed=True):
     path: RelativePath
     #: The reason for failure.
     reason: Exception
+
+
+__all__ = [
+    "ExtractionContext",
+    "BrokenTask",
+    "BrokenFile",
+]

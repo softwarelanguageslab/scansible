@@ -260,3 +260,12 @@ class MetaFile(ASTFile, frozen=True):
         return cls.model_validate(
             {"path": path.relative, "metablock": parse_file(path)}, context=context
         )
+
+
+__all__ = [
+    "Platform",
+    "RoleRequirement",
+    "MetaRoleRequirement",
+    "MetaBlock",
+    "MetaFile",
+]

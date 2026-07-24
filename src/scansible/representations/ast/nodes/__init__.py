@@ -10,24 +10,13 @@ from .._validators import AbsolutePath
 from ..common import BrokenFile, BrokenTask
 
 # Re-export public AST node types.
-from .base import ASTFile as ASTFile
-from .base import ASTNode as ASTNode
-from .playbook import Play as Play
-from .playbook import Playbook as Playbook
-from .playbook import VarsPrompt as VarsPrompt
-from .role import Role as Role
-from .role_meta import MetaBlock as MetaBlock
-from .role_meta import MetaFile as MetaFile
-from .role_meta import Platform as Platform
-from .role_meta import RoleRequirement as RoleRequirement
-from .task import BaseTask as BaseTask
-from .task import Block as Block
-from .task import Handler as Handler
-from .task import HandlerFile as HandlerFile
-from .task import LoopControl as LoopControl
-from .task import Task as Task
-from .task import TaskFile as TaskFile
-from .variable import VariableFile as VariableFile
+from .base import *
+from .expression import *
+from .playbook import *
+from .role import *
+from .role_meta import *
+from .task import *
+from .variable import *
 
 
 class AST(BaseModel, frozen=True):
@@ -53,3 +42,52 @@ class AST(BaseModel, frozen=True):
     def is_playbook(self) -> bool:
         """Whether the model represents a playbook. Mutually exclusive with `is_role`."""
         return isinstance(self.root, Playbook)
+
+
+# Deliberate duplication as basedpyright otherwise complains about unsupported operations on `__all__`,
+# possibly leading to degraded static tooling.
+__all__ = [
+    "AST",
+    # .base
+    "ASTFile",
+    "ASTNode",
+    # .expression
+    "Expression",
+    "Condition",
+    "Identifier",
+    "StrLiteral",
+    "IntLiteral",
+    "FloatLiteral",
+    "PercentLiteral",
+    "BoolLiteral",
+    "DateLiteral",
+    "DatetimeLiteral",
+    "SeqLiteral",
+    "MapLiteral",
+    "ScalarLiteral",
+    "CompositeLiteral",
+    "AnyLiteral",
+    "AnyExpression",
+    # .playbook
+    "VarsPrompt",
+    "Play",
+    "ImportPlaybook",
+    "Playbook",
+    # .role
+    "Role",
+    # .role_meta
+    "Platform",
+    "RoleRequirement",
+    "MetaBlock",
+    "MetaFile",
+    # .task
+    "LoopControl",
+    "BaseTask",
+    "Task",
+    "Handler",
+    "Block",
+    "TaskFile",
+    "HandlerFile",
+    # .variable
+    "VariableFile",
+]

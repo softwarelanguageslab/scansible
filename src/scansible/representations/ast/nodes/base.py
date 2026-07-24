@@ -73,3 +73,10 @@ class ASTNode(ASTEntity, frozen=True):
         """
         self.__position__: Position = self.position  # pyright: ignore[reportAttributeAccessIssue] -- Frozen but still works at this point.
         return self
+
+
+__all__ = [
+    "ASTEntity",
+    "ASTFile",
+    "ASTNode",
+]

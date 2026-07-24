@@ -51,3 +51,9 @@ def extract_role(
         broken_files=ctx.broken_files,
         broken_tasks=ctx.broken_tasks,
     )
+
+
+__all__ = [
+    "extract_playbook",
+    "extract_role",
+]

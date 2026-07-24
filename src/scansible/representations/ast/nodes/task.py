@@ -492,3 +492,15 @@ class HandlerFile(ASTFile, frozen=True):
         return cls.model_validate(
             {"path": path.relative, "handlers": parse_file(path)}, context=context
         )
+
+
+__all__ = [
+    "LoopControl",
+    "BaseTask",
+    "Task",
+    "Handler",
+    "Block",
+    "TaskFile",
+    "HandlerFile",
+    "TaskOrBlock",
+]

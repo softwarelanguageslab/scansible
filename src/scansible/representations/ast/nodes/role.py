@@ -129,3 +129,8 @@ class Role(ASTFile, frozen=True, arbitrary_types_allowed=True):
             default_var_files=SourceFileMap(defaults_files, prefix="defaults/"),
             meta_file=meta_file,
         )
+
+
+__all__ = [
+    "Role",
+]

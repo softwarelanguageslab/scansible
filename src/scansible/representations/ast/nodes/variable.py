@@ -31,3 +31,8 @@ class VariableFile(ASTFile, frozen=True):
         return cls.model_validate(
             {"path": path.relative, "variables": parse_file(path)}, context=context
         )
+
+
+__all__ = [
+    "VariableFile",
+]

@@ -15,7 +15,7 @@ from icontract import require
 from loguru import logger
 
 from scansible.representations import ast
-from scansible.representations.ast.nodes.expression import BoolLiteral, StrLiteral
+from scansible.representations.ast import BoolLiteral, StrLiteral
 from scansible.types import AnyValue
 from scansible.utils import SENTINEL, Sentinel, first, make_immutable
 
