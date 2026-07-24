@@ -55,11 +55,6 @@ class ASTNode(ASTEntity, frozen=True):
     #: The source code position of the node.
     position: Position = Field(default_factory=Position.synthetic)
 
-    @property
-    def __position__(self) -> Position:
-        # Cannot use Pydantic property starting with __, so need property instead.
-        return self.position
-
     @model_validator(mode="before")
     @classmethod
     def _inject_position(cls, data: object) -> object:
@@ -68,3 +63,13 @@ class ASTNode(ASTEntity, frozen=True):
             data["position"] = data.__position__
 
         return data  # pyright: ignore[reportUnknownVariableType]
+
+    @model_validator(mode="after")
+    def _alias_position(self) -> Self:
+        """Alias the `position` property to `__position__` to adhere to the `Positioned` protocol.
+
+        This workaround is necessary because Pydantic does not allow attributes to start with __.
+        Note that we're not subclassing the `Positioned` trait because it causes a metaclass conflict.
+        """
+        self.__position__: Position = self.position  # pyright: ignore[reportAttributeAccessIssue] -- Frozen but still works at this point.
+        return self
