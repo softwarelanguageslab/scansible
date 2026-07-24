@@ -18,8 +18,7 @@ from ruamel.yaml.nodes import Node
 from ruamel.yaml.resolver import BaseResolver
 from yaml.resolver import Resolver as _PyYAMLResolver
 
-from scansible.utils import Position
-from scansible.utils.position import LineColumn
+from scansible.utils import LineColumn, Position
 
 from .nodes import (
     YamlBool,

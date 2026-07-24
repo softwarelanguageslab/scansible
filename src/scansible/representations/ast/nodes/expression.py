@@ -16,7 +16,7 @@ from typing import Annotated, Any, Callable, Final, Protocol, Self, get_args, ov
 import decimal
 import keyword
 from abc import abstractmethod
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import date, datetime
 
 from jinja2 import Environment, TemplateSyntaxError
@@ -38,6 +38,9 @@ from ..common import BrokenTask, ExtractionContext
 from .base import ASTNode
 
 _JINJA_ENV = Environment(cache_size=0)
+
+#: Placeholder position used as the default for directly constructed nodes.
+_SYNTHETIC_POSITION: Final = Position.synthetic()
 
 
 def _get_position(value: object) -> Position:
@@ -145,6 +148,11 @@ class Identifier(str, Positioned):
 
     __position__: Position
 
+    def __new__(cls, value: str, *, position: Position = _SYNTHETIC_POSITION) -> Self:
+        obj = str.__new__(cls, value)
+        obj.__position__ = position
+        return obj
+
     @classmethod
     def __get_pydantic_core_schema__(
         cls, source_type: object, handler: GetCoreSchemaHandler
@@ -155,9 +163,7 @@ class Identifier(str, Positioned):
             if keyword.iskeyword(value):
                 raise ValueError(f"{value} is a reserved keyword")
 
-            object = cls(value)
-            object.__position__ = _get_position(value)
-            return object
+            return cls(value, position=_get_position(value))
 
         return core_schema.no_info_after_validator_function(
             validate, core_schema.str_schema()
@@ -176,19 +182,24 @@ class Literal(Positioned, Protocol):
         ...
 
     @classmethod
-    def _construct(cls, original_value: Any, coerced_value: Any) -> Self:  # pyright: ignore[reportExplicitAny, reportAny]
-        """Construct an instance of the class, given the original and coerced value."""
-        return cls(coerced_value)  # pyright: ignore[reportCallIssue]
+    def _construct(
+        cls,
+        original_value: Any,  # pyright: ignore[reportExplicitAny, reportAny]
+        coerced_value: Any,  # pyright: ignore[reportExplicitAny, reportAny]
+        position: Position,
+    ) -> Self:
+        """Construct an instance of the class, given the original and coerced value and its position."""
+        return cls(coerced_value, position=position)  # pyright: ignore[reportCallIssue]
 
     @classmethod
     def _construct_and_wrap(cls, original_value: object, coerced_value: object) -> Self:
-        """Construct an instance and set the position.
+        """Construct an instance, deriving its position from the original value.
 
         Unlikely to need overriding, instead, override `_construct`.
         """
-        wrapped = cls._construct(original_value, coerced_value)
-        wrapped.__position__ = _get_position(original_value)
-        return wrapped
+        return cls._construct(
+            original_value, coerced_value, _get_position(original_value)
+        )
 
     @classmethod
     def _make_validator(
@@ -227,10 +238,17 @@ class StrLiteral(str, Literal):
     #: Whether this string is in fact a vault-encrypted value.
     is_vaulted: Final[bool] = False
 
+    def __new__(cls, value: str, *, position: Position = _SYNTHETIC_POSITION) -> Self:
+        obj = str.__new__(cls, value)
+        obj.__position__ = position
+        return obj
+
     @classmethod
     @override
-    def _construct(cls, original_value: object, coerced_value: str) -> Self:
-        obj = cls(coerced_value)
+    def _construct(
+        cls, original_value: object, coerced_value: str, position: Position
+    ) -> Self:
+        obj = cls(coerced_value, position=position)
         obj.is_vaulted = isinstance(original_value, YamlVaultValue)  # pyright: ignore[reportAttributeAccessIssue]
         return obj
 
@@ -252,6 +270,11 @@ class IntLiteral(int, Literal):
     """AST node representing a literal integer."""
 
     __position__: Position
+
+    def __new__(cls, value: int, *, position: Position = _SYNTHETIC_POSITION) -> Self:
+        obj = int.__new__(cls, value)
+        obj.__position__ = position
+        return obj
 
     @classmethod
     @override
@@ -276,6 +299,11 @@ class FloatLiteral(float, Literal):
 
     __position__: Position
 
+    def __new__(cls, value: float, *, position: Position = _SYNTHETIC_POSITION) -> Self:
+        obj = float.__new__(cls, value)
+        obj.__position__ = position
+        return obj
+
     @classmethod
     @override
     def _validate(cls, value: object) -> float:
@@ -290,6 +318,11 @@ class PercentLiteral(float, Literal):
     """AST node representing a literal percentage."""
 
     __position__: Position
+
+    def __new__(cls, value: float, *, position: Position = _SYNTHETIC_POSITION) -> Self:
+        obj = float.__new__(cls, value)
+        obj.__position__ = position
+        return obj
 
     @classmethod
     @override
@@ -312,8 +345,11 @@ class BoolLiteral(Literal):
     _real_bool: bool
     __position__: Position
 
-    def __init__(self, value: bool) -> None:
+    def __init__(
+        self, value: bool, *, position: Position = _SYNTHETIC_POSITION
+    ) -> None:
         self._real_bool = value
+        self.__position__ = position
 
     def __bool__(self) -> bool:
         return self._real_bool
@@ -352,6 +388,11 @@ class DateLiteral(date, Literal):
 
     __position__: Position
 
+    def __new__(cls, value: date, *, position: Position = _SYNTHETIC_POSITION) -> Self:
+        obj = date.__new__(cls, value.year, value.month, value.day)
+        obj.__position__ = position
+        return obj
+
     @classmethod
     @override
     def _validate(cls, value: object) -> date:
@@ -360,16 +401,28 @@ class DateLiteral(date, Literal):
             raise ValueError("Expected date")
         return value
 
-    @classmethod
-    @override
-    def _construct(cls, original_value: object, coerced_value: date) -> Self:
-        return cls(coerced_value.year, coerced_value.month, coerced_value.day)
-
 
 class DatetimeLiteral(datetime, Literal):
     """AST node representing a literal datetime."""
 
     __position__: Position
+
+    def __new__(
+        cls, value: datetime, *, position: Position = _SYNTHETIC_POSITION
+    ) -> Self:
+        obj = datetime.__new__(
+            cls,
+            value.year,
+            value.month,
+            value.day,
+            value.hour,
+            value.minute,
+            value.second,
+            value.microsecond,
+            value.tzinfo,
+        )
+        obj.__position__ = position
+        return obj
 
     @classmethod
     @override
@@ -379,25 +432,18 @@ class DatetimeLiteral(datetime, Literal):
             raise ValueError("Expected datetime")
         return value
 
-    @classmethod
-    @override
-    def _construct(cls, original_value: object, coerced_value: datetime) -> Self:
-        return cls(
-            coerced_value.year,
-            coerced_value.month,
-            coerced_value.day,
-            coerced_value.hour,
-            coerced_value.minute,
-            coerced_value.second,
-            coerced_value.microsecond,
-            coerced_value.tzinfo,
-        )
-
 
 class SeqLiteral[T](tuple[T, ...], Literal):
     """AST node representing a literal sequence."""
 
     __position__: Position
+
+    def __new__(
+        cls, value: Iterable[T] = (), *, position: Position = _SYNTHETIC_POSITION
+    ) -> Self:
+        obj = tuple.__new__(cls, value)  # pyright: ignore[reportUnknownMemberType]
+        obj.__position__ = position
+        return obj
 
     @classmethod
     @override
@@ -486,6 +532,18 @@ class MapLiteral[K, V](FrozenDict[K, V], Literal):
     """AST node representing a literal mapping."""
 
     __position__: Position
+
+    def __init__(
+        self,
+        value: Mapping[K, V] | Iterable[tuple[K, V]] | None = None,
+        *,
+        position: Position = _SYNTHETIC_POSITION,
+    ) -> None:
+        if value is not None:
+            super().__init__(value)
+        else:
+            super().__init__()
+        self.__position__ = position
 
     @classmethod
     @override

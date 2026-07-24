@@ -324,9 +324,7 @@ def describe_literals():
             """
             valid_task = parse_yaml_dict(yaml)
 
-            result = TypeAdapter(LenientSeqLiteral[Task]).validate_python(
-                [valid_task]
-            )
+            result = TypeAdapter(LenientSeqLiteral[Task]).validate_python([valid_task])
 
             assert len(result) == 1
             assert isinstance(result[0], Task)
@@ -420,3 +418,20 @@ def describe_literals():
             )
             assert h == {"x": 1, "y": 2}
             assert h.__position__ == ("test.yaml", (6, 5), (8, 1))
+
+        def has_a_synthetic_position_by_default():
+            # Directly constructed (non-validated) nodes must still satisfy `Positioned`.
+            assert Identifier("item").__position__.is_synthetic
+            assert StrLiteral("hello").__position__.is_synthetic
+            assert IntLiteral(123).__position__.is_synthetic
+            assert FloatLiteral(4.0).__position__.is_synthetic
+            assert PercentLiteral(4.0).__position__.is_synthetic
+            assert BoolLiteral(True).__position__.is_synthetic
+            assert DateLiteral(date(2026, 1, 1)).__position__.is_synthetic
+            assert DatetimeLiteral(
+                datetime(2026, 1, 2, 3, 4, 5)
+            ).__position__.is_synthetic
+            assert SeqLiteral[IntLiteral]((IntLiteral(1),)).__position__.is_synthetic
+            assert MapLiteral[StrLiteral, IntLiteral](
+                {StrLiteral("a"): IntLiteral(1)}
+            ).__position__.is_synthetic
