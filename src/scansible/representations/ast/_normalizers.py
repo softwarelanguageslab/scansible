@@ -1,8 +1,9 @@
 """Reusable field-normalization logic.
 
-Each `Normalizer` implements one normalization rule (e.g. wrapping a scalar into a single-element list).
-Normalizers are attached to a model field via `Annotated[T, SomeNormalizer]` and are applied by
-`ASTEntity` before Pydantic validates the field's value.
+Each `Normalizer` implements one normalization rule that needs the validation context, e.g.
+`Lenient`, which drops invalid sequence items when extraction is lenient. Normalizers are
+attached to a model field via `Annotated[T, SomeNormalizer]` and are applied by `ASTEntity`
+before Pydantic validates the field's value.
 """
 
 from __future__ import annotations

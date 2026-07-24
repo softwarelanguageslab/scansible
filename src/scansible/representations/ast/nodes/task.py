@@ -64,8 +64,7 @@ class LoopControl(ASTNode, frozen=True):
     index_var: Identifier | None = None
     #: Loop label in output.
     label: StrLiteral | None = None
-    #: Amount of time in seconds to pause between each iteration. Can be a
-    #: string in case this is an expression. 0 by default.
+    #: Amount of time in seconds to pause between each iteration.
     pause: FloatLiteral | Expression = FloatLiteral(0.0)
     #: Whether to include more information in the loop items.
     #: See https://docs.ansible.com/ansible/latest/user_guide/playbooks_loops.html#extended-loop-variables
@@ -122,9 +121,9 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
     delegate_facts: BoolLiteral | Expression | None = None
     #: Conditional expression(s) to override the "failed" status.
     failed_when: SeqLiteral[Condition | BoolLiteral] = Field(default_factory=SeqLiteral)
-    #: Loop on the task, or None if no loop. Can be a string (an expression),
-    #: a list of arbitrary values, or, when the loop comes from `with_dict`, a
-    #: dict of arbitrary items.
+    #: Loop on the task, or None if no loop. Can be an expression, a list of
+    #: arbitrary values, or, when the loop comes from `with_dict`, a dict of
+    #: arbitrary items.
     loop: (
         Expression
         | SeqLiteral[AnyExpression]

@@ -2,8 +2,8 @@
 
 Expressions can be literal values and Jinja2 expressions, either bare (without `{{ }}`) or wrapped (with `{{ }}`).
 
-For now, expression nodes are validated subclasses of plain `str` and can be used just like an actual `str`.
-In the future, they may become full-fledged `ASTNode` instances with parsed expressions.
+`Expression` and `Condition` are `ASTNode` instances that eagerly parse their source string into a
+Jinja2 AST (`template`) at validation time, alongside the original source (`raw`).
 
 Literals are deliberately kept separate from the CST nodes to enforce the distinction between the CST and the AST.
 Moreover, AST nodes may perform type coercions that the CST nodes do not, and are used in different ways.
