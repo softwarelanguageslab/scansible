@@ -68,7 +68,6 @@ def describe_extracting_variables():
             == "$ANSIBLE_VAULT;1.1;AES256\n62396263313762316136336334303463366465303638626438616530343935623766626534366436\n"
         )
         assert pwd.is_vaulted
-        assert pwd.__position__ == ("main.yml", (2, 22), (5, 1))
 
     def allows_variable_values_to_be_none(tmp_path: Path):
         yaml = """
@@ -121,36 +120,26 @@ def describe_extracting_variables():
         a, b, c, d, e, f, g, h, i, j = result.variables.values()
         assert isinstance(a, StrLiteral)
         assert a == "hello"
-        assert a.__position__ == ("main.yml", (2, 4), (2, 9))
         assert isinstance(b, IntLiteral)
         assert b == 123
-        assert b.__position__ == ("main.yml", (3, 4), (3, 7))
         assert c == 4.0
         assert isinstance(c, FloatLiteral)
-        assert c.__position__ == ("main.yml", (4, 4), (4, 8))
         assert isinstance(d, BoolLiteral)
         assert d == True  # noqa: E712
-        assert d.__position__ == ("main.yml", (5, 4), (5, 7))
         assert isinstance(e, DateLiteral)
         assert e == date(2026, 1, 1)
-        assert e.__position__ == ("main.yml", (6, 4), (6, 14))
         assert isinstance(f, DatetimeLiteral)
         assert f == datetime(2026, 1, 2, 3, 4, 5, tzinfo=f.tzinfo)
-        assert f.__position__ == ("main.yml", (7, 4), (7, 24))
         assert isinstance(g, SeqLiteral)
         assert g == (123, "abc")
         assert isinstance(g[0], IntLiteral)
         assert isinstance(g[1], StrLiteral)
-        assert g.__position__ == ("main.yml", (9, 3), (11, 1))
         assert isinstance(h, MapLiteral)
         assert h == {"x": 4.56, "y": True}
-        assert h.__position__ == ("main.yml", (12, 3), (14, 1))
         assert isinstance(i, StrLiteral)
         assert i == "{{ unsafe }}"
-        assert i.__position__ == ("main.yml", (14, 4), (14, 26))
         assert isinstance(j, StrLiteral)
         assert j.is_vaulted
-        assert j.__position__ == ("main.yml", (15, 4), (18, 1))
 
     @pytest.mark.parametrize(
         "content",

@@ -135,7 +135,7 @@ class Condition(Expression, frozen=True):
             raise ValueError(f"invalid condition: {tse}") from tse
 
         assert isinstance(template.body[0], j2_nodes.If)
-        return j2_nodes.Template(template.body[0].test)
+        return j2_nodes.Template([template.body[0].test])
 
 
 class Identifier(str, Positioned):
