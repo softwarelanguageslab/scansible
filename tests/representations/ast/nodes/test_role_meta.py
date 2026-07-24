@@ -9,7 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from scansible.representations.ast import ExtractionContext, MetaFile
-from scansible.representations.ast.nodes.expression import BoolLiteral
+from scansible.representations.ast.nodes.expression import BoolLiteral, Condition
 from scansible.utils import ProjectPath
 
 
@@ -195,7 +195,7 @@ def describe_extracting_metadata_file():
             yaml = """
                 dependencies:
                     - role: testrole
-                      when: "{{ ansible_os_family == 'Debian' }}"
+                      when: "ansible_os_family == 'Debian'"
             """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
             ctx = ExtractionContext(False)
@@ -204,17 +204,18 @@ def describe_extracting_metadata_file():
 
             assert len(result.metablock.dependencies) == 1
             assert result.metablock.dependencies[0].role == "testrole"
-            assert result.metablock.dependencies[0].when == (
-                "{{ ansible_os_family == 'Debian' }}",
-            )
+            assert len(result.metablock.dependencies[0].when) == 1
+            c = result.metablock.dependencies[0].when[0]
+            assert isinstance(c, Condition)
+            assert c.raw == "ansible_os_family == 'Debian'"
 
         def extracts_dependencies_with_multiple_conditions(tmp_path: Path):
             yaml = """
                 dependencies:
                     - role: testrole
                       when:
-                        - "{{ ansible_os_family == 'Debian' }}"
-                        - "{{ 1 + 1 == 2 }}"
+                        - "ansible_os_family == 'Debian'"
+                        - "1 + 1 == 2"
             """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
             ctx = ExtractionContext(False)
@@ -223,10 +224,12 @@ def describe_extracting_metadata_file():
 
             assert len(result.metablock.dependencies) == 1
             assert result.metablock.dependencies[0].role == "testrole"
-            assert result.metablock.dependencies[0].when == (
-                "{{ ansible_os_family == 'Debian' }}",
-                "{{ 1 + 1 == 2 }}",
-            )
+            assert len(result.metablock.dependencies[0].when) == 2
+            c0, c1 = result.metablock.dependencies[0].when
+            assert isinstance(c0, Condition)
+            assert c0.raw == "ansible_os_family == 'Debian'"
+            assert isinstance(c1, Condition)
+            assert c1.raw == "1 + 1 == 2"
 
         def ignores_malformed_dependency_in_lenient_mode(tmp_path: Path):
             yaml = """

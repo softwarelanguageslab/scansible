@@ -25,6 +25,7 @@ from collections.abc import Mapping, Sequence
 from ansible.parsing.dataloader import DataLoader
 from ansible.template import Templar
 
+from scansible.representations import ast
 from scansible.representations.pdg.extractor.expressions.records import TemplatableType
 from scansible.representations.pdg.representation import ValidTypeStr
 from scansible.types import AnyValue, ScalarValue
@@ -102,6 +103,9 @@ def is_template(expr: AnyValue) -> TypeGuard[TemplatableType]:
 
 
 def wrap_expression(expr: AnyValue) -> Expression:
+    if isinstance(expr, ast.Expression):
+        expr = expr.raw
+
     type_name = extract_type_name(expr)
 
     if isinstance(expr, Sequence) and not isinstance(expr, str):
@@ -123,5 +127,7 @@ def wrap_expression(expr: AnyValue) -> Expression:
 def wrap_condition(expr: AnyValue) -> Expression:
     if isinstance(expr, str):
         return Condition(expr)
+    if isinstance(expr, ast.Condition):
+        return Condition(expr.raw)
     else:
         return wrap_expression(expr)

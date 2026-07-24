@@ -19,18 +19,23 @@ from abc import abstractmethod
 from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 
-from ansible.parsing.dataloader import DataLoader
-from ansible.template import Templar
-from pydantic import BeforeValidator, Discriminator, GetCoreSchemaHandler, Tag
+from jinja2 import Environment, TemplateSyntaxError
+from jinja2 import nodes as j2_nodes
+from pydantic import (
+    BeforeValidator,
+    Discriminator,
+    GetCoreSchemaHandler,
+    Tag,
+    model_validator,
+)
 from pydantic_core import core_schema
 
 from scansible.representations.cst import YamlNode, YamlUnsafeStr, YamlVaultValue
 from scansible.utils import FrozenDict, Position, Positioned
 
+from .base import ASTNode
 
-def _is_template(expr: str) -> bool:
-    templar = Templar(DataLoader())
-    return templar.is_template(expr)
+_JINJA_ENV = Environment(cache_size=0)
 
 
 def _get_position(value: object) -> Position:
@@ -39,55 +44,98 @@ def _get_position(value: object) -> Position:
     return Position.synthetic()
 
 
-class Expression(str, Positioned):
+def _is_literal(raw: str, template: j2_nodes.Template) -> bool:
+    return not raw or (
+        len(template.body) == 1
+        and isinstance(output := template.body[0], j2_nodes.Output)
+        and len(output.nodes) == 1
+        and isinstance((data := output.nodes[0]), j2_nodes.TemplateData)
+        # Check that parsing didn't remove comments etc.
+        and data.data == raw
+    )
+
+
+class Expression(ASTNode, frozen=True, arbitrary_types_allowed=True):
     """AST node representing a Jinja2 expression."""
 
-    __position__: Position
+    raw: StrLiteral
+    template: j2_nodes.Template
 
     @classmethod
-    def __get_pydantic_core_schema__(
-        cls, source_type: object, handler: GetCoreSchemaHandler
-    ) -> core_schema.CoreSchema:
-        def validate(value: object) -> Self:
-            if not isinstance(value, str):
-                raise ValueError("expressions must be strings")
-            if not _is_template(value):
-                raise ValueError("not a valid expression")
-            if isinstance(value, YamlUnsafeStr):
-                raise ValueError("expression is marked unsafe")
-
-            object = cls(value)
-            object.__position__ = _get_position(value)
-            return object
-
-        return core_schema.no_info_after_validator_function(
-            validate, core_schema.any_schema()
+    def _parse_expression(cls, value: str) -> j2_nodes.Template:
+        """Parse an expression to a template, and raise ValueError in case of malformed expressions."""
+        # Quickly check whether any Jinja2 delimiters are present
+        delimiters = (
+            _JINJA_ENV.block_start_string,
+            _JINJA_ENV.variable_start_string,
+            _JINJA_ENV.comment_start_string,
         )
+        if not any(delimiter in value for delimiter in delimiters):
+            raise ValueError("Jinja2 expressions must contain Jinja2 delimiters")
+
+        try:
+            template = _JINJA_ENV.parse(value)
+        except TemplateSyntaxError as tse:
+            raise ValueError(f"invalid expression: {tse}") from tse
+
+        if _is_literal(value, template):
+            raise ValueError("Expression must contain Jinja2 constructs")
+
+        return template
+
+    @model_validator(mode="before")
+    @classmethod
+    def _parse_from_string(cls, data: object) -> object:
+        """Validate and parse an expression string, and return a format suitable for Pydantic to ingest."""
+        if not isinstance(data, str):
+            raise ValueError("expressions must be strings")
+        if isinstance(data, YamlUnsafeStr):
+            raise ValueError("refusing to treat an unsafe string as an expression")
+
+        return {
+            "raw": data,
+            "template": cls._parse_expression(data),
+            "position": _get_position(data),
+        }
 
 
-class Condition(str, Positioned):
+class Condition(Expression, frozen=True):
     """AST node representing an Ansible condition.
 
-    Ansible conditions are Jinja2 expressions without surrounding braces.
+    Ansible conditions are special-case expressions without surrounding braces. We model
+    them as subtypes of expressions with specialised handling so that consumers can use
+    the standard Expression interface without concerning themselves about bare conditions.
     """
 
-    __position__: Position
-
     @classmethod
-    def __get_pydantic_core_schema__(
-        cls, source_type: object, handler: GetCoreSchemaHandler
-    ) -> core_schema.CoreSchema:
-        def validate(value: str) -> Self:
-            # FIXME: We need validation here to make sure it's a correct condition, but
-            # the validation is complex and currently lives in the PDG builder.
-            # When doing such validation, we may as well parse the expressions/conditions too.
-            object = cls(value)
-            object.__position__ = _get_position(value)
-            return object
+    @override
+    def _parse_expression(cls, value: str) -> j2_nodes.Template:
+        """Parse an condition to a template, and raise ValueError in case of malformed conditions.
 
-        return core_schema.no_info_after_validator_function(
-            validate, core_schema.str_schema()
-        )
+        Conditions are wrapped by Ansible in another Jinja2 expression and thus should not contain braces.
+        We consider an expression that contains Jinja2 braces to be an error. Note that some Ansible versions
+        allow this, we conservatively do not.
+        """
+        # Note that we cannot use the quick check for delimiters as done in `Expression`, as that overapproximates
+        # and thus cannot guarantee that a string is NOT an expression. Therefore, we'll parse the expression as is,
+        # reject any non-literals, and parse it wrapped.
+
+        try:
+            template = _JINJA_ENV.parse(value)
+            if not _is_literal(value, template):
+                raise ValueError("Conditions must not contain any Jinja2 brace syntax")
+        except TemplateSyntaxError:
+            # ignore for now, it might parse correctly when wrapped.
+            pass
+
+        wrapped = "{% if " + value + " %} True {% else %} False {% endif %}"
+        try:
+            template = _JINJA_ENV.parse(wrapped)
+        except TemplateSyntaxError as tse:
+            raise ValueError(f"invalid condition: {tse}") from tse
+
+        assert isinstance(template.body[0], j2_nodes.If)
+        return j2_nodes.Template(template.body[0].test)
 
 
 class Identifier(str, Positioned):

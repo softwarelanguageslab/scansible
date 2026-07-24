@@ -73,7 +73,7 @@ class LoopControl(ASTNode, frozen=True):
     #: Whether to include `allitems` in the extended version.
     extended_allitems: BoolLiteral | Expression | None = BoolLiteral(True)
     #: Conditions when to break the loop.
-    break_when: SeqLiteral[Condition] = Field(default_factory=SeqLiteral)
+    break_when: SeqLiteral[Condition | BoolLiteral] = Field(default_factory=SeqLiteral)
 
 
 class BaseTask(ASTNode, CommonDirectives, frozen=True):
@@ -142,12 +142,12 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
     poll: IntLiteral | Expression | None = None
     #: Value given to the register keyword, i.e. variable name that will store
     #: the result of this action. Renamed due to naming conflicts with base classes.
-    register_var: Identifier | Expression | None = Field(default=None, alias="register")
+    register_var: Identifier | None = Field(default=None, alias="register")
     #: Number of tries for failed tasks.
     retries: IntLiteral | Expression | None = None
     #: Retry task until condition(s) are satisfied.
     until: SeqLiteral[Condition | BoolLiteral] = Field(default_factory=SeqLiteral)
-    #: Condition on the task, or None if no condition.
+    #: Conditions on the task.
     when: SeqLiteral[Condition | BoolLiteral] = Field(default_factory=SeqLiteral)
 
     @field_validator("action", mode="after")
@@ -428,7 +428,7 @@ class Block(ASTNode, CommonDirectives, frozen=True):
     #: Apply facts to delegated host.
     delegate_facts: BoolLiteral | Expression | None = None
 
-    #: Condition on the block, or None if no condition.
+    #: Conditions on the block.
     when: SeqLiteral[Condition | BoolLiteral] = Field(default_factory=SeqLiteral)
 
     @model_validator(mode="after")

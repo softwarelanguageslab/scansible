@@ -10,6 +10,7 @@ from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImpo
 from pydantic import ValidationError
 
 from scansible.representations.ast import Block, ExtractionContext, Play, Playbook, Task
+from scansible.representations.ast.nodes.expression import Condition
 from scansible.representations.ast.nodes.playbook import (
     ImportPlaybook,
     PlayRoleRequirement,
@@ -375,7 +376,8 @@ def describe_extracting_import_playbook():
 
         assert result.import_playbook == "other.yml"
         assert result.vars == {"x": 123}
-        assert result.when == ("condition is True",)
+        assert len(result.when) == 1
+        assert isinstance(result.when[0], Condition)
 
     @pytest.mark.parametrize("collection", ("ansible.legacy", "ansible.builtin"))
     def normalizes_fully_qualified_names(collection: str):

@@ -84,3 +84,5 @@ from .nodes import Task as Task
 from .nodes import TaskFile as TaskFile
 from .nodes import VariableFile as VariableFile
 from .nodes import VarsPrompt as VarsPrompt
+from .nodes.expression import Condition as Condition
+from .nodes.expression import Expression as Expression

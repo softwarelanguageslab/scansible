@@ -14,6 +14,7 @@ from ansible.template import Templar
 from icontract import require
 from loguru import logger
 
+from scansible.representations import ast
 from scansible.representations.ast.nodes.expression import BoolLiteral, StrLiteral
 from scansible.types import AnyValue
 from scansible.utils import SENTINEL, Sentinel, first, make_immutable
@@ -192,6 +193,7 @@ class VarContext:
         yield
         self._envs.exit_scope()
 
+    # FIXME: The following functions should be combined now that the AST distinguishes literals, expressions, and conditions already
     def build_expression(self, expr: AnyValue) -> rep.DataNode:
         return self._build_expression(wrap_expression(expr)).data_node
 
@@ -220,6 +222,7 @@ class VarContext:
     def _parse_ast(
         self, expr: TemplatedExpression | Condition
     ) -> TemplateExpressionAST | None:
+        # FIXME use preparsed version from AST.
         if isinstance(expr, Condition):
             return TemplateExpressionAST.parse_conditional(
                 expr.raw, self._envs.get_variable_initialisers()
@@ -438,6 +441,10 @@ class VarContext:
             f"Defining variable {name!r} of type {type(initialiser).__name__} "
             + f"in env of type {env_type.name}"
         )
+
+        # FIXME HACK!
+        if isinstance(initialiser, ast.Expression):
+            initialiser = initialiser.raw
 
         var_rev = self._get_next_def_revision(name)
         logger.debug(f"Selected revision {var_rev} for {name}")

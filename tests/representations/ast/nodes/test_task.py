@@ -7,7 +7,12 @@ from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImpo
 from pydantic import ValidationError
 
 from scansible.representations.ast import ExtractionContext, Handler, Task
-from scansible.representations.ast.nodes.expression import BoolLiteral, StrLiteral
+from scansible.representations.ast.nodes.expression import (
+    BoolLiteral,
+    Condition,
+    Expression,
+    StrLiteral,
+)
 
 
 def describe_extracting_tasks():
@@ -72,7 +77,10 @@ def describe_extracting_tasks():
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "file"
-        assert result.args == {"path": "{{ file_path }}"}
+        [(arg_name, arg)] = result.args.items()
+        assert arg_name == "path"
+        assert isinstance(arg, Expression)
+        assert arg.raw == "{{ file_path }}"
         assert result.name == "Ensure file exists"
         assert result.vars == {"file_path": "test.txt"}
 
@@ -87,7 +95,10 @@ def describe_extracting_tasks():
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "debug"
-        assert result.args == {"msg": "{{ item }}"}
+        [(arg_name, arg)] = result.args.items()
+        assert arg_name == "msg"
+        assert isinstance(arg, Expression)
+        assert arg.raw == "{{ item }}"
         assert result.name == "test"
         assert result.loop == ("hello", "world")
 
@@ -102,9 +113,13 @@ def describe_extracting_tasks():
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "debug"
-        assert result.args == {"msg": "{{ item }}"}
+        [(arg_name, arg)] = result.args.items()
+        assert arg_name == "msg"
+        assert isinstance(arg, Expression)
+        assert arg.raw == "{{ item }}"
         assert result.name == "test"
-        assert result.loop == "{{ somelist }}"
+        assert isinstance(result.loop, Expression)
+        assert result.loop.raw == "{{ somelist }}"
 
     def extracts_task_with_loop_control():
         yaml = """
@@ -119,7 +134,10 @@ def describe_extracting_tasks():
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "debug"
-        assert result.args == {"msg": "{{ myvar }}"}
+        [(arg_name, arg)] = result.args.items()
+        assert arg_name == "msg"
+        assert isinstance(arg, Expression)
+        assert arg.raw == "{{ myvar }}"
         assert result.name == "test"
         assert result.loop == ("hello", "world")
         assert result.loop_control is not None
@@ -137,7 +155,7 @@ def describe_extracting_tasks():
                 pause: 2
                 extended: yes
                 extended_allitems: no
-                break_when: "{{ myvar == 'world' }}"
+                break_when: "myvar == 'world'"
         """
         ctx = ExtractionContext(False)
 
@@ -150,7 +168,10 @@ def describe_extracting_tasks():
         assert result.loop_control.pause == 2
         assert result.loop_control.extended == BoolLiteral(True)
         assert result.loop_control.extended_allitems == BoolLiteral(False)
-        assert result.loop_control.break_when == ("{{ myvar == 'world' }}",)
+        assert len(result.loop_control.break_when) == 1
+        c = result.loop_control.break_when[0]
+        assert isinstance(c, Condition)
+        assert c.raw == "myvar == 'world'"
 
     def rejects_task_with_string_literal_poll():
         yaml = """
@@ -174,7 +195,10 @@ def describe_extracting_tasks():
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "debug"
-        assert result.args == {"msg": "{{ myvar }}"}
+        [(arg_name, arg)] = result.args.items()
+        assert arg_name == "msg"
+        assert isinstance(arg, Expression)
+        assert arg.raw == "{{ myvar }}"
         assert result.name == "test"
         assert result.when == (True,)
 
@@ -189,9 +213,9 @@ def describe_extracting_tasks():
         assert result.action == "import_tasks"
         assert result.args == {"_raw_params": "tasks.yml"}
 
-    def does_not_eagerly_evaluate_expressions():
-        # register is a "static" field and Ansible will try to evaluate the
-        # expression eagerly, which we should prevent
+    def rejects_expression_for_register():
+        # register is a "static" field: Ansible does not template it, so it must
+        # be a plain identifier, not a Jinja2 expression.
         yaml = """
             name: test
             debug:
@@ -200,12 +224,8 @@ def describe_extracting_tasks():
         """
         ctx = ExtractionContext(False)
 
-        result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
-
-        assert result.action == "debug"
-        assert result.args == {"msg": "hello"}
-        assert result.name == "test"
-        assert result.register_var == "{{ expr }}"
+        with pytest.raises(ValidationError, match="Expected a valid identifier"):
+            _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def does_not_eagerly_resolve_actions():
         yaml = """
@@ -296,7 +316,10 @@ def describe_extracting_handlers():
         assert result is not None
         assert result.action == "file"
         assert result.name == "Ensure file exists"
-        assert result.args == {"path": "{{ file_path }}"}
+        [(arg_name, arg)] = result.args.items()
+        assert arg_name == "path"
+        assert isinstance(arg, Expression)
+        assert arg.raw == "{{ file_path }}"
         assert result.listen == ("a topic",)
 
     def extracts_handler_with_list_of_listens():
@@ -315,7 +338,10 @@ def describe_extracting_handlers():
         assert result is not None
         assert result.action == "file"
         assert result.name == "Ensure file exists"
-        assert result.args == {"path": "{{ file_path }}"}
+        [(arg_name, arg)] = result.args.items()
+        assert arg_name == "path"
+        assert isinstance(arg, Expression)
+        assert arg.raw == "{{ file_path }}"
         assert result.listen == ("a topic", "another topic")
 
 
@@ -578,7 +604,10 @@ def describe_normalization():
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "file"
-        assert result.args == {"path": "{{ item }}"}
+        [(arg_name, arg)] = result.args.items()
+        assert arg_name == "path"
+        assert isinstance(arg, Expression)
+        assert arg.raw == "{{ item }}"
         assert result.name == "test"
         assert result.loop == ("hello", "world")
         assert result.loop_with == "items"
@@ -744,9 +773,15 @@ def describe_common_directives():
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
-        assert result.environment == (
-            {"PYTHONPATH": None, "VIRTUAL_ENV": "{{ test }}"},
-        )
+        assert len(result.environment) == 1
+        env = result.environment[0]
+        assert isinstance(env, dict)
+        [(python_path_name, python_path), (virtual_env_name, virtual_env)] = env.items()
+        assert python_path_name == "PYTHONPATH"
+        assert python_path is None
+        assert virtual_env_name == "VIRTUAL_ENV"
+        assert isinstance(virtual_env, Expression)
+        assert virtual_env.raw == "{{ test }}"
 
 
 def describe_vars():

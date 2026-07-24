@@ -6,7 +6,7 @@ import pytest
 from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImport]
 
 from scansible.representations.ast import Block, ExtractionContext, Task
-from scansible.representations.ast.nodes.expression import BoolLiteral
+from scansible.representations.ast.nodes.expression import BoolLiteral, Condition
 
 
 def describe_extracting_blocks():
@@ -94,7 +94,10 @@ def describe_extracting_blocks():
 
         result = Block.model_validate(parse_yaml_dict(yaml), context=ctx)
 
-        assert result.when == ("some_condition",)
+        assert len(result.when) == 1
+        c = result.when[0]
+        assert isinstance(c, Condition)
+        assert c.raw == "some_condition"
         assert result.notify == ("a handler",)
         assert result.delegate_to == "otherhost"
         assert result.delegate_facts == BoolLiteral(True)
