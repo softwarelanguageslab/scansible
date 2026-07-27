@@ -21,7 +21,10 @@ class YamlStr(str, YamlNode):
     """String originating from a YAML document, with position information."""
 
     def __new__(cls, value: str, position: Position) -> YamlStr:
-        obj = str.__new__(cls, value)
+        # ruamel.yaml inserts <BEL> (0x07, \a) characters in multi-line folded strings to indicate
+        # where the string was split, so that the split can be reconstructed later. Remove these.
+        # TODO: We should probably also keep track of these so we can track source positions during string manipulation.
+        obj = str.__new__(cls, value.replace("\a", ""))
         obj.__position__ = position
         return obj
 
