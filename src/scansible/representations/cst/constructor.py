@@ -197,5 +197,8 @@ class CustomYAML(YAML):
     ) -> None:
         super().__init__(typ=typ, pure=pure, output=output, plug_ins=plug_ins)
         self.current_file_name = file_name
+        # The YAML parser raises on duplicate keys, Ansible warns but allows it, so ignore duplicate keys.
+        # TODO: We should perhaps log keep track of duplicate keys and warn about it too.
+        self.allow_duplicate_keys: bool = True
         self.Resolver: type[AnsibleResolver] = AnsibleResolver
         self.Constructor: type[CustomConstructor] = CustomConstructor

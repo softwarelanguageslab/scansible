@@ -12,6 +12,7 @@ from typing import Annotated, ClassVar, Literal, Self, cast, override
 
 from collections.abc import Mapping
 
+from ansible.errors import AnsibleParserError
 from ansible.parsing.splitter import parse_kv, split_args
 from ansible.utils.fqcn import add_internal_fqcns
 from pydantic import Discriminator, Field, Tag, field_validator, model_validator
@@ -243,7 +244,10 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
         arg_list.extend(action_args)
 
         # action could be "xyz" or "xyz a=b c=d", split it.
-        [action, *freeform_args] = split_args(action)
+        try:
+            [action, *freeform_args] = split_args(action)
+        except AnsibleParserError as e:
+            raise ValueError("Malformed action string") from e
         arg_list.append(" ".join(freeform_args))
 
         ds["action"] = action
@@ -299,7 +303,10 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
     def _parse_args(cls, action: str, args: str) -> Mapping[ScalarValue, AnyValue]:
         """Parse a raw `key=value` argument string, treating `action` specially if it's a freeform action."""
         check_raw = action in FREEFORM_ACTIONS
-        return parse_kv(args, check_raw)  # pyright: ignore[reportReturnType]
+        try:
+            return parse_kv(args, check_raw)  # pyright: ignore[reportReturnType]
+        except AnsibleParserError as e:
+            raise ValueError("Malformed action args string") from e
 
     @classmethod
     def _parse_task_level_args(

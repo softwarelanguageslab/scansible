@@ -7,8 +7,8 @@ from typing import Callable, override
 from collections.abc import Sequence
 from functools import cached_property
 
-from ansible.errors import AnsibleParserError
 from pydantic import ValidationError
+from ruamel.yaml import YAMLError
 
 from scansible.utils import ProjectPath, SourceFileMap, find_all_files, find_file
 
@@ -28,7 +28,7 @@ def _safe_extract[T: ASTFile](
     """Run `extractor`, recording a `BrokenFile` and returning `None` on validation failure instead of raising."""
     try:
         return extractor(file_path, ctx)
-    except (ValidationError, AnsibleParserError) as e:
+    except (ValidationError, YAMLError) as e:
         ctx.broken_files.append(BrokenFile(path=file_path.relative, reason=e))
 
 
