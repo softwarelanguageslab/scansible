@@ -329,7 +329,12 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
     @classmethod
     def _all_directives(cls) -> set[str]:
         """Return the set of directives that exist on this entity."""
-        return {field.alias or name for name, field in cls.model_fields.items()}
+        return {
+            field.alias or name
+            for name, field in cls.model_fields.items()
+            # Position is internal.
+            if name != "position"
+        }
 
     @classmethod
     def _is_task_directive(cls, key: str) -> bool:

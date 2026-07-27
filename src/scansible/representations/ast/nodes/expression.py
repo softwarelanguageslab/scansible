@@ -100,7 +100,7 @@ class Expression(ASTNode, frozen=True, arbitrary_types_allowed=True):
         return {
             "raw": data,
             "template": cls._parse_expression(data),
-            "position": _get_position(data),
+            "__position__": _get_position(data),
         }
 
 

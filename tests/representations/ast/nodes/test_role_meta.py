@@ -351,6 +351,34 @@ def describe_extracting_metadata_file():
             assert result.metablock.dependencies[0].become == BoolLiteral(True)
             assert result.metablock.dependencies[0].params == {"param_x": 123}
 
+        def handles_position_argument(tmp_path: Path):
+            """`position` as an argument may conflict with our model's attributes."""
+            yaml = """
+                    galaxy_info:
+                        platforms:
+                            - name: Debian
+                              versions:
+                                - any
+
+                    dependencies:
+                        - role: test
+                          become: yes
+                          param_x: 123
+                          position: "start"
+                """
+            _ = (tmp_path / "main.yml").write_text(dedent(yaml))
+            ctx = ExtractionContext(False)
+
+            result = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
+
+            assert len(result.metablock.dependencies) == 1
+            assert result.metablock.dependencies[0].role == "test"
+            assert result.metablock.dependencies[0].become == BoolLiteral(True)
+            assert result.metablock.dependencies[0].params == {
+                "param_x": 123,
+                "position": "start",
+            }
+
         def supports_new_style_role_requirements(
             tmp_path: Path,
         ):

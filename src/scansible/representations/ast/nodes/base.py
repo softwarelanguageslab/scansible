@@ -36,14 +36,14 @@ class ASTNode(ASTEntity, frozen=True):
     """Base class inherited by all nodes inside of an AST for a file."""
 
     #: The source code position of the node.
-    position: Position = Field(default_factory=Position.synthetic)
+    position: Position = Field(default_factory=Position.synthetic, alias="__position__")
 
     @model_validator(mode="before")
     @classmethod
     def _inject_position(cls, data: object) -> object:
         """Extract source code position information from Ansible objects and present it to the model for validation."""
         if isinstance(data, YamlMap):
-            data["position"] = data.__position__
+            data["__position__"] = data.__position__
 
         return data  # pyright: ignore[reportUnknownVariableType]
 
