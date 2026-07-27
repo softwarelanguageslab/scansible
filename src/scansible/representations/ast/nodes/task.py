@@ -8,9 +8,9 @@ from Ansible's various shorthand and obsoleted syntaxes.
 
 from __future__ import annotations
 
-from typing import Annotated, ClassVar, Literal, Self, cast, override
+from typing import Annotated, Any, ClassVar, Self, cast, override
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 
 from ansible.errors import AnsibleParserError
 from ansible.parsing.splitter import parse_kv, split_args
@@ -418,19 +418,17 @@ class Handler(BaseTask, frozen=True):
     listen: SeqLiteral[StrLiteral] = Field(default_factory=SeqLiteral)
 
 
-class Block(ASTNode, CommonDirectives, frozen=True):
-    """Represents an Ansible block of tasks."""
+class BaseBlock[ChildT](ASTNode, CommonDirectives, frozen=True):
+    """Represents commonalities for Ansible blocks (of tasks, or of handlers)."""
 
-    # TODO: Verify whether handlers can occur in blocks and whether there should be a separate handler block.
-
-    #: The block's main task list.
-    block: SeqLiteral[TaskOrBlock]
-    #: List of tasks in the block's rescue section, i.e. the tasks that will
-    #: execute when an exception occurs.
-    rescue: SeqLiteral[TaskOrBlock] = Field(default_factory=SeqLiteral)
-    #: List of tasks in the block's always section, like a try-catch's `finally`
-    #: handler.
-    always: SeqLiteral[TaskOrBlock] = Field(default_factory=SeqLiteral)
+    #: The block's main child list.
+    block: SeqLiteral[ChildT]
+    #: List of children in the block's rescue section, i.e. the children that
+    #: will execute when an exception occurs.
+    rescue: SeqLiteral[ChildT] = Field(default_factory=SeqLiteral)
+    #: List of children in the block's always section, like a try-catch's
+    #: `finally` handler.
+    always: SeqLiteral[ChildT] = Field(default_factory=SeqLiteral)
 
     #: List of handler names of handlers to notify.
     notify: SeqLiteral[StrLiteral] = Field(default_factory=SeqLiteral)
@@ -450,17 +448,49 @@ class Block(ASTNode, CommonDirectives, frozen=True):
         return self
 
 
-def _distinguish_task_vs_block(obj: object) -> Literal["task", "block"] | None:
-    if isinstance(obj, dict):
-        if "block" in obj or "rescue" in obj or "always" in obj:
-            return "block"
-        return "task"
-    if isinstance(obj, Task):
-        return "task"
-    if isinstance(obj, Block):
-        return "block"
+class Block(BaseBlock["TaskOrBlock"], frozen=True):
+    """Represents an Ansible block of tasks."""
 
-    raise ValueError("Expected block or task to be a dictionary")
+
+class HandlerBlock(BaseBlock["HandlerOrBlock"], frozen=True):
+    """Represents an Ansible block of handlers.
+
+    `rescue`/`always` are syntactically valid here but never execute in real
+    Ansible. The block's own name is not a valid `notify` topic (only the
+    nested handlers' own name/listen are).
+    """
+
+
+def _make_task_or_block_discriminator(
+    plain_cls: type[BaseTask],
+    block_cls: type[BaseBlock[Any]],  # pyright: ignore[reportExplicitAny]
+    plain_tag: str,
+) -> Callable[[object], str | None]:
+    """Build a discriminator distinguishing a plain task/handler from a block.
+
+    Shared between `TaskOrBlock` and `HandlerOrBlock`, which differ only in
+    which concrete classes they discriminate between.
+    """
+
+    def discriminate(obj: object) -> str | None:
+        if isinstance(obj, dict):
+            if "block" in obj or "rescue" in obj or "always" in obj:
+                return "block"
+            return plain_tag
+        if isinstance(obj, plain_cls):
+            return plain_tag
+        if isinstance(obj, block_cls):
+            return "block"
+
+        raise ValueError(f"Expected block or {plain_tag} to be a dictionary")
+
+    return discriminate
+
+
+_distinguish_task_vs_block = _make_task_or_block_discriminator(Task, Block, "task")
+_distinguish_handler_vs_block = _make_task_or_block_discriminator(
+    Handler, HandlerBlock, "handler"
+)
 
 
 #: A task-list entry: either a `Task` or a `Block`, discriminated by whether
@@ -469,6 +499,16 @@ type TaskOrBlock = Annotated[
     Annotated[Task, Tag("task")] | Annotated[Block, Tag("block")],
     Discriminator(_distinguish_task_vs_block),
 ]
+
+#: A handler-list entry: either a `Handler` or a `HandlerBlock`, discriminated
+#: by whether the raw data contains `block`/`rescue`/`always` keys.
+type HandlerOrBlock = Annotated[
+    Annotated[Handler, Tag("handler")] | Annotated[HandlerBlock, Tag("block")],
+    Discriminator(_distinguish_handler_vs_block),
+]
+
+_ = Block.model_rebuild()
+_ = HandlerBlock.model_rebuild()
 
 
 class TaskFile(ASTFile, frozen=True):
@@ -490,7 +530,9 @@ class HandlerFile(ASTFile, frozen=True):
     """Represents a file containing handlers."""
 
     #: The top-level handlers contained in the file, in the order of definition.
-    handlers: LenientSeqLiteral[Handler] = Field(default_factory=LenientSeqLiteral)
+    handlers: LenientSeqLiteral[HandlerOrBlock] = Field(
+        default_factory=LenientSeqLiteral
+    )
 
     @classmethod
     @override
@@ -506,7 +548,9 @@ __all__ = [
     "BaseTask",
     "Task",
     "Handler",
+    "BaseBlock",
     "Block",
+    "HandlerBlock",
     "TaskFile",
     "HandlerFile",
     "TaskOrBlock",

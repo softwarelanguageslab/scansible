@@ -15,6 +15,7 @@ from scansible.representations.ast import BaseTask as Task
 from scansible.representations.ast import (
     Block,
     ExtractionContext,
+    HandlerBlock,
     Play,
     Playbook,
     TaskFile,
@@ -302,12 +303,12 @@ def extract_all_tasks(project: Path) -> list[Task]:
     return tasks
 
 
-def flatten_tasks(ts: Sequence[Task | Block]) -> Iterable[Task]:
+def flatten_tasks(ts: Sequence[Task | Block | HandlerBlock]) -> Iterable[Task]:
     for t in ts:
         match t:
             case Task():
                 yield t
-            case Block():
+            case Block() | HandlerBlock():
                 yield from flatten_tasks(t.block)
                 yield from flatten_tasks(t.rescue)
                 yield from flatten_tasks(t.always)

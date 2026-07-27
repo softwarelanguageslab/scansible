@@ -28,7 +28,7 @@ from .expression import (
     StrLiteral,
 )
 from .role_meta import RoleRequirement
-from .task import Handler, TaskOrBlock
+from .task import HandlerOrBlock, TaskOrBlock
 
 
 class VarsPrompt(ASTNode, frozen=True):
@@ -101,7 +101,7 @@ class Play(ASTNode, CommonDirectives, frozen=True):
     )
 
     #: Handlers for the play.
-    handlers: LenientSeqLiteral[Handler] = Field(default_factory=LenientSeqLiteral)
+    handlers: LenientSeqLiteral[HandlerOrBlock] = Field(default_factory=LenientSeqLiteral)
     #: Tasks to be run before the roles in `roles`.
     pre_tasks: LenientSeqLiteral[TaskOrBlock] = Field(
         default_factory=LenientSeqLiteral

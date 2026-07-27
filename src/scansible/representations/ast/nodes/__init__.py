@@ -85,7 +85,9 @@ __all__ = [
     "BaseTask",
     "Task",
     "Handler",
+    "BaseBlock",
     "Block",
+    "HandlerBlock",
     "TaskFile",
     "HandlerFile",
     # .variable

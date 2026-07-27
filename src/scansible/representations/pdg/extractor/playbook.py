@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
 
 from loguru import logger
 
 from scansible.representations.ast import (
-    Block,
     Handler,
+    HandlerBlock,
     Play,
     Playbook,
     RoleRequirement,
@@ -127,7 +127,7 @@ class PlaybookExtractor:
         return result
 
     def _extract_handlers(
-        self, handlers: Sequence[Block | Handler], result: ExtractionResult
+        self, handlers: Sequence[Handler | HandlerBlock], result: ExtractionResult
     ) -> ExtractionResult:
         return result.chain(
             HandlerListExtractor(self.context, handlers).extract_handlers(

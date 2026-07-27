@@ -9,7 +9,15 @@ import pytest
 from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImport]
 from pydantic import ValidationError
 
-from scansible.representations.ast import Block, ExtractionContext, Play, Playbook, Task
+from scansible.representations.ast import (
+    Block,
+    ExtractionContext,
+    Handler,
+    HandlerBlock,
+    Play,
+    Playbook,
+    Task,
+)
 from scansible.representations.ast.nodes.expression import Condition
 from scansible.representations.ast.nodes.playbook import (
     ImportPlaybook,
@@ -224,6 +232,29 @@ def describe_extracting_plays():
         assert len(result.pre_tasks) == 1
         assert len(result.post_tasks) == 1
         assert len(result.handlers) == 1
+
+    def extracts_play_with_handler_block():
+        yaml = """
+            name: test play
+            hosts: servers
+            handlers:
+              - block:
+                  - name: restart x
+                    service:
+                        name: test
+                    listen: a topic
+        """
+        ctx = ExtractionContext(False)
+
+        result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
+
+        assert len(result.handlers) == 1
+        b = result.handlers[0]
+        assert isinstance(b, HandlerBlock)
+        assert len(b.block) == 1
+        h = b.block[0]
+        assert isinstance(h, Handler)
+        assert h.listen == ("a topic",)
 
     def normalizes_none_task_lists():
         yaml = """

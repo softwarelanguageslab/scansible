@@ -77,7 +77,7 @@ class RoleExtractor:
                     result = result.chain(
                         HandlerListExtractor(
                             self.context,
-                            hf.handlers,  # type: ignore[arg-type]
+                            hf.handlers,
                         ).extract_handlers(result.next_predecessors)
                     )
 
