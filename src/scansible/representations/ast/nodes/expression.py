@@ -56,7 +56,7 @@ def _is_literal(raw: str, template: j2_nodes.Template) -> bool:
         and len(output.nodes) == 1
         and isinstance((data := output.nodes[0]), j2_nodes.TemplateData)
         # Check that parsing didn't remove comments etc.
-        and data.data == raw
+        and data.data.strip() == raw.strip()
     )
 
 
