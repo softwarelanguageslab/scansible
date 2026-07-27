@@ -97,7 +97,7 @@ def describe_expression():
                 _ = Expression.model_validate("This is not an expression")
 
         def rejects_malformed_syntax():
-            with pytest.raises(ValidationError, match="invalid expression"):
+            with pytest.raises(ValidationError, match="Template Syntax Error"):
                 _ = Expression.model_validate("{{ x +")
 
 
@@ -141,7 +141,7 @@ def describe_condition():
                 _ = Condition.model_validate("{{ x == 1 }}")
 
         def rejects_malformed_syntax():
-            with pytest.raises(ValidationError, match="invalid condition"):
+            with pytest.raises(ValidationError, match="Template Syntax Error"):
                 _ = Condition.model_validate("x ==")
 
 

@@ -81,7 +81,7 @@ class Expression(ASTNode, frozen=True, arbitrary_types_allowed=True):
         try:
             template = _JINJA_ENV.parse(value)
         except TemplateSyntaxError as tse:
-            raise ValueError(f"invalid expression: {tse}") from tse
+            raise ValueError(f"Template Syntax Error: {tse}") from tse
 
         if _is_literal(value, template):
             raise ValueError("Expression must contain Jinja2 constructs")
@@ -137,7 +137,7 @@ class Condition(Expression, frozen=True):
         try:
             template = _JINJA_ENV.parse(wrapped)
         except TemplateSyntaxError as tse:
-            raise ValueError(f"invalid condition: {tse}") from tse
+            raise ValueError(f"Template Syntax Error: {tse}") from tse
 
         assert isinstance(template.body[0], j2_nodes.If)
         return j2_nodes.Template([template.body[0].test])

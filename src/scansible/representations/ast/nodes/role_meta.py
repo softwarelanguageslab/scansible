@@ -235,7 +235,7 @@ class MetaBlock(ASTNode, frozen=True, extra="ignore"):
     def _hoist_platforms(cls, value: object) -> object:
         """Hoist `galaxy_info.platforms` to a top-level key before validation."""
 
-        if not (isinstance(value, dict) and "galaxy_info" in value):
+        if not (isinstance(value, dict) and value.get("galaxy_info") != None):  # noqa: E711
             return value
 
         galaxy_info = value["galaxy_info"]
