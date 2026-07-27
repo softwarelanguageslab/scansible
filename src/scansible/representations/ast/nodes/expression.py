@@ -375,6 +375,9 @@ class BoolLiteral(Literal):
         if isinstance(value, bool):
             return value
 
+        if isinstance(value, str):
+            value = value.lower().strip()
+
         if value in ("y", "yes", "on", "1", "true", "t", 1, 1.0):
             return True
         elif value in ("n", "no", "off", "0", "false", "f", 0, 0.0):
