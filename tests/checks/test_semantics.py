@@ -25,14 +25,7 @@ def build_graph(path: Path) -> ExtractionContext:
 
 
 def write_yaml(content: str, path: Path) -> None:
-    path.write_text(content)
-
-
-def assert_same_results(actual: list[CheckResult], expected: list[CheckResult]) -> None:
-    # FIXME: We're ignoring the file location for now, as it's broken in the current AST implementation.
-    assert len(actual) == len(expected)
-    for r1, r2 in zip(actual, expected):
-        assert r1.rule_name == r2.rule_name
+    _ = path.write_text(content)
 
 
 def describe_unsafe_reuse_rules() -> None:
@@ -55,9 +48,9 @@ def describe_unsafe_reuse_rules() -> None:
 
         results = run_all_checks(ctx)
 
-        assert_same_results(
-            results, [CheckResult("Unsafe reuse: Impure expression", f"{pb_path}:4:17")]
-        )
+        assert results == [
+            CheckResult("Unsafe reuse: Impure expression", "pb.yml:4:17")
+        ]
 
     def redefined_dependence(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -82,10 +75,9 @@ def describe_unsafe_reuse_rules() -> None:
 
         results = run_all_checks(ctx)
 
-        assert_same_results(
-            results,
-            [CheckResult("Unsafe reuse: Redefined dependence", f"{pb_path}:5:17")],
-        )
+        assert results == [
+            CheckResult("Unsafe reuse: Redefined dependence", "pb.yml:5:17")
+        ]
 
 
 def describe_unintended_override_rules() -> None:
@@ -108,14 +100,9 @@ def describe_unintended_override_rules() -> None:
 
         results = run_all_checks(ctx)
 
-        assert_same_results(
-            results,
-            [
-                CheckResult(
-                    "Unintended override: Unconditional override", f"{pb_path}:9:21"
-                )
-            ],
-        )
+        assert results == [
+            CheckResult("Unintended override: Unconditional override", "pb.yml:9:21")
+        ]
 
     def unusable(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -136,14 +123,9 @@ def describe_unintended_override_rules() -> None:
 
         results = run_all_checks(ctx)
 
-        assert_same_results(
-            results,
-            [
-                CheckResult(
-                    "Unintended override: Unused because shadowed", f"{pb_path}:9:21"
-                )
-            ],
-        )
+        assert results == [
+            CheckResult("Unintended override: Unused because shadowed", "pb.yml:9:21")
+        ]
 
 
 def describe_too_high_precedence_rules() -> None:
@@ -163,15 +145,12 @@ def describe_too_high_precedence_rules() -> None:
 
         results = run_all_checks(ctx)
 
-        assert_same_results(
-            results,
-            [
-                CheckResult(
-                    "Unnecessarily high precedence: Unnecessary set_fact",
-                    f"{pb_path}:5:21",
-                )
-            ],
-        )
+        assert results == [
+            CheckResult(
+                "Unnecessarily high precedence: Unnecessary set_fact",
+                "pb.yml:5:21",
+            )
+        ]
 
     def set_fact_false_impure(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -226,12 +205,9 @@ def describe_too_high_precedence_rules() -> None:
 
         results = run_all_checks(ctx)
 
-        assert_same_results(
-            results,
-            [
-                CheckResult(
-                    "Unnecessarily high precedence: Unnecessary include_vars",
-                    f"{tmp_path / 'vars.yml'}:1:1\n\tvia {pb_path}:4:19",
-                )
-            ],
-        )
+        assert results == [
+            CheckResult(
+                "Unnecessarily high precedence: Unnecessary include_vars",
+                "vars.yml:1:1\n\tvia pb.yml:4:19",
+            )
+        ]

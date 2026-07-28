@@ -1,26 +1,25 @@
 from __future__ import annotations
 
-from typing import ClassVar, ContextManager, Generic, TypeVar
+from typing import ClassVar, override
 
 import abc
 import re
 from collections.abc import Iterable, Sequence
+from contextlib import AbstractContextManager
 from functools import reduce
 
 from jinja2 import nodes
 from loguru import logger
 
+from scansible.representations import ast
 from scansible.representations.pdg.extractor.expressions.simplification import (
     SimplifiedExpression,
 )
-from scansible.types import AnyValue
 
 from ... import representation as rep
 from ..expressions import EnvironmentType, TemplateExpressionAST, simplify_expression
 from ..result import ExtractionResult
 from .base import TaskExtractor, TaskVarsScopeLevel
-
-_IncludedContent = TypeVar("_IncludedContent")
 
 
 def _is_too_general_filename_pattern(pattern: str) -> bool:
@@ -28,26 +27,28 @@ def _is_too_general_filename_pattern(pattern: str) -> bool:
     return len(parts) <= 2 and parts[0] in (".+", "(.+)")
 
 
-class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]):
+class DynamicIncludesExtractor[Content](TaskExtractor, abc.ABC):
     CONTENT_TYPE: ClassVar[str]
     TASK_VARS_SCOPE_LEVEL: ClassVar[TaskVarsScopeLevel] = EnvironmentType.INCLUDE_PARAMS
 
     @abc.abstractmethod
-    def _extract_included_name(self, args: dict[str, AnyValue]) -> AnyValue:
+    def _extract_included_name(
+        self, args: dict[ast.StrLiteral, ast.AnyExpression]
+    ) -> ast.AnyExpression:
         """Extract included name from arguments, and pop the argument."""
         raise NotImplementedError()
 
     @abc.abstractmethod
     def _load_content(
-        self, included_name: str
-    ) -> ContextManager[_IncludedContent | None]:
+        self, included_name: ast.StrLiteral
+    ) -> AbstractContextManager[Content | None]:
         """Load and enter included content as a context manager."""
         raise NotImplementedError
 
     @abc.abstractmethod
     def _extract_included_content(
         self,
-        included_content: _IncludedContent,
+        included_content: Content,
         predecessors: Sequence[rep.ControlNode],
     ) -> ExtractionResult:
         raise NotImplementedError()
@@ -63,6 +64,7 @@ class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]
     def _file_exists(self, name: str) -> bool:
         raise NotImplementedError()
 
+    @override
     def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
         with self.setup_task_vars_scope(self.TASK_VARS_SCOPE_LEVEL):
             result = self._do_extract(predecessors)
@@ -86,7 +88,9 @@ class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]
         with self.context.activate_conditions(conditional_nodes):
             self._check_conditions()
 
-            if not included_name_expr or not isinstance(included_name_expr, str):
+            if not included_name_expr or not isinstance(
+                included_name_expr, (ast.StrLiteral, ast.Expression)
+            ):
                 self.logger.error("Unknown included file name!")
                 included_result = self._create_placeholder_task(
                     included_name_expr, predecessors
@@ -104,7 +108,7 @@ class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]
         pass
 
     def _load_and_extract_content(
-        self, included_name: str, predecessors: Sequence[rep.ControlNode]
+        self, included_name: ast.StrLiteral, predecessors: Sequence[rep.ControlNode]
     ) -> ExtractionResult:
         with self._load_content(included_name) as included_content:
             if included_content is None:
@@ -117,7 +121,7 @@ class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]
             return self._extract_included_content(included_content, predecessors)
 
     def _create_placeholder_task(
-        self, included_name: AnyValue, predecessors: Sequence[rep.ControlNode]
+        self, included_name: ast.AnyExpression, predecessors: Sequence[rep.ControlNode]
     ) -> ExtractionResult:
         task_node = rep.Task(
             action=self.task.action, name=self.task.name, location=self.location
@@ -143,23 +147,22 @@ class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]
             return included_result.add_next_predecessors(predecessors)
         return included_result
 
-    def _simplify_included_name_asts(self, name_expr: str) -> set[SimplifiedExpression]:
+    def _simplify_included_name_asts(
+        self, name_expr: ast.Expression
+    ) -> set[SimplifiedExpression]:
         """Turn expressions into regular expressions for name selection."""
-        ast = TemplateExpressionAST.parse(name_expr)
-        if ast is None or ast.is_literal():
-            return set()
-
+        ast = TemplateExpressionAST(name_expr)
         assert isinstance(ast.ast_root, nodes.Template)
         return simplify_expression(ast.ast_root, self.context.vars)
 
     def _process_include_expr(
-        self, name_expr: str, predecessors: Sequence[rep.ControlNode]
+        self,
+        name_expr: ast.StrLiteral | ast.Expression,
+        predecessors: Sequence[rep.ControlNode],
     ) -> ExtractionResult:
-        if not self.context.vars.is_template(name_expr):
-            # Literal
+        if isinstance(name_expr, ast.StrLiteral):
             return self._process_literal_include(name_expr, predecessors)
 
-        assert isinstance(name_expr, str)
         candidate_asts = self._simplify_included_name_asts(name_expr)
         if not candidate_asts:
             logger.warning(
@@ -172,7 +175,7 @@ class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]
 
     def _process_include_candidates(
         self,
-        name_expr: str,
+        name_expr: ast.Expression,
         candidates: set[SimplifiedExpression],
         predecessors: Sequence[rep.ControlNode],
     ) -> ExtractionResult:
@@ -201,7 +204,7 @@ class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]
 
     def _find_filename_candidates(
         self, candidates: set[SimplifiedExpression]
-    ) -> Iterable[tuple[str, Sequence[str]]]:
+    ) -> Iterable[tuple[ast.StrLiteral, Sequence[ast.Condition]]]:
         # TODO: This may return the same candidate expression for different
         # conditions, leading to the same code path being added multiple times.
         # How should we handle this?
@@ -214,11 +217,11 @@ class DynamicIncludesExtractor(TaskExtractor, abc.ABC, Generic[_IncludedContent]
                 if _is_too_general_filename_pattern(pattern):
                     continue
                 yield from (
-                    (cand, expr.conditions)
+                    (ast.StrLiteral(cand), expr.conditions)
                     for cand in self._get_filename_candidates(expr.as_regex())
                 )
 
     def _process_literal_include(
-        self, name_expr: str, predecessors: Sequence[rep.ControlNode]
+        self, name_expr: ast.StrLiteral, predecessors: Sequence[rep.ControlNode]
     ) -> ExtractionResult:
         return self._load_and_extract_content(name_expr, predecessors)

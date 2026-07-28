@@ -1,16 +1,12 @@
 from __future__ import annotations
 
+from typing import final
+
 from collections.abc import Sequence
 
 from loguru import logger
 
-from scansible.representations.ast import (
-    Handler,
-    HandlerBlock,
-    Play,
-    Playbook,
-    RoleRequirement,
-)
+from scansible.representations import ast
 
 from .context import ExtractionContext
 from .expressions import EnvironmentType
@@ -21,8 +17,9 @@ from .task_lists import TaskListExtractor
 from .variables import VariablesExtractor
 
 
+@final
 class PlaybookExtractor:
-    def __init__(self, context: ExtractionContext, playbook: Playbook) -> None:
+    def __init__(self, context: ExtractionContext, playbook: ast.Playbook) -> None:
         self.context = context
         self.playbook = playbook
 
@@ -33,7 +30,7 @@ class PlaybookExtractor:
         # for all hosts, whereas the other files are for specific hosts.
 
         for play in self.playbook.plays:
-            if not isinstance(play, Play):
+            if not isinstance(play, ast.Play):
                 # Skip ImportPlaybook
                 continue
 
@@ -45,15 +42,17 @@ class PlaybookExtractor:
                 # Extract variables first. Order doesn't really matter.
 
                 # - Play variables
-                VariablesExtractor(self.context, play.vars).extract_variables(
+                _ = VariablesExtractor(self.context, play.vars).extract_variables(
                     EnvironmentType.PLAY_VARS
                 )
 
                 # - Play vars_prompt
                 # HACK: These prompts don't always use the default, but we're acting as if it's always the default that's used. TODO: Better representation!
-                VariablesExtractor(
+                _ = VariablesExtractor(
                     self.context,
-                    {prompt.name: prompt.default for prompt in play.vars_prompt},
+                    ast.MapLiteral(
+                        (prompt.name, prompt.default) for prompt in play.vars_prompt
+                    ),
                 ).extract_variables(EnvironmentType.PLAY_VARS_PROMPT)
 
                 # - Play vars_files
@@ -74,13 +73,13 @@ class PlaybookExtractor:
                             if file_content is None:
                                 continue
 
-                            VariablesExtractor(
+                            _ = VariablesExtractor(
                                 self.context, file_content.variables
                             ).extract_variables(EnvironmentType.PLAY_VARS_FILES)
                             break
                     else:
                         logger.bind(location=play.position).error(
-                            f"Could not load play vars_file {vars_file!r}"  # pyright: ignore
+                            f"Could not load play vars_file {vars_file!r}"  # pyright: ignore[reportPossiblyUnboundVariable]
                         )
 
                 # Follow Ansible's execution order:
@@ -116,7 +115,7 @@ class PlaybookExtractor:
                 result = self._extract_handlers(play.handlers, result)
 
     def _extract_roles(
-        self, roles: Sequence[RoleRequirement], result: ExtractionResult
+        self, roles: Sequence[ast.RoleRequirement], result: ExtractionResult
     ) -> ExtractionResult:
         for role_dep in roles:
             result = result.chain(
@@ -127,7 +126,9 @@ class PlaybookExtractor:
         return result
 
     def _extract_handlers(
-        self, handlers: Sequence[Handler | HandlerBlock], result: ExtractionResult
+        self,
+        handlers: Sequence[ast.Handler | ast.HandlerBlock],
+        result: ExtractionResult,
     ) -> ExtractionResult:
         return result.chain(
             HandlerListExtractor(self.context, handlers).extract_handlers(

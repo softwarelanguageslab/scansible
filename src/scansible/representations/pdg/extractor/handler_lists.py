@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from typing import final
+
 from collections.abc import Sequence
 
 from loguru import logger
 
-from scansible.representations.ast import Handler, HandlerBlock
+from scansible.representations import ast
 
 from .. import representation as rep
 from .context import ExtractionContext
@@ -12,9 +14,12 @@ from .result import ExtractionResult
 from .tasks import task_extractor_factory
 
 
+@final
 class HandlerListExtractor:
     def __init__(
-        self, context: ExtractionContext, handlers: Sequence[Handler | HandlerBlock]
+        self,
+        context: ExtractionContext,
+        handlers: Sequence[ast.Handler | ast.HandlerBlock],
     ) -> None:
         self.context = context
         self.handlers = handlers
@@ -38,7 +43,7 @@ class HandlerListExtractor:
         # TODO: Link the conditions to the tasks that notify the handlers.
 
         for child in self.handlers:
-            if isinstance(child, HandlerBlock):
+            if isinstance(child, ast.HandlerBlock):
                 # FIXME: A dedicated HandlerBlock extractor should exist to properly
                 # handle rescue/always non-execution; for now, flatten everything into
                 # the parent handler list so extraction doesn't crash.
@@ -50,7 +55,7 @@ class HandlerListExtractor:
                     predecessors
                 )
 
-            topics = set(child.listen if isinstance(child, Handler) else [])
+            topics = set(child.listen if isinstance(child, ast.Handler) else [])
             if child.name is not None:
                 topics.add(child.name)
             notifiers: set[rep.Task] = set()

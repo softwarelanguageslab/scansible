@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import Sequence
+from typing import final
 
-from scansible.representations.ast import Block, Task
+from collections.abc import Sequence
+
+from scansible.representations import ast
 
 from .. import representation as rep
 from .blocks import BlockExtractor
@@ -11,9 +13,10 @@ from .result import ExtractionResult
 from .tasks import task_extractor_factory
 
 
+@final
 class TaskListExtractor:
     def __init__(
-        self, context: ExtractionContext, tasks: Sequence[Block | Task]
+        self, context: ExtractionContext, tasks: Sequence[ast.Block | ast.Task]
     ) -> None:
         self.context = context
         self.tasks = tasks
@@ -24,7 +27,7 @@ class TaskListExtractor:
         result = ExtractionResult.empty(predecessors)
 
         for child in self.tasks:
-            if isinstance(child, Block):
+            if isinstance(child, ast.Block):
                 child_result = BlockExtractor(self.context, child).extract_block(
                     result.next_predecessors
                 )

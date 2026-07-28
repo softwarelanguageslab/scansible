@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from typing import Sequence
+from typing import cast, final
+
+from collections.abc import Sequence
 
 from loguru import logger
 
-from scansible.representations.ast import Block, Task
+from scansible.representations import ast
 
 from .. import representation as rep
 from .context import ExtractionContext
@@ -12,6 +14,7 @@ from .expressions import EnvironmentType, RecursiveDefinitionError
 from .result import ExtractionResult
 
 
+@final
 class BlockExtractor:
     SUPPORTED_BLOCK_ATTRIBUTES = frozenset(
         (
@@ -26,7 +29,7 @@ class BlockExtractor:
         )
     )
 
-    def __init__(self, context: ExtractionContext, block: Block) -> None:
+    def __init__(self, context: ExtractionContext, block: ast.Block) -> None:
         self.context = context
         self.block = block
         self.location = context.get_location(block)
@@ -47,7 +50,7 @@ class BlockExtractor:
             # shadow variables registered in an outer block. However, it's
             # confirmed to be a bug, so we'll handle it as if it were
             # implemented correctly.
-            self.context.vars.define_initialised_variable(
+            _ = self.context.vars.define_initialised_variable(
                 var_name, EnvironmentType.BLOCK_VARS, var_value
             )
 
@@ -86,7 +89,7 @@ class BlockExtractor:
             if misc_kw not in self.block.model_fields_set:
                 # Default
                 continue
-            kw_val = getattr(self.block, misc_kw)
+            kw_val = cast(ast.AnyExpression, getattr(self.block, misc_kw))
 
             prev_value: rep.DataNode | None = None
 
@@ -113,22 +116,15 @@ class BlockExtractor:
                     value, ctrl_node, rep.Keyword(keyword=misc_kw)
                 )
 
-        for kw in Block.model_fields:
-            if kw in self.block.model_fields_set:
-                # Default
-                continue
-            if kw not in self.SUPPORTED_BLOCK_ATTRIBUTES and kw not in (
-                "location",
-                "raw",
-                "parent",
-            ):
+        for kw in self.block.model_directives_set:
+            if kw not in self.SUPPORTED_BLOCK_ATTRIBUTES:
                 self.logger.warning(f"Unsupported block keyword {kw!r}!")
 
         return result
 
     def _extract_children(
         self,
-        child_list: Sequence[Task | Block],
+        child_list: Sequence[ast.Task | ast.Block],
         predecessors: Sequence[rep.ControlNode],
     ) -> ExtractionResult:
         from .task_lists import TaskListExtractor

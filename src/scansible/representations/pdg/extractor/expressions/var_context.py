@@ -2,21 +2,16 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeGuard, final
+from typing import TYPE_CHECKING, final
 
 from collections import defaultdict
 from collections.abc import Generator, Iterable, Mapping, Sequence
 from contextlib import contextmanager
 
 from ansible.module_utils.facts.system.distribution import Distribution
-from ansible.parsing.dataloader import DataLoader
-from ansible.template import Templar
-from icontract import require
 from loguru import logger
 
 from scansible.representations import ast
-from scansible.representations.ast import BoolLiteral, StrLiteral
-from scansible.types import AnyValue
 from scansible.utils import SENTINEL, Sentinel, first, make_immutable
 
 from ... import representation as rep
@@ -29,21 +24,11 @@ from .constants import (
 )
 from .environments import EnvironmentStack, EnvironmentType
 from .environments.types import LocalEnvType
-from .expression_types import (
-    Condition,
-    Expression,
-    MappingExpression,
-    ScalarLiteral,
-    SequenceExpression,
-    TemplatedExpression,
-    wrap_condition,
-    wrap_expression,
-)
+from .expression_types import extract_type_name
 from .records import (
     ChangeableVariableValueRecord,
     ConstantVariableValueRecord,
     LiteralEvaluationResult,
-    TemplatableType,
     TemplateEvaluationResult,
     TemplateResult,
     VariableDefinitionRecord,
@@ -182,70 +167,41 @@ class VarContext:
             self.extraction_ctx.graph.add_edge(predecessor, new_var_node, rep.WHEN)
 
     @contextmanager
-    def enter_scope(self, env_type: LocalEnvType) -> Generator[None, None, None]:
+    def enter_scope(self, env_type: LocalEnvType) -> Generator[None]:
         self._envs.enter_scope(env_type)
         yield
         self._envs.exit_scope()
 
     @contextmanager
-    def enter_cached_scope(self, env_type: LocalEnvType) -> Generator[None, None, None]:
+    def enter_cached_scope(self, env_type: LocalEnvType) -> Generator[None]:
         self._envs.enter_cached_scope(env_type)
         yield
         self._envs.exit_scope()
 
-    # FIXME: The following functions should be combined now that the AST distinguishes literals, expressions, and conditions already
-    def build_expression(self, expr: AnyValue) -> rep.DataNode:
-        return self._build_expression(wrap_expression(expr)).data_node
+    def build_expression(self, expr: ast.AnyExpression) -> rep.DataNode:
+        return self._build_expression(expr).data_node
 
-    def build_condition(self, expr: str | bool) -> rep.DataNode:
-        return self._build_expression(wrap_condition(expr)).data_node
-
-    def _build_expression(self, expr: Expression) -> TemplateResult:
-        if isinstance(expr, ScalarLiteral):
-            return self._build_scalar_literal(expr)
-        elif isinstance(expr, SequenceExpression):
+    def _build_expression(self, expr: ast.AnyExpression) -> TemplateResult:
+        if isinstance(expr, ast.Expression):
+            return self._resolve_expression(TemplateExpressionAST(expr))
+        if isinstance(expr, ast.SeqLiteral):
             return self._build_sequence_expression(expr)
-        elif isinstance(expr, MappingExpression):
+        elif isinstance(expr, ast.MapLiteral):
             return self._build_mapping_expression(expr)
-
-        # FIXME: AST parsing should happen before passing the expression, so the dispatching can occur earlier.
-        ast = self._parse_ast(expr)
-
-        # TODO: Can the second part of this condition ever be true?
-        if ast is None or ast.is_literal():
-            if ast is None:
-                logger.warning(f"{expr!r} is malformed")
-            return self._build_scalar_literal(ScalarLiteral("str", expr.raw))
-
-        return self._resolve_expression(ast)
-
-    def _parse_ast(
-        self, expr: TemplatedExpression | Condition
-    ) -> TemplateExpressionAST | None:
-        # FIXME use preparsed version from AST.
-        if isinstance(expr, Condition):
-            return TemplateExpressionAST.parse_conditional(
-                expr.raw, self._envs.get_variable_initialisers()
-            )
         else:
-            return TemplateExpressionAST.parse(expr.raw)
+            return self._build_scalar_literal(expr)
 
     def _build_mapping_expression(
-        self, expr: MappingExpression
+        self, expr: ast.MapLiteral[ast.ScalarLiteral, ast.AnyExpression]
     ) -> TemplateEvaluationResult:
-        parent_node = rep.CompositeLiteral(type=expr.type)
+        parent_node = rep.CompositeLiteral(type=extract_type_name(expr))
         self.extraction_ctx.graph.add_node(parent_node)
 
         all_used_vars: list[VariableValueRecord] = []
-        for k, v in expr.mapping.items():
+        for k, v in expr.items():
             val_tr = self._build_expression(v)
             all_used_vars.extend(val_tr.used_variables)
-
-            if not isinstance(k, ScalarLiteral):
-                logger.warning("Templated keys are not supported yet!")
-                key_str = str(k)
-            else:
-                key_str = str(k.value)
+            key_str = str(k)
 
             self.extraction_ctx.graph.add_edge(
                 val_tr.data_node, parent_node, rep.Composition(index=key_str)
@@ -254,13 +210,13 @@ class VarContext:
         return TemplateEvaluationResult(parent_node, parent_node, all_used_vars)
 
     def _build_sequence_expression(
-        self, expr: SequenceExpression
+        self, expr: ast.SeqLiteral[ast.AnyExpression]
     ) -> TemplateEvaluationResult:
-        parent_node = rep.CompositeLiteral(type=expr.type)
+        parent_node = rep.CompositeLiteral(type=extract_type_name(expr))
         self.extraction_ctx.graph.add_node(parent_node)
 
         all_used_vars: list[VariableValueRecord] = []
-        for i, e in enumerate(expr.elements):
+        for i, e in enumerate(expr):
             val_tr = self._build_expression(e)
             all_used_vars.extend(val_tr.used_variables)
 
@@ -270,25 +226,19 @@ class VarContext:
 
         return TemplateEvaluationResult(parent_node, parent_node, all_used_vars)
 
-    def _build_scalar_literal(self, expr: ScalarLiteral) -> TemplateResult:
-        location = self.extraction_ctx.get_location(expr.value)
+    def _build_scalar_literal(self, expr: ast.ScalarLiteral) -> TemplateResult:
+        location = self.extraction_ctx.get_location(expr)
+        type_ = extract_type_name(expr)
 
         # FIXME: Hack
-        if isinstance(expr.value, BoolLiteral):
-            lit = rep.ScalarLiteral(
-                type=expr.type, value=bool(expr.value), location=location
-            )
-        elif isinstance(expr.value, StrLiteral) and expr.value.is_vaulted:
-            lit = rep.ScalarLiteral(
-                type="VaultValue", value=expr.value, location=location
-            )
+        if isinstance(expr, ast.BoolLiteral):
+            lit = rep.ScalarLiteral(type=type_, value=bool(expr), location=location)
         else:
-            lit = rep.ScalarLiteral(type=expr.type, value=expr.value, location=location)
+            lit = rep.ScalarLiteral(type=type_, value=expr, location=location)
 
         self.extraction_ctx.graph.add_node(lit)
         return LiteralEvaluationResult(lit)
 
-    @require(lambda ast: not ast.is_literal())
     def _resolve_expression(
         self, ast: TemplateExpressionAST
     ) -> TemplateEvaluationResult:
@@ -394,12 +344,11 @@ class VarContext:
         self.extraction_ctx.graph.add_edge(tr.expr_node, iv, rep.DEF)
         return tr.__replace__(data_node=iv)  # type: ignore[return-value]
 
-    def is_template(self, expr: AnyValue | Sentinel) -> TypeGuard[TemplatableType]:
-        templar = Templar(DataLoader())
-        return templar.is_template(expr)
-
     def define_initialised_variable(
-        self, name: str, env_type: EnvironmentType, initialiser: AnyValue
+        self,
+        name: ast.Identifier,
+        env_type: EnvironmentType,
+        initialiser: ast.AnyExpression,
     ) -> rep.Variable:
         """Define a variable with an initialiser which is lazily evaluated."""
         return self._define_variable(name, env_type, initialiser, False)
@@ -408,7 +357,7 @@ class VarContext:
         self,
         name: str,
         env_type: EnvironmentType,
-        initialiser_expr: AnyValue,
+        initialiser_expr: ast.AnyExpression,
         initialiser_node: rep.DataNode,
     ) -> rep.Variable:
         """Define a fact initialised with an eagerly-evaluated expression."""
@@ -426,7 +375,7 @@ class VarContext:
         self,
         name: str,
         env_type: EnvironmentType,
-        initialiser: AnyValue | Sentinel,
+        initialiser: ast.AnyExpression | Sentinel,
         eager: bool,
     ) -> rep.Variable:
         """Declare a variable, initialized with the given expression.
@@ -441,10 +390,6 @@ class VarContext:
             f"Defining variable {name!r} of type {type(initialiser).__name__} "
             + f"in env of type {env_type.name}"
         )
-
-        # FIXME HACK!
-        if isinstance(initialiser, ast.Expression):
-            initialiser = initialiser.raw
 
         var_rev = self._get_next_def_revision(name)
         logger.debug(f"Selected revision {var_rev} for {name}")
@@ -468,13 +413,13 @@ class VarContext:
             name,
             var_rev,
             make_immutable(initialiser),
-            eager or not self.is_template(initialiser),
+            eager or not isinstance(initialiser, ast.Expression),
             env_type,
         )
         self._envs.set_variable_definition(name, def_record)
         self._value_to_var_node[(def_record, 0)] = var_node
 
-        if eager or not self.is_template(initialiser):
+        if eager or not isinstance(initialiser, ast.Expression):
             # Assume the value is used by the caller is constant if they don't
             # provide an expression. At the very least, the caller should link it
             # with DEF (e.g. set_fact or register) or USE (e.g. undefined variables
@@ -485,9 +430,7 @@ class VarContext:
             self._envs.set_constant_variable_value(name, val_record)
 
             if not eager and not isinstance(initialiser, Sentinel):
-                lit_node = self._build_expression(
-                    wrap_expression(initialiser)
-                ).data_node
+                lit_node = self._build_expression(initialiser).data_node
                 self.extraction_ctx.graph.add_edge(lit_node, var_node, rep.DEF)
 
         return var_node
@@ -521,7 +464,7 @@ class VarContext:
         # expression was already evaluated previously and still has the same
         # value, this will just return the previous record.
         assert not isinstance(vdef.initialiser, Sentinel)
-        template_record = self._build_expression(wrap_expression(vdef.initialiser))
+        template_record = self._build_expression(vdef.initialiser)
 
         # Try to find a pre-existing value record for this template record. If
         # it exists, we've already evaluated this variable before and we can
@@ -610,8 +553,12 @@ class VarContext:
         return vval
 
     def get_initialisers(
-        self, name: str, constraints: Mapping[str, AnyValue]
-    ) -> Sequence[tuple[AnyValue, Mapping[str, AnyValue], Sequence[str]]]:
+        self, name: str, constraints: Mapping[str, ast.AnyExpression]
+    ) -> Sequence[
+        tuple[
+            ast.AnyExpression, Mapping[str, ast.AnyExpression], Sequence[ast.Condition]
+        ]
+    ]:
         """Get possible initialisers for `name`, adhering to any prior
         initialiser constraints.
         Returns tuples of initialisers, new constraints, and new conditions."""
@@ -637,8 +584,8 @@ class VarContext:
         return []
 
     def _get_constrained_magic_initialisers(
-        self, name: str, constraints: Mapping[str, AnyValue]
-    ) -> Sequence[tuple[str, list[str]]]:
+        self, name: str, constraints: Mapping[str, ast.AnyExpression]
+    ) -> Sequence[tuple[ast.StrLiteral, Sequence[ast.Condition]]]:
         if name not in ("ansible_os_family", "ansible_distribution"):
             return []
 
@@ -656,4 +603,9 @@ class VarContext:
             else:
                 values = Distribution.OS_FAMILY.keys()
 
-        return [(value, [f'{name} == "{value}"']) for value in values]
+        values = [ast.StrLiteral(value) for value in values]
+
+        return [
+            (value, [ast.Condition.model_validate(f'{name} == "{value}"')])
+            for value in values
+        ]

@@ -71,13 +71,13 @@ class CommonDirectives(BaseModel, frozen=True):
     #: Whether to perform privilege escalation.
     become: BoolLiteral | Expression | None = None
     #: How to perform privilege escalation (sudo, su, ...)
-    become_method: StrLiteral | None = None
+    become_method: Expression | StrLiteral | None = None
     #: User to escalate to.
-    become_user: StrLiteral | None = None
+    become_user: Expression | StrLiteral | None = None
     #: Flags to pass to privilege escalation program.
-    become_flags: StrLiteral | None = None
+    become_flags: Expression | StrLiteral | None = None
     #: Path to privilege escalation executable.
-    become_exe: StrLiteral | None = None
+    become_exe: Expression | StrLiteral | None = None
 
     #: Tags on the entity.
     tags: SeqLiteral[StrLiteral | IntLiteral] = Field(default_factory=SeqLiteral)

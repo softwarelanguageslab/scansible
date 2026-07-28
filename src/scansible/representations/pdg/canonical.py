@@ -285,7 +285,7 @@ def _parse_ast(node: Expression) -> jnodes.Node:
     ast = (
         TemplateExpressionAST.parse(node.expr)
         if not node.is_conditional
-        else TemplateExpressionAST.parse_conditional(node.expr, {})
+        else TemplateExpressionAST.parse_conditional(node.expr)
     )
     return ensure_not_none(ast).ast_root
 
@@ -377,7 +377,7 @@ def _replace_constant_expressions(pdg: Graph) -> None:
     for node in pdg.get_nodes(Expression):
         ast = _parse_ast(node)
         if isinstance(ast, jnodes.Const):
-            lit_node = ScalarLiteral(type=extract_type_name(ast.value), value=ast.value)
+            lit_node = ScalarLiteral(type=ast.value.__class__.__name__, value=ast.value)
         elif _is_simple_expression(ast):
             assert isinstance(ast.body[0], jnodes.Output)
             all_const = all(

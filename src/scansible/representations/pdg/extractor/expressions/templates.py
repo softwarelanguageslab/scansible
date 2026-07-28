@@ -7,6 +7,7 @@ from typing import Protocol, TypeVar, cast, final, override
 import os
 import re
 from collections.abc import Callable, Iterable
+from warnings import deprecated
 
 from jinja2 import Environment, nodes
 from jinja2.compiler import DependencyFinderVisitor
@@ -14,6 +15,8 @@ from jinja2.exceptions import TemplateSyntaxError
 from jinja2.visitor import NodeVisitor
 from loguru import logger
 from pydantic import BaseModel
+
+from scansible.representations import ast
 
 ANSIBLE_GLOBALS = frozenset({"lookup", "query", "q", "now", "finalize", "omit"})
 
@@ -664,35 +667,30 @@ class FindUndeclaredVariablesVisitor(NodeVisitor):
 class TemplateExpressionAST:
     def __init__(
         self,
-        ast_root: nodes.Node,
-        raw: str,
-        extra_references: set[str] | None = None,
-        is_conditional: bool = False,
+        expression: ast.Expression,
     ) -> None:
-        self.ast_root = ast_root
-        self.raw = raw
-        self.is_conditional = is_conditional
+        self.ast_root = expression.template
+        self.raw = expression.raw
+        self.is_conditional = isinstance(expression, ast.Condition)
 
         var_visitor = FindUndeclaredVariablesVisitor(ANSIBLE_GLOBALS)
-        var_visitor.visit(ast_root)
+        var_visitor.visit(self.ast_root)
         self.referenced_variables = var_visitor.undeclared
-        if extra_references is not None:
-            self.referenced_variables |= extra_references
 
         dep_visitor = DependencyFinderVisitor()
-        dep_visitor.visit(ast_root)
+        dep_visitor.visit(self.ast_root)
 
         self.used_tests = dep_visitor.tests
         self.used_filters = dep_visitor.filters
 
         self.uses_now = any(
             call_node.node.name == "now"
-            for call_node in ast_root.find_all(nodes.Call)
+            for call_node in self.ast_root.find_all(nodes.Call)
             if isinstance(call_node.node, nodes.Name)
         )
         self.used_lookups: set[LookupTarget] = {
             create_lookup_target(call_node.args[0])
-            for call_node in ast_root.find_all(nodes.Call)
+            for call_node in self.ast_root.find_all(nodes.Call)
             if (
                 (isinstance(call_node.node, nodes.Name))
                 and call_node.node.name in ("lookup", "query", "q")
@@ -701,57 +699,31 @@ class TemplateExpressionAST:
 
     def is_literal(self) -> bool:
         return not self.raw or (
-            isinstance(self.ast_root, nodes.Template)
-            and len(self.ast_root.body) == 1
+            len(self.ast_root.body) == 1
             and isinstance(self.ast_root.body[0], nodes.Output)
             and len(self.ast_root.body[0].nodes) == 1
             and isinstance(self.ast_root.body[0].nodes[0], nodes.TemplateData)
         )
 
     @classmethod
+    @deprecated("Construct instances directly instead")
     def parse(cls, expression: str) -> TemplateExpressionAST | None:
+        """Parse an expression to an AST.
+
+        For conditionals (without braces), use `parse_conditional`.
         """
-        Parse a bare template expression to an AST.
-        For conditionals, use `parse_conditional`.
-
-        :param      expression:      The template expression
-        :type       expression:      str
-
-        :returns:   The template expression AST instance.
-        :rtype:     TemplateExpressionAST
-        """
-        env = Environment(cache_size=0)
-
         try:
-            return cls(env.parse(expression), expression)
+            return cls(ast.Expression.model_validate(expression))
         except TemplateSyntaxError as tse:
             logger.error("Template syntax error: " + str(tse))
             return None
 
     @classmethod
-    def parse_conditional(
-        cls, expression: str, variable_mappings: dict[str, str]
-    ) -> TemplateExpressionAST | None:
-        """
-        Parse a template expression to an AST.
-
-        :param      expression:         The template expression
-        :type       expression:         str
-        :param      variable_mappings:  Mappings from variables to their
-                                        initialisers, used to resolve
-                                        multi-level expressions.
-        :type       variable_mappings:  dict[str, str]
-
-        :returns:   The template expression AST instance.
-        :rtype:     TemplateExpressionAST
-        """
-        env = Environment(cache_size=0)
-
+    @deprecated("Construct instances directly instead")
+    def parse_conditional(cls, expression: str) -> TemplateExpressionAST | None:
+        """Parse a conditional expression (without braces) to an AST."""
         try:
-            ast, extra_references = parse_conditional(
-                expression, env, variable_mappings
-            )
-            return cls(ast, expression, extra_references, True)
+            return cls(ast.Condition.model_validate(expression))
         except TemplateSyntaxError as tse:
             logger.error("Template syntax error: " + str(tse))
             return None

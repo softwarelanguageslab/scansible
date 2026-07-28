@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from jinja2 import nodes
 from loguru import logger
 
-from scansible.types import AnyValue
+from scansible.representations import ast
 from scansible.utils import FrozenDict, first, join_sequences
 
 from .templates import TemplateExpressionAST
@@ -19,14 +19,14 @@ from .var_context import VarContext
 @dataclass(frozen=True)
 class SimplifiedExpression:
     ast: nodes.Output
-    var_mappings: Mapping[str, AnyValue]
-    conditions: Sequence[str]
+    var_mappings: Mapping[str, ast.AnyExpression]
+    conditions: Sequence[ast.Condition]
     skip_nodes: int = 0  # Used to prevent infinitely retrying non-inlinable nodes.
 
     @classmethod
     def empty(cls, ast: nodes.Template) -> SimplifiedExpression:
         assert len(ast.body) == 1 and isinstance(ast.body[0], nodes.Output)
-        return cls(ast.body[0], FrozenDict({}), tuple())
+        return cls(ast.body[0], FrozenDict({}), ())
 
     def as_regex(self) -> str:
         re_str = ""
@@ -46,9 +46,11 @@ class SimplifiedExpression:
     def is_literal(self) -> bool:
         return all(isinstance(child, nodes.TemplateData) for child in self.ast.nodes)
 
-    def as_literal(self) -> str:
+    def as_literal(self) -> ast.StrLiteral:
         assert self.is_literal
-        return "".join(cast(nodes.TemplateData, child).data for child in self.ast.nodes)
+        return ast.StrLiteral(
+            "".join(cast(nodes.TemplateData, child).data for child in self.ast.nodes)
+        )
 
 
 def simplify_expression(
@@ -132,8 +134,8 @@ def _get_inlined_candidates(
         return
 
     for var_init, new_var_mappings, new_conditions in var_inits:
-        if not var_ctx.is_template(var_init) or not isinstance(var_init, str):
-            if isinstance(var_init, (list, tuple, Mapping)):
+        if not isinstance(var_init, ast.Expression):
+            if isinstance(var_init, (ast.SeqLiteral, ast.MapLiteral)):
                 logger.debug(
                     f"Cannot simplify reference {var_ref!r}, initialiser is composite"
                 )
@@ -151,10 +153,7 @@ def _get_inlined_candidates(
         logger.debug(
             f"Performing nested simplification of reference {var_ref!r}'s initialiser {var_init!r}"
         )
-        ref_ast = TemplateExpressionAST.parse(var_init)
-        if ref_ast is None:
-            yield None
-            continue
+        ref_ast = TemplateExpressionAST(var_init)
 
         assert isinstance(ref_ast.ast_root, nodes.Template)
         if not isinstance(ref_ast.ast_root.body[0], nodes.Output):

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Callable
+from typing import Any, Literal, cast
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ from graph_matchers import (  # pyright: ignore[reportImplicitRelativeImport]
 )
 from pytest_mock import MockerFixture
 
+from scansible.representations import ast
 from scansible.representations.pdg import (
     DEF,
     Expression,
@@ -37,10 +39,13 @@ def create_context(g: Graph, mocker: MockerFixture, tmp_path: Path) -> ContextCr
         ExtractionContext(
             g,
             mocker.Mock(
-                **{
-                    "path": tmp_path,
-                    "root.main_tasks_file.path": Path("tasks/main.yml"),
-                }
+                **cast(  # pyright: ignore[reportAny]
+                    dict[str, Any],  # pyright: ignore[reportExplicitAny]
+                    {
+                        "path": tmp_path,
+                        "root.main_tasks_file.path": Path("tasks/main.yml"),
+                    },
+                )
             ),
             mocker.Mock(),
             lenient=True,
@@ -49,26 +54,33 @@ def create_context(g: Graph, mocker: MockerFixture, tmp_path: Path) -> ContextCr
     )
 
 
+# Shorthands to construct AST nodes
+strlit = ast.StrLiteral
+intlit = ast.IntLiteral
+expr = ast.Expression.model_validate
+ident = ast.Identifier
+
+
 def describe_unmodified() -> None:
     @pytest.mark.parametrize(
         "expr, type", [("hello", "str"), ("1", "str"), ("True", "str"), ("yes", "str")]
     )
     def should_extract_literal(
-        expr: str, type: str, create_context: ContextCreator
+        expr: str, type: Literal["str"], create_context: ContextCreator
     ) -> None:
         ctx, g = create_context()
 
-        ctx.build_expression(expr)
+        _ = ctx.build_expression(strlit(expr))
 
         assert_graphs_match(
-            g, create_graph({"lit": ScalarLiteral(type="str", value=expr)}, [])
+            g, create_graph({"lit": ScalarLiteral(type=type, value=expr)}, [])
         )
 
     def should_declare_literal_variable(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.define_initialised_variable(
-            "test_var", EnvironmentType.HOST_FACTS, "hello world"
+        _ = ctx.define_initialised_variable(
+            ident("test_var"), EnvironmentType.HOST_FACTS, strlit("hello world")
         )
 
         assert_graphs_match(
@@ -90,7 +102,7 @@ def describe_unmodified() -> None:
     def should_extract_variables(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.build_expression("hello {{ target }}")
+        _ = ctx.build_expression(expr("hello {{ target }}"))
 
         assert_graphs_match(
             g,
@@ -115,7 +127,7 @@ def describe_unmodified() -> None:
     def should_extract_magic_variables(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.build_expression("hello {{ ansible_version }}")
+        _ = ctx.build_expression(expr("hello {{ ansible_version }}"))
 
         assert_graphs_match(
             g,
@@ -140,7 +152,7 @@ def describe_unmodified() -> None:
     def should_extract_host_facts(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.build_expression("hello {{ ansible_os_family }}")
+        _ = ctx.build_expression(expr("hello {{ ansible_os_family }}"))
 
         assert_graphs_match(
             g,
@@ -166,8 +178,8 @@ def describe_unmodified() -> None:
         # We don't want to deduplicate template literals yet
         ctx, g = create_context()
 
-        ctx.build_expression("hello world")
-        ctx.build_expression("hello world")
+        _ = ctx.build_expression(strlit("hello world"))
+        _ = ctx.build_expression(strlit("hello world"))
 
         assert_graphs_match(
             g,
@@ -184,8 +196,8 @@ def describe_unmodified() -> None:
         # We don't want to deduplicate template literals yet
         ctx, g = create_context()
 
-        ctx.build_expression("hello {{ target }}")
-        ctx.build_expression("hello {{ target }}")
+        _ = ctx.build_expression(expr("hello {{ target }}"))
+        _ = ctx.build_expression(expr("hello {{ target }}"))
 
         assert_graphs_match(
             g,
@@ -210,10 +222,10 @@ def describe_unmodified() -> None:
     def should_extract_variable_definition(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.define_initialised_variable(
-            "msg", EnvironmentType.HOST_FACTS, "hello {{ target }}"
+        _ = ctx.define_initialised_variable(
+            ident("msg"), EnvironmentType.HOST_FACTS, expr("hello {{ target }}")
         )
-        ctx.build_expression("{{ msg }}")
+        _ = ctx.build_expression(expr("{{ msg }}"))
 
         assert_graphs_match(
             g,
@@ -247,7 +259,7 @@ def describe_unmodified() -> None:
         )
 
     @pytest.mark.parametrize(
-        "expr, expected",
+        "expression, _expected",
         [
             ('{{ "/etc/tzinfo" | basename }}', "{{ '/etc/tzinfo' | basename }}"),
             (
@@ -258,18 +270,18 @@ def describe_unmodified() -> None:
         ],
     )
     def should_not_reevaluate_static_templates(
-        expr: str, expected: str, create_context: ContextCreator
+        expression: str, _expected: str, create_context: ContextCreator
     ) -> None:
         ctx, g = create_context()
 
-        ctx.build_expression(expr)
-        ctx.build_expression(expr)
+        _ = ctx.build_expression(expr(expression))
+        _ = ctx.build_expression(expr(expression))
 
         assert_graphs_match(
             g,
             create_graph(
                 {
-                    "e": Expression(expr=expr),
+                    "e": Expression(expr=expression),
                     "iv": IntermediateValue(identifier=1),
                 },
                 [("e", "iv", DEF)],
@@ -279,7 +291,7 @@ def describe_unmodified() -> None:
 
 def describe_modified() -> None:
     @pytest.mark.parametrize(
-        "expr, expected, components",
+        "expression, _expected, components",
         [
             ("The time is {{ now() }}", "The time is {{ now() }}", ("function 'now'",)),
             (
@@ -300,18 +312,21 @@ def describe_modified() -> None:
         ],
     )
     def should_reevaluate_dynamic_templates(
-        expr: str, expected: str, components: tuple[str], create_context: ContextCreator
+        expression: str,
+        _expected: str,
+        components: tuple[str],
+        create_context: ContextCreator,
     ) -> None:
         ctx, g = create_context()
 
-        ctx.build_expression(expr)
-        ctx.build_expression(expr)
+        _ = ctx.build_expression(expr(expression))
+        _ = ctx.build_expression(expr(expression))
 
         assert_graphs_match(
             g,
             create_graph(
                 {
-                    "e": Expression(expr=expr, impure_components=components),
+                    "e": Expression(expr=expression, impure_components=components),
                     "iv1": IntermediateValue(identifier=1),
                     "iv2": IntermediateValue(identifier=2),
                 },
@@ -322,11 +337,15 @@ def describe_modified() -> None:
     def should_reevaluate_when_variable_changed(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.define_initialised_variable("a", EnvironmentType.HOST_FACTS, "hello")
-        ctx.build_expression("{{ a }} world")
+        _ = ctx.define_initialised_variable(
+            ident("a"), EnvironmentType.HOST_FACTS, strlit("hello")
+        )
+        _ = ctx.build_expression(expr("{{ a }} world"))
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_initialised_variable("a", EnvironmentType.TASK_VARS, "hi")
-            ctx.build_expression("{{ a }} world")
+            _ = ctx.define_initialised_variable(
+                ident("a"), EnvironmentType.TASK_VARS, strlit("hi")
+            )
+            _ = ctx.build_expression(expr("{{ a }} world"))
 
         assert_graphs_match(
             g,
@@ -365,11 +384,11 @@ def describe_modified() -> None:
     def should_reevaluate_when_variable_dynamic(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.define_initialised_variable(
-            "when", EnvironmentType.HOST_FACTS, "{{ now() }}"
+        _ = ctx.define_initialised_variable(
+            ident("when"), EnvironmentType.HOST_FACTS, expr("{{ now() }}")
         )
-        ctx.build_expression("The time is {{ when }}")
-        ctx.build_expression("The time is {{ when }}")
+        _ = ctx.build_expression(expr("The time is {{ when }}"))
+        _ = ctx.build_expression(expr("The time is {{ when }}"))
 
         assert_graphs_match(
             g,
@@ -416,14 +435,18 @@ def describe_modified() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        ctx.define_initialised_variable("a", EnvironmentType.HOST_FACTS, "hello")
-        ctx.define_initialised_variable(
-            "b", EnvironmentType.HOST_FACTS, "{{ a }} world"
+        _ = ctx.define_initialised_variable(
+            ident("a"), EnvironmentType.HOST_FACTS, strlit("hello")
         )
-        ctx.build_expression("{{ b }}!")
+        _ = ctx.define_initialised_variable(
+            ident("b"), EnvironmentType.HOST_FACTS, expr("{{ a }} world")
+        )
+        _ = ctx.build_expression(expr("{{ b }}!"))
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_initialised_variable("a", EnvironmentType.TASK_VARS, "hi")
-            ctx.build_expression("{{ b }}!")
+            _ = ctx.define_initialised_variable(
+                ident("a"), EnvironmentType.TASK_VARS, strlit("hi")
+            )
+            _ = ctx.build_expression(expr("{{ b }}!"))
 
         assert_graphs_match(
             g,
@@ -484,11 +507,17 @@ def describe_modified() -> None:
     def should_reevaluate_only_one_var(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.define_initialised_variable("a", EnvironmentType.HOST_FACTS, "hello")
-        ctx.define_initialised_variable("b", EnvironmentType.HOST_FACTS, "world")
-        ctx.build_expression("{{ a }} {{ b }}!")
-        ctx.define_initialised_variable("a", EnvironmentType.INCLUDE_VARS, "hi")
-        ctx.build_expression("{{ a }} {{ b }}!")
+        _ = ctx.define_initialised_variable(
+            ident("a"), EnvironmentType.HOST_FACTS, strlit("hello")
+        )
+        _ = ctx.define_initialised_variable(
+            ident("b"), EnvironmentType.HOST_FACTS, strlit("world")
+        )
+        _ = ctx.build_expression(expr("{{ a }} {{ b }}!"))
+        _ = ctx.define_initialised_variable(
+            ident("a"), EnvironmentType.INCLUDE_VARS, strlit("hi")
+        )
+        _ = ctx.build_expression(expr("{{ a }} {{ b }}!"))
 
         assert_graphs_match(
             g,
@@ -539,11 +568,15 @@ def describe_scoping() -> None:
     def should_use_most_specific_scope(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.define_initialised_variable("a", EnvironmentType.HOST_FACTS, "1")
-        ctx.build_expression("1 {{ a }}")
+        _ = ctx.define_initialised_variable(
+            ident("a"), EnvironmentType.HOST_FACTS, strlit("1")
+        )
+        _ = ctx.build_expression(expr("1 {{ a }}"))
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_initialised_variable("a", EnvironmentType.TASK_VARS, "2")
-            ctx.build_expression("2 {{ a }}")
+            _ = ctx.define_initialised_variable(
+                ident("a"), EnvironmentType.TASK_VARS, strlit("2")
+            )
+            _ = ctx.build_expression(expr("2 {{ a }}"))
 
         assert_graphs_match(
             g,
@@ -582,12 +615,14 @@ def describe_scoping() -> None:
     def should_override_root_scope_variables(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.define_initialised_variable("a", EnvironmentType.HOST_FACTS, "1")
+        _ = ctx.define_initialised_variable(
+            ident("a"), EnvironmentType.HOST_FACTS, strlit("1")
+        )
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_initialised_variable(
-                "a", EnvironmentType.SET_FACTS_REGISTERED, "2"
+            _ = ctx.define_initialised_variable(
+                ident("a"), EnvironmentType.SET_FACTS_REGISTERED, strlit("2")
             )
-        ctx.build_expression("{{ a }}")
+        _ = ctx.build_expression(expr("{{ a }}"))
 
         assert_graphs_match(
             g,
@@ -623,10 +658,10 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.INCLUDE_PARAMS):
-            ctx.define_initialised_variable(
-                "ansible_version", EnvironmentType.INCLUDE_PARAMS, "123"
+            _ = ctx.define_initialised_variable(
+                ident("ansible_version"), EnvironmentType.INCLUDE_PARAMS, strlit("123")
             )
-            ctx.build_expression("{{ ansible_version }}")
+            _ = ctx.build_expression(expr("{{ ansible_version }}"))
 
         assert_graphs_match(
             g,
@@ -660,11 +695,11 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.INCLUDE_PARAMS):
-            ctx.define_initialised_variable(
-                "ansible_version", EnvironmentType.INCLUDE_PARAMS, "123"
+            _ = ctx.define_initialised_variable(
+                ident("ansible_version"), EnvironmentType.INCLUDE_PARAMS, strlit("123")
             )
-            ctx.build_expression("1: {{ ansible_version }}")
-            ctx.build_expression("2: {{ ansible_version }}")
+            _ = ctx.build_expression(expr("1: {{ ansible_version }}"))
+            _ = ctx.build_expression(expr("2: {{ ansible_version }}"))
 
         assert_graphs_match(
             g,
@@ -704,10 +739,12 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.INCLUDE_PARAMS):
-            ctx.define_initialised_variable(
-                "ansible_os_family", EnvironmentType.INCLUDE_PARAMS, "123"
+            _ = ctx.define_initialised_variable(
+                ident("ansible_os_family"),
+                EnvironmentType.INCLUDE_PARAMS,
+                strlit("123"),
             )
-            ctx.build_expression("{{ ansible_os_family }}")
+            _ = ctx.build_expression(expr("{{ ansible_os_family }}"))
 
         assert_graphs_match(
             g,
@@ -737,10 +774,10 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.ROLE_DEFAULTS):
-            ctx.define_initialised_variable(
-                "ansible_os_family", EnvironmentType.ROLE_DEFAULTS, "123"
+            _ = ctx.define_initialised_variable(
+                ident("ansible_os_family"), EnvironmentType.ROLE_DEFAULTS, strlit("123")
             )
-            ctx.build_expression("{{ ansible_os_family }}")
+            _ = ctx.build_expression(expr("{{ ansible_os_family }}"))
 
         assert_graphs_match(
             g,
@@ -776,15 +813,15 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.ROLE_DEFAULTS):
-            ctx.define_initialised_variable(
-                "ansible_os_family", EnvironmentType.ROLE_DEFAULTS, "123"
+            _ = ctx.define_initialised_variable(
+                ident("ansible_os_family"), EnvironmentType.ROLE_DEFAULTS, strlit("123")
             )
-            ctx.build_expression("{{ ansible_os_family }}")
+            _ = ctx.build_expression(expr("{{ ansible_os_family }}"))
             with ctx.enter_scope(EnvironmentType.ROLE_VARS):
-                ctx.define_initialised_variable(
-                    "ansible_os_family", EnvironmentType.ROLE_VARS, "456"
+                _ = ctx.define_initialised_variable(
+                    ident("ansible_os_family"), EnvironmentType.ROLE_VARS, strlit("456")
                 )
-                ctx.build_expression("{{ ansible_os_family }}")
+                _ = ctx.build_expression(expr("{{ ansible_os_family }}"))
 
         assert_graphs_match(
             g,
@@ -829,8 +866,8 @@ def describe_scoping() -> None:
     def should_use_same_host_fact(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.build_expression("1: {{ ansible_os_family }}")
-        ctx.build_expression("2: {{ ansible_os_family }}")
+        _ = ctx.build_expression(expr("1: {{ ansible_os_family }}"))
+        _ = ctx.build_expression(expr("2: {{ ansible_os_family }}"))
 
         assert_graphs_match(
             g,
@@ -861,10 +898,12 @@ def describe_scoping() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        ctx.define_initialised_variable("a", EnvironmentType.HOST_FACTS, "1")
-        ctx.build_expression("1 {{ a }}")
+        _ = ctx.define_initialised_variable(
+            ident("a"), EnvironmentType.HOST_FACTS, strlit("1")
+        )
+        _ = ctx.build_expression(expr("1 {{ a }}"))
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.build_expression("1 {{ a }}")
+            _ = ctx.build_expression(expr("1 {{ a }}"))
 
         assert_graphs_match(
             g,
@@ -893,11 +932,15 @@ def describe_scoping() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        ctx.define_initialised_variable("a", EnvironmentType.HOST_FACTS, "1")
-        ctx.build_expression("1 {{ a }}")
+        _ = ctx.define_initialised_variable(
+            ident("a"), EnvironmentType.HOST_FACTS, strlit("1")
+        )
+        _ = ctx.build_expression(expr("1 {{ a }}"))
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_initialised_variable("a", EnvironmentType.TASK_VARS, "2")
-        ctx.build_expression("1 {{ a }}")
+            _ = ctx.define_initialised_variable(
+                ident("a"), EnvironmentType.TASK_VARS, strlit("2")
+            )
+        _ = ctx.build_expression(expr("1 {{ a }}"))
 
         assert_graphs_match(
             g,
@@ -932,12 +975,18 @@ def describe_scoping() -> None:
     def should_hoist_template(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.define_initialised_variable("a", EnvironmentType.HOST_FACTS, "1")
+        _ = ctx.define_initialised_variable(
+            ident("a"), EnvironmentType.HOST_FACTS, strlit("1")
+        )
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_initialised_variable("c", EnvironmentType.TASK_VARS, "c")
-            ctx.build_expression("1 {{ a }}")
-            ctx.define_initialised_variable("a", EnvironmentType.TASK_VARS, "2")
-        ctx.build_expression("1 {{ a }}")
+            _ = ctx.define_initialised_variable(
+                ident("c"), EnvironmentType.TASK_VARS, strlit("c")
+            )
+            _ = ctx.build_expression(expr("1 {{ a }}"))
+            _ = ctx.define_initialised_variable(
+                ident("a"), EnvironmentType.TASK_VARS, strlit("2")
+            )
+        _ = ctx.build_expression(expr("1 {{ a }}"))
 
         assert_graphs_match(
             g,
@@ -982,12 +1031,16 @@ def describe_scoping() -> None:
 
         # Difference to 'should_use_most_specific_scope': Same template here,
         # different template there
-        ctx.define_initialised_variable("a", EnvironmentType.HOST_FACTS, "1")
-        ctx.build_expression("1 {{ a }}")
+        _ = ctx.define_initialised_variable(
+            ident("a"), EnvironmentType.HOST_FACTS, strlit("1")
+        )
+        _ = ctx.build_expression(expr("1 {{ a }}"))
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_initialised_variable("a", EnvironmentType.TASK_VARS, "2")
-            ctx.build_expression("1 {{ a }}")
-        ctx.build_expression("1 {{ a }}")
+            _ = ctx.define_initialised_variable(
+                ident("a"), EnvironmentType.TASK_VARS, strlit("2")
+            )
+            _ = ctx.build_expression(expr("1 {{ a }}"))
+        _ = ctx.build_expression(expr("1 {{ a }}"))
 
         assert_graphs_match(
             g,
@@ -1026,12 +1079,18 @@ def describe_scoping() -> None:
     def should_evaluate_var_into_template_scope(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.define_initialised_variable("a", EnvironmentType.HOST_FACTS, "{{ b }}")
+        _ = ctx.define_initialised_variable(
+            ident("a"), EnvironmentType.HOST_FACTS, expr("{{ b }}")
+        )
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_initialised_variable("b", EnvironmentType.TASK_VARS, "1")
-            ctx.build_expression("{{ a }}")
-        ctx.define_initialised_variable("b", EnvironmentType.HOST_FACTS, "2")
-        ctx.build_expression("{{ a }}")
+            _ = ctx.define_initialised_variable(
+                ident("b"), EnvironmentType.TASK_VARS, strlit("1")
+            )
+            _ = ctx.build_expression(expr("{{ a }}"))
+        _ = ctx.define_initialised_variable(
+            ident("b"), EnvironmentType.HOST_FACTS, strlit("2")
+        )
+        _ = ctx.build_expression(expr("{{ a }}"))
 
         assert_graphs_match(
             g,
@@ -1093,18 +1152,20 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_initialised_variable(
-                "a", EnvironmentType.TASK_VARS, "{{ 'hello' | reverse }}"
+            _ = ctx.define_initialised_variable(
+                ident("a"), EnvironmentType.TASK_VARS, expr("{{ 'hello' | reverse }}")
             )
-            ctx.define_initialised_variable(
-                "b", EnvironmentType.TASK_VARS, "{{ c | reverse }}"
+            _ = ctx.define_initialised_variable(
+                ident("b"), EnvironmentType.TASK_VARS, expr("{{ c | reverse }}")
             )
-            ctx.define_initialised_variable("c", EnvironmentType.TASK_VARS, "world")
-            ctx.build_expression("{{ b }} {{ a }}")
-        ctx.define_initialised_variable(
-            "a", EnvironmentType.HOST_FACTS, "{{ 'hello' | reverse }}"
+            _ = ctx.define_initialised_variable(
+                ident("c"), EnvironmentType.TASK_VARS, strlit("world")
+            )
+            _ = ctx.build_expression(expr("{{ b }} {{ a }}"))
+        _ = ctx.define_initialised_variable(
+            ident("a"), EnvironmentType.HOST_FACTS, expr("{{ 'hello' | reverse }}")
         )
-        ctx.build_expression("{{ b }} {{ a }}")
+        _ = ctx.build_expression(expr("{{ b }} {{ a }}"))
 
         assert_graphs_match(
             g,
@@ -1173,12 +1234,16 @@ def describe_scoping() -> None:
     def should_hoist_variable_binding(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        ctx.define_initialised_variable("a", EnvironmentType.HOST_FACTS, "{{ b }}")
+        _ = ctx.define_initialised_variable(
+            ident("a"), EnvironmentType.HOST_FACTS, expr("{{ b }}")
+        )
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_initialised_variable("b", EnvironmentType.TASK_VARS, "1")
+            _ = ctx.define_initialised_variable(
+                ident("b"), EnvironmentType.TASK_VARS, strlit("1")
+            )
             with ctx.enter_scope(EnvironmentType.TASK_VARS):
-                ctx.build_expression("{{ a }}")
-            ctx.build_expression("{{ a }}")  # Should reuse above expr
+                _ = ctx.build_expression(expr("{{ a }}"))
+            _ = ctx.build_expression(expr("{{ a }}"))  # Should reuse above expr
 
         assert_graphs_match(
             g,
@@ -1218,11 +1283,13 @@ def describe_scoping() -> None:
 
         ln = ScalarLiteral(type="int", value=1)
         g.add_node(ln)
-        _ = ctx.define_fact("b", EnvironmentType.SET_FACTS_REGISTERED, 1, ln)
+        _ = ctx.define_fact("b", EnvironmentType.SET_FACTS_REGISTERED, intlit(1), ln)
 
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_initialised_variable("b", EnvironmentType.TASK_VARS, "2")
-            ctx.build_expression("{{ b }}")
+            _ = ctx.define_initialised_variable(
+                ident("b"), EnvironmentType.TASK_VARS, strlit("2")
+            )
+            _ = ctx.build_expression(expr("{{ b }}"))
 
         assert_graphs_match(
             g,
@@ -1260,11 +1327,13 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_initialised_variable("b", EnvironmentType.TASK_VARS, "1")
+            _ = ctx.define_initialised_variable(
+                ident("b"), EnvironmentType.TASK_VARS, strlit("1")
+            )
         ln = ScalarLiteral(type="int", value=2)
         g.add_node(ln)
-        _ = ctx.define_fact("b", EnvironmentType.SET_FACTS_REGISTERED, 2, ln)
-        ctx.build_expression("{{ b }}")
+        _ = ctx.define_fact("b", EnvironmentType.SET_FACTS_REGISTERED, intlit(2), ln)
+        _ = ctx.build_expression(expr("{{ b }}"))
 
         assert_graphs_match(
             g,
@@ -1302,12 +1371,16 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_initialised_variable("b", EnvironmentType.TASK_VARS, "1")
+            _ = ctx.define_initialised_variable(
+                ident("b"), EnvironmentType.TASK_VARS, strlit("1")
+            )
             ln = ScalarLiteral(type="int", value=2)
             g.add_node(ln)
-            _ = ctx.define_fact("b", EnvironmentType.SET_FACTS_REGISTERED, 2, ln)
-            ctx.build_expression("{{ b }}")
-        ctx.build_expression("{{ b }}")  # Should reuse above expr
+            _ = ctx.define_fact(
+                "b", EnvironmentType.SET_FACTS_REGISTERED, intlit(2), ln
+            )
+            _ = ctx.build_expression(expr("{{ b }}"))
+        _ = ctx.build_expression(expr("{{ b }}"))  # Should reuse above expr
 
         assert_graphs_match(
             g,
@@ -1345,21 +1418,25 @@ def _describe_caching() -> None:
     def should_cache_dynamic_template_variables(create_context: ContextCreator) -> None:
         ctx, _ = create_context()
 
-        ctx.define_initialised_variable("b", EnvironmentType.HOST_FACTS, "{{ now() }}")
+        _ = ctx.define_initialised_variable(
+            ident("b"), EnvironmentType.HOST_FACTS, expr("{{ now() }}")
+        )
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            d1 = ctx.build_expression("{{ b }}")
-            d2 = ctx.build_expression("{{ b }}")  # Should reuse above
+            d1 = ctx.build_expression(expr("{{ b }}"))
+            d2 = ctx.build_expression(expr("{{ b }}"))  # Should reuse above
 
         assert d1 is d2
 
     def should_discard_after_leaving_scope(create_context: ContextCreator) -> None:
         ctx, _ = create_context()
 
-        ctx.define_initialised_variable("b", EnvironmentType.HOST_FACTS, "{{ now() }}")
+        _ = ctx.define_initialised_variable(
+            ident("b"), EnvironmentType.HOST_FACTS, expr("{{ now() }}")
+        )
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            d1 = ctx.build_expression("{{ b }}")
-            d2 = ctx.build_expression("{{ b }}")  # Should reuse above
-        d3 = ctx.build_expression("{{ b }}")  # Should not reuse above
+            d1 = ctx.build_expression(expr("{{ b }}"))
+            d2 = ctx.build_expression(expr("{{ b }}"))  # Should reuse above
+        d3 = ctx.build_expression(expr("{{ b }}"))  # Should not reuse above
 
         assert d1 is d2
         assert d1 is not d3
@@ -1369,11 +1446,13 @@ def _describe_caching() -> None:
     ) -> None:
         ctx, _ = create_context()
 
-        ctx.define_initialised_variable("b", EnvironmentType.HOST_FACTS, "{{ now() }}")
-        d1 = ctx.build_expression("{{ b }}")
+        _ = ctx.define_initialised_variable(
+            ident("b"), EnvironmentType.HOST_FACTS, expr("{{ now() }}")
+        )
+        d1 = ctx.build_expression(expr("{{ b }}"))
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            d2 = ctx.build_expression("{{ b }}")
-        d3 = ctx.build_expression("{{ b }}")
+            d2 = ctx.build_expression(expr("{{ b }}"))
+        d3 = ctx.build_expression(expr("{{ b }}"))
 
         assert d1 is not d2
         assert d1 is not d3
@@ -1383,21 +1462,23 @@ def _describe_caching() -> None:
         ctx, _ = create_context()
 
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            d1 = ctx.build_expression("{{ now() }}")
-            d2 = ctx.build_expression("{{ now() }}")
+            d1 = ctx.build_expression(expr("{{ now() }}"))
+            d2 = ctx.build_expression(expr("{{ now() }}"))
 
         assert d1 is not d2
 
     def should_not_reuse_outer_cache(create_context: ContextCreator) -> None:
         ctx, _ = create_context()
 
-        ctx.define_initialised_variable("b", EnvironmentType.HOST_FACTS, "{{ now() }}")
+        _ = ctx.define_initialised_variable(
+            ident("b"), EnvironmentType.HOST_FACTS, expr("{{ now() }}")
+        )
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            do1 = ctx.build_expression("{{ b }}")
+            do1 = ctx.build_expression(expr("{{ b }}"))
             with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-                di1 = ctx.build_expression("{{ b }}")
-                di2 = ctx.build_expression("{{ b }}")
-            do2 = ctx.build_expression("{{ b }}")
+                di1 = ctx.build_expression(expr("{{ b }}"))
+                di2 = ctx.build_expression(expr("{{ b }}"))
+            do2 = ctx.build_expression(expr("{{ b }}"))
 
         assert di1 is di2
         assert do1 is do2
@@ -1406,11 +1487,15 @@ def _describe_caching() -> None:
     def should_cache_nested_variables(create_context: ContextCreator) -> None:
         ctx, _ = create_context()
 
-        ctx.define_initialised_variable("b", EnvironmentType.HOST_FACTS, "{{ now() }}")
-        ctx.define_initialised_variable("a", EnvironmentType.HOST_FACTS, "{{ b }}")
+        _ = ctx.define_initialised_variable(
+            ident("b"), EnvironmentType.HOST_FACTS, expr("{{ now() }}")
+        )
+        _ = ctx.define_initialised_variable(
+            ident("a"), EnvironmentType.HOST_FACTS, expr("{{ b }}")
+        )
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            d1 = ctx.build_expression("{{ a }}")
-            d2 = ctx.build_expression("{{ a }}")
+            d1 = ctx.build_expression(expr("{{ a }}"))
+            d2 = ctx.build_expression(expr("{{ a }}"))
 
         assert d1 is d2
 
@@ -1419,10 +1504,12 @@ def _describe_caching() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        ctx.define_initialised_variable("b", EnvironmentType.HOST_FACTS, "{{ now() }}")
+        _ = ctx.define_initialised_variable(
+            ident("b"), EnvironmentType.HOST_FACTS, expr("{{ now() }}")
+        )
         with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            ctx.build_expression("{{ b + 1 }}")
-            ctx.build_expression("{{ b + 2 }}")
+            _ = ctx.build_expression(expr("{{ b + 1 }}"))
+            _ = ctx.build_expression(expr("{{ b + 2 }}"))
 
         assert_graphs_match(
             g,

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import TypeAlias, cast, final
+from typing import cast, final
 
 import json
 import re
 import textwrap
 from collections import defaultdict
-from collections.abc import Generator, Iterable, Iterator, Sequence
+from collections.abc import Generator, Iterable, Sequence
 from contextlib import contextmanager
 from os.path import normpath
 from pathlib import Path
@@ -15,6 +15,7 @@ from loguru import logger
 
 from scansible.representations import ast
 from scansible.utils import (
+    Position,
     Positioned,
     ProjectPath,
     capture_output,
@@ -25,8 +26,6 @@ from scansible.utils import (
 
 from .. import representation as rep
 from .expressions import VarContext
-
-LocTuple: TypeAlias = tuple[str, int, int]
 
 
 @final
@@ -400,15 +399,16 @@ class VisibilityInformation:
         ]
         return json.dumps(as_lists)
 
-    @classmethod
-    def load(cls, payload: str) -> VisibilityInformation:
-        inst = VisibilityInformation()
-        as_lists = json.loads(payload)
-        for k, vals in as_lists:
-            name, rev = k
-            vals_as_tuples = {(vname, vrev) for vname, vrev in vals}
-            inst.set_info(name, rev, vals_as_tuples)
-        return inst
+    # FIXME: Never called, and a mess.
+    # @classmethod
+    # def load(cls, payload: str) -> VisibilityInformation:
+    #     inst = VisibilityInformation()
+    #     as_lists = json.loads(payload)
+    #     for k, vals in as_lists:
+    #         name, rev = k
+    #         vals_as_tuples = {(vname, vrev) for vname, vrev in vals}
+    #         inst.set_info(name, rev, vals_as_tuples)
+    #     return inst
 
 
 class ExtractionContext:
@@ -419,7 +419,7 @@ class ExtractionContext:
     # Auxiliary information about variable visibility. We don't store this in
     # the graph itself but in a companion file.
     visibility_information: VisibilityInformation
-    errors: list[tuple[str, LocTuple | None]]
+    errors: list[tuple[str, Position | None]]
     _next_iv_id: int
 
     handler_notifications: dict[str, set[rep.Task]]
@@ -446,7 +446,7 @@ class ExtractionContext:
         self.active_loops = []
 
     @contextmanager
-    def activate_conditions(self, conditions: list[rep.DataNode]) -> Iterator[None]:
+    def activate_conditions(self, conditions: list[rep.DataNode]) -> Generator[None]:
         old_conditions = self.active_conditions
         self.active_conditions = join_sequences(old_conditions, conditions)
         try:
@@ -455,7 +455,7 @@ class ExtractionContext:
             self.active_conditions = old_conditions
 
     @contextmanager
-    def activate_loop(self, loop_data_node: rep.DataNode) -> Iterator[None]:
+    def activate_loop(self, loop_data_node: rep.DataNode) -> Generator[None]:
         old_loops = self.active_loops
         self.active_loops = join_sequences(old_loops, [loop_data_node])
         try:
@@ -468,17 +468,15 @@ class ExtractionContext:
         return self._next_iv_id - 1
 
     def get_location(self, ds: object) -> rep.NodeLocation:
-        file: str
-        line: int
-        column: int
+        file = "unknown file"
+        line = -1
+        column = -1
 
         if isinstance(ds, Positioned) and not ds.__position__.is_synthetic:
             file = str(ds.__position__.path)
             line, column = ds.__position__.start.line, ds.__position__.start.column
         elif hasattr(ds, "location"):
-            file, line, column = ds.location  # type: ignore[attr-defined]
-        else:
-            file, line, column = "unknown file", -1, -1
+            file, line, column = cast(tuple[str, int, int], ds.location)  # pyright: ignore[reportAttributeAccessIssue]
 
         return rep.NodeLocation(
             file=file,
@@ -487,11 +485,11 @@ class ExtractionContext:
             includer_location=self.include_ctx.last_include_location,
         )
 
-    def record_extraction_error(self, reason: str, location: LocTuple | None) -> None:
-        self.errors.append((reason, location))
+    def record_extraction_error(self, reason: str, position: Position | None) -> None:
+        self.errors.append((reason, position))
 
     def summarise_extraction_errors(self) -> str:
-        reason_to_location: dict[str, list[LocTuple | None]] = defaultdict(list)
+        reason_to_location: dict[str, list[Position | None]] = defaultdict(list)
         for reason, location in self.errors:
             reason_to_location[reason.strip()].append(location)
 

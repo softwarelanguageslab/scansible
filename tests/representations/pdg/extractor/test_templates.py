@@ -6,6 +6,7 @@ from typing import NamedTuple
 
 import pytest
 
+from scansible.representations import ast
 from scansible.representations.pdg.extractor.expressions.templates import (
     LookupTarget,
     LookupTargetLiteral,
@@ -85,12 +86,13 @@ conditional_test_cases = [
 ]
 
 
-def _do_parse(case: Case) -> TemplateExpressionAST | None:
-    if case.is_conditional:
-        return TemplateExpressionAST.parse_conditional(
-            case.expr, case.variable_mappings
-        )
-    return TemplateExpressionAST.parse(case.expr)
+def _do_parse(case: Case) -> TemplateExpressionAST:
+    expr = (
+        ast.Condition.model_validate(case.expr)
+        if case.is_conditional
+        else ast.Expression.model_validate(case.expr)
+    )
+    return TemplateExpressionAST(expr)
 
 
 @pytest.mark.parametrize("case", test_cases)

@@ -26,12 +26,13 @@ from pydantic import (
     Discriminator,
     GetCoreSchemaHandler,
     Tag,
+    TypeAdapter,
     ValidationError,
     model_validator,
 )
 from pydantic_core import core_schema
 
-from scansible.representations.cst import YamlNode, YamlUnsafeStr, YamlVaultValue
+from scansible.representations.cst import YamlUnsafeStr, YamlVaultValue
 from scansible.utils import FrozenDict, Position, Positioned
 
 from ..common import BrokenTask, ExtractionContext
@@ -44,7 +45,7 @@ _SYNTHETIC_POSITION: Final = Position.synthetic()
 
 
 def _get_position(value: object) -> Position:
-    if isinstance(value, YamlNode):
+    if isinstance(value, Positioned):
         return value.__position__
     return Position.synthetic()
 
@@ -157,7 +158,9 @@ class Identifier(str, Positioned):
     def __get_pydantic_core_schema__(
         cls, source_type: object, handler: GetCoreSchemaHandler
     ) -> core_schema.CoreSchema:
-        def validate(value: str) -> Self:
+        def validate(value: object) -> Self:
+            if not isinstance(value, str):
+                raise ValueError(f"Identifiers must be strings, got {type(value)}")
             if not (value.isascii() and value.isidentifier()):
                 raise ValueError(f"Expected a valid identifier, got {value}")
             if keyword.iskeyword(value):
@@ -166,8 +169,13 @@ class Identifier(str, Positioned):
             return cls(value, position=_get_position(value))
 
         return core_schema.no_info_after_validator_function(
-            validate, core_schema.str_schema()
+            validate, core_schema.any_schema()
         )
+
+    @classmethod
+    def from_object(cls, o: object) -> Self:
+        """Create an identifier from an arbitrary object."""
+        return TypeAdapter(cls).validate_python(o)
 
 
 class Literal(Positioned, Protocol):

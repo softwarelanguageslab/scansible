@@ -18,7 +18,6 @@ dependencies = [
     "ansible", # Needed for collections.
     "kuzu>=0.10.0",
     "rustworkx>=0.16.0",
-    "icontract>=2.7.3",
     "ruamel-yaml>=0.19.1",
 ]
 

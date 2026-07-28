@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import override
+from typing import cast, override
 
 from collections.abc import Sequence
+
+from scansible.representations import ast
 
 from ... import representation as rep
 from ..expressions import EnvironmentType, RecursiveDefinitionError
@@ -47,7 +49,7 @@ class GenericTaskExtractor(TaskExtractor):
     def _extract_single_task(
         self, predecessors: Sequence[rep.ControlNode]
     ) -> ExtractionResult:
-        if self.task.loop_control:
+        if "loop_control" in self.task.model_directives_set:
             self.logger.warning("Found loop_control without loop")
 
         return self._extract_bare_task(predecessors)
@@ -125,7 +127,7 @@ class GenericTaskExtractor(TaskExtractor):
             if misc_kw in self.task.model_fields_set:
                 try:
                     val_node = self.context.vars.build_expression(
-                        getattr(self.task, misc_kw)
+                        cast(ast.AnyExpression, getattr(self.task, misc_kw))
                     )
                 except RecursiveDefinitionError as e:
                     self.logger.error(e)

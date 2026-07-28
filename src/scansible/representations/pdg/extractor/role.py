@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from typing import final
+
 from collections.abc import Sequence
 
 from loguru import logger
 
-from scansible.representations.ast import Role
+from scansible.representations import ast
 
 from .. import representation as rep
 from .context import ExtractionContext
@@ -16,8 +18,9 @@ from .task_lists import TaskListExtractor
 from .variables import VariablesExtractor
 
 
+@final
 class RoleExtractor:
-    def __init__(self, context: ExtractionContext, role: Role) -> None:
+    def __init__(self, context: ExtractionContext, role: ast.Role) -> None:
         self.context = context
         self.role = role
 

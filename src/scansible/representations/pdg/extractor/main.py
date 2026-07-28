@@ -105,21 +105,11 @@ class StructuralGraphExtractor:
 
     def _capture_log_message(self, message: loguru.Message) -> None:
         location = message.record.get("extra", {}).get("location")
-        if isinstance(location, Position):
-            if not location.is_synthetic:
-                location = (
-                    str(location.path),
-                    location.start.line,
-                    location.start.column,
-                )
-            else:
-                location = None
-        if not isinstance(location, tuple):
-            location = None
-        if location is not None and location[0] == "unknown file":
-            location = None
+        position: Position | None = None
+        if isinstance(location, Position) and not location.is_synthetic:
+            position = location
         reason = str(message)
-        self.context.record_extraction_error(reason, location)
+        self.context.record_extraction_error(reason, position)
 
     def _extract_role(self) -> None:
         _ = RoleExtractor(
