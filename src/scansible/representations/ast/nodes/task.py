@@ -135,7 +135,7 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
     #: `with_items` -> `items`.
     loop_with: StrLiteral | None = None
     #: Loop control defined on the task.
-    loop_control: LoopControl | None = None
+    loop_control: LoopControl = Field(default_factory=LoopControl)
     #: List of handler names of handlers to notify.
     notify: SeqLiteral[StrLiteral] = Field(default_factory=SeqLiteral)
     #: Polling interval for async tasks.
