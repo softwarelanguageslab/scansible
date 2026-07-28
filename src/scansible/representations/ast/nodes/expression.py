@@ -11,12 +11,12 @@ Moreover, AST nodes may perform type coercions that the CST nodes do not, and ar
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Callable, Final, Protocol, Self, get_args, override
+from typing import Annotated, Any, Final, Protocol, Self, get_args, override
 
 import decimal
 import keyword
 from abc import abstractmethod
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import date, datetime
 
 from jinja2 import Environment, TemplateSyntaxError
@@ -295,7 +295,7 @@ class IntLiteral(int, Literal):
             decimal_value = decimal.Decimal(value)  # pyright: ignore[reportArgumentType]
             int_value = int(decimal_value)
         except (decimal.DecimalException, TypeError) as e:
-            raise ValueError from e
+            raise ValueError("Invalid int") from e
 
         if int_value != decimal_value:
             raise ValueError(f"Floating-point value {value!r} would be truncated.")
@@ -319,7 +319,7 @@ class FloatLiteral(float, Literal):
         try:
             return float(value)  # pyright: ignore[reportArgumentType]
         except TypeError as e:
-            raise ValueError from e
+            raise ValueError("Invalid float") from e
 
 
 class PercentLiteral(float, Literal):
@@ -341,7 +341,7 @@ class PercentLiteral(float, Literal):
         try:
             return float(value)  # pyright: ignore[reportArgumentType]
         except TypeError as e:
-            raise ValueError from e
+            raise ValueError("Invalid float") from e
 
 
 class BoolLiteral(Literal):
@@ -460,7 +460,7 @@ class SeqLiteral[T](tuple[T, ...], Literal):
     @override
     def _validate(cls, value: object) -> Sequence[object]:
         """Coerce the given value to a sequence, like Ansible does."""
-        if value == None:  # noqa: E711  # Could be YamlNone
+        if value == None:  # Could be YamlNone
             return ()
         if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
             value = (value,)
@@ -495,7 +495,7 @@ class LenientSeqLiteral[T](SeqLiteral[T]):
     @classmethod
     @override
     def _validate(cls, value: object) -> Sequence[object]:
-        if value == None:  # noqa: E711 -- could be YamlNone
+        if value == None:  # could be YamlNone
             return ()
         if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
             raise ValueError("Expected a sequence")
@@ -560,7 +560,7 @@ class MapLiteral[K, V](FrozenDict[K, V], Literal):
     @override
     def _validate(cls, value: object) -> Mapping[object, object]:
         """Coerce the given value to a mapping, like Ansible does."""
-        if value == None:  # noqa: E711
+        if value == None:
             return {}
         if not isinstance(value, Mapping):
             raise ValueError("Cannot coerce value to mapping")

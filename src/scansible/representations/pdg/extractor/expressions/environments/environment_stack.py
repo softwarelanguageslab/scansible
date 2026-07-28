@@ -91,15 +91,6 @@ class EnvironmentStack:
             if (el := getter(env)) is not None and predicate(el)
         )
 
-    def _get_highest_precedence_variable_value(
-        self,
-        key: str,
-        predicate: Callable[[VariableValueRecord], bool] = lambda _: True,
-    ) -> tuple[VariableValueRecord, Environment] | None:
-        return self._get_highest_precedence_element(
-            operator.methodcaller("get_variable_value", key), predicate
-        )
-
     def _get_highest_precedence_variable_definition(
         self,
         key: str,
@@ -107,15 +98,6 @@ class EnvironmentStack:
     ) -> tuple[VariableDefinitionRecord, Environment] | None:
         return self._get_highest_precedence_element(
             operator.methodcaller("get_variable_definition", key), predicate
-        )
-
-    def _get_highest_precedence_expression(
-        self,
-        key: str,
-        predicate: Callable[[TemplateEvaluationResult], bool] = lambda _: True,
-    ) -> tuple[TemplateEvaluationResult, Environment] | None:
-        return self._get_highest_precedence_element(
-            operator.methodcaller("get_expression", key), predicate
         )
 
     def _get_topmost_environment(self, env_type: EnvironmentType) -> Environment:
@@ -342,7 +324,7 @@ class EnvironmentStack:
 
     def _get_all_visible_definitions(self) -> dict[str, VariableDefinitionRecord]:
         return reduce(
-            operator.or_,
+            operator.or_,  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
             (
                 env.get_all_variable_definitions()
                 for env in reversed(self.precedence_chain)
@@ -363,7 +345,7 @@ class EnvironmentStack:
 
     def get_currently_visible_definitions(self) -> set[tuple[str, int]]:
         all_vars = self._get_all_visible_definitions()
-        return set((vdef.name, vdef.revision) for vdef in all_vars.values())
+        return {(vdef.name, vdef.revision) for vdef in all_vars.values()}
 
     def enter_scope(self, env_type: LocalEnvType) -> None:
         if env_type not in LOCAL_ENV_TYPES:

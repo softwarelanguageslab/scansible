@@ -12,6 +12,8 @@ from os.path import normpath
 from pathlib import Path
 
 from loguru import logger
+from pydantic import ValidationError
+from ruamel.yaml import YAMLError
 
 from scansible.representations import ast
 from scansible.utils import (
@@ -80,7 +82,7 @@ class IncludeContext:
     @contextmanager
     def _enter_file(
         self, file_path: ProjectPath, includer_location: rep.NodeLocation | None
-    ) -> Generator[None, None, None]:
+    ) -> Generator[None]:
         if includer_location is None:
             assert self.last_include_location is None
 
@@ -97,7 +99,7 @@ class IncludeContext:
         role: ast.Role,
         role_base_path: ProjectPath,
         includer_location: rep.NodeLocation,
-    ) -> Generator[None, None, None]:
+    ) -> Generator[None]:
         self._role_stack.append(role_base_path)
         try:
             # TODO: this is ugly. we can probably use an ExitStack here.
@@ -115,7 +117,7 @@ class IncludeContext:
     @contextmanager
     def load_and_enter_task_file(
         self, path: str, includer_location: rep.NodeLocation
-    ) -> Generator[ast.TaskFile | None, None, None]:
+    ) -> Generator[ast.TaskFile | None]:
         real_path = self._find_file(path, "tasks")
         if not real_path:
             yield None
@@ -135,7 +137,7 @@ class IncludeContext:
                 task_file = ast.TaskFile.load(real_path, struct_ctx)
             if logged_output := output.getvalue():
                 logger.warning(logged_output)
-        except Exception as e:
+        except (ValidationError, YAMLError) as e:
             logger.error(e)
             yield None
             return
@@ -149,7 +151,7 @@ class IncludeContext:
     @contextmanager
     def load_and_enter_role(
         self, role_name: str, includer_location: rep.NodeLocation
-    ) -> Generator[ast.Role | None, None, None]:
+    ) -> Generator[ast.Role | None]:
         real_path = self.find_role(role_name)
         if not real_path:
             yield None
@@ -164,7 +166,7 @@ class IncludeContext:
 
         try:
             model = ast.extract_role(real_path.absolute, lenient=self.lenient)
-        except Exception as e:
+        except (ValidationError, YAMLError) as e:
             logger.error(e)
             yield None
             return
@@ -179,7 +181,7 @@ class IncludeContext:
             yield role
 
     @contextmanager
-    def enter_role_file(self, role_file_path: Path) -> Generator[None, None, None]:
+    def enter_role_file(self, role_file_path: Path) -> Generator[None]:
         assert self._role_base_path is not None, (
             "Should not attempt to enter role file without having entered role"
         )
@@ -191,7 +193,7 @@ class IncludeContext:
     @contextmanager
     def load_and_enter_var_file(
         self, path: str, includer_location: rep.NodeLocation
-    ) -> Generator[ast.VariableFile | None, None, None]:
+    ) -> Generator[ast.VariableFile | None]:
         real_path = self._find_file(path, "vars")
         if not real_path:
             yield None
@@ -204,7 +206,7 @@ class IncludeContext:
                 )
             if logged_output := output.getvalue():
                 logger.warning(logged_output)
-        except Exception as e:
+        except (ValidationError, YAMLError) as e:
             logger.error(e)
             yield None
             return
@@ -259,7 +261,7 @@ class IncludeContext:
                 for f in find_all_files(search_dir)
             ]
 
-            results |= set(f for f in files if pattern.match(f))
+            results |= {f for f in files if pattern.match(f)}
 
         return results
 
@@ -370,7 +372,7 @@ class IncludeContext:
 
 class VisibilityInformation:
     def __init__(self) -> None:
-        self._store: dict[tuple[str, int], set[tuple[str, int]]] = dict()
+        self._store: dict[tuple[str, int], set[tuple[str, int]]] = {}
 
     def set_info(
         self, var_name: str, def_version: int, visible_definitions: set[tuple[str, int]]
@@ -497,7 +499,7 @@ class ExtractionContext:
         for reason, locations in sorted(reason_to_location.items()):
             num_unknown = len([loc for loc in locations if loc is None])
             loc_strs = sorted(
-                set(":".join(map(str, loc)) for loc in locations if loc is not None)
+                {":".join(map(str, loc)) for loc in locations if loc is not None}
             )
             if num_unknown:
                 prefix = "and " if loc_strs else ""

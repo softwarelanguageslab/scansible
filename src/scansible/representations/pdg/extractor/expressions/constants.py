@@ -117,14 +117,10 @@ PURE_FILTERS = frozenset(
         "subelements",
         "split",
         "urldecode",
-        "urlencode",
         "urlsplit",
-        "min",
-        "max",
         "log",
         "pow",
         "root",
-        "unique",
         "intersect",
         "difference",
         "symmetric_difference",
@@ -259,8 +255,6 @@ MAGIC_VAR_NAMES = frozenset(
         # but include params have the highest precedence anyway.
         "ansible_parent_role_names",
         "ansible_parent_role_paths",
-        # Not sure about this one.
-        "ansible_search_path",
         # These are in fact host vars, so much lower precedence than magic vars.
         # "group_names",
         # "inventory_hostname",

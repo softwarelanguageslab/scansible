@@ -101,11 +101,11 @@ class Play(ASTNode, CommonDirectives, frozen=True):
     )
 
     #: Handlers for the play.
-    handlers: LenientSeqLiteral[HandlerOrBlock] = Field(default_factory=LenientSeqLiteral)
-    #: Tasks to be run before the roles in `roles`.
-    pre_tasks: LenientSeqLiteral[TaskOrBlock] = Field(
+    handlers: LenientSeqLiteral[HandlerOrBlock] = Field(
         default_factory=LenientSeqLiteral
     )
+    #: Tasks to be run before the roles in `roles`.
+    pre_tasks: LenientSeqLiteral[TaskOrBlock] = Field(default_factory=LenientSeqLiteral)
     #: Tasks to be run after the main tasks.
     post_tasks: LenientSeqLiteral[TaskOrBlock] = Field(
         default_factory=LenientSeqLiteral

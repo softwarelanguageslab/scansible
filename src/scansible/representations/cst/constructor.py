@@ -167,10 +167,9 @@ class AnsibleResolver(BaseResolver):
         self, version: object = None, loader: object = None, loadumper: object = None
     ) -> None:
         super().__init__(loader if loader is not None else loadumper)
-
-    yaml_implicit_resolvers: dict[object, object] = dict(
-        _PyYAMLResolver.yaml_implicit_resolvers
-    )
+        self.yaml_implicit_resolvers: dict[object, object] = dict(
+            _PyYAMLResolver.yaml_implicit_resolvers
+        )
 
     @property
     @override

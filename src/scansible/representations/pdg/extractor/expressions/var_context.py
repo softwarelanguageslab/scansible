@@ -387,7 +387,7 @@ class VarContext:
         when a template that uses this variable is evaluated.
         """
         logger.debug(
-            f"Defining variable {name!r} of type {type(initialiser).__name__} "
+            f"Defining variable {name!r} of type {initialiser.__class__.__name__} "
             + f"in env of type {env_type.name}"
         )
 

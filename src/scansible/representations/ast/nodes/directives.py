@@ -157,11 +157,10 @@ class CommonDirectives(BaseModel, frozen=True):
         """Translate the removed `always_run` directive to `check_mode`."""
         # `always_run` is an old, now-removed directive which has since been
         # replaced by the `check_mode: no` directive.
-        if "always_run" in ds:
+        if ds.pop("always_run", None):
             # if `always_run: yes` -> `check_mode: no`.
             # not sure if `always_run: no` necessarily means `check_mode: yes` or
             # just "use default behaviour".
-            if ds.pop("always_run"):
-                ds["check_mode"] = False
+            ds["check_mode"] = False
 
         return ds

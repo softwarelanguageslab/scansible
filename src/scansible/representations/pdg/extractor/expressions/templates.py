@@ -148,7 +148,7 @@ class ASTStringifier(NodeVisitor):
         return f"{OPERAND_TO_STR.get(node.op, node.op)} {self.visit(node.expr)}"
 
     def visit_Const(self, node: nodes.Const, **_: object) -> str:
-        return repr(node.value)
+        return repr(node.value)  # pyright: ignore[reportAny]
 
     def visit_List(self, node: nodes.List, **_: object) -> str:
         return "[" + ", ".join(self.visit(item) for item in node.items) + "]"
@@ -245,7 +245,7 @@ class ASTStringifier(NodeVisitor):
         head = "{% set " + self.visit(node.target) + "%}"
         body = "".join(self.visit(child) for child in node.body)
         tail = "{% endset %}"
-        return "".join((head, body, tail))
+        return f"{head}{body}{tail}"
 
     def visit_Test(self, node: nodes.Test, negate: bool = False, **_: object) -> str:
         lhs = self.visit(node.node)
@@ -637,7 +637,7 @@ def create_lookup_target(node: nodes.Node) -> LookupTarget:
     if isinstance(node, nodes.Name):
         return LookupTargetVariable(name=node.name)
 
-    if not isinstance(node, nodes.Const) or not isinstance(node.value, str):
+    if not isinstance(node, nodes.Const) or not isinstance(node.value, str):  # pyright: ignore[reportAny]
         logger.warning(
             f"Not extracting lookup plugin target, not a string or variable: {node}"
         )

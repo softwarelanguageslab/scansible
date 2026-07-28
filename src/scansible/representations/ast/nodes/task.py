@@ -325,7 +325,7 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
         for args in arg_list:
             if isinstance(args, str):
                 args = cls._parse_args(action, args)
-            if args == None:  # noqa: E711 -- could be YamlNone
+            if args == None:  # could be YamlNone
                 args = {}
             if not isinstance(args, dict):
                 raise ValueError("Expected args to be a dictionary")

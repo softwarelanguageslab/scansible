@@ -27,41 +27,41 @@ def g() -> Graph:
     return Graph()
 
 
-def describe_dump_node() -> None:
-    def should_dump_expression(g: Graph) -> None:
+def describe_dump_node():
+    def should_dump_expression():
         e = Expression(expr="{{ test }}")
         e.node_id = 0
 
-        result = dump_node(e, g)
+        result = dump_node(e)
 
         assert (
             result
             == '(n0:Expression { expr: "{{ test }}", impure_components: "[]", is_conditional: false, location: null, node_id: 0 })'
         )
 
-    def should_dump_variable(g: Graph) -> None:
+    def should_dump_variable():
         v = Variable(name="test", version=0, value_version=0, scope_level=1)
         v.node_id = 0
 
-        result = dump_node(v, g)
+        result = dump_node(v)
 
         assert (
             result
             == '(n0:Variable { location: null, name: "test", node_id: 0, scope_level: 1, value_version: 0, version: 0 })'
         )
 
-    def should_dump_task(g: Graph) -> None:
+    def should_dump_task():
         t = Task(action="file", name="task name")
         t.node_id = 0
 
-        result = dump_node(t, g)
+        result = dump_node(t)
 
         assert (
             result
             == '(n0:Task { action: "file", location: null, name: "task name", node_id: 0 })'
         )
 
-    def should_dump_task_with_location(g: Graph) -> None:
+    def should_dump_task_with_location():
         t = Task(
             action="file",
             name="task name",
@@ -69,18 +69,18 @@ def describe_dump_node() -> None:
         )
         t.node_id = 0
 
-        result = dump_node(t, g)
+        result = dump_node(t)
 
         assert (
             result
             == '(n0:Task { action: "file", location: "{\\"file\\": \\"test.yml\\", \\"line\\": 1, \\"column\\": 10, \\"includer_location\\": null}", name: "task name", node_id: 0 })'
         )
 
-    def should_dump_literal_string(g: Graph) -> None:
+    def should_dump_literal_string():
         l = ScalarLiteral(type="str", value="literal value")
         l.node_id = 0
 
-        result = dump_node(l, g)
+        result = dump_node(l)
 
         assert (
             result
@@ -101,12 +101,12 @@ def describe_dump_node() -> None:
         ],
     )
     def should_dump_literal_non_string(
-        g: Graph, type: LiteralT["int", "float", "bool"], value: int | float | bool
-    ) -> None:
+        type: LiteralT["int", "float", "bool"], value: float | bool
+    ):
         l = ScalarLiteral(type=type, value=value)
         l.node_id = 0
 
-        result = dump_node(l, g)
+        result = dump_node(l)
 
         assert (
             result
@@ -114,8 +114,8 @@ def describe_dump_node() -> None:
         )
 
 
-def describe_dump_edge() -> None:
-    def should_dump_order_edge() -> None:
+def describe_dump_edge():
+    def should_dump_order_edge():
         n1, n2 = Node(), Node()
         n1.node_id = 1
         n2.node_id = 2
@@ -125,7 +125,7 @@ def describe_dump_edge() -> None:
 
         assert result == "(n1)-[:ORDER { back: false, transitive: false }]->(n2)"
 
-    def should_dump_def_edge() -> None:
+    def should_dump_def_edge():
         n1, n2 = Node(), Node()
         n1.node_id = 1
         n2.node_id = 2
@@ -135,7 +135,7 @@ def describe_dump_edge() -> None:
 
         assert result == "(n1)-[:DEF]->(n2)"
 
-    def should_dump_use_edge() -> None:
+    def should_dump_use_edge():
         n1, n2 = Node(), Node()
         n1.node_id = 1
         n2.node_id = 2
@@ -145,7 +145,7 @@ def describe_dump_edge() -> None:
 
         assert result == "(n1)-[:USE]->(n2)"
 
-    def should_dump_keyword_edge() -> None:
+    def should_dump_keyword_edge():
         n1, n2 = Node(), Node()
         n1.node_id = 1
         n2.node_id = 2
@@ -156,23 +156,23 @@ def describe_dump_edge() -> None:
         assert result == '(n1)-[:KEYWORD { keyword: "the.keyword" }]->(n2)'
 
 
-def describe_dump_graph() -> None:
-    def should_return_empty_query_for_empty_graph(g: Graph) -> None:
+def describe_dump_graph():
+    def should_return_empty_query_for_empty_graph(g: Graph):
         result = dump_graph(g)
 
         assert not result
 
-    def should_return_query_for_graph_with_single_node(g: Graph) -> None:
+    def should_return_query_for_graph_with_single_node(g: Graph):
         t = Task(action="file", name="task name")
         g.add_node(t)
 
         result = dump_graph(g)
 
-        assert result == "CREATE " + dump_node(t, g)
+        assert result == "CREATE " + dump_node(t)
 
     def should_return_query_for_graph_with_multiple_nodes_without_edges(
         g: Graph,
-    ) -> None:
+    ):
         t = Task(action="file", name="task name")
         v = Variable(name="avar", version=0, value_version=0, scope_level=1)
         g.add_node(t)
@@ -180,9 +180,9 @@ def describe_dump_graph() -> None:
 
         result = dump_graph(g)
 
-        assert result == "CREATE " + ", \n".join([dump_node(t, g), dump_node(v, g)])
+        assert result == "CREATE " + ", \n".join([dump_node(t), dump_node(v)])
 
-    def should_return_query_for_graph_with_multiple_nodes_with_edges(g: Graph) -> None:
+    def should_return_query_for_graph_with_multiple_nodes_with_edges(g: Graph):
         t = Task(action="file", name="task name")
         v = Variable(name="avar", version=0, value_version=0, scope_level=1)
         e = Keyword(keyword="args.path")
@@ -193,5 +193,5 @@ def describe_dump_graph() -> None:
         result = dump_graph(g)
 
         assert result == "CREATE " + ", \n".join(
-            [dump_node(t, g), dump_node(v, g), dump_edge(e, v, t)]
+            [dump_node(t), dump_node(v), dump_edge(e, v, t)]
         )

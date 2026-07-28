@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import override
+from typing import Self, override
 
 from collections.abc import Iterable
 from datetime import date, datetime
@@ -13,14 +13,12 @@ class YamlNode(Positioned):
 
     __position__: Position
 
-    pass
-
 
 ## Custom YAML subclasses
 class YamlStr(str, YamlNode):
     """String originating from a YAML document, with position information."""
 
-    def __new__(cls, value: str, position: Position) -> YamlStr:
+    def __new__(cls, value: str, position: Position) -> Self:
         # ruamel.yaml inserts <BEL> (0x07, \a) characters in multi-line folded strings to indicate
         # where the string was split, so that the split can be reconstructed later. Remove these.
         # TODO: We should probably also keep track of these so we can track source positions during string manipulation.
@@ -32,7 +30,7 @@ class YamlStr(str, YamlNode):
 class YamlInt(int, YamlNode):
     """Integer originating from a YAML document, with position information."""
 
-    def __new__(cls, value: int, position: Position) -> YamlInt:
+    def __new__(cls, value: int, position: Position) -> Self:
         obj = int.__new__(cls, value)
         obj.__position__ = position
         return obj
@@ -73,7 +71,7 @@ class YamlBool(YamlNode):
 class YamlFloat(float, YamlNode):
     """Float originating from a YAML document, with position information."""
 
-    def __new__(cls, value: float, position: Position) -> YamlFloat:
+    def __new__(cls, value: float, position: Position) -> Self:
         obj = float.__new__(cls, value)
         obj.__position__ = position
         return obj
@@ -82,7 +80,7 @@ class YamlFloat(float, YamlNode):
 class YamlDate(date, YamlNode):
     """Date originating from a YAML document, with position information."""
 
-    def __new__(cls, value: date, position: Position) -> YamlDate:
+    def __new__(cls, value: date, position: Position) -> Self:
         obj = date.__new__(cls, value.year, value.month, value.day)
         obj.__position__ = position
         return obj
@@ -91,7 +89,7 @@ class YamlDate(date, YamlNode):
 class YamlDatetime(datetime, YamlNode):
     """Datetime originating from a YAML document, with position information."""
 
-    def __new__(cls, value: datetime, position: Position) -> YamlDatetime:
+    def __new__(cls, value: datetime, position: Position) -> Self:
         obj = datetime.__new__(
             cls,
             value.year,
@@ -110,7 +108,7 @@ class YamlDatetime(datetime, YamlNode):
 class YamlVaultValue(str, YamlNode):
     """Vault-encrypted value originating from a YAML document, with position information."""
 
-    def __new__(cls, value: str, position: Position) -> YamlVaultValue:
+    def __new__(cls, value: str, position: Position) -> Self:
         obj = str.__new__(cls, value)
         obj.__position__ = position
         return obj
@@ -121,7 +119,7 @@ class YamlUnsafeStr(str, YamlNode):
 
     Unsafe strings should not be templated."""
 
-    def __new__(cls, value: str, position: Position) -> YamlUnsafeStr:
+    def __new__(cls, value: str, position: Position) -> Self:
         obj = str.__new__(cls, value)
         obj.__position__ = position
         return obj

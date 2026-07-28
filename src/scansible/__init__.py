@@ -13,9 +13,6 @@ import rich.progress
 from ansible import constants as ans_constants
 from loguru import logger
 
-from scansible.representations.pdg.canonical import canonicalize_pdg
-from scansible.utils.module_type_info import ModuleKnowledgeBase
-
 
 @click.group
 @click.option("-v", "--verbose", is_flag=True, default=False, help="Print debug output")
@@ -88,16 +85,16 @@ def cli(verbose: bool, quiet: bool) -> None:
     default=False,
     help="Whether extraction and building should be strict. This aborts processing files if a single task in that file is malformed. (default: lenient)",
 )
-@click.option(
-    "--canonicalize/--no-canonicalize",
-    default=False,
-    help="Whether to canonicalize the resulting graph",
-)
-@click.option(
-    "--module-kb-path",
-    type=click.Path(resolve_path=True, path_type=Path, dir_okay=False, exists=True),
-    help="Path to the module knowledge base (only required when --canonicalize is set)",
-)
+# @click.option(
+#     "--canonicalize/--no-canonicalize",
+#     default=False,
+#     help="Whether to canonicalize the resulting graph",
+# )
+# @click.option(
+#     "--module-kb-path",
+#     type=click.Path(resolve_path=True, path_type=Path, dir_okay=False, exists=True),
+#     help="Path to the module knowledge base (only required when --canonicalize is set)",
+# )
 def build_pdg(
     project_path: Path,
     name: str | None,
@@ -108,8 +105,8 @@ def build_pdg(
     aux_file: TextIO | None,
     errors_file: TextIO | None,
     strict: bool,
-    canonicalize: bool,
-    module_kb_path: Path | None,
+    # canonicalize: bool,
+    # module_kb_path: Path | None,
 ) -> None:
     """Build a PDG for a project residing at PROJECT_PATH."""
     if name is None:
@@ -119,8 +116,8 @@ def build_pdg(
         Path(p) for p in ans_constants.DEFAULT_ROLES_PATH
     ]
 
-    if canonicalize and not module_kb_path:
-        raise ValueError("--module-kb-path is required when --canonicalize is set")
+    # if canonicalize and not module_kb_path:
+    #     raise ValueError("--module-kb-path is required when --canonicalize is set")
 
     from .representations.pdg import dump_graph, extract_pdg
 
@@ -133,10 +130,10 @@ def build_pdg(
     pdg = ctx.graph
     logger.info(f"Extracted PDG of {pdg.num_nodes} nodes and {pdg.num_edges} edges")
 
-    if canonicalize:
-        assert module_kb_path
-        pdg = canonicalize_pdg(pdg, ModuleKnowledgeBase.load_from_file(module_kb_path))
-        logger.info(f"Reduced size to {pdg.num_nodes} nodes and {pdg.num_edges} edges")
+    # if canonicalize:
+    #     assert module_kb_path
+    #     pdg = canonicalize_pdg(pdg, ModuleKnowledgeBase.load_from_file(module_kb_path))
+    #     logger.info(f"Reduced size to {pdg.num_nodes} nodes and {pdg.num_edges} edges")
 
     output.write(dump_graph(output_format, pdg))
 
@@ -294,29 +291,29 @@ def check_all(
     )
 
 
-@cli.command()
-@click.argument("output_path", type=click.Path(resolve_path=True, path_type=Path))
-@click.argument(
-    "ansible_doc_path",
-    default="ansible-doc",
-    type=click.Path(
-        resolve_path=True, exists=True, dir_okay=False, executable=True, path_type=Path
-    ),
-)
-@click.option(
-    "--full",
-    type=bool,
-    help="Include descriptions, examples, etc. in the dumped output",
-    default=False,
-)
-def prepare_module_kb(
-    output_path: Path, ansible_doc_path: Path, full: bool = False
-) -> None:
-    """Prepare the knowledge base of modules and write it to OUTPUT_PATH."""
+# @cli.command()
+# @click.argument("output_path", type=click.Path(resolve_path=True, path_type=Path))
+# @click.argument(
+#     "ansible_doc_path",
+#     default="ansible-doc",
+#     type=click.Path(
+#         resolve_path=True, exists=True, dir_okay=False, executable=True, path_type=Path
+#     ),
+# )
+# @click.option(
+#     "--full",
+#     type=bool,
+#     help="Include descriptions, examples, etc. in the dumped output",
+#     default=False,
+# )
+# def prepare_module_kb(
+#     output_path: Path, ansible_doc_path: Path, full: bool = False
+# ) -> None:
+#     """Prepare the knowledge base of modules and write it to OUTPUT_PATH."""
 
-    kb = ModuleKnowledgeBase.init_from_ansible_docs(str(ansible_doc_path))
-    output_path.parent.mkdir(exist_ok=True, parents=True)
-    kb.dump_to_file(output_path, slim=not full)
+#     kb = ModuleKnowledgeBase.init_from_ansible_docs(str(ansible_doc_path))
+#     output_path.parent.mkdir(exist_ok=True, parents=True)
+#     kb.dump_to_file(output_path, slim=not full)
 
 
 @cli.command()
@@ -376,16 +373,16 @@ def extract_dependencies(input_project: Path, output_file: Path) -> None:
     multiple=True,
     help='Additional search paths to find role dependencies. Can be specified as environment variable "ROLE_SEARCH_PATH" (multiple paths can be separated with ":"). Provided directories are prepended to Ansible defaults.',
 )
-@click.option(
-    "--canonicalize/--no-canonicalize",
-    default=False,
-    help="Whether to canonicalize the resulting graph",
-)
-@click.option(
-    "--module-kb-path",
-    type=click.Path(resolve_path=True, path_type=Path, dir_okay=False, exists=True),
-    help="Path to the module knowledge base (only required when --canonicalize is set)",
-)
+# @click.option(
+#     "--canonicalize/--no-canonicalize",
+#     default=False,
+#     help="Whether to canonicalize the resulting graph",
+# )
+# @click.option(
+#     "--module-kb-path",
+#     type=click.Path(resolve_path=True, path_type=Path, dir_okay=False, exists=True),
+#     help="Path to the module knowledge base (only required when --canonicalize is set)",
+# )
 @click.option(
     "--transitive-cfg/--no-transitive-cfg",
     default=False,
@@ -396,8 +393,8 @@ def bulk_build(
     repo_dir: Path,
     output_path: Path,
     role_search_path: Sequence[Path],
-    canonicalize: bool,
-    module_kb_path: Path | None,
+    # canonicalize: bool,
+    # module_kb_path: Path | None,
 ) -> None:
     """Build a collection of PDGs in bulk.
 
@@ -408,15 +405,15 @@ def bulk_build(
     be extracted separately.
     """
 
-    if canonicalize and not module_kb_path:
-        raise ValueError("--module-kb-path is required when --canonicalize is set")
+    # if canonicalize and not module_kb_path:
+    #     raise ValueError("--module-kb-path is required when --canonicalize is set")
 
     entrypoints = list(csv.DictReader(input_file))
     output_path.mkdir(exist_ok=True, parents=True)
 
-    if canonicalize:
-        assert module_kb_path
-        module_kb = ModuleKnowledgeBase.load_from_file(module_kb_path)
+    # if canonicalize:
+    #     assert module_kb_path
+    #     module_kb = ModuleKnowledgeBase.load_from_file(module_kb_path)
 
     from .representations.pdg import dump_graph, extract_pdg
 
@@ -454,11 +451,11 @@ def bulk_build(
                     f"Extracted PDG of {pdg.num_nodes} nodes and {pdg.num_edges} edges"
                 )
 
-                if canonicalize:
-                    pdg = canonicalize_pdg(pdg, module_kb)  # pyright: ignore
-                    logger.info(
-                        f"Reduced size to {pdg.num_nodes} nodes and {pdg.num_edges} edges"
-                    )
+                # if canonicalize:
+                #     pdg = canonicalize_pdg(pdg, module_kb)
+                #     logger.info(
+                #         f"Reduced size to {pdg.num_nodes} nodes and {pdg.num_edges} edges"
+                #     )
             except Exception as exc:
                 if isinstance(exc, KeyboardInterrupt):
                     raise

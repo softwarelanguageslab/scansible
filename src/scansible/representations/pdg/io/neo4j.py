@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 import json
 
 from .. import representation as rep
 
 
-def dump_value(v: Any, attr_key: str) -> str:
+def dump_value(v: object, attr_key: str) -> str:
     if attr_key == "location" and isinstance(v, dict) and v["file"] == "unknown file":
         return "NULL"
     if isinstance(v, (tuple, list, dict)):
@@ -18,14 +16,14 @@ def dump_value(v: Any, attr_key: str) -> str:
     return json.dumps(v)
 
 
-def _create_attr_content(attrs: dict[str, Any]) -> str:
+def _create_attr_content(attrs: dict[str, object]) -> str:
     return ", ".join(
         f"{attr_key}: {dump_value(attr_value, attr_key)}"
         for attr_key, attr_value in sorted(attrs.items())
     )
 
 
-def dump_node(n: rep.Node, g: rep.Graph) -> str:
+def dump_node(n: rep.Node) -> str:
     node_label = n.__class__.__name__
     node_id = n.node_id
     node_attrs = n.model_dump()
@@ -53,7 +51,7 @@ def dump_edge(e: rep.Edge, source: rep.Node, target: rep.Node) -> str:
 
 
 def dump_graph(g: rep.Graph) -> str:
-    node_strs = [dump_node(n, g) for n in g.nodes]
+    node_strs = [dump_node(n) for n in g.nodes]
     edge_strs = [dump_edge(edge, src, target) for (src, target, edge) in g.edges]
 
     query = ", \n".join([s for s in node_strs + edge_strs if s])

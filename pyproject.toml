@@ -27,13 +27,11 @@ scansible = "scansible:cli"
 [dependency-groups]
 dev = [
     "hypothesis>=6.17.0,<7",
-    "types-PyYAML>=6.0.12.1,<7",
     "pytest>=7.2.0,<8",
     "pytest-describe>=2.0.1,<3",
     "coverage>=6.5.0,<7",
     "pytest-cov>=4.0.0,<5",
     "pytest-mock>=3.10.0,<4",
-    "types-redis>=4.3.21.6,<5",
     "ruff>=0.15.21",
     "basedpyright>=1.39.9",
 ]
@@ -46,7 +44,9 @@ build-backend = "hatchling.build"
 extend-select = ["I"]
 # F403/F405 complain about star imports and being unable to resolve them,
 # ignore these as they're handled properly by basedpyright
-extend-ignore = ["F403", "F405"]
+# RUF022 complains about sorting of __all__, but we want to keep a grouping.
+# TRY004 wants us to use TypeError in Pydantic validators but those don't get caught by Pydantic
+extend-ignore = ["F403", "F405", "RUF022", "TRY004"]
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/*" = ["D", "INP001", "S101", "PLR2004", "FBT001"]
