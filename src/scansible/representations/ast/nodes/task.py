@@ -334,21 +334,9 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
         return combined_args
 
     @classmethod
-    def _all_directives(cls) -> set[str]:
-        """Return the set of directives that exist on this entity."""
-        return {
-            field.alias or name
-            for name, field in cls.model_fields.items()
-            # Position is internal.
-            if name != "position"
-        }
-
-    @classmethod
     def _is_task_directive(cls, key: str) -> bool:
         """Whether `key` is a recognized task directive rather than a module action."""
-        return (
-            key in cls._all_directives() or key == "static" or key.startswith("with_")
-        )
+        return key in cls.model_directives or key == "static" or key.startswith("with_")
 
     @classmethod
     def _transform_includes(cls, ds: RawDirectives) -> RawDirectives:
