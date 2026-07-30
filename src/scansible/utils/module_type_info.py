@@ -41,7 +41,7 @@
 #     suboptions: Mapping[str, OptionInfo] | None
 
 #     @classmethod
-#     def parse(cls, info: dict[str, Any], name: str, mod_name: str) -> OptionInfo:  # type: ignore[misc]
+#     def parse(cls, info: dict[str, Any], name: str, mod_name: str) -> OptionInfo:
 #         # Copy so we can mutate
 #         info = dict(info)
 
@@ -155,7 +155,7 @@
 #         return deep_slim(serialized)
 
 #     @classmethod
-#     def load(cls, info: dict[str, Any]) -> ModuleInfo:  # type: ignore[misc]
+#     def load(cls, info: dict[str, Any]) -> ModuleInfo:
 #         info = dict(info)
 #         info["options"] = {
 #             option_name: OptionInfo.parse(
@@ -245,7 +245,7 @@
 #             json.dump(self.dump(slim), f, sort_keys=True, indent=2)
 
 #     @classmethod
-#     def load(cls, info: dict[str, Any]) -> ModuleKnowledgeBase:  # type: ignore[misc]
+#     def load(cls, info: dict[str, Any]) -> ModuleKnowledgeBase:
 #         return cls({name: ModuleInfo.load(modinfo) for name, modinfo in info.items()})
 
 #     @classmethod

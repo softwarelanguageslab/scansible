@@ -68,7 +68,7 @@ class RoleExtractor:
                 # been loaded using IncludeContext.load_and_enter_role.
                 tf_result = TaskListExtractor(
                     self.context,
-                    self.role.main_tasks_file.tasks,  # type: ignore[arg-type]
+                    self.role.main_tasks_file.tasks,
                 ).extract_tasks(result.next_predecessors)
                 result = result.chain(tf_result)
             else:

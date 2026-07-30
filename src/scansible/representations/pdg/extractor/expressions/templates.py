@@ -47,7 +47,7 @@ class ASTStringifier(NodeVisitor):
     def stringify(self, node: nodes.Node, is_conditional: bool) -> str:
         generated = self.visit(node)
         self._check_correctness(node, generated, is_conditional)
-        return generated  # type: ignore[no-any-return]
+        return generated
 
     def _check_correctness(
         self, node: nodes.Node, generated: str, is_conditional: bool

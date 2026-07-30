@@ -56,7 +56,7 @@ class BlockExtractor:
 
         # A block without a list of tasks should be impossible
         # TODO: Typing here is messed up, since Block's children could be handlers too.
-        result = self._extract_children(self.block.block, predecessors)  # type: ignore[arg-type]
+        result = self._extract_children(self.block.block, predecessors)
 
         # Predecessors of the first rescue child can be any of the nodes
         # in the main block, since any of the children could have failed.
@@ -70,7 +70,7 @@ class BlockExtractor:
             # last task of the rescue.
             result = result.merge(
                 self._extract_children(self.block.rescue, result.added_control_nodes)
-            )  # type: ignore[arg-type]
+            )
 
         # Predecessors of the always block is either the last main block task,
         # or the last rescue block task if it was called.
@@ -83,7 +83,7 @@ class BlockExtractor:
             # will always be the last task of the always block, so use `chain`.
             result = result.chain(
                 self._extract_children(self.block.always, result.next_predecessors)
-            )  # type: ignore[arg-type]
+            )
 
         for misc_kw in ("become", "become_user", "become_method"):
             if misc_kw not in self.block.model_fields_set:

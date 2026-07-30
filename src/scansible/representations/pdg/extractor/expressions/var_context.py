@@ -344,7 +344,7 @@ class VarContext:
 
         self.extraction_ctx.graph.add_node(iv)
         self.extraction_ctx.graph.add_edge(tr.expr_node, iv, rep.DEF)
-        return tr.__replace__(data_node=iv)  # type: ignore[return-value]
+        return tr.__replace__(data_node=iv)
 
     def define_initialised_variable(
         self,
