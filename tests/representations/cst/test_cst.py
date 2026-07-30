@@ -5,9 +5,11 @@ from __future__ import annotations
 from typing import Any, cast
 
 import io
+import math
 from pathlib import Path
 
 import pytest
+from ruamel.yaml import YAMLError
 
 from scansible.representations.cst import (
     YamlBool,
@@ -107,7 +109,7 @@ def describe_scalars():
             result = load("key: .nan")["key"]
 
             assert isinstance(result, YamlFloat)
-            assert result != result  # NaN never compares equal to itself
+            assert math.isnan(result)
             assert result.__position__.path == "test.yml"
 
         @pytest.mark.parametrize(
@@ -312,5 +314,5 @@ def describe_parse_file():
     def raises_on_invalid_yaml(tmp_path: Path):
         _ = (tmp_path / "bad.yml").write_text("hello:\n-world")
 
-        with pytest.raises(Exception):
+        with pytest.raises(YAMLError):
             _ = parse_file(ProjectPath(tmp_path, "bad.yml"))

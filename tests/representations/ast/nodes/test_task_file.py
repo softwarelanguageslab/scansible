@@ -46,7 +46,7 @@ def describe_extracting_tasks_file():
         _ = (tmp_path / "main.yml").write_text(content)
         ctx = ExtractionContext(False)
 
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError, match="Expected a sequence"):
             _ = TaskFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
     def ignores_malformed_task_in_lenient_mode(tmp_path: Path):

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from typing import Any
-
 import sys
+from collections.abc import Sequence
 
 import pytest
 from graph_matchers import create_graph  # pyright: ignore[reportImplicitRelativeImport]
@@ -11,16 +10,18 @@ from loguru import logger
 from scansible.representations.pdg import Graph
 
 logger.remove()
-logger.add(sys.stderr, format="{level} {message}", level="DEBUG")
+_ = logger.add(sys.stderr, format="{level} {message}", level="DEBUG")
 
 
-def pytest_addoption(parser: Any) -> None:
+def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(
         "--slow", action="store_true", default=False, help="run slow tests"
     )
 
 
-def pytest_collection_modifyitems(config: Any, items: Any) -> None:
+def pytest_collection_modifyitems(
+    config: pytest.Config, items: Sequence[pytest.Item]
+) -> None:
     if config.getoption("--slow"):
         # --slow given in cli: do not skip slow tests
         return

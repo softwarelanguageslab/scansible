@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImport]
-from pydantic import ValidationError
 
 from scansible.representations.ast import ExtractionContext, Handler, Task
 from scansible.representations.ast.nodes.expression import (
@@ -181,7 +180,7 @@ def describe_extracting_tasks():
         """
         ctx = ExtractionContext(False)
 
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValueError):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def extracts_task_with_literal_boolean_when():
@@ -224,7 +223,7 @@ def describe_extracting_tasks():
         """
         ctx = ExtractionContext(False)
 
-        with pytest.raises(ValidationError, match="Expected a valid identifier"):
+        with pytest.raises(ValueError, match="Expected a valid identifier"):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def does_not_eagerly_resolve_actions():
@@ -263,7 +262,7 @@ def describe_extracting_tasks():
         """
         ctx = ExtractionContext(False)
 
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValueError):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def rejects_tasks_with_invalid_postvalidated_attribute_values():
@@ -275,7 +274,7 @@ def describe_extracting_tasks():
         """
         ctx = ExtractionContext(False)
 
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValueError):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def rejects_tasks_with_no_action():
@@ -284,7 +283,7 @@ def describe_extracting_tasks():
         """
         ctx = ExtractionContext(False)
 
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValueError):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def rejects_tasks_with_multiple_actions():
@@ -297,7 +296,7 @@ def describe_extracting_tasks():
         """
         ctx = ExtractionContext(False)
 
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValueError):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
 
@@ -496,7 +495,7 @@ def describe_parsing_action():
         ],
     )
     def rejects_invalid_actions(task: dict[str, object]):
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValueError):
             _ = Task.model_validate(task)
 
 
@@ -587,7 +586,7 @@ def describe_normalization():
         """
         ctx = ExtractionContext(False)
 
-        with pytest.raises(ValidationError, match="Invalid mix of directives"):
+        with pytest.raises(ValueError, match="Invalid mix of directives"):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def transforms_deprecated_with_keyword():
@@ -655,7 +654,7 @@ def describe_validation():
         """
         ctx = ExtractionContext(False)
 
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValueError):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def rejects_include_tasks_marked_static():
@@ -665,7 +664,7 @@ def describe_validation():
         """
         ctx = ExtractionContext(False)
 
-        with pytest.raises(ValidationError, match="include_tasks with static: yes"):
+        with pytest.raises(ValueError, match="include_tasks with static: yes"):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def rejects_import_tasks_marked_nonstatic():
@@ -675,7 +674,7 @@ def describe_validation():
         """
         ctx = ExtractionContext(False)
 
-        with pytest.raises(ValidationError, match="import_tasks with static: no"):
+        with pytest.raises(ValueError, match="import_tasks with static: no"):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def rejects_duplicate_loop_statements():
@@ -686,7 +685,7 @@ def describe_validation():
         """
         ctx = ExtractionContext(False)
 
-        with pytest.raises(ValidationError, match="duplicate loop statements"):
+        with pytest.raises(ValueError, match="duplicate loop statements"):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def rejects_unsupported_directive_on_include_tasks():
@@ -696,7 +695,7 @@ def describe_validation():
         """
         ctx = ExtractionContext(False)
 
-        with pytest.raises(ValidationError, match="Unsupported directives"):
+        with pytest.raises(ValueError, match="Unsupported directives"):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
 
@@ -797,5 +796,5 @@ def describe_vars():
         """
         ctx = ExtractionContext(False)
 
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValueError):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)

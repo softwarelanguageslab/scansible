@@ -6,7 +6,6 @@ from pathlib import Path
 from textwrap import dedent
 
 import pytest
-from pydantic import ValidationError
 
 from scansible.representations.ast import ExtractionContext, MetaFile
 from scansible.representations.ast.nodes.expression import BoolLiteral, Condition
@@ -18,7 +17,7 @@ def describe_extracting_metadata_file():
         _ = (tmp_path / "main.yml").write_text("")
         ctx = ExtractionContext(False)
 
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             _ = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
     @pytest.mark.parametrize("content", ["- hello\n- world"])  # list  # string
@@ -26,7 +25,7 @@ def describe_extracting_metadata_file():
         _ = (tmp_path / "main.yml").write_text(content)
         ctx = ExtractionContext(False)
 
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             _ = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
     def describe_platforms():
@@ -86,7 +85,7 @@ def describe_extracting_metadata_file():
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
             ctx = ExtractionContext(False)
 
-            with pytest.raises(Exception):
+            with pytest.raises(ValueError):
                 _ = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
         def rejects_invalid_platforms_list(tmp_path: Path):
@@ -97,7 +96,7 @@ def describe_extracting_metadata_file():
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
             ctx = ExtractionContext(False)
 
-            with pytest.raises(Exception):
+            with pytest.raises(ValueError):
                 _ = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
         def rejects_weird_platform_entry(tmp_path: Path):
@@ -109,7 +108,7 @@ def describe_extracting_metadata_file():
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
             ctx = ExtractionContext(False)
 
-            with pytest.raises(ValidationError):
+            with pytest.raises(ValueError):
                 _ = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
         def normalizes_missing_galaxy_info_property(tmp_path: Path):
@@ -272,7 +271,7 @@ def describe_extracting_metadata_file():
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
             ctx = ExtractionContext(False)
 
-            with pytest.raises(Exception):
+            with pytest.raises(ValueError):
                 _ = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
         def raises_on_wrong_dependency_type(tmp_path: Path):
@@ -289,7 +288,7 @@ def describe_extracting_metadata_file():
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
             ctx = ExtractionContext(False)
 
-            with pytest.raises(Exception):
+            with pytest.raises(ValueError):
                 _ = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
         def raises_on_missing_role_name(tmp_path: Path):
@@ -306,7 +305,7 @@ def describe_extracting_metadata_file():
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
             ctx = ExtractionContext(False)
 
-            with pytest.raises(Exception):
+            with pytest.raises(ValueError):
                 _ = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
         def raises_on_invalid_role_name_type(tmp_path: Path):
@@ -323,7 +322,7 @@ def describe_extracting_metadata_file():
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
             ctx = ExtractionContext(False)
 
-            with pytest.raises(Exception):
+            with pytest.raises(ValueError):
                 _ = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
         def considers_extra_non_directive_dependency_properties_to_be_parameters(

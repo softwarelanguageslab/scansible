@@ -67,8 +67,8 @@ class ProjectPath:
     relative: Path
 
     def __init__(self, root_path: Path, file_path: Path | str) -> None:
-        assert root_path.is_absolute()
-        assert root_path.is_dir()
+        if not root_path.is_absolute() or not root_path.is_dir():
+            raise ValueError("Root path must be absolute path to existing directory")
         self.root = root_path.resolve()
 
         if not isinstance(file_path, Path):

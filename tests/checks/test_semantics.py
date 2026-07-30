@@ -8,14 +8,13 @@ from scansible.checks import CheckResult
 from scansible.checks.semantics import run_all_checks as orig_run_all_checks
 from scansible.representations.pdg import extract_pdg
 from scansible.representations.pdg.extractor.context import ExtractionContext
+from scansible.representations.pdg.representation import NodeLocation
 
 
 def run_all_checks(ctx: ExtractionContext) -> list[CheckResult]:
     orig_results = orig_run_all_checks(ctx.graph, ctx.visibility_information)
     return [
-        CheckResult(
-            f"{res.rule_category}: {res.rule_name}", str(res.location or "Unknown file")
-        )
+        CheckResult(f"{res.rule_category}: {res.rule_name}", res.location)
         for res in orig_results
     ]
 
@@ -49,7 +48,10 @@ def describe_unsafe_reuse_rules() -> None:
         results = run_all_checks(ctx)
 
         assert results == [
-            CheckResult("Unsafe reuse: Impure expression", "pb.yml:4:17")
+            CheckResult(
+                "Unsafe reuse: Impure expression",
+                NodeLocation(file="pb.yml", line=4, column=17),
+            )
         ]
 
     def redefined_dependence(tmp_path: Path) -> None:
@@ -76,7 +78,10 @@ def describe_unsafe_reuse_rules() -> None:
         results = run_all_checks(ctx)
 
         assert results == [
-            CheckResult("Unsafe reuse: Redefined dependence", "pb.yml:5:17")
+            CheckResult(
+                "Unsafe reuse: Redefined dependence",
+                NodeLocation(file="pb.yml", line=5, column=17),
+            )
         ]
 
 
@@ -101,7 +106,10 @@ def describe_unintended_override_rules() -> None:
         results = run_all_checks(ctx)
 
         assert results == [
-            CheckResult("Unintended override: Unconditional override", "pb.yml:9:21")
+            CheckResult(
+                "Unintended override: Unconditional override",
+                NodeLocation(file="pb.yml", line=9, column=21),
+            )
         ]
 
     def unusable(tmp_path: Path) -> None:
@@ -124,7 +132,10 @@ def describe_unintended_override_rules() -> None:
         results = run_all_checks(ctx)
 
         assert results == [
-            CheckResult("Unintended override: Unused because shadowed", "pb.yml:9:21")
+            CheckResult(
+                "Unintended override: Unused because shadowed",
+                NodeLocation(file="pb.yml", line=9, column=21),
+            )
         ]
 
 
@@ -148,7 +159,7 @@ def describe_too_high_precedence_rules() -> None:
         assert results == [
             CheckResult(
                 "Unnecessarily high precedence: Unnecessary set_fact",
-                "pb.yml:5:21",
+                NodeLocation(file="pb.yml", line=5, column=21),
             )
         ]
 
@@ -208,6 +219,11 @@ def describe_too_high_precedence_rules() -> None:
         assert results == [
             CheckResult(
                 "Unnecessarily high precedence: Unnecessary include_vars",
-                "vars.yml:1:1\n\tvia pb.yml:4:19",
+                NodeLocation(
+                    file="vars.yml",
+                    line=1,
+                    column=1,
+                    includer_location=NodeLocation(file="pb.yml", line=4, column=19),
+                ),
             )
         ]

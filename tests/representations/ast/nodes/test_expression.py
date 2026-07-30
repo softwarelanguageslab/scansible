@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImport]
 from jinja2 import nodes as j2_nodes
-from pydantic import TypeAdapter, ValidationError
+from pydantic import TypeAdapter
 
 from scansible.representations.ast import ExtractionContext, Task
 from scansible.representations.ast.nodes.expression import (
@@ -81,23 +81,21 @@ def describe_expression():
 
     def describe_invalid():
         def rejects_non_string_input():
-            with pytest.raises(ValidationError, match="expressions must be strings"):
+            with pytest.raises(ValueError, match="expressions must be strings"):
                 _ = Expression.model_validate(123)
 
         def rejects_unsafe_strings():
             unsafe = parse_yaml_dict("x: !unsafe '{{ myvar }}'")["x"]
 
-            with pytest.raises(
-                ValidationError, match="refusing to treat an unsafe string"
-            ):
+            with pytest.raises(ValueError, match="refusing to treat an unsafe string"):
                 _ = Expression.model_validate(unsafe)
 
         def rejects_strings_without_jinja_delimiters():
-            with pytest.raises(ValidationError, match="must contain Jinja2 delimiters"):
+            with pytest.raises(ValueError, match="must contain Jinja2 delimiters"):
                 _ = Expression.model_validate("This is not an expression")
 
         def rejects_malformed_syntax():
-            with pytest.raises(ValidationError, match="Template Syntax Error"):
+            with pytest.raises(ValueError, match="Template Syntax Error"):
                 _ = Expression.model_validate("{{ x +")
 
 
@@ -123,25 +121,21 @@ def describe_condition():
 
     def describe_invalid():
         def rejects_non_string_input():
-            with pytest.raises(ValidationError, match="expressions must be strings"):
+            with pytest.raises(ValueError, match="expressions must be strings"):
                 _ = Condition.model_validate(123)
 
         def rejects_unsafe_strings():
             unsafe = parse_yaml_dict("x: !unsafe 'x == 1'")["x"]
 
-            with pytest.raises(
-                ValidationError, match="refusing to treat an unsafe string"
-            ):
+            with pytest.raises(ValueError, match="refusing to treat an unsafe string"):
                 _ = Condition.model_validate(unsafe)
 
         def rejects_brace_wrapped_conditions():
-            with pytest.raises(
-                ValidationError, match="must not contain any Jinja2 brace syntax"
-            ):
+            with pytest.raises(ValueError, match="must not contain any Jinja2 brace"):
                 _ = Condition.model_validate("{{ x == 1 }}")
 
         def rejects_malformed_syntax():
-            with pytest.raises(ValidationError, match="Template Syntax Error"):
+            with pytest.raises(ValueError, match="Template Syntax Error"):
                 _ = Condition.model_validate("x ==")
 
 
@@ -161,7 +155,7 @@ def describe_identifier():
         ],
     )
     def rejects_invalid_identifiers(value: str):
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValueError):
             _ = TypeAdapter(Identifier).validate_python(value)
 
 
@@ -199,11 +193,11 @@ def describe_literals():
             assert TypeAdapter(IntLiteral).validate_python("42") == 42
 
         def rejects_truncating_floats():
-            with pytest.raises(ValidationError, match="would be truncated"):
+            with pytest.raises(ValueError, match="would be truncated"):
                 _ = TypeAdapter(IntLiteral).validate_python("1.5")
 
         def rejects_non_numeric_strings():
-            with pytest.raises(ValidationError):
+            with pytest.raises(ValueError):
                 _ = TypeAdapter(IntLiteral).validate_python("abc")
 
     def describe_float_literal():
@@ -211,7 +205,7 @@ def describe_literals():
             assert TypeAdapter(FloatLiteral).validate_python(3) == 3.0
 
         def rejects_uncoercible_values():
-            with pytest.raises(ValidationError):
+            with pytest.raises(ValueError):
                 _ = TypeAdapter(FloatLiteral).validate_python(None)
 
     def describe_percent_literal():
@@ -249,7 +243,7 @@ def describe_literals():
             assert hash(result) == hash(True)
 
         def rejects_uncoercible_values():
-            with pytest.raises(ValidationError):
+            with pytest.raises(ValueError):
                 _ = TypeAdapter(BoolLiteral).validate_python("maybe")
 
     def describe_date_literal():
@@ -259,17 +253,17 @@ def describe_literals():
             assert TypeAdapter(DateLiteral).validate_python(value) == value
 
         def rejects_non_dates():
-            with pytest.raises(ValidationError):
+            with pytest.raises(ValueError):
                 _ = TypeAdapter(DateLiteral).validate_python("2026-01-01")
 
     def describe_datetime_literal():
         def accepts_datetimes():
-            value = datetime(2026, 1, 1, 1, 2, 3)
+            value = datetime(2026, 1, 1, 1, 2, 3, tzinfo=UTC)
 
             assert TypeAdapter(DatetimeLiteral).validate_python(value) == value
 
         def rejects_non_datetimes():
-            with pytest.raises(ValidationError):
+            with pytest.raises(ValueError):
                 _ = TypeAdapter(DatetimeLiteral).validate_python("2026-01-01T01:02:03")
 
     def describe_seq_literal():
@@ -287,7 +281,7 @@ def describe_literals():
             assert TypeAdapter(LenientSeqLiteral[int]).validate_python(None) == ()
 
         def rejects_a_bare_scalar():
-            with pytest.raises(ValidationError):
+            with pytest.raises(ValueError):
                 _ = TypeAdapter(LenientSeqLiteral[int]).validate_python(5)
 
         def passes_through_a_real_sequence():
@@ -298,7 +292,7 @@ def describe_literals():
         def raises_on_invalid_items_when_strict():
             ctx = ExtractionContext(lenient=False)
 
-            with pytest.raises(ValidationError):
+            with pytest.raises(ValueError):
                 _ = TypeAdapter(LenientSeqLiteral[int]).validate_python(
                     [1, "nope", 3],
                     context=ctx,  # pyright: ignore[reportArgumentType]
@@ -354,7 +348,7 @@ def describe_literals():
             assert TypeAdapter(MapLiteral[str, int]).validate_python(None) == {}
 
         def rejects_non_mappings():
-            with pytest.raises(ValidationError):
+            with pytest.raises(ValueError):
                 _ = TypeAdapter(MapLiteral[str, int]).validate_python([1, 2])
 
         def passes_through_a_real_mapping():
@@ -387,7 +381,7 @@ def describe_literals():
             assert c.__position__ == ("test.yaml", (4, 4), (4, 8))
 
             d = TypeAdapter(BoolLiteral).validate_python(values["d"])
-            assert d == True  # noqa: E712
+            assert d == True
             assert d.__position__ == ("test.yaml", (5, 4), (5, 7))
 
             e = TypeAdapter(DateLiteral).validate_python(values["e"])
@@ -429,7 +423,7 @@ def describe_literals():
             assert BoolLiteral(True).__position__.is_synthetic
             assert DateLiteral(date(2026, 1, 1)).__position__.is_synthetic
             assert DatetimeLiteral(
-                datetime(2026, 1, 2, 3, 4, 5)
+                datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
             ).__position__.is_synthetic
             assert SeqLiteral[IntLiteral]((IntLiteral(1),)).__position__.is_synthetic
             assert MapLiteral[StrLiteral, IntLiteral](

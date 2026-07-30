@@ -27,7 +27,7 @@ def a_node() -> None:
     def should_not_be_hashable_before_node_id_is_set(factory: NodeFactory) -> None:
         node = factory(rep.NodeLocation(file="test.yml", line=0, column=0))
 
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError, match="partially initialised"):
             _ = hash(node)
 
     def should_be_hashable_after_node_id_is_set(factory: NodeFactory) -> None:
@@ -37,9 +37,10 @@ def a_node() -> None:
         assert hash(node) is not None
 
     def should_support_equality(factory: NodeFactory) -> None:
-        node = factory(rep.NodeLocation(file="test.yml", line=0, column=0))
+        node1 = factory(rep.NodeLocation(file="test.yml", line=0, column=0))
+        node2 = factory(rep.NodeLocation(file="test.yml", line=0, column=0))
 
-        assert node == node
+        assert node1 == node2
 
     def should_be_unique_if_different_location(factory: NodeFactory) -> None:
         node1 = factory(rep.NodeLocation(file="test.yml", line=0, column=0))
@@ -122,7 +123,7 @@ def describe_literal() -> None:
             _ = rep.ScalarLiteral(type="not_a_type", value=None)  # pyright: ignore[reportArgumentType]
 
     @pytest.mark.parametrize("value", [None, 1, "value", 1.0, False])
-    def scalar_should_have_value(value: int | str | float | bool | None) -> None:
+    def scalar_should_have_value(value: str | float | bool | None) -> None:
         _ = rep.ScalarLiteral(type="str", value=value)
 
     @pytest.mark.parametrize("value", [["value1", "value2"], {"value1": "value2"}])

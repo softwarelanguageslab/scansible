@@ -7,7 +7,6 @@ from textwrap import dedent
 
 import pytest
 from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImport]
-from pydantic import ValidationError
 
 from scansible.representations.ast import (
     Block,
@@ -150,7 +149,7 @@ def describe_extracting_plays():
         """
         ctx = ExtractionContext(False)
 
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             _ = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def rejects_play_with_empty_hosts():
@@ -162,7 +161,7 @@ def describe_extracting_plays():
         """
         ctx = ExtractionContext(False)
 
-        with pytest.raises(ValidationError, match="cannot be empty"):
+        with pytest.raises(ValueError, match="cannot be empty"):
             _ = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def extracts_play_with_vars_prompt():
@@ -315,7 +314,7 @@ def describe_extracting_plays():
         """
         ctx = ExtractionContext(False)
 
-        with pytest.raises(ValidationError, match="mutually exclusive"):
+        with pytest.raises(ValueError, match="mutually exclusive"):
             _ = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def extracts_play_with_int_role():
@@ -429,7 +428,7 @@ def describe_extracting_import_playbook():
         """
         ctx = ExtractionContext(False)
 
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValueError):
             _ = ImportPlaybook.model_validate(parse_yaml_dict(yaml), context=ctx)
 
 

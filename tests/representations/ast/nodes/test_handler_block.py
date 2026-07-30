@@ -117,7 +117,7 @@ def describe_extracting_handler_blocks():
         """
         ctx = ExtractionContext(False)
 
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             _ = HandlerBlock.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def rejects_handler_blocks_without_block():
@@ -127,7 +127,7 @@ def describe_extracting_handler_blocks():
         """
         ctx = ExtractionContext(False)
 
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             _ = HandlerBlock.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def rejects_rescue_with_empty_handler_block():
@@ -138,5 +138,5 @@ def describe_extracting_handler_blocks():
         """
         ctx = ExtractionContext(False)
 
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             _ = HandlerBlock.model_validate(parse_yaml_dict(yaml), context=ctx)

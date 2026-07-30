@@ -9,7 +9,8 @@ from itertools import chain
 
 from loguru import logger
 
-from scansible.utils import first, first_where
+from scansible.representations import ast
+from scansible.utils import Sentinel, first, first_where
 from scansible.utils.type_validators import ensure_not_none
 
 from ..records import (
@@ -331,7 +332,7 @@ class EnvironmentStack:
             ),
         )
 
-    def get_variable_initialisers(self) -> dict[str, str]:
+    def get_variable_initialisers(self) -> dict[str, ast.AnyExpression]:
         all_vars = self._get_all_visible_definitions()
 
         # Need to do the filtering for vars without initialisers at the end
@@ -340,7 +341,7 @@ class EnvironmentStack:
         return {
             vdef.name: vdef.initialiser
             for vdef in all_vars.values()
-            if isinstance(vdef.initialiser, str)
+            if not isinstance(vdef.initialiser, Sentinel)
         }
 
     def get_currently_visible_definitions(self) -> set[tuple[str, int]]:

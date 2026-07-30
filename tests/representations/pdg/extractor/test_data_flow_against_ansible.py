@@ -1,25 +1,29 @@
+# pyright: reportUnusedFunction = false, reportAny = false
+
 """Tests which test the inferred data flow against Ansible's behaviour."""
-# pyright: reportUnusedFunction = false
 
 from __future__ import annotations
 
-from typing import cast
+from typing import Any, cast, final
 
 import json
 import subprocess
 import tempfile
-from collections.abc import Iterable, Iterator
+from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from pathlib import Path
+from textwrap import dedent
 
 import jinja2
 import pytest
 import yaml
 
+from scansible.representations import ast
+
 try:
     from yaml import CDumper as Dumper
 except ImportError:
-    from yaml import Dumper  # type: ignore[misc]
+    from yaml import Dumper
 
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
@@ -54,6 +58,7 @@ PlaybookFile = tuple[Path, str]
 Dataflow = list[str]
 
 
+@final
 class Block:
     content: list[dict[str, object]]
     var_deps: dict[str, set[str]]
@@ -106,6 +111,7 @@ class Block:
         )
 
 
+@final
 class CodeGen:
     def __init__(self, draw: st.DrawFn) -> None:
         self.last_val = 0
@@ -281,7 +287,7 @@ class CodeGen:
         block = Block("incl_tasks", self.curr_block)
         var_names = self.draw(st.lists(_ansible_var_names, unique=True, min_size=1))
         file_path = Path("tasks", file_name + ".yml")
-        incl_task: dict[str, object] = {
+        incl_task: dict[str, Any] = {  # pyright: ignore[reportExplicitAny]
             "name": f"Include {file_name}",
             "include_tasks": str(file_path),
             "vars": {},
@@ -290,7 +296,7 @@ class CodeGen:
 
         for var_name in var_names:
             var_val = self._draw_value(var_name, block)
-            incl_task["vars"][var_name] = var_val  # type: ignore[index]
+            incl_task["vars"][var_name] = var_val
             self._add_print(var_name, block)
             self._used_variables.add(var_name)
         self.curr_block.content.append(incl_task)
@@ -303,7 +309,7 @@ class CodeGen:
         self._block_stack.append(new_block)
 
     def _pop_local_scope(self) -> None:
-        self._block_stack.pop()
+        _ = self._block_stack.pop()
 
     @property
     def _next_value(self) -> str:
@@ -317,7 +323,7 @@ class CodeGen:
             from_block = self.curr_block
 
         reusable_vars = [
-            var_name for var_name in from_block.all_var_deps.keys() if var_name != name
+            var_name for var_name in from_block.all_var_deps if var_name != name
         ]
         if not def_at_runtime:
             # Role vars or role defaults, need to check the chain to prevent
@@ -390,7 +396,7 @@ class CodeGen:
         files: list[tuple[Path, str]] = []
         for fp, content in self._files.items():
             if fp.parent.name != "tasks" and content:
-                content = content[0]  # type: ignore[assignment]
+                content = content[0]
             if not content:
                 continue
             files.append((fp, yaml.dump(content, Dumper=Dumper)))
@@ -402,7 +408,7 @@ class CodeGen:
 def ansible_playbooks(draw: st.DrawFn) -> list[PlaybookFile]:
     init_scopes = draw(st.lists(_ansible_init_scopes))
     scopes = draw(st.lists(_ansible_scopes))
-    assume(bool(init_scopes + scopes))
+    _ = assume(bool(init_scopes + scopes))
 
     code_gen = CodeGen(draw)
     for init_scope in init_scopes:
@@ -419,12 +425,12 @@ def ansible_playbooks(draw: st.DrawFn) -> list[PlaybookFile]:
 @pytest.mark.slow
 @given(ansible_playbooks())
 @settings(deadline=None, max_examples=100)
-def test_inferred_dataflow_matches_actual(playbooks: list[PlaybookFile]) -> None:  # type: ignore[misc]
+def test_inferred_dataflow_matches_actual(playbooks: list[PlaybookFile]) -> None:
     with _setup_env(playbooks) as playbook_dir:
         try:
             graph = _parse_graph(playbook_dir / "roles" / "test")
         except RecursionError:
-            assume(False)
+            _ = assume(False)
             return
 
         try:
@@ -439,22 +445,23 @@ def test_inferred_dataflow_matches_actual(playbooks: list[PlaybookFile]) -> None
 
 
 @contextmanager
-def _setup_env(playbooks: list[PlaybookFile]) -> Iterator[Path]:
+def _setup_env(playbooks: list[PlaybookFile]) -> Generator[Path]:
     with tempfile.TemporaryDirectory() as tmpdir_s:
         tmpdir = Path(tmpdir_s)
         role_dir = tmpdir / "roles" / "test"
         for pb in playbooks:
             (role_dir / pb[0]).parent.mkdir(exist_ok=True, parents=True)
-            (role_dir / pb[0]).write_text(pb[1])
+            _ = (role_dir / pb[0]).write_text(pb[1])
 
-        (tmpdir / "pb.yml").write_text(
-            """
-- gather_facts: no
-  connection: local
-  hosts: localhost
-  tasks:
-    - include_role:
-        name: test"""
+        _ = (tmpdir / "pb.yml").write_text(
+            dedent("""
+            - gather_facts: no
+            connection: local
+            hosts: localhost
+            tasks:
+                - include_role:
+                    name: test
+            """)
         )
 
         yield Path(tmpdir)
@@ -520,7 +527,7 @@ def _resolve_expr_to_value(g: rep.Graph, expr: rep.Expression) -> str:
         raise ValueError(f"invalid USE node: {type(used_data)} {used_data}")
 
     templ = jinja2.Template(expr.expr)
-    templ_ast = TemplateExpressionAST.parse(expr.expr)
+    templ_ast = TemplateExpressionAST(ast.Expression.model_validate(expr.expr))
     assert templ_ast is not None
     var_names = templ_ast.referenced_variables
     var_name = next(iter(var_names))
@@ -554,6 +561,7 @@ def _observe_dataflow(playbook_dir: Path) -> Dataflow:
         text=True,
         env={"ANSIBLE_STDOUT_CALLBACK": "json"},
         cwd=playbook_dir,
+        check=True,
     )
     assert not proc.returncode, proc.stderr
     out = json.loads(proc.stdout)

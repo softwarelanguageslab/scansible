@@ -17,13 +17,13 @@ from scansible.representations.pdg.extractor.expressions.templates import (
 
 class Case(NamedTuple):
     expr: str
-    variables: set[str] = set()
-    filters: set[str] = set()
-    tests: set[str] = set()
-    lookup_targets: set[LookupTarget] = set()
+    variables: set[str] = set()  # noqa: RUF012
+    filters: set[str] = set()  # noqa: RUF012
+    tests: set[str] = set()  # noqa: RUF012
+    lookup_targets: set[LookupTarget] = set()  # noqa: RUF012
     uses_now: bool = False
     is_conditional: bool = False
-    variable_mappings: dict[str, str] = {}
+    variable_mappings: dict[str, str] = {}  # noqa: RUF012
 
 
 test_cases = [
