@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, final
+from typing import TYPE_CHECKING, cast, final
 
 from collections import defaultdict
 from collections.abc import Generator, Iterable, Mapping, Sequence
 from contextlib import contextmanager
 
-from ansible.module_utils.facts.system.distribution import Distribution
+from ansible.module_utils.facts.system.distribution import (  # pyright: ignore[reportMissingTypeStubs]
+    Distribution,
+)
 from loguru import logger
 
 from scansible.representations import ast
@@ -590,18 +592,20 @@ class VarContext:
             return []
 
         values: Iterable[str]
+        OS_FAMILY_MAP = Distribution.OS_FAMILY_MAP
+        OS_FAMILY = cast(dict[str, str], Distribution.OS_FAMILY)
         if name == "ansible_os_family":
             distribution = constraints.get("ansible_distribution")
             if distribution and isinstance(distribution, str):
-                values = [Distribution.OS_FAMILY[distribution]]
+                values = [OS_FAMILY[distribution]]
             else:
-                values = Distribution.OS_FAMILY_MAP.keys()
+                values = OS_FAMILY_MAP.keys()
         elif name == "ansible_distribution":
             os_family = constraints.get("ansible_os_family")
             if os_family and isinstance(os_family, str):
-                values = Distribution.OS_FAMILY_MAP[os_family]
+                values = OS_FAMILY_MAP[os_family]
             else:
-                values = Distribution.OS_FAMILY.keys()
+                values = OS_FAMILY.keys()
 
         values = [ast.StrLiteral(value) for value in values]
 

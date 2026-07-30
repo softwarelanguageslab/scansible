@@ -12,9 +12,14 @@ from typing import Annotated, Any, ClassVar, Self, cast, override
 
 from collections.abc import Callable, Mapping
 
-from ansible.errors import AnsibleParserError
-from ansible.parsing.splitter import parse_kv, split_args
-from ansible.utils.fqcn import add_internal_fqcns
+from ansible.errors import AnsibleParserError  # pyright: ignore[reportMissingTypeStubs]
+from ansible.parsing.splitter import (  # pyright: ignore[reportMissingTypeStubs]
+    parse_kv,
+    split_args,
+)
+from ansible.utils.fqcn import (  # pyright: ignore[reportMissingTypeStubs]
+    add_internal_fqcns,
+)
 from pydantic import Discriminator, Field, Tag, field_validator, model_validator
 
 from scansible.representations.cst import parse_file
@@ -50,8 +55,8 @@ FREEFORM_ACTIONS_SIMPLE = (
     "win_shell",
 )
 #: `FREEFORM_ACTIONS_SIMPLE`, expanded with their fully-qualified collection names.
-FREEFORM_ACTIONS = frozenset(
-    tuple(add_internal_fqcns(FREEFORM_ACTIONS_SIMPLE))
+FREEFORM_ACTIONS: frozenset[str] = frozenset(
+    tuple(add_internal_fqcns(FREEFORM_ACTIONS_SIMPLE))  # pyright: ignore[reportUnknownArgumentType]
     + ("ansible.windows.win_command", "ansible.windows.win_shell")
 )
 
@@ -245,7 +250,7 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
 
         # action could be "xyz" or "xyz a=b c=d", split it.
         try:
-            [action, *freeform_args] = split_args(action)
+            [action, *freeform_args] = cast(list[str], split_args(action))
         except AnsibleParserError as e:
             raise ValueError("Malformed action string") from e
         arg_list.append(" ".join(freeform_args))
@@ -304,7 +309,7 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
         """Parse a raw `key=value` argument string, treating `action` specially if it's a freeform action."""
         check_raw = action in FREEFORM_ACTIONS
         try:
-            return parse_kv(args, check_raw)  # pyright: ignore[reportReturnType]
+            return parse_kv(args, check_raw)
         except AnsibleParserError as e:
             raise ValueError("Malformed action args string") from e
 

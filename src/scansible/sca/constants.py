@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+from typing import cast
+
 import pkgutil
 import sys
 from pathlib import Path
 
 import rich
-from ansible import constants as C
+from ansible import constants as C  # pyright: ignore[reportMissingTypeStubs]
 
 CONSOLE = rich.console.Console(width=999)
 
-_COLLECTION_SEARCH_PATHS = map(Path, C.COLLECTIONS_PATHS + sys.path)
+_COLLECTION_SEARCH_PATHS = map(Path, cast(list[str], C.COLLECTIONS_PATHS) + sys.path)  # pyright: ignore[reportAttributeAccessIssue]
 COLLECTION_PATHS = [
     coll_path
     for search_path in _COLLECTION_SEARCH_PATHS

@@ -8,7 +8,9 @@ import os
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
 
-from ansible.parsing.dataloader import DataLoader
+from ansible.parsing.dataloader import (  # pyright: ignore[reportMissingTypeStubs]
+    DataLoader,
+)
 
 from .collections import FrozenDict
 

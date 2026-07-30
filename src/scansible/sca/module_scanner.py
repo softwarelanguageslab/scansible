@@ -10,7 +10,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-import ansible
+import ansible  # pyright: ignore[reportMissingTypeStubs]
 
 from scansible.sca.constants import (
     ANSIBLE_BUILTIN_IGNORES,

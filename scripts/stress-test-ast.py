@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Callable, TextIO, cast
+from typing import TextIO, cast
 
 import csv
 import re
@@ -11,7 +11,7 @@ import sys
 import tarfile
 import tempfile
 from collections import Counter
-from collections.abc import Generator, Sequence
+from collections.abc import Callable, Generator, Sequence
 from contextlib import contextmanager
 from itertools import groupby
 from operator import itemgetter
@@ -350,7 +350,7 @@ def main(entrypoints_csv: TextIO, data_dir: Path, fail_after: int) -> None:
 
                         try:
                             result = _extract(entrypoint_path, entrypoint["type"])
-                        except Exception as exc:
+                        except (YAMLError, ValidationError) as exc:
                             if _is_ignored(location, exc, ignore_counts):
                                 ignored_count += 1
                                 continue

@@ -178,11 +178,11 @@ wheels = [
 
 [[package]]
 name = "graphviz"
-version = "0.20.1"
+version = "0.21"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/a5/90/fb047ce95c1eadde6ae78b3fca6a598b4c307277d4f8175d12b18b8f7321/graphviz-0.20.1.zip", hash = "sha256:8c58f14adaa3b947daf26c19bc1e98c4e0702cdc31cf99153e6f06904d492bf8", size = 255182, upload-time = "2022-07-23T11:33:05.786Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f8/b3/3ac91e9be6b761a4b30d66ff165e54439dcd48b83f4e20d644867215f6ca/graphviz-0.21.tar.gz", hash = "sha256:20743e7183be82aaaa8ad6c93f8893c923bd6658a04c32ee115edb3c8a835f78", size = 200434, upload-time = "2025-06-15T09:35:05.824Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/de/5e/fcbb22c68208d39edff467809d06c9d81d7d27426460ebc598e55130c1aa/graphviz-0.20.1-py3-none-any.whl", hash = "sha256:587c58a223b51611c0cf461132da386edd896a029524ca61a1462b880bf97977", size = 47037, upload-time = "2022-07-23T11:33:03.472Z" },
+    { url = "https://files.pythonhosted.org/packages/91/4c/e0ce1ef95d4000ebc1c11801f9b944fa5910ecc15b5e351865763d8657f8/graphviz-0.21-py3-none-any.whl", hash = "sha256:54f33de9f4f911d7e84e4191749cac8cc5653f815b06738c54db9a15ab8b1e42", size = 47300, upload-time = "2025-06-15T09:35:04.433Z" },
 ]
 
 [[package]]
@@ -596,7 +596,7 @@ requires-dist = [
     { name = "ansible" },
     { name = "ansible-core", specifier = "<3" },
     { name = "click", specifier = ">=8.1.3,<9" },
-    { name = "graphviz", specifier = ">=0.20.1,<0.21" },
+    { name = "graphviz", specifier = ">=0.21,<0.22" },
     { name = "jinja2", specifier = ">=3.1.2,<4" },
     { name = "kuzu", specifier = ">=0.10.0" },
     { name = "loguru", specifier = ">=0.6.0,<0.7" },

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import graphviz as gv
+import graphviz as gv  # pyright: ignore[reportMissingTypeStubs]
 
 from .. import representation as rep
 
@@ -66,7 +66,7 @@ def dump_node(n: rep.Node, dot: gv.Digraph) -> None:
     attrs = get_node_attributes(n)
     label = get_node_label(n)
 
-    dot.node(str(node_id), label=label, **(default_attrs | attrs))
+    dot.node(str(node_id), label=label, **(default_attrs | attrs))  # pyright: ignore[reportUnknownMemberType]
 
 
 def dump_edge(e: rep.Edge, source: rep.Node, target: rep.Node, dot: gv.Digraph) -> None:
@@ -86,7 +86,7 @@ def dump_edge(e: rep.Edge, source: rep.Node, target: rep.Node, dot: gv.Digraph) 
         edge_label = f"DEFLOOPITEM: {e.loop_with}"
 
     if isinstance(e, rep.Order) and e.transitive:
-        dot.edge(
+        dot.edge(  # pyright: ignore[reportUnknownMemberType]
             source_id,
             target_id,
             label=edge_label,
@@ -95,14 +95,14 @@ def dump_edge(e: rep.Edge, source: rep.Node, target: rep.Node, dot: gv.Digraph) 
             color="grey",
         )
     elif isinstance(e, rep.Order):
-        dot.edge(source_id, target_id, label=edge_label, weight="100", penwidth="2.5")
+        dot.edge(source_id, target_id, label=edge_label, weight="100", penwidth="2.5")  # pyright: ignore[reportUnknownMemberType]
     else:
-        dot.edge(source_id, target_id, label=edge_label)
+        dot.edge(source_id, target_id, label=edge_label)  # pyright: ignore[reportUnknownMemberType]
 
 
 def dump_graph(g: rep.Graph) -> gv.Digraph:
     dot = gv.Digraph()
-    dot.attr("node", fontname="Courier")
+    dot.attr("node", fontname="Courier")  # pyright: ignore[reportUnknownMemberType]
 
     for n in g.nodes:
         dump_node(n, dot)

@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from typing import Literal, cast
 
-import os
 from collections.abc import Iterable
-from contextlib import redirect_stderr
 from pathlib import Path
 
-from ansible.errors import AnsibleError
-from ansible.parsing.dataloader import DataLoader
+from ruamel.yaml import YAMLError
+
+from scansible.representations.cst import parse_file
+from scansible.utils import ProjectPath
 
 
 def is_entrypoint(path: Path) -> bool:
@@ -54,9 +54,8 @@ def is_entrypoint(path: Path) -> bool:
 
     # Finally, parse the YAML and check in more detail
     try:
-        with open(os.devnull, "w") as devnull, redirect_stderr(devnull):
-            yaml_obj = DataLoader().load(content)
-    except AnsibleError:
+        yaml_obj = parse_file(ProjectPath.from_root(path))
+    except YAMLError:
         # If the file fails to parse, don't consider it an entrypoint.
         return False
 

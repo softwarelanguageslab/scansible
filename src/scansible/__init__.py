@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TextIO
+from typing import TextIO, cast
 
 import csv
 import sys
@@ -10,7 +10,9 @@ from pathlib import Path
 import click
 import rich.console
 import rich.progress
-from ansible import constants as ans_constants
+from ansible import (  # pyright: ignore[reportMissingTypeStubs]
+    constants as ans_constants,
+)
 from loguru import logger
 
 
@@ -113,7 +115,8 @@ def build_pdg(
         name = project_path.name
     as_pb = None if project_type is None else project_type == "playbook"
     role_search_paths = list(role_search_path) + [
-        Path(p) for p in ans_constants.DEFAULT_ROLES_PATH
+        Path(p)
+        for p in cast(list[str], ans_constants.DEFAULT_ROLES_PATH)  # pyright: ignore[reportAttributeAccessIssue]
     ]
 
     # if canonicalize and not module_kb_path:
@@ -187,7 +190,8 @@ def check(
     """Check the project residing at PROJECT_PATH for smells."""
     as_pb = None if project_type is None else project_type == "playbook"
     role_search_paths = list(role_search_path) + [
-        Path(p) for p in ans_constants.DEFAULT_ROLES_PATH
+        Path(p)
+        for p in cast(list[str], ans_constants.DEFAULT_ROLES_PATH)  # pyright: ignore[reportAttributeAccessIssue]
     ]
 
     from .representations.pdg import extract_pdg
@@ -244,7 +248,8 @@ def check_all(
 ) -> None:
     """Check the project residing at PROJECT_PATH for smells in all files."""
     role_search_paths = list(role_search_path) + [
-        Path(p) for p in ans_constants.DEFAULT_ROLES_PATH
+        Path(p)
+        for p in cast(list[str], ans_constants.DEFAULT_ROLES_PATH)  # pyright: ignore[reportAttributeAccessIssue]
     ]
 
     from .checks import CheckResult, TerminalReporter, run_all_checks

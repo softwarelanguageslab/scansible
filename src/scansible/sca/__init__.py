@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from typing import cast
+
 import json
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from pathlib import Path
 
-from ansible import constants as ans_constants
+from ansible import (  # pyright: ignore[reportMissingTypeStubs]
+    constants as ans_constants,
+)
 from loguru import logger
 from pydantic import ValidationError
 from rich.markup import escape
@@ -46,7 +50,7 @@ from .vulnerabilities import find_vulnerabilities
 
 
 def _find_role(name: str) -> Path | None:
-    for root in ans_constants.DEFAULT_ROLES_PATH:
+    for root in cast(list[str], ans_constants.DEFAULT_ROLES_PATH):  # pyright: ignore[reportAttributeAccessIssue]
         p = Path(root) / name
         if Path(root) in p.resolve().parents and p.is_dir():
             return p
@@ -184,7 +188,7 @@ def _detect_smells(
     project: Path, role_search_paths: list[Path]
 ) -> Iterable[RuleResult]:
     role_search_paths = role_search_paths + list(
-        map(Path, ans_constants.DEFAULT_ROLES_PATH)
+        map(Path, cast(list[str], ans_constants.DEFAULT_ROLES_PATH))  # pyright: ignore[reportAttributeAccessIssue]
     )
 
     entrypoints = find_entrypoints(project)
