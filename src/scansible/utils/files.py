@@ -8,9 +8,7 @@ import os
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
 
-from ansible.parsing.dataloader import (  # pyright: ignore[reportMissingTypeStubs]
-    DataLoader,
-)
+from scansible.constants import YAML_EXTENSIONS
 
 from .collections import FrozenDict
 
@@ -118,22 +116,12 @@ def find_file(dir_path: ProjectPath, file_name: str) -> ProjectPath | None:
 
     :raises AssertionError: When multiple files were found.
     """
-    # TODO: Use `SourceFileMap`?
-    loader = DataLoader()
-    # DataLoader.find_vars_files is misnamed.
-    found_paths = loader.find_vars_files(
-        str(dir_path.absolute), file_name, allow_dir=False
-    )
-    # found_paths should always have at most one element, since it can only have
-    # multiple elements when allow_dir=True
+    candidates = [f"{file_name}{ext}" for ext in [""] + YAML_EXTENSIONS]
+    for candidate in candidates:
+        if (dir_path.absolute / candidate).is_file():
+            return dir_path.join(candidate)
 
-    if not found_paths:
-        return None
-
-    found_path = found_paths[0]
-    return dir_path.join(
-        found_path.decode("utf-8") if isinstance(found_path, bytes) else found_path
-    )
+    return None
 
 
 def find_all_files(dir_path: ProjectPath) -> list[ProjectPath]:

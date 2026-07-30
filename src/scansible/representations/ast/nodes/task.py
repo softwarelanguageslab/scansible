@@ -17,9 +17,6 @@ from ansible.parsing.splitter import (  # pyright: ignore[reportMissingTypeStubs
     parse_kv,
     split_args,
 )
-from ansible.utils.fqcn import (  # pyright: ignore[reportMissingTypeStubs]
-    add_internal_fqcns,
-)
 from pydantic import Discriminator, Field, Tag, field_validator, model_validator
 
 from scansible.representations.cst import parse_file
@@ -42,22 +39,6 @@ from .expression import (
     ScalarLiteral,
     SeqLiteral,
     StrLiteral,
-)
-
-# Adapted from ansible.constants
-#: Unqualified names of actions that take freeform (unparsed) arguments.
-FREEFORM_ACTIONS_SIMPLE = (
-    "command",
-    "raw",
-    "script",
-    "shell",
-    "win_command",
-    "win_shell",
-)
-#: `FREEFORM_ACTIONS_SIMPLE`, expanded with their fully-qualified collection names.
-FREEFORM_ACTIONS: frozenset[str] = frozenset(
-    tuple(add_internal_fqcns(FREEFORM_ACTIONS_SIMPLE))  # pyright: ignore[reportUnknownArgumentType]
-    + ("ansible.windows.win_command", "ansible.windows.win_shell")
 )
 
 
@@ -307,7 +288,7 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
     @classmethod
     def _parse_args(cls, action: str, args: str) -> Mapping[ScalarValue, AnyValue]:
         """Parse a raw `key=value` argument string, treating `action` specially if it's a freeform action."""
-        check_raw = action in FREEFORM_ACTIONS
+        check_raw = actions.is_freeform_action(action)
         try:
             return parse_kv(args, check_raw)
         except AnsibleParserError as e:

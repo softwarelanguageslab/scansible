@@ -7,11 +7,12 @@ import sys
 from pathlib import Path
 
 import rich
-from ansible import constants as C  # pyright: ignore[reportMissingTypeStubs]
+
+from scansible.constants import COLLECTIONS_PATHS
 
 CONSOLE = rich.console.Console(width=999)
 
-_COLLECTION_SEARCH_PATHS = map(Path, cast(list[str], C.COLLECTIONS_PATHS) + sys.path)  # pyright: ignore[reportAttributeAccessIssue]
+_COLLECTION_SEARCH_PATHS = map(Path, cast(list[str], COLLECTIONS_PATHS) + sys.path)
 COLLECTION_PATHS = [
     coll_path
     for search_path in _COLLECTION_SEARCH_PATHS
