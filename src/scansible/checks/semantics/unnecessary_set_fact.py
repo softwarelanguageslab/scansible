@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import override
+
 from scansible.representations.pdg.extractor.context import VisibilityInformation
 from scansible.representations.pdg.extractor.expressions import EnvironmentType
 from scansible.representations.pdg.representation import (
@@ -59,6 +61,7 @@ def is_pure_expr(graph: Graph, expr: Expression) -> bool:
 
 
 class UnnecessarySetFactRule(Rule):
+    @override
     def scan(self, graph: Graph, visinfo: VisibilityInformation) -> list[RuleResult]:
         set_facted_vars = [
             node

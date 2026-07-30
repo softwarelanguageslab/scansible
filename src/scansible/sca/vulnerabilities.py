@@ -1,3 +1,5 @@
+# pyright: reportAny = false, reportExplicitAny = false
+
 from __future__ import annotations
 
 from typing import Any
@@ -7,8 +9,11 @@ from pathlib import Path
 
 import requests
 
-from scansible.sca import CONSOLE
-from scansible.sca.constants import DEBIAN_NAME_MAPPINGS, ECOSYSTEMS_SEVERITY_MAPPING
+from scansible.sca.constants import (
+    CONSOLE,
+    DEBIAN_NAME_MAPPINGS,
+    ECOSYSTEMS_SEVERITY_MAPPING,
+)
 from scansible.sca.types import Vulnerability
 
 CACHE_PATH = Path("cache")
@@ -19,7 +24,7 @@ _debian_advisories_cache: dict[str, dict[str, Any]] | None = None
 class EcosystemsCache:
     def __init__(self) -> None:
         self._cache: dict[str, Any] = {}
-        self._cache_path = CACHE_PATH / "ecosystems_cache.json"
+        self._cache_path: Path = CACHE_PATH / "ecosystems_cache.json"
         if self._cache_path.is_file():
             self._read_cache()
 
@@ -28,7 +33,7 @@ class EcosystemsCache:
         self._cache = json.loads(cache_text)
 
     def _write_cache(self) -> None:
-        self._cache_path.write_text(json.dumps(self._cache))
+        _ = self._cache_path.write_text(json.dumps(self._cache))
 
     def _params_to_key(self, ecosystem: str, package: str) -> str:
         return f"{ecosystem}:{package}"
@@ -63,7 +68,7 @@ def _get_debian_advisories() -> dict[str, dict[str, Any]]:
     if not adv_path.is_file():
         resp = requests.get("https://security-tracker.debian.org/tracker/data/json")
         resp.raise_for_status()
-        adv_path.write_text(resp.text)
+        _ = adv_path.write_text(resp.text)
 
     with adv_path.open("rt") as f:
         content = json.load(f)
@@ -121,7 +126,7 @@ def _build_vuln_from_ecosystems(
         package_name,
         _get_ecosystems_id(adv),
         adv.get("title", ""),
-        ECOSYSTEMS_SEVERITY_MAPPING.get(adv["severity"], adv["severity"]).lower(),
+        ECOSYSTEMS_SEVERITY_MAPPING.get(adv["severity"], adv["severity"]).lower(),  # pyright: ignore[reportOptionalMemberAccess]
         adv["description"],
     )
 

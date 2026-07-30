@@ -7,7 +7,9 @@ from pathlib import Path
 
 from ansible import constants as ans_constants
 from loguru import logger
+from pydantic import ValidationError
 from rich.markup import escape
+from ruamel.yaml import YAMLError
 
 from scansible.checks.security import run_all_checks
 from scansible.checks.security.rules.base import RuleResult
@@ -18,6 +20,7 @@ from scansible.representations.ast import (
     HandlerBlock,
     Play,
     Playbook,
+    StrLiteral,
     TaskFile,
 )
 from scansible.representations.pdg.extractor.main import extract_pdg
@@ -29,19 +32,24 @@ from scansible.sca.constants import (
 from scansible.utils import Position, ProjectPath
 from scansible.utils.entrypoints import find_entrypoints
 
-from .collection_info import ModuleInfo, get_collection_index
+from .collection_info import get_collection_index
 from .module_scanner import extract_module_dependencies
 from .report import generate_report
-from .types import CollectionUsage, ModuleUsage, ProjectDependencies, RoleUsage
+from .types import (
+    CollectionUsage,
+    ModuleInfo,
+    ModuleUsage,
+    ProjectDependencies,
+    RoleUsage,
+)
 from .vulnerabilities import find_vulnerabilities
 
 
 def _find_role(name: str) -> Path | None:
     for root in ans_constants.DEFAULT_ROLES_PATH:
         p = Path(root) / name
-        if Path(root) in p.resolve().parents:
-            if p.is_dir():
-                return p
+        if Path(root) in p.resolve().parents and p.is_dir():
+            return p
 
     return None
 
@@ -69,7 +77,7 @@ def _extend_role_usages(
 def extract_dependencies(project: Path, output_path: Path) -> None:
     deps = _extract_project_dependencies(project)
 
-    output_path.write_text(json.dumps(deps._asdict()))
+    _ = output_path.write_text(json.dumps(deps._asdict()))
     _print_dependencies(deps)
 
 
@@ -181,7 +189,7 @@ def _detect_smells(
 
     entrypoints = find_entrypoints(project)
     logger.remove()
-    logger.add(CONSOLE.print, level="ERROR")
+    _ = logger.add(CONSOLE.print, level="ERROR")
 
     for entrypoint, project_type in entrypoints:
         as_pb = project_type == "playbook"
@@ -233,7 +241,7 @@ def _extract_role_includes(project: Path) -> Iterable[tuple[str, Position]]:
 
         match rep:
             case Playbook():
-                worklist.extend(rep.plays)
+                worklist.extend(p for p in rep.plays if isinstance(p, Play))
             case TaskFile():
                 worklist.extend(flatten_tasks(rep.tasks))
 
@@ -251,7 +259,7 @@ def _extract_role_includes(project: Path) -> Iterable[tuple[str, Position]]:
 
             case Task():
                 if item.action in ANSIBLE_ROLE_INCLUDE_MODULES:
-                    yield str(item.args["name"]), item.position
+                    yield str(item.args[StrLiteral("name")]), item.position
 
 
 def extract_modules(project: Path, relative_paths: bool = True) -> list[ModuleUsage]:
@@ -269,7 +277,7 @@ def extract_modules(project: Path, relative_paths: bool = True) -> list[ModuleUs
         if is_trivial_module(m):
             continue
         mname = f"{m.collection}.{m.name}"
-        tloc = f"{t.position.file}:{t.position.start_line}"
+        tloc = f"{t.__position__.path}:{t.__position__.start.line}"
         usages[mname].append(tloc)
 
     if relative_paths:
@@ -293,6 +301,8 @@ def extract_all_tasks(project: Path) -> list[Task]:
         match rep:
             case Playbook():
                 for p in rep.plays:
+                    if not isinstance(p, Play):
+                        continue
                     tasks.extend(flatten_tasks(p.pre_tasks))
                     tasks.extend(flatten_tasks(p.tasks))
                     tasks.extend(flatten_tasks(p.post_tasks))
@@ -318,10 +328,10 @@ def try_extract_pb_or_tasks_file(f: Path) -> Playbook | TaskFile | None:
     ctx = ExtractionContext(False)
     try:
         return TaskFile.load(ProjectPath.from_root(f), ctx)
-    except:
+    except (ValidationError, YAMLError):
         try:
             return Playbook.load(ProjectPath.from_root(f), ctx)
-        except:
+        except (ValidationError, YAMLError):
             return None
 
 

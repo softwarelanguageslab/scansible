@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import override
+
 from scansible.representations.pdg.extractor.context import VisibilityInformation
 from scansible.representations.pdg.representation import Graph, NodeLocation, Task
 
@@ -7,6 +9,7 @@ from .base import Rule, RuleResult
 
 
 class SanityCheckNumberOfTasksRule(Rule):
+    @override
     def scan(self, graph: Graph, visinfo: VisibilityInformation) -> list[RuleResult]:
         num_tasks = len(graph.get_nodes(Task))
         if num_tasks > 2:

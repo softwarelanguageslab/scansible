@@ -12,7 +12,7 @@ from ansible.module_utils.facts.system.distribution import Distribution
 from loguru import logger
 
 from scansible.representations import ast
-from scansible.utils import SENTINEL, Sentinel, first, make_immutable
+from scansible.utils import SENTINEL, Sentinel, first
 
 from ... import representation as rep
 from .constants import (
@@ -412,7 +412,7 @@ class VarContext:
         def_record = VariableDefinitionRecord(
             name,
             var_rev,
-            make_immutable(initialiser),
+            initialiser,
             eager or not isinstance(initialiser, ast.Expression),
             env_type,
         )

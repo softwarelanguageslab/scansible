@@ -13,7 +13,6 @@ from .collections import ensure_sequence as ensure_sequence
 from .collections import first as first
 from .collections import first_where as first_where
 from .collections import join_sequences as join_sequences
-from .collections import make_immutable as make_immutable
 from .files import ProjectPath as ProjectPath
 from .files import SourceFileMap as SourceFileMap
 from .files import find_all_files as find_all_files

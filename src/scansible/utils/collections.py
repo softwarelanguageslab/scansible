@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import cast, override
 
 import itertools
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Sequence
 
 
 def first[T](it: Iterable[T]) -> T | None:
@@ -26,19 +26,6 @@ class FrozenDict[K, V](dict[K, V]):
     @override
     def __hash__(self) -> int:  # pyright: ignore[reportIncompatibleVariableOverride]
         return hash(frozenset(self.items()))
-
-
-def make_immutable[T](obj: T) -> T:
-    if isinstance(obj, str):
-        return obj
-    if isinstance(obj, Mapping):
-        return FrozenDict(
-            {make_immutable(k): make_immutable(v) for k, v in obj.items()}
-        )  # type: ignore
-    if isinstance(obj, Sequence):
-        return tuple([make_immutable(e) for e in obj])  # type: ignore
-
-    return obj
 
 
 def join_sequences[T](seq1: Sequence[T], seq2: Sequence[T]) -> Sequence[T]:

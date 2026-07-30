@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import override
+
 from collections import defaultdict
 from collections.abc import Iterable
 
@@ -19,6 +21,7 @@ class UnusedOverriddenRule(Rule):
     by the other check.
     """
 
+    @override
     def scan(self, graph: Graph, visinfo: VisibilityInformation) -> list[RuleResult]:
         var_nodes = graph.get_nodes(Variable)
 

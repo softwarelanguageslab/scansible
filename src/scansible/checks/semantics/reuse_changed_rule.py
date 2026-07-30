@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from typing import override
+
 from collections import defaultdict
 from collections.abc import Collection, Iterable
+from itertools import pairwise
 
 from scansible.representations.pdg.extractor.context import VisibilityInformation
 from scansible.representations.pdg.representation import Graph, Variable
@@ -15,6 +18,7 @@ from .utils import (
 
 
 class ReuseChangedVariableRule(Rule):
+    @override
     def scan(self, graph: Graph, visinfo: VisibilityInformation) -> list[RuleResult]:
         var_nodes = graph.get_nodes(Variable)
 
@@ -50,7 +54,7 @@ class ReuseChangedVariableRule(Rule):
         # upstream. We ignore the latter, as we'll analyse the impact of a redefinition
         # upstream, not here.
         nodes_sorted = sorted(nodes, key=lambda n: n.value_version)
-        for v1, v2 in zip(nodes_sorted, nodes_sorted[1:]):
+        for v1, v2 in pairwise(nodes_sorted):
             (
                 value_version_change_reason,
                 value_change_context,

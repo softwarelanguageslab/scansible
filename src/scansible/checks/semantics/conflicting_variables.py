@@ -96,7 +96,9 @@ class ConflictingVariables:
                 # precedence
                 # Find first index of a variable with lower precedence
                 lower_idx = find_index(
-                    var_defs, lambda var_def: var_def[1] < scope, idx + 1
+                    var_defs,
+                    lambda var_def: var_def[1] < scope,  # noqa: B023
+                    idx + 1,
                 )
                 if lower_idx is None:
                     # There are no variables with a lower precedence any more,

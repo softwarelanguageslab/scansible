@@ -149,6 +149,5 @@ def find_all_files(dir_path: ProjectPath) -> list[ProjectPath]:
             except RecursionError:
                 print(child)
                 # TODO: Why can this spin in an infinite loop??
-                pass
 
     return results

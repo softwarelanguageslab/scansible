@@ -28,7 +28,7 @@ def cli(verbose: bool, quiet: bool) -> None:
     # Set up logging
     logger.remove()
     desired_level = "DEBUG" if verbose else "WARNING" if quiet else "INFO"
-    logger.add(sys.stderr, level=desired_level)
+    _ = logger.add(sys.stderr, level=desired_level)
 
 
 @cli.command
@@ -135,12 +135,12 @@ def build_pdg(
     #     pdg = canonicalize_pdg(pdg, ModuleKnowledgeBase.load_from_file(module_kb_path))
     #     logger.info(f"Reduced size to {pdg.num_nodes} nodes and {pdg.num_edges} edges")
 
-    output.write(dump_graph(output_format, pdg))
+    _ = output.write(dump_graph(output_format, pdg))
 
     if aux_file is not None:
-        aux_file.write(ctx.visibility_information.dump())
+        _ = aux_file.write(ctx.visibility_information.dump())
     if errors_file is not None:
-        errors_file.write(ctx.summarise_extraction_errors())
+        _ = errors_file.write(ctx.summarise_extraction_errors())
 
 
 @cli.command
@@ -213,13 +213,6 @@ def check(
     "file_path", type=click.Path(exists=True, resolve_path=True, path_type=Path)
 )
 @click.option(
-    "-t",
-    "--type",
-    "project_type",
-    type=click.Choice(["playbook", "role"]),
-    help="Type of the provided project (default: autodetect)",
-)
-@click.option(
     "--role-search-path",
     type=click.Path(file_okay=False, path_type=Path),
     envvar="ROLE_SEARCH_PATH",
@@ -245,7 +238,6 @@ def check_all(
     project_path: Path,
     file_path: Path,
     role_search_path: Sequence[Path],
-    project_type: str | None,
     strict: bool,
     enable_security: bool,
     enable_semantics: bool,
@@ -255,23 +247,23 @@ def check_all(
         Path(p) for p in ans_constants.DEFAULT_ROLES_PATH
     ]
 
+    from .checks import CheckResult, TerminalReporter, run_all_checks
     from .representations.pdg import extract_pdg
     from .utils.entrypoints import find_entrypoints
 
+    # FIXME: Why does this check exist?
     if project_path.parent != project_path:
         entrypoints = find_entrypoints(project_path)
     else:
         entrypoints = [(file_path, "playbook")]
-    results = []
+    results: list[CheckResult] = []
     logger.remove()
 
     for entrypoint, project_type in entrypoints:
-        as_pb = None if project_type is None else project_type == "playbook"
+        as_pb = project_type == "playbook"
         ctx = extract_pdg(
             entrypoint, role_search_paths, as_pb=as_pb, lenient=not strict
         )
-
-        from .checks import TerminalReporter, run_all_checks
 
         results.extend(
             run_all_checks(
@@ -286,7 +278,7 @@ def check_all(
         [
             result
             for result in results
-            if result.location.split(":")[0] == str(file_path)
+            if result.location is not None and result.location.file == str(file_path)
         ]
     )
 
@@ -438,7 +430,7 @@ def bulk_build(
             log_path = output_base / f"{output_name}.log"
             log_path.unlink(missing_ok=True)
             logger.remove()
-            logger.add(log_path, level="INFO")
+            _ = logger.add(log_path, level="INFO")
             try:
                 ctx = extract_pdg(
                     entrypoint_path,

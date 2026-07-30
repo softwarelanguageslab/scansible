@@ -26,20 +26,20 @@ from scansible.sca.types import ModuleDependency
 class Cache:
     def __init__(self) -> None:
         self._cache: dict[str, Mapping[str, Sequence[ModuleDependency]]] = {}
-        self._cache_path = Path("cache") / "dep_cache.json"
+        self._cache_path: Path = Path("cache") / "dep_cache.json"
         if self._cache_path.is_file():
             self._read_cache()
 
     def _read_cache(self) -> None:
         cache_text = self._cache_path.read_text()
-        cache_data = json.loads(cache_text)
+        cache_data = json.loads(cache_text)  # pyright: ignore[reportAny]
         self._cache = {}
 
-        for coll, values in cache_data.items():
+        for coll, values in cache_data.items():  # pyright: ignore[reportAny]
             dct: dict[str, Sequence[ModuleDependency]] = {}
             self._cache[coll] = dct
-            for mod, deps in values.items():
-                dct[mod] = [ModuleDependency(dep["name"], dep["type"]) for dep in deps]
+            for mod, deps in values.items():  # pyright: ignore[reportAny]
+                dct[mod] = [ModuleDependency(dep["name"], dep["type"]) for dep in deps]  # pyright: ignore[reportAny]
 
     def _write_cache(self) -> None:
         cache_dct = {}
@@ -50,7 +50,7 @@ class Cache:
                 dct[mod] = [{"name": dep.name, "type": dep.type} for dep in deps]
 
         old_cache = self._cache
-        self._cache_path.write_text(json.dumps(cache_dct))
+        _ = self._cache_path.write_text(json.dumps(cache_dct))
         self._read_cache()
         assert old_cache == self._cache
 
@@ -99,7 +99,7 @@ def _prepare_input(coll_fqn: str, d: Path) -> Path:
         "projectPath": str(coll_path),
         "basePath": str(base_path),
     }
-    input_file.write_text(json.dumps([coll_repr]))
+    _ = input_file.write_text(json.dumps([coll_repr]))
     return input_file
 
 
@@ -156,14 +156,16 @@ def _extract_collection_dependencies(
                 capture_output=True,
                 text=True,
                 timeout=MODULE_SCA_PROJECT_TIMEOUT,
+                check=True,
             )
+        except subprocess.TimeoutExpired:
+            print(f"{coll_fqn} timed out!")
+            return {}
+        try:
             completed_proc.check_returncode()
         except subprocess.CalledProcessError:
             print(f"{coll_fqn} failed!")
             print(completed_proc.stderr)
-            return {}
-        except subprocess.TimeoutExpired:
-            print(f"{coll_fqn} timed out!")
             return {}
 
         return _parse_output(output_file)

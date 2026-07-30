@@ -1,3 +1,5 @@
+# pyright: reportAny = false, reportExplicitAny = false
+
 from __future__ import annotations
 
 from typing import Any
@@ -90,30 +92,33 @@ def generate_report(
         loader=FileSystemLoader("src/scansible/sca/html"),
         autoescape=select_autoescape(),
     )
-    env.globals = dict(
-        project_name=project_name,
-        collections=collections,
-        modules=modules,
-        roles=dependencies.roles,
-        dependencies=list(all_module_dependencies.values()),
-        vulnerabilities=vulnerabilities,
-        smells=smells,
-        pages=pages,
-    )
+    env.globals = {  # pyright: ignore[reportAttributeAccessIssue]
+        "project_name": project_name,
+        "collections": collections,
+        "modules": modules,
+        "roles": dependencies.roles,
+        "dependencies": list(all_module_dependencies.values()),
+        "vulnerabilities": vulnerabilities,
+        "smells": smells,
+        "pages": pages,
+    }
 
     for html_file, _ in pages:
         template = env.get_template(f"{html_file}.html.j2")
         content = template.render(current_file=html_file)
-        (output_dir / f"{html_file}.html").write_text(content)
+        _ = (output_dir / f"{html_file}.html").write_text(content)
 
 
-def _read_code(loc: str, num_lines: int) -> tuple[str, int, int]:
+def _read_code(loc: str | None, num_lines: int) -> tuple[str, int, int]:
+    if loc is None:
+        return "NOT FOUND!", 0, 0
+
     *file_path_str, lineno_raw, _ = loc.split(":")
     lineno = int(lineno_raw) - 1
     file_path = Path(":".join(file_path_str))
     try:
         text = file_path.read_text()
-    except IOError:
+    except OSError:
         return "NOT FOUND!", 0, 0
 
     lines = text.splitlines()

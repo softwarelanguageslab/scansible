@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 
 
 class ModuleInfo(NamedTuple):
@@ -29,8 +29,8 @@ class ModuleUsage(NamedTuple):
 class RoleUsage(NamedTuple):
     name: str
     usages: Sequence[str]
-    used_collections: Collection[str]
-    used_modules: Collection[str]
+    used_collections: set[str]
+    used_modules: set[str]
 
 
 class ModuleDependency(NamedTuple):

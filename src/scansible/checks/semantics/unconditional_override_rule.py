@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import override
+
 from collections import defaultdict
 from collections.abc import Iterable
 
@@ -28,6 +30,7 @@ class UnconditionalOverrideRule(Rule):
     condition. That analysis is fairly naive, we merely check whether the conditions have any variable usage in common.
     """
 
+    @override
     def scan(self, graph: Graph, visinfo: VisibilityInformation) -> list[RuleResult]:
         var_nodes = graph.get_nodes(Variable)
 
@@ -101,16 +104,16 @@ class UnconditionalOverrideRule(Rule):
                 if vals_v1 & set(e2_uses):
                     continue
 
-            all_cond_uses_v1 = set(
-                cu1
+            all_cond_uses_v1 = {
+                cu1  # pyright: ignore[reportUnhashable]
                 for cond_v1 in get_def_conditions(graph, v1)
                 for cu1 in get_all_used_variables(graph, cond_v1)
-            )
-            all_cond_uses_v2 = set(
-                cu2
+            }
+            all_cond_uses_v2 = {
+                cu2  # pyright: ignore[reportUnhashable]
                 for cond_v2 in get_def_conditions(graph, v2)
                 for cu2 in get_all_used_variables(graph, cond_v2)
-            )
+            }
 
             # Perhaps v1 shows up in the condition of v2?
             if all_cond_uses_v2 & vals_v1:

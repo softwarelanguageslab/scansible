@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import abc
+
 from pydantic import BaseModel
 
 from scansible.representations.pdg.extractor.context import VisibilityInformation
@@ -16,7 +18,8 @@ class RuleResult(BaseModel, frozen=True, strict=True, extra="forbid"):
     location: NodeLocation | None
 
 
-class Rule:
+class Rule(abc.ABC):
+    @abc.abstractmethod
     def scan(
         self, graph: Graph, visinfo: VisibilityInformation
     ) -> list[RuleResult]: ...

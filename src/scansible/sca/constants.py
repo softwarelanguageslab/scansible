@@ -42,7 +42,7 @@ ANSIBLE_BUILTIN_IGNORES = {
 PYTHON_BUILTINS = set(sys.builtin_module_names) | {
     pkg.name
     for pkg in pkgutil.iter_modules()
-    if pkg.module_finder.path.startswith(str(Path(pkgutil.__file__).parent))
+    if pkg.module_finder.path.startswith(str(Path(pkgutil.__file__).parent))  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
 }
 
 DEBIAN_NAME_MAPPINGS = {

@@ -58,7 +58,7 @@ def _escape_string(v: str) -> str:
 def _node_to_dict(node: Node) -> Mapping[str, DatabaseValue]:
     node_dict = {
         k: (_escape_string(v) if isinstance(v, str) else v)
-        for k, v in node.model_dump(exclude={"location"}).items()
+        for k, v in node.model_dump(exclude={"location"}).items()  # pyright: ignore[reportAny]
     }
 
     return node_dict

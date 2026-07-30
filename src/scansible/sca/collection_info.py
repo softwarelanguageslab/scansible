@@ -1,3 +1,5 @@
+# pyright: reportAny = false, reportExplicitAny = false
+
 from __future__ import annotations
 
 import json
@@ -49,11 +51,10 @@ class CollectionIndex:
         if len(cands) == 1:
             return cands[0]
 
-        return sorted(
-            cands, reverse=True, key=lambda cand: get_module_match_score(cand, args)
-        )[0]
+        return max(cands, key=lambda cand: get_module_match_score(cand, args))
 
 
+# FIXME: use pydantic model for validation?
 def get_collection_index() -> CollectionIndex:
     with COLLECTION_CONTENT_PATH.open("rt") as f:
         collection_content = json.load(f)

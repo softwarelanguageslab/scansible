@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from typing import override
+
 from collections import defaultdict
 from collections.abc import Collection, Iterable
+from itertools import pairwise
 
 from scansible.representations.pdg.extractor.context import VisibilityInformation
 from scansible.representations.pdg.representation import Expression, Graph, Variable
@@ -15,6 +18,7 @@ from .utils import (
 
 
 class ReuseImpureExpressionRule(Rule):
+    @override
     def scan(self, graph: Graph, visinfo: VisibilityInformation) -> list[RuleResult]:
         var_nodes = graph.get_nodes(Variable)
 
@@ -47,7 +51,7 @@ class ReuseImpureExpressionRule(Rule):
         # care about changes due to non-idempotency of direct dependences,
         # we'll check further issues downstream.
         nodes_sorted = sorted(nodes, key=lambda n: n.value_version)
-        for v1, v2 in zip(nodes_sorted, nodes_sorted[1:]):
+        for v1, v2 in pairwise(nodes_sorted):
             (
                 value_version_change_reason,
                 value_change_context,

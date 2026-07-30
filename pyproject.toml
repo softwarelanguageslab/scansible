@@ -46,7 +46,7 @@ extend-select = ["I"]
 # ignore these as they're handled properly by basedpyright
 # RUF022 complains about sorting of __all__, but we want to keep a grouping.
 # TRY004 wants us to use TypeError in Pydantic validators but those don't get caught by Pydantic
-extend-ignore = ["F403", "F405", "RUF022", "TRY004"]
+extend-ignore = ["F403", "F405", "RUF022", "TRY004", "DTZ005"]
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/*" = ["D", "INP001", "S101", "PLR2004", "FBT001"]

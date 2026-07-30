@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import final, override
+from typing import ClassVar, final, override
 
 from .base import Rule, RuleQuery
 
@@ -16,7 +16,7 @@ class AdminByDefaultRule(Rule):
     USER_ROLE_REGEX = "|".join(USER_ROLE_TOKENS)
 
     #: Names that indicate an administrator account is used.
-    ADMIN_NAMES = ["admin", "root"]
+    ADMIN_NAMES: ClassVar = ["admin", "root"]
 
     @property
     @override

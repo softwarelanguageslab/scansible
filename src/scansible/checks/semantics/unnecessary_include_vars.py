@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import override
+
 from collections import defaultdict
 
 from scansible.representations.pdg.extractor.context import VisibilityInformation
@@ -66,6 +68,7 @@ def is_pure_expr(graph: Graph, expr: Expression) -> bool:
 
 
 class UnnecessaryIncludeVarsRule(Rule):
+    @override
     def scan(self, graph: Graph, visinfo: VisibilityInformation) -> list[RuleResult]:
         included_vars = [
             node
