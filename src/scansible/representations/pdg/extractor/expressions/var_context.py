@@ -14,16 +14,10 @@ from ansible.module_utils.facts.system.distribution import (  # pyright: ignore[
 from loguru import logger
 
 from scansible.representations import ast
-from scansible.utils import SENTINEL, Sentinel, first
+from scansible.utils import SENTINEL, Sentinel
 
 from ... import representation as rep
-from .constants import (
-    MAGIC_VAR_NAMES,
-    PURE_FILTERS,
-    PURE_LOOKUP_PLUGINS,
-    PURE_TESTS,
-    UNQUALIFIED_HOST_FACT_NAMES,
-)
+from .constants import MAGIC_VAR_NAMES, UNQUALIFIED_HOST_FACT_NAMES
 from .environments import EnvironmentStack, EnvironmentType
 from .environments.types import LocalEnvType
 from .expression_types import extract_type_name
@@ -36,7 +30,7 @@ from .records import (
     VariableDefinitionRecord,
     VariableValueRecord,
 )
-from .templates import LookupTargetLiteral, TemplateExpressionAST
+from .templates import TemplateExpressionAST
 
 if TYPE_CHECKING:
     from ..context import ExtractionContext
@@ -44,32 +38,6 @@ if TYPE_CHECKING:
 
 class RecursiveDefinitionError(Exception):
     pass
-
-
-def _get_impure_components(ast: TemplateExpressionAST) -> Iterable[str]:
-    if ast.uses_now:
-        yield "function 'now'"
-
-    yield from (
-        f"filter '{filter_op}'"
-        for filter_op in ast.used_filters
-        if filter_op not in PURE_FILTERS
-    )
-    yield from (
-        f"test '{test_op}'" for test_op in ast.used_tests if test_op not in PURE_TESTS
-    )
-    yield from (
-        f"lookup {lookup_op}"
-        for lookup_op in ast.used_lookups
-        if not (
-            isinstance(lookup_op, LookupTargetLiteral)
-            and lookup_op.name in PURE_LOOKUP_PLUGINS
-        )
-    )
-
-
-def _is_impure_expression(ast: TemplateExpressionAST) -> bool:
-    return first(_get_impure_components(ast)) is not None
 
 
 def _is_magic_variable(name: str) -> bool:
@@ -255,7 +223,7 @@ class VarContext:
             return self._create_new_expression_result(ast, used_values)
 
         logger.debug(f"Re-evaluation of {tr!r} for expression {ast.raw!r}")
-        if _is_impure_expression(ast):
+        if not ast.is_pure:
             logger.debug(f"Expression {ast.raw!r} may be impure, creating new result")
             return self._create_reevaluated_impure_expression_result(tr)
 
@@ -316,8 +284,7 @@ class VarContext:
     ) -> TemplateEvaluationResult:
         en = rep.Expression(
             expr=ast.raw,
-            is_conditional=ast.is_conditional,
-            impure_components=tuple(_get_impure_components(ast)),
+            impure_components=ast.impure_components,
             location=self.extraction_ctx.get_location(ast.raw),
         )
         iv = rep.IntermediateValue(identifier=self.extraction_ctx.next_iv_id())

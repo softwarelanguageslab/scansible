@@ -36,7 +36,7 @@ def describe_dump_node():
 
         assert (
             result
-            == '(n0:Expression { expr: "{{ test }}", impure_components: "[]", is_conditional: false, location: null, node_id: 0 })'
+            == '(n0:Expression { expr: "{{ test }}", impure_components: "[]", location: null, node_id: 0 })'
         )
 
     def should_dump_variable():

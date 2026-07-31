@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+#: Names in Jinja2 expressions that are defined by Ansible.
+ANSIBLE_GLOBALS = frozenset({"lookup", "query", "q", "now", "finalize", "omit"})
+
 PURE_LOOKUP_PLUGINS = frozenset(
     {
         "config",

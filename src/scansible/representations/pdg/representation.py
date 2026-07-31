@@ -114,8 +114,6 @@ class Expression(DataNode):
     """Node representing a template expression."""
 
     expr: Annotated[str, StringConstraints(min_length=1)] = Field(frozen=True)
-    is_conditional: bool = Field(frozen=True, default=False)
-
     impure_components: Sequence[str] = Field(frozen=True, default_factory=tuple)
 
     @property

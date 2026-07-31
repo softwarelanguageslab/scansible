@@ -5,12 +5,10 @@ from __future__ import annotations
 from typing import NamedTuple
 
 import pytest
+from jinja2.compiler import DependencyFinderVisitor
 
 from scansible.representations import ast
 from scansible.representations.pdg.extractor.expressions.templates import (
-    LookupTarget,
-    LookupTargetLiteral,
-    LookupTargetVariable,
     TemplateExpressionAST,
 )
 
@@ -20,10 +18,7 @@ class Case(NamedTuple):
     variables: set[str] = set()  # noqa: RUF012
     filters: set[str] = set()  # noqa: RUF012
     tests: set[str] = set()  # noqa: RUF012
-    lookup_targets: set[LookupTarget] = set()  # noqa: RUF012
-    uses_now: bool = False
-    is_conditional: bool = False
-    variable_mappings: dict[str, str] = {}  # noqa: RUF012
+    impure_components: set[str] = set()  # noqa: RUF012
 
 
 test_cases = [
@@ -44,54 +39,23 @@ test_cases = [
     ),
     Case(
         expr='{{ lookup("file", "/etc/motd") }}',
-        lookup_targets={LookupTargetLiteral(name="file")},
+        impure_components={"lookup 'file'"},
     ),
     Case(
         expr="{{ lookup(target, motdfile) }}",
         variables={"target", "motdfile"},
-        lookup_targets={LookupTargetVariable(name="target")},
+        impure_components={"lookup of non-constant (Name)"},
     ),
-    Case(expr="The time is {{ now() }}", uses_now=True),
+    Case(
+        expr="The time is {{ now() }}",
+        impure_components={"function 'now'"},
+    ),
     Case(expr='Inline {{ expressions }} work {{ "too" }}!', variables={"expressions"}),
-]
-
-conditional_test_cases = [
-    Case(
-        expr='url is match("http://example.com/users/.*/resources/")',
-        variables={"url"},
-        tests={"match"},
-        is_conditional=True,
-    ),
-    Case(expr="my_items", variables={"my_items"}, is_conditional=True),
-    Case(
-        expr="my_items.keys() | list",
-        variables={"my_items"},
-        filters={"list"},
-        is_conditional=True,
-    ),
-    Case(expr="{{ my_condition }}", variables={"my_condition"}, is_conditional=True),
-    Case(
-        expr="{{ my_condition }}",
-        variables={"my_condition", "url"},
-        tests={"match"},
-        is_conditional=True,
-        variable_mappings={"my_condition": 'url is match("*://example.*")'},
-    ),
-    Case(
-        expr="item.last_updated < now()",
-        variables={"item"},
-        uses_now=True,
-        is_conditional=True,
-    ),
 ]
 
 
 def _do_parse(case: Case) -> TemplateExpressionAST:
-    expr = (
-        ast.Condition.model_validate(case.expr)
-        if case.is_conditional
-        else ast.Expression.model_validate(case.expr)
-    )
+    expr = ast.Expression.model_validate(case.expr)
     return TemplateExpressionAST(expr)
 
 
@@ -109,26 +73,28 @@ def describe_template_parser() -> None:
         assert ast is not None
         assert ast.referenced_variables == case.variables
 
-    def should_find_filters(case: Case) -> None:
+    def should_find_impure_components(case: Case) -> None:
         ast = _do_parse(case)
 
         assert ast is not None
-        assert ast.used_filters == case.filters
+        assert ast.is_pure == (not case.impure_components)
+        assert set(ast.impure_components) == case.impure_components
+
+
+@pytest.mark.parametrize("case", test_cases)
+def describe_dependency_finder_visitor() -> None:
+    def should_find_filters(case: Case) -> None:
+        ast = _do_parse(case)
+        visitor = DependencyFinderVisitor()
+
+        visitor.visit(ast.ast_root)
+
+        assert visitor.filters == case.filters
 
     def should_find_tests(case: Case) -> None:
         ast = _do_parse(case)
+        visitor = DependencyFinderVisitor()
 
-        assert ast is not None
-        assert ast.used_tests == case.tests
+        visitor.visit(ast.ast_root)
 
-    def should_find_now_usage(case: Case) -> None:
-        ast = _do_parse(case)
-
-        assert ast is not None
-        assert ast.uses_now == case.uses_now
-
-    def should_find_lookups(case: Case) -> None:
-        ast = _do_parse(case)
-
-        assert ast is not None
-        assert ast.used_lookups == case.lookup_targets
+        assert visitor.tests == case.tests

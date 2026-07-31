@@ -1,648 +1,19 @@
-# ruff: disable[N802] -- Otherwise complains about visitor method casing, but we cannot mark them as override as the superclass doesn't have the methods defined
-
 """Extract information from template expressions."""
 
 from __future__ import annotations
 
-from typing import Protocol, TypeVar, cast, final, override
+from typing import final
 
-import os
-import re
-from collections.abc import Callable, Iterable
-from warnings import deprecated
+from collections.abc import Container, Iterable, Sequence
+from functools import cached_property
 
-from jinja2 import Environment, nodes
+from jinja2 import nodes
 from jinja2.compiler import DependencyFinderVisitor
-from jinja2.exceptions import TemplateSyntaxError
 from jinja2.visitor import NodeVisitor
-from loguru import logger
-from pydantic import BaseModel
 
 from scansible.representations import ast
 
-ANSIBLE_GLOBALS = frozenset({"lookup", "query", "q", "now", "finalize", "omit"})
-
-OPERAND_TO_STR = {
-    "eq": "==",
-    "ne": "!=",
-    "gt": ">",
-    "lt": "<",
-    "gteq": ">=",
-    "lteq": "<=",
-    "notin": "not in",
-}
-
-
-class ASTStringifier(NodeVisitor):
-    @override
-    def generic_visit(self, node: nodes.Node, *args: object, **kwargs: object) -> str:
-        if isinstance(node, nodes.BinExpr):
-            return self.visit_BinExpr(node)
-        if isinstance(node, nodes.UnaryExpr):
-            return self.visit_UnaryExpr(node)
-        raise ValueError(f"Unsupported node: {node}")
-
-    @override
-    def visit(self, node: nodes.Node, *args: object, **kwargs: object) -> str:
-        return cast(str, super().visit(node, *args, **kwargs))
-
-    def stringify(self, node: nodes.Node, *, is_conditional: bool) -> str:
-        generated = self.visit(node)
-        self._check_correctness(node, generated, is_conditional=is_conditional)
-        return generated
-
-    def _check_correctness(
-        self, node: nodes.Node, generated: str, *, is_conditional: bool
-    ) -> None:
-        env = Environment()  # noqa: S701
-        reparsed = merge_consecutive_templatedata(
-            env.parse(generated)
-            if not is_conditional
-            else parse_conditional(generated, env, {})[0]
-        )
-        node = merge_consecutive_templatedata(node)
-
-        if reparsed == node:
-            return
-
-        # Allow changing of bad conditionals which contain braces
-        if is_conditional and isinstance(node, nodes.Template):
-            return
-
-        diffs = _find_ast_differences(reparsed, node)
-
-        raise RuntimeError(
-            f"""
-                Bad stringification!
-                {reparsed}
-                vs
-                {node}
-
-                {self.visit(reparsed)}
-                vs
-                {generated}
-
-                Diffs: {os.linesep.join(diffs)}
-
-                Conditional: {is_conditional}
-                """
-        )
-
-    def visit_Name(self, node: nodes.Name, **_: object) -> str:
-        return node.name
-
-    def visit_NSRef(self, node: nodes.NSRef, **_: object) -> str:
-        return f"{node.name}.{node.attr}"
-
-    def visit_Template(self, node: nodes.Template, **_: object) -> str:
-        parts = [self.visit(child) for child in node.body]
-
-        # Escape TemplateData ending with { followed by expression/statement,
-        # otherwise subsequent parsing will fail. Similarly for TD starting with }
-        # preceded by expression/statement.
-        for idx, part in enumerate(parts):
-            if (
-                part.endswith("{")
-                and len(parts) > (idx + 1)
-                and parts[idx + 1].startswith(("{{ ", "{% "))
-            ):
-                # Turn "{{% if" into "{ {%- if" etc., which parses correctly.
-                parts[idx + 1] = re.sub(r"(\{[\{%])", r" \1-", parts[idx + 1])
-            if (
-                part.startswith("}")
-                and idx > 0
-                and parts[idx - 1].endswith((" }}", " %}"))
-            ):
-                # Turn "endif %}}" into "endif -%} }" etc., which parses correctly.
-                parts[idx - 1] = re.sub(r"([\}%]})", r"-\1 ", parts[idx - 1])
-
-        rendered = "".join(parts)
-        # Add additional trailing newline, Jinja2's parser consumes one.
-        if rendered.endswith("\n"):
-            rendered += "\n"
-        return rendered
-
-    def visit_Output(self, node: nodes.Output, **_: object) -> str:
-        result = ""
-        for child in node.nodes:
-            if isinstance(child, nodes.TemplateData):
-                result += self.visit(child)
-            else:
-                result += "{{ " + self.visit(child) + " }}"
-
-        return result
-
-    def visit_TemplateData(self, node: nodes.TemplateData, **_: object) -> str:
-        if (
-            "{{" in node.data
-            or "}}" in node.data
-            or "{%" in node.data
-            or "%}" in node.data
-        ):
-            return "{% raw %}" + node.data + "{% endraw %}"
-        return node.data
-
-    def visit_Compare(self, node: nodes.Compare, **_: object) -> str:
-        if len(node.ops) != 1:
-            raise ValueError(f"Unsupported node: {node}")
-        return f"({self.visit(node.expr)} {self.visit(node.ops[0])})"
-
-    def visit_Operand(self, node: nodes.Operand, **_: object) -> str:
-        return f"{OPERAND_TO_STR.get(node.op, node.op)} {self.visit(node.expr)}"
-
-    def visit_Const(self, node: nodes.Const, **_: object) -> str:
-        return repr(node.value)  # pyright: ignore[reportAny]
-
-    def visit_List(self, node: nodes.List, **_: object) -> str:
-        return "[" + ", ".join(self.visit(item) for item in node.items) + "]"
-
-    def visit_Dict(self, node: nodes.Dict, **_: object) -> str:
-        return "{" + ", ".join(self.visit(item) for item in node.items) + "}"
-
-    def visit_Pair(self, node: nodes.Pair, **_: object) -> str:
-        return f"{self.visit(node.key)}: {self.visit(node.value)}"
-
-    def visit_Not(self, node: nodes.Not, **_: object) -> str:
-        if isinstance(node.node, nodes.Test):
-            return self.visit_Test(node.node, negate=True)
-        return f"(not {self.visit(node.node)})"
-
-    def visit_BinExpr(self, node: nodes.BinExpr, **_: object) -> str:
-        return f"({self.visit(node.left)} {node.operator} {self.visit(node.right)})"
-
-    def visit_UnaryExpr(self, node: nodes.UnaryExpr, **_: object) -> str:
-        return f"{node.operator} {self.visit(node.node)}"
-
-    def visit_Concat(self, node: nodes.Concat, **_: object) -> str:
-        return "(" + " ~ ".join(self.visit(child) for child in node.nodes) + ")"
-
-    def visit_CondExpr(self, node: nodes.CondExpr, **_: object) -> str:
-        base = f"({self.visit(node.expr1)} if {self.visit(node.test)}"
-        if node.expr2 is None:
-            return base + ")"
-        else:
-            return f"{base} else {self.visit(node.expr2)})"
-
-    def visit_If(self, node: nodes.If, **_: object) -> str:
-        head = (
-            "{% if "
-            + self.visit(node.test)
-            + " %}"
-            + "".join(self.visit(child) for child in node.body)
-        )
-
-        elifs: list[str] = []
-        for elif_ in node.elif_:
-            assert not elif_.else_ and not elif_.elif_
-            elifs.append(
-                "{% elif "
-                + self.visit(elif_.test)
-                + " %}"
-                + "".join(self.visit(child) for child in elif_.body)
-            )
-
-        if node.else_:
-            tail = (
-                "{% else %}"
-                + "".join(self.visit(child) for child in node.else_)
-                + "{% endif %}"
-            )
-        else:
-            tail = "{% endif %}"
-
-        return f"{head}{''.join(elifs)}{tail}"
-
-    def visit_FilterBlock(self, node: nodes.FilterBlock, **_: object) -> str:
-        head = "{% filter " + self.visit(node.filter) + " %}"
-        return (
-            head + "".join(self.visit(child) for child in node.body) + "{% endfilter %}"
-        )
-
-    def visit_For(self, node: nodes.For, **_: object) -> str:
-        if node.recursive:
-            raise ValueError(f"Unsupported node: {node}")
-
-        head = "{% for " + self.visit(node.target) + " in " + self.visit(node.iter)
-        if node.test:
-            head += " if " + self.visit(node.test)
-        head += " %}"
-        body = "".join(self.visit(child) for child in node.body)
-        if node.else_:
-            else_ = "{% else %}" + "".join(self.visit(child) for child in node.else_)
-        else:
-            else_ = ""
-        end = "{% endfor %}"
-
-        return f"{head}{body}{else_}{end}"
-
-    def visit_Tuple(self, node: nodes.Tuple, **_: object) -> str:
-        return f"({', '.join(self.visit(child) for child in node.items)})"
-
-    def visit_Assign(self, node: nodes.Assign, **_: object) -> str:
-        assign = f"set {self.visit(node.target)} = {self.visit(node.node)}"
-        return "{% " + assign + " %}"
-
-    def visit_AssignBlock(self, node: nodes.AssignBlock, **_: object) -> str:
-        if node.filter is not None:
-            raise ValueError(f"Unsupported node: {node}")
-        head = "{% set " + self.visit(node.target) + "%}"
-        body = "".join(self.visit(child) for child in node.body)
-        tail = "{% endset %}"
-        return f"{head}{body}{tail}"
-
-    def visit_Test(self, node: nodes.Test, *, negate: bool = False, **_: object) -> str:
-        lhs = self.visit(node.node)
-        rhs = self._stringify_call(
-            node.name, node.args, node.kwargs, node.dyn_args, node.dyn_kwargs
-        )
-        if negate:
-            return f"{lhs} is not {rhs}"
-        else:
-            return f"{lhs} is {rhs}"
-
-    def visit_Filter(
-        self, node: nodes.Filter, *, parenthesize: bool = False, **_: object
-    ) -> str:
-        filter_call = self._stringify_call(
-            node.name, node.args, node.kwargs, node.dyn_args, node.dyn_kwargs
-        )
-        if node.node is not None:
-            rendered = f"{self.visit(node.node)} | {filter_call}"
-        else:
-            rendered = filter_call
-        if parenthesize:
-            return f"({rendered})"
-        return rendered
-
-    def visit_Call(self, node: nodes.Call, **_: object) -> str:
-        return self._stringify_call(
-            self.visit(node.node),
-            node.args,
-            node.kwargs,
-            node.dyn_args,
-            node.dyn_kwargs,
-            force_parens=True,
-        )
-
-    def visit_Getitem(self, node: nodes.Getitem, **_: object) -> str:
-        return f"{self.visit(node.node, parenthesize=True)}[{self.visit(node.arg)}]"
-
-    def visit_Getattr(self, node: nodes.Getattr, **_: object) -> str:
-        return f"{self.visit(node.node, parenthesize=True)}.{node.attr}"
-
-    def visit_Keyword(self, node: nodes.Keyword, **_: object) -> str:
-        return f"{node.key}={self.visit(node.value)}"
-
-    def visit_Slice(self, node: nodes.Slice, **_: object) -> str:
-        start = self.visit(node.start) if node.start else ""
-        stop = self.visit(node.stop) if node.stop else ""
-        if node.step:
-            return f"{start}:{stop}:{self.visit(node.step)}"
-        else:
-            return f"{start}:{stop}"
-
-    def _stringify_call(
-        self,
-        name: str,
-        args: list[nodes.Expr],
-        kwargs: list[nodes.Pair] | list[nodes.Keyword],
-        dyn_args: nodes.Expr | None,
-        dyn_kwargs: nodes.Expr | None,
-        *,
-        force_parens: bool = False,
-    ) -> str:
-        if (
-            not args
-            and not kwargs
-            and not dyn_args
-            and not dyn_kwargs
-            and not force_parens
-        ):
-            return name
-
-        args_list = ", ".join(self.visit(arg) for arg in args)
-        kwargs_list = ", ".join(self.visit(kwarg) for kwarg in kwargs)
-        dyn_args_str = f"*{self.visit(dyn_args)}" if dyn_args is not None else ""
-        dyn_kwargs_str = f"**{self.visit(dyn_kwargs)}" if dyn_kwargs is not None else ""
-        args_str = ", ".join(
-            part
-            for part in (args_list, kwargs_list, dyn_args_str, dyn_kwargs_str)
-            if part
-        )
-        return f"{name}({args_str})"
-
-
-NodeT = TypeVar("NodeT", bound=nodes.Node)
-type NodeMatcher = Callable[[nodes.Node], bool]
-
-
-# Needs to be a protocol so we can enforce the same input and output type with a typevar.
-# If written as a Callable, like NodeMatcher, the typevar would need to be instantiated
-# in the visitor below.
-class NodeReplacer(Protocol):
-    def __call__(self, node: NodeT) -> NodeT: ...
-
-
-class NodeReplacerVisitor(NodeVisitor):
-    def __init__(self, matcher: NodeMatcher, replacer: NodeReplacer) -> None:
-        self.match: NodeMatcher = matcher
-        self.replace: NodeReplacer = replacer
-
-    @override
-    def generic_visit(self, node: nodes.Node, *args: object, **kwargs: object) -> None:
-        if isinstance(node, nodes.BinExpr):
-            self.visit_BinExpr(node)
-            return
-        if isinstance(node, nodes.UnaryExpr):
-            self.visit_UnaryExpr(node)
-            return
-
-        if list(node.iter_child_nodes()):
-            raise ValueError(f"Unsupported node: {node}")
-
-    @override
-    def visit(self, node: NodeT, *args: object, **kwargs: object) -> NodeT:
-        if self.match(node):
-            return self.replace(node)
-        super().visit(node)
-        return node
-
-    def _match_and_replace(self, node: NodeT) -> NodeT:
-        if self.match(node):
-            return self.replace(node)
-        else:
-            return self.visit(node)
-
-    def _match_and_replace_list(self, nodes: list[nodes.Node] | None) -> None:
-        if nodes is None:
-            return
-        for idx in range(len(nodes)):
-            nodes[idx] = self._match_and_replace(nodes[idx])
-
-    def visit_Template(self, node: nodes.Template) -> None:
-        self._match_and_replace_list(node.body)
-
-    def visit_Output(self, node: nodes.Output) -> None:
-        self._match_and_replace_list(cast(list[nodes.Node], node.nodes))
-
-    def visit_Compare(self, node: nodes.Compare) -> None:
-        node.expr = self._match_and_replace(node.expr)
-        self._match_and_replace_list(cast(list[nodes.Node], node.ops))
-
-    def visit_Operand(self, node: nodes.Operand) -> None:
-        node.expr = self._match_and_replace(node.expr)
-
-    def visit_List(self, node: nodes.List) -> None:
-        self._match_and_replace_list(cast(list[nodes.Node], node.items))
-
-    def visit_Dict(self, node: nodes.Dict) -> None:
-        self._match_and_replace_list(cast(list[nodes.Node], node.items))
-
-    def visit_Pair(self, node: nodes.Pair) -> None:
-        node.key = self._match_and_replace(node.key)
-        node.value = self._match_and_replace(node.value)
-
-    def visit_Not(self, node: nodes.Not) -> None:
-        node.node = self._match_and_replace(node.node)
-
-    def visit_BinExpr(self, node: nodes.BinExpr) -> None:
-        node.left = self._match_and_replace(node.left)
-        node.right = self._match_and_replace(node.right)
-
-    def visit_UnaryExpr(self, node: nodes.UnaryExpr) -> None:
-        node.node = self._match_and_replace(node.node)
-
-    def visit_Concat(self, node: nodes.Concat) -> None:
-        self._match_and_replace_list(cast(list[nodes.Node], node.nodes))
-
-    def visit_CondExpr(self, node: nodes.CondExpr) -> None:
-        node.expr1 = self._match_and_replace(node.expr1)
-        node.test = self._match_and_replace(node.test)
-        if node.expr2 is not None:
-            node.expr2 = self._match_and_replace(node.expr2)
-
-    def visit_If(self, node: nodes.If) -> None:
-        node.test = self._match_and_replace(node.test)
-        self._match_and_replace_list(node.body)
-        self._match_and_replace_list(cast(list[nodes.Node], node.elif_))
-        self._match_and_replace_list(node.else_)
-
-    def visit_FilterBlock(self, node: nodes.FilterBlock) -> None:
-        node.filter = self._match_and_replace(node.filter)
-        self._match_and_replace_list(node.body)
-
-    def visit_For(self, node: nodes.For) -> None:
-        node.target = self._match_and_replace(node.target)
-        node.iter = self._match_and_replace(node.iter)
-        self._match_and_replace_list(node.body)
-        self._match_and_replace_list(node.else_)
-
-    def visit_Tuple(self, node: nodes.Tuple) -> None:
-        self._match_and_replace_list(cast(list[nodes.Node], node.items))
-
-    def visit_Assign(self, node: nodes.Assign) -> None:
-        node.node = self._match_and_replace(node.node)
-        node.target = self._match_and_replace(node.target)
-
-    def visit_AssignBlock(self, node: nodes.AssignBlock) -> None:
-        self._match_and_replace_list(node.body)
-        node.target = self._match_and_replace(node.target)
-        if node.filter is not None:
-            node.filter = self._match_and_replace(node.filter)
-
-    def visit_Slice(self, node: nodes.Slice) -> None:
-        if node.start:
-            node.start = self._match_and_replace(node.start)
-        if node.stop:
-            node.stop = self._match_and_replace(node.stop)
-        if node.step:
-            node.step = self._match_and_replace(node.step)
-
-    def visit_Test(self, node: nodes.Test) -> None:
-        node.node = self._match_and_replace(node.node)
-        self._match_and_replace_list(cast(list[nodes.Node], node.args))
-        self._match_and_replace_list(cast(list[nodes.Node], node.kwargs))
-        if node.dyn_args is not None:
-            node.dyn_args = self._match_and_replace(node.dyn_args)
-        if node.dyn_kwargs is not None:
-            node.dyn_kwargs = self._match_and_replace(node.dyn_kwargs)
-
-    def visit_Filter(self, node: nodes.Filter) -> None:
-        if node.node is not None:
-            node.node = self._match_and_replace(node.node)
-        self._match_and_replace_list(cast(list[nodes.Node], node.args))
-        self._match_and_replace_list(cast(list[nodes.Node], node.kwargs))
-        if node.dyn_args is not None:
-            node.dyn_args = self._match_and_replace(node.dyn_args)
-        if node.dyn_kwargs is not None:
-            node.dyn_kwargs = self._match_and_replace(node.dyn_kwargs)
-
-    def visit_Call(self, node: nodes.Call) -> None:
-        node.node = self._match_and_replace(node.node)
-        self._match_and_replace_list(cast(list[nodes.Node], node.args))
-        self._match_and_replace_list(cast(list[nodes.Node], node.kwargs))
-        if node.dyn_args is not None:
-            node.dyn_args = self._match_and_replace(node.dyn_args)
-        if node.dyn_kwargs is not None:
-            node.dyn_kwargs = self._match_and_replace(node.dyn_kwargs)
-
-    def visit_Getitem(self, node: nodes.Getitem) -> None:
-        node.node = self._match_and_replace(node.node)
-        node.arg = self._match_and_replace(node.arg)
-
-    def visit_Getattr(self, node: nodes.Getattr) -> None:
-        node.node = self._match_and_replace(node.node)
-
-    def visit_Keyword(self, node: nodes.Keyword) -> None:
-        node.value = self._match_and_replace(node.value)
-
-
-def merge_consecutive_templatedata(ast: nodes.Node) -> nodes.Node:
-    def _check_node(node: nodes.Node) -> bool:
-        return isinstance(node, nodes.Output)
-
-    def _replace_node(node: NodeT) -> NodeT:
-        if not isinstance(node, nodes.Output):
-            return node
-
-        new_nodes: list[nodes.Expr] = []
-        for child in node.nodes:
-            if (
-                not new_nodes
-                or not isinstance(child, nodes.TemplateData)
-                or not isinstance(new_nodes[-1], nodes.TemplateData)
-            ):
-                new_nodes.append(child)
-            else:
-                new_nodes[-1].data += child.data
-
-        # Remove any empty template data. This doesn't functionally change anything
-        # in the expression, but it leads to a difference in the stringifier.
-        if len(new_nodes) > 1:
-            new_nodes = [
-                node
-                for node in new_nodes
-                if not (isinstance(node, nodes.TemplateData) and not node.data)
-            ]
-
-        # Need to cast as the type checker doesn't seem to be able to infer the connection between
-        # this newly connected output and the type guard earlier.
-        return cast(NodeT, nodes.Output(new_nodes))
-
-    return NodeReplacerVisitor(_check_node, _replace_node).visit(ast)
-
-
-def _find_ast_differences(a: nodes.Node, b: nodes.Node) -> Iterable[str]:
-    if a == b:
-        return
-
-    if type(a) is not type(b):
-        yield f"{type(a)} vs {type(b)}"
-        return
-
-    a_children = list(a.iter_child_nodes())
-    b_children = list(b.iter_child_nodes())
-
-    if a_children == b_children:
-        yield f"{type(a)}: Attributes differ: {list(a.iter_fields())} vs {list(b.iter_fields())}"
-        return
-
-    if len(a_children) != len(b_children):
-        yield f"{type(a)}: {len(a_children)} vs {len(b_children)} children: {a} vs {b}"
-        return
-
-    for a_child, b_child in zip(a_children, b_children, strict=True):
-        yield from _find_ast_differences(a_child, b_child)
-
-
-class LookupTarget(BaseModel, frozen=True):
-    pass
-
-
-class NamedLookupTarget(LookupTarget, frozen=True):
-    name: str
-
-
-class LookupTargetLiteral(NamedLookupTarget, frozen=True):
-    @override
-    def __str__(self) -> str:
-        return f"'{self.name}'"
-
-
-class LookupTargetVariable(NamedLookupTarget, frozen=True):
-    @override
-    def __str__(self) -> str:
-        return self.name
-
-
-class LookupTargetUnknown(LookupTarget, frozen=True):
-    value: str
-
-    @override
-    def __str__(self) -> str:
-        return self.value
-
-
-def parse_wrapped_conditional(expr: str, env: Environment) -> nodes.Node:
-    expr = "{% if " + expr + " %} True {% else %} False {% endif %}"
-    ast = env.parse(expr)
-    assert isinstance(ast.body[0], nodes.If)
-    return ast.body[0].test
-
-
-def parse_conditional(
-    expr: str, env: Environment, var_mappings: dict[str, str]
-) -> tuple[nodes.Node, set[str]]:
-    ast = env.parse(expr)
-    if not ast.body:
-        return ast, set()
-
-    assert len(ast.body) == 1
-
-    if not isinstance(ast.body[0], nodes.Output):
-        # Definitely an expression, and likely one we cannot handle properly.
-        logger.warning(
-            f"Weird conditional ({ast.body[0].__class__.__name__}) found: {expr!r}"
-        )
-        return ast, set()
-
-    if all(isinstance(child, nodes.TemplateData) for child in ast.body[0].nodes):
-        # The condition is not a template expression. Wrap it as a condition
-        return parse_wrapped_conditional(expr, env), set()
-
-    # This conditional template expression contains braces.
-    # Ansible will template this, then afterwards feed the result
-    # back into the templar recursively. We can't do that, because
-    # we may not have enough information to evaluate the template.
-    # Instead, we go with a best effort approach.
-
-    # If there is exactly one part to the template, and it references
-    # a variable of which we know the value, we substitute it. We also indicate
-    # the additional reference to the first variable
-    if (
-        len(ast.body[0].nodes) == 1
-        and isinstance(ast.body[0].nodes[0], nodes.Name)
-        and ast.body[0].nodes[0].name in var_mappings
-    ):
-        var_name = ast.body[0].nodes[0].name
-        var_str = var_mappings[var_name]
-        return parse_wrapped_conditional(var_str, env), {var_name}
-
-    # Otherwise, we don't know anything about the variable, so we parse it as is.
-    return ast, set()
-
-
-def create_lookup_target(node: nodes.Node) -> LookupTarget:
-    if isinstance(node, nodes.Name):
-        return LookupTargetVariable(name=node.name)
-
-    if not isinstance(node, nodes.Const) or not isinstance(node.value, str):  # pyright: ignore[reportAny]
-        logger.warning(
-            f"Not extracting lookup plugin target, not a string or variable: {node}"
-        )
-        return LookupTargetUnknown(value=str(node))
-
-    return LookupTargetLiteral(name=node.value)
+from .constants import ANSIBLE_GLOBALS, PURE_FILTERS, PURE_LOOKUP_PLUGINS, PURE_TESTS
 
 
 class FindUndeclaredVariablesVisitor(NodeVisitor):
@@ -650,13 +21,13 @@ class FindUndeclaredVariablesVisitor(NodeVisitor):
         self.declared: set[str] = set(declared)
         self.undeclared: set[str] = set()
 
-    def visit_Name(self, name_node: nodes.Name) -> None:
+    def visit_Name(self, name_node: nodes.Name) -> None:  # noqa: N802
         if name_node.ctx == "load" and name_node.name not in self.declared:
             self.undeclared.add(name_node.name)
         else:
             self.declared.add(name_node.name)
 
-    def visit_Block(self, _block_node: nodes.Block) -> None:
+    def visit_Block(self, _block_node: nodes.Block) -> None:  # noqa: N802
         # Don't visit blocks, they may have local declarations.
         # Not sure if we'd ever need to visit blocks.
         pass
@@ -667,59 +38,44 @@ class TemplateExpressionAST:
     def __init__(self, expression: ast.Expression) -> None:
         self.ast_root = expression.template
         self.raw = expression.raw
-        self.is_conditional = isinstance(expression, ast.Condition)
 
+    @cached_property
+    def referenced_variables(self) -> set[str]:
         var_visitor = FindUndeclaredVariablesVisitor(ANSIBLE_GLOBALS)
         var_visitor.visit(self.ast_root)
-        self.referenced_variables = var_visitor.undeclared
+        return var_visitor.undeclared
 
+    @cached_property
+    def impure_components(self) -> Sequence[str]:
+        """The components that make this expression impure."""
+        return tuple(self._get_impure_components())
+
+    @cached_property
+    def is_pure(self) -> bool:
+        """Whether this expression is pure, i.e., returns the same value if the input values remain the same."""
+        return not self.impure_components
+
+    def _get_calls_to(self, names: Container[str]) -> Sequence[nodes.Call]:
+        """Return all call nodes to certain functions."""
+        return [
+            call_node
+            for call_node in self.ast_root.find_all(nodes.Call)
+            if isinstance(call_node.node, nodes.Name) and call_node.node.name in names
+        ]
+
+    def _get_impure_components(self) -> Iterable[str]:
         dep_visitor = DependencyFinderVisitor()
         dep_visitor.visit(self.ast_root)
 
-        self.used_tests = dep_visitor.tests
-        self.used_filters = dep_visitor.filters
+        if self._get_calls_to(("now",)):
+            yield "function 'now'"
 
-        self.uses_now = any(
-            call_node.node.name == "now"
-            for call_node in self.ast_root.find_all(nodes.Call)
-            if isinstance(call_node.node, nodes.Name)
-        )
-        self.used_lookups: set[LookupTarget] = {
-            create_lookup_target(call_node.args[0])
-            for call_node in self.ast_root.find_all(nodes.Call)
-            if (
-                (isinstance(call_node.node, nodes.Name))
-                and call_node.node.name in ("lookup", "query", "q")
-            )
-        }
+        yield from (f"filter '{op}'" for op in (dep_visitor.filters - PURE_FILTERS))
+        yield from (f"test '{op}'" for op in (dep_visitor.tests - PURE_TESTS))
 
-    def is_literal(self) -> bool:
-        return not self.raw or (
-            len(self.ast_root.body) == 1
-            and isinstance(self.ast_root.body[0], nodes.Output)
-            and len(self.ast_root.body[0].nodes) == 1
-            and isinstance(self.ast_root.body[0].nodes[0], nodes.TemplateData)
-        )
-
-    @classmethod
-    @deprecated("Construct instances directly instead")
-    def parse(cls, expression: str) -> TemplateExpressionAST | None:
-        """Parse an expression to an AST.
-
-        For conditionals (without braces), use `parse_conditional`.
-        """
-        try:
-            return cls(ast.Expression.model_validate(expression))
-        except TemplateSyntaxError as tse:
-            logger.error("Template syntax error: " + str(tse))
-            return None
-
-    @classmethod
-    @deprecated("Construct instances directly instead")
-    def parse_conditional(cls, expression: str) -> TemplateExpressionAST | None:
-        """Parse a conditional expression (without braces) to an AST."""
-        try:
-            return cls(ast.Condition.model_validate(expression))
-        except TemplateSyntaxError as tse:
-            logger.error("Template syntax error: " + str(tse))
-            return None
+        for call in self._get_calls_to(("lookup", "query", "q")):
+            target = call.args[0]
+            if not isinstance(target, nodes.Const):
+                yield f"lookup of non-constant ({target.__class__.__name__})"
+            elif target.value not in PURE_LOOKUP_PLUGINS:  # pyright: ignore[reportAny]
+                yield f"lookup {target.value!r}"  # pyright: ignore[reportAny]
