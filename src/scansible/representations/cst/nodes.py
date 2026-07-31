@@ -8,6 +8,17 @@ from datetime import date, datetime
 from scansible.utils import Position, Positioned
 
 
+def _get_position(position: Position | None, value: object) -> Position:
+    """Return either the position (if defined), the position of the given value, or a synthetic position."""
+    if position is not None:
+        return position
+
+    if isinstance(value, Positioned):
+        return value.__position__
+
+    return Position.synthetic()
+
+
 class YamlNode(Positioned):
     """Base class for YAML nodes."""
 
@@ -18,21 +29,21 @@ class YamlNode(Positioned):
 class YamlStr(str, YamlNode):
     """String originating from a YAML document, with position information."""
 
-    def __new__(cls, value: str, position: Position) -> Self:
+    def __new__(cls, value: str, *, position: Position | None = None) -> Self:
         # ruamel.yaml inserts <BEL> (0x07, \a) characters in multi-line folded strings to indicate
         # where the string was split, so that the split can be reconstructed later. Remove these.
         # TODO: We should probably also keep track of these so we can track source positions during string manipulation.
         obj = str.__new__(cls, value.replace("\a", ""))
-        obj.__position__ = position
+        obj.__position__ = _get_position(position, value)
         return obj
 
 
 class YamlInt(int, YamlNode):
     """Integer originating from a YAML document, with position information."""
 
-    def __new__(cls, value: int, position: Position) -> Self:
+    def __new__(cls, value: int, *, position: Position | None = None) -> Self:
         obj = int.__new__(cls, value)
-        obj.__position__ = position
+        obj.__position__ = _get_position(position, value)
         return obj
 
 
@@ -46,9 +57,14 @@ class YamlBool(YamlNode):
 
     __position__: Position
 
-    def __init__(self, value: bool, position: Position) -> None:  # noqa: FBT001
+    def __init__(
+        self,
+        value: bool,  # noqa: FBT001
+        *,
+        position: Position | None = None,
+    ) -> None:
         self._real_bool = value
-        self.__position__ = position
+        self.__position__ = _get_position(position, value)
 
     def __bool__(self) -> bool:
         return self._real_bool
@@ -71,25 +87,25 @@ class YamlBool(YamlNode):
 class YamlFloat(float, YamlNode):
     """Float originating from a YAML document, with position information."""
 
-    def __new__(cls, value: float, position: Position) -> Self:
+    def __new__(cls, value: float, *, position: Position | None = None) -> Self:
         obj = float.__new__(cls, value)
-        obj.__position__ = position
+        obj.__position__ = _get_position(position, value)
         return obj
 
 
 class YamlDate(date, YamlNode):
     """Date originating from a YAML document, with position information."""
 
-    def __new__(cls, value: date, position: Position) -> Self:
+    def __new__(cls, value: date, *, position: Position | None = None) -> Self:
         obj = date.__new__(cls, value.year, value.month, value.day)
-        obj.__position__ = position
+        obj.__position__ = _get_position(position, value)
         return obj
 
 
 class YamlDatetime(datetime, YamlNode):
     """Datetime originating from a YAML document, with position information."""
 
-    def __new__(cls, value: datetime, position: Position) -> Self:
+    def __new__(cls, value: datetime, *, position: Position | None = None) -> Self:
         obj = datetime.__new__(
             cls,
             value.year,
@@ -101,16 +117,16 @@ class YamlDatetime(datetime, YamlNode):
             value.microsecond,
             value.tzinfo,
         )
-        obj.__position__ = position
+        obj.__position__ = _get_position(position, value)
         return obj
 
 
 class YamlVaultValue(str, YamlNode):
     """Vault-encrypted value originating from a YAML document, with position information."""
 
-    def __new__(cls, value: str, position: Position) -> Self:
+    def __new__(cls, value: str, *, position: Position | None = None) -> Self:
         obj = str.__new__(cls, value)
-        obj.__position__ = position
+        obj.__position__ = _get_position(position, value)
         return obj
 
 
@@ -119,9 +135,9 @@ class YamlUnsafeStr(str, YamlNode):
 
     Unsafe strings should not be templated."""
 
-    def __new__(cls, value: str, position: Position) -> Self:
+    def __new__(cls, value: str, *, position: Position | None = None) -> Self:
         obj = str.__new__(cls, value)
-        obj.__position__ = position
+        obj.__position__ = _get_position(position, value)
         return obj
 
 
@@ -134,8 +150,8 @@ class YamlNone(YamlNode):
 
     __position__: Position
 
-    def __init__(self, position: Position) -> None:
-        self.__position__ = position
+    def __init__(self, *, position: Position | None = None) -> None:
+        self.__position__ = position or Position.synthetic()
 
     def __bool__(self) -> bool:
         return False
@@ -158,12 +174,17 @@ class YamlSeq[T: YamlValue](list[T], YamlNode):
 
     __position__: Position
 
-    def __init__(self, value: Iterable[T] | None = None, *, position: Position) -> None:
+    def __init__(
+        self,
+        value: Iterable[T] | None = None,
+        *,
+        position: Position | None = None,
+    ) -> None:
         if value is not None:
             super().__init__(value)
         else:
             super().__init__()
-        self.__position__ = position
+        self.__position__ = _get_position(position, value)
 
 
 class YamlMap[K: YamlScalar, V: YamlValue](dict[K, V], YamlNode):
@@ -172,13 +193,16 @@ class YamlMap[K: YamlScalar, V: YamlValue](dict[K, V], YamlNode):
     __position__: Position
 
     def __init__(
-        self, value: Iterable[tuple[K, V]] | None = None, *, position: Position
+        self,
+        value: Iterable[tuple[K, V]] | None = None,
+        *,
+        position: Position | None = None,
     ) -> None:
         if value is not None:
             super().__init__(value)
         else:
             super().__init__()
-        self.__position__ = position
+        self.__position__ = _get_position(position, value)
 
     @override
     def copy(self) -> YamlMap[K, V]:

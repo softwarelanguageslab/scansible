@@ -9,5 +9,3 @@ from datetime import date, datetime
 type ScalarValue = str | int | bool | float | date | datetime | None
 #: Scalar or (possibly recursive) composite values.
 type AnyValue = ScalarValue | Sequence[AnyValue] | Mapping[ScalarValue, AnyValue]
-#: Possibly-recursive composite values.
-type CompositeValue = Sequence[AnyValue] | Mapping[ScalarValue, AnyValue]

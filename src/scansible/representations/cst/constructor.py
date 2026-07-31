@@ -53,31 +53,31 @@ class CustomConstructor(SafeConstructor):
     @override
     def construct_yaml_str(self, node: Node) -> YamlStr:
         value = super().construct_yaml_str(node)
-        obj = YamlStr(value, self._get_position(node))
+        obj = YamlStr(value, position=self._get_position(node))
         return obj
 
     @override
     def construct_yaml_int(self, node: Node) -> YamlInt:
         value = super().construct_yaml_int(node)
-        obj = YamlInt(value, self._get_position(node))
+        obj = YamlInt(value, position=self._get_position(node))
         return obj
 
     @override
     def construct_yaml_float(self, node: Node) -> YamlFloat:
         value = super().construct_yaml_float(node)
-        obj = YamlFloat(value, self._get_position(node))
+        obj = YamlFloat(value, position=self._get_position(node))
         return obj
 
     @override
     def construct_yaml_bool(self, node: Node) -> YamlBool:  # pyright: ignore[reportIncompatibleMethodOverride]
         value = super().construct_yaml_bool(node)
-        obj = YamlBool(value, self._get_position(node))
+        obj = YamlBool(value, position=self._get_position(node))
         return obj
 
     @override
     def construct_yaml_null(self, node: Node) -> YamlNone:
         super().construct_yaml_null(node)
-        obj = YamlNone(self._get_position(node))
+        obj = YamlNone(position=self._get_position(node))
         return obj
 
     @override
@@ -85,10 +85,10 @@ class CustomConstructor(SafeConstructor):
         value = super().construct_yaml_timestamp(node, values)
         # `datetime` is a subclass of `date`, so it must be checked first.
         if isinstance(value, datetime):
-            obj = YamlDatetime(value, self._get_position(node))
+            obj = YamlDatetime(value, position=self._get_position(node))
         else:
             assert isinstance(value, date)
-            obj = YamlDate(value, self._get_position(node))
+            obj = YamlDate(value, position=self._get_position(node))
         return obj
 
     @override
@@ -107,7 +107,7 @@ class CustomConstructor(SafeConstructor):
 
     def construct_vault_value(self, node: Node) -> YamlVaultValue:
         value = self.construct_scalar(node)
-        obj = YamlVaultValue(value, self._get_position(node))
+        obj = YamlVaultValue(value, position=self._get_position(node))
         return obj
 
     def construct_unsafe_value(self, node: Node) -> YamlUnsafeStr:
@@ -115,7 +115,7 @@ class CustomConstructor(SafeConstructor):
         # to each YamlNode indicating whether it's unsafe, and set the attribute for any contained value?
         # FIXME: This might also contain other data types?
         value = self.construct_scalar(node)
-        obj = YamlUnsafeStr(value, self._get_position(node))
+        obj = YamlUnsafeStr(value, position=self._get_position(node))
         return obj
 
 

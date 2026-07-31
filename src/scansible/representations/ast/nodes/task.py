@@ -19,8 +19,13 @@ from ansible.parsing.splitter import (  # pyright: ignore[reportMissingTypeStubs
 )
 from pydantic import Discriminator, Field, Tag, field_validator, model_validator
 
-from scansible.representations.cst import parse_file
-from scansible.types import AnyValue, ScalarValue
+from scansible.representations.cst import (
+    YamlMap,
+    YamlScalar,
+    YamlStr,
+    YamlValue,
+    parse_file,
+)
 from scansible.utils import ProjectPath, actions
 
 from ..common import ExtractionContext, RawDirectives
@@ -181,7 +186,7 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
         if "local_action" in ds:
             ds["action"] = ds.pop("local_action")
             # This unconditionally overrides any other delegation set.
-            ds["delegate_to"] = "localhost"
+            ds["delegate_to"] = YamlStr("localhost")
 
         # Find action from unrecognized directives
         for k in list(ds.keys()):
@@ -192,7 +197,7 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
                     f"Conflicting action statements: {k} vs {ds['action']}"
                 )
             old_style = False
-            ds["action"] = k
+            ds["action"] = YamlStr(k)
 
         if "action" not in ds:
             raise ValueError("No action found in task")
@@ -223,45 +228,49 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
         """
         # args have lower priority than specially-parsed arguments on the action.
         # Add from lowest to highest priority, will be combined at the end.
-        arg_list: list[AnyValue] = [cls._parse_task_level_args(ds)]
+        arg_list: list[YamlValue] = [cls._parse_task_level_args(ds)]
         action, action_args = cls._flatten_old_style_action_and_arguments(
             ds.pop("action")
         )
         arg_list.extend(action_args)
+        # FIXME: We need to propagate positions manually as
+        # 1) `parse_kv` and `split_args` operate on `str`, not `YamlStr`
+        # and 2) `YamlStr.split` and other operations don't propagate yet.
+        orig_position = action.__position__
 
         # action could be "xyz" or "xyz a=b c=d", split it.
         try:
             [action, *freeform_args] = cast(list[str], split_args(action))
         except AnsibleParserError as e:
             raise ValueError("Malformed action string") from e
-        arg_list.append(" ".join(freeform_args))
+        arg_list.append(YamlStr(" ".join(freeform_args), position=orig_position))
 
-        ds["action"] = action
+        ds["action"] = YamlStr(action, position=orig_position)
         ds["args"] = cls._combine_args(action, *arg_list)
 
         return ds
 
     @classmethod
     def _flatten_old_style_action_and_arguments(
-        cls, action: AnyValue
-    ) -> tuple[str, list[AnyValue]]:
+        cls, action: YamlValue
+    ) -> tuple[YamlStr, list[YamlValue]]:
         """Given an old-style action specification, extract the action and separate the arguments."""
-        arg_list: list[AnyValue] = []
+        arg_list: list[YamlValue] = []
         if isinstance(action, dict):
             # action is like { module: "xyz", a: b, ... }
             if "module" not in action:
                 raise ValueError("No action detected in old-style task")
             args = action
-            action = args.pop("module")
+            action = args.pop(YamlStr("module"))
             arg_list.append(args)
             if "args" in args:
                 # action is like { module: "xyz", args: { ... }}
-                arg_list.append(args.pop("args"))
+                arg_list.append(args.pop(YamlStr("args")))
 
         if not isinstance(action, str):
             raise ValueError("Expected action to be a string")
 
-        return action, arg_list
+        return YamlStr(action), arg_list
 
     @classmethod
     def _parse_new_style_module_arguments(cls, ds: RawDirectives) -> RawDirectives:
@@ -286,36 +295,46 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
         return ds
 
     @classmethod
-    def _parse_args(cls, action: str, args: str) -> Mapping[ScalarValue, AnyValue]:
+    def _parse_args(cls, action: str, args: str) -> Mapping[YamlScalar, YamlValue]:
         """Parse a raw `key=value` argument string, treating `action` specially if it's a freeform action."""
         check_raw = actions.is_freeform_action(action)
+        # Coerce to YamlStr because we shouldn't assume it actually is before accessing position information.
+        args = YamlStr(args)
         try:
-            return parse_kv(args, check_raw)
+            parsed = cast(dict[str, str], parse_kv(args, check_raw))
+            # Re-introduce positions that got lost during `parse_kv`.
+            return YamlMap(
+                (
+                    YamlStr(k, position=args.__position__),
+                    YamlStr(v, position=args.__position__),
+                )
+                for k, v in parsed.items()
+            )
         except AnsibleParserError as e:
             raise ValueError("Malformed action args string") from e
 
     @classmethod
-    def _parse_task_level_args(
-        cls, ds: RawDirectives
-    ) -> Mapping[ScalarValue, AnyValue]:
+    def _parse_task_level_args(cls, ds: RawDirectives) -> YamlValue:
         """Pop and normalize the task-level `args` directive."""
-        task_args = ds.pop("args", {})
+        task_args = ds.pop("args", YamlMap())
         if isinstance(task_args, str):
-            task_args = {"_variable_params": task_args}
-        return task_args  # pyright: ignore[reportReturnType]
+            task_args = YamlMap[YamlScalar, YamlValue](
+                [(YamlStr("_variable_params"), task_args)]
+            )
+        return task_args
 
     @classmethod
-    def _combine_args(cls, action: str, *arg_list: AnyValue) -> AnyValue:
+    def _combine_args(cls, action: str, *arg_list: YamlValue) -> YamlValue:
         """Merge multiple argument sources into one dict, lowest to highest priority."""
-        combined_args = {}
+        combined_args = YamlMap[YamlScalar, YamlValue]()
         for args in arg_list:
             if isinstance(args, str):
                 args = cls._parse_args(action, args)
             if args == None:  # could be YamlNone
-                args = {}
+                continue
             if not isinstance(args, dict):
                 raise ValueError("Expected args to be a dictionary")
-            combined_args.update(args)  # pyright: ignore[reportUnknownMemberType]
+            combined_args.update(args)
 
         return combined_args
 
@@ -338,7 +357,10 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
             # context and based on whether the file exists, and fall back to
             # dynamic inclusion if that fails. This may lead to slightly different
             # semantics than our approximation here.
-            ds["action"] = "import_tasks" if is_static else "include_tasks"
+            ds["action"] = YamlStr(
+                "import_tasks" if is_static else "include_tasks",
+                position=action.__position__,
+            )
         elif actions.is_include_tasks(action) and is_static is True:
             raise ValueError("include_tasks with static: yes")
         elif actions.is_import_tasks(action) and is_static is False:
@@ -352,7 +374,7 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
         for k in set(ds):
             if not k.startswith("with_"):
                 continue
-            loop_name = k.removeprefix("with_")
+            loop_name = YamlStr(k.removeprefix("with_"))
             if "loop" in ds or "loop_with" in ds:
                 raise ValueError("duplicate loop statements")
             ds["loop"] = ds.pop(k)

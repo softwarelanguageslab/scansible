@@ -6,12 +6,12 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ValidationError
 
-from scansible.types import AnyValue
+from scansible.representations.cst import YamlValue
 
 from ._validators import RelativePath
 
 #: Raw dictionaries of Ansible entities.
-type RawDirectives = dict[str, AnyValue]
+type RawDirectives = dict[str, YamlValue]
 
 
 class ExtractionContext:

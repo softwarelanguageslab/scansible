@@ -1118,7 +1118,7 @@ def describe_glitch_test_cases() -> None:
             RuleResult(
                 WeakCryptoAlgorithmRule.name,
                 WeakCryptoAlgorithmRule.description,
-                "pb.yml:8:19",
+                "pb.yml:9:26",
                 "pb.yml:8:19",
             ),
         ]

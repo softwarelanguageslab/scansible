@@ -8,6 +8,8 @@ from typing import cast
 
 from pydantic import BaseModel, Field, model_validator
 
+from scansible.representations.cst import YamlBool, YamlMap, YamlStr
+
 from ..common import RawDirectives
 from .expression import (
     AnyExpression,
@@ -131,7 +133,7 @@ class CommonDirectives(BaseModel, frozen=True):
         suffixes = ("", "_user", "_exe", "_flags", "_pass")
 
         # If sudo or su is specified as directive, we can mark those as the become-method.
-        ds["become_method"] = prefix
+        ds["become_method"] = YamlStr(prefix)
 
         # Transform each (derived) directive to use `become`.
         for suffix in suffixes:
@@ -140,10 +142,10 @@ class CommonDirectives(BaseModel, frozen=True):
 
             if suffix == "_pass" and old_directive in ds:
                 # There's no `become_pass` alternative, so define the variable instead.
-                variables = ds.get("vars", {})
+                variables = ds.get("vars", YamlMap())
                 if not isinstance(variables, dict):
                     raise ValueError("Expected `vars` directive to carry a dictionary")
-                variables["ansible_become_password"] = ds.pop(old_directive)
+                variables[YamlStr("ansible_become_password")] = ds.pop(old_directive)
                 ds["vars"] = variables
                 continue
 
@@ -157,10 +159,10 @@ class CommonDirectives(BaseModel, frozen=True):
         """Translate the removed `always_run` directive to `check_mode`."""
         # `always_run` is an old, now-removed directive which has since been
         # replaced by the `check_mode: no` directive.
-        if ds.pop("always_run", None):
+        if always_run := ds.pop("always_run", None):
             # if `always_run: yes` -> `check_mode: no`.
             # not sure if `always_run: no` necessarily means `check_mode: yes` or
             # just "use default behaviour".
-            ds["check_mode"] = False
+            ds["check_mode"] = YamlBool(False, position=always_run.__position__)  # noqa: FBT003
 
         return ds
