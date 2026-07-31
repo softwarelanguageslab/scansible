@@ -16,8 +16,8 @@ from .base import TaskExtractor
 class SetFactTaskExtractor(TaskExtractor):
     @classmethod
     @override
-    def SUPPORTED_TASK_ATTRIBUTES(cls) -> frozenset[str]:
-        return super().SUPPORTED_TASK_ATTRIBUTES().union({"loop", "loop_control"})
+    def supported_task_attributes(cls) -> frozenset[str]:
+        return super().supported_task_attributes().union({"loop", "loop_control"})
 
     @override
     def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:

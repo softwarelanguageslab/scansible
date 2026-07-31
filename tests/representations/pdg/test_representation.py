@@ -62,7 +62,7 @@ def a_node() -> None:
 
 @behaves_like(a_node)
 def describe_task() -> None:
-    @pytest.fixture()
+    @pytest.fixture
     def factory() -> NodeFactory:
         return lambda loc: rep.Task(
             action="file", name="Ensure file exists", location=loc
@@ -88,7 +88,7 @@ def describe_task() -> None:
 
 @behaves_like(a_node)
 def describe_variable() -> None:
-    @pytest.fixture()
+    @pytest.fixture
     def factory() -> NodeFactory:
         return lambda loc: rep.Variable(
             name="a_var", version=1, value_version=1, scope_level=1, location=loc
@@ -108,15 +108,15 @@ def describe_variable() -> None:
 
 @behaves_like(a_node)
 def describe_literal() -> None:
-    @pytest.fixture()
+    @pytest.fixture
     def factory() -> NodeFactory:
         return lambda loc: rep.ScalarLiteral(type="bool", value=True, location=loc)
 
-    @pytest.mark.parametrize("type", ["bool", "str", "list"])
-    def should_have_type(type: Literal["bool", "str", "list"]) -> None:
-        lit = rep.ScalarLiteral(type=type, value=None)
+    @pytest.mark.parametrize("type_", ["bool", "str", "list"])
+    def should_have_type(type_: Literal["bool", "str", "list"]) -> None:
+        lit = rep.ScalarLiteral(type=type_, value=None)
 
-        assert lit.type == type
+        assert lit.type == type_
 
     def should_reject_invalid_types() -> None:
         with pytest.raises(ValueError):
@@ -136,15 +136,15 @@ def describe_literal() -> None:
 
 @behaves_like(a_node)
 def describe_expression() -> None:
-    @pytest.fixture()
+    @pytest.fixture
     def factory() -> NodeFactory:
         return lambda loc: rep.Expression(expr="{{ template_expr }}", location=loc)
 
     @pytest.mark.parametrize("expr", ["something", "{{ something }}"])
     def should_have_expr(expr: str) -> None:
-        exprNode = rep.Expression(expr=expr)
+        expr_node = rep.Expression(expr=expr)
 
-        assert exprNode.expr == expr
+        assert expr_node.expr == expr
 
     @pytest.mark.parametrize("expr", [[], "", 1])
     def should_reject_invalid_expr(expr: object) -> None:
@@ -159,7 +159,7 @@ def describe_construction() -> None:
         assert g is not None
 
 
-@pytest.fixture()
+@pytest.fixture
 def g() -> rep.Graph:
     g = rep.Graph()
     assert g.num_nodes == 0
@@ -340,7 +340,7 @@ def validated_edge() -> None:
 
 @behaves_like(validated_edge)
 def describe_order_edge() -> None:
-    @pytest.fixture()
+    @pytest.fixture
     def edge_type() -> rep.Edge:
         return rep.ORDER
 
@@ -370,7 +370,7 @@ def describe_order_edge() -> None:
 
 @behaves_like(validated_edge)
 def describe_use_edge() -> None:
-    @pytest.fixture()
+    @pytest.fixture
     def edge_type() -> rep.Edge:
         return rep.USE
 
@@ -399,7 +399,7 @@ def describe_use_edge() -> None:
 
 @behaves_like(validated_edge)
 def describe_def_edge() -> None:
-    @pytest.fixture()
+    @pytest.fixture
     def edge_type() -> rep.Edge:
         return rep.DEF
 
@@ -431,7 +431,7 @@ def describe_def_edge() -> None:
 
 @behaves_like(validated_edge)
 def describe_kw_edge() -> None:
-    @pytest.fixture()
+    @pytest.fixture
     def edge_type() -> rep.Edge:
         return rep.Keyword(keyword="args.param")
 

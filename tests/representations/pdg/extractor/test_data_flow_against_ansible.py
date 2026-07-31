@@ -12,6 +12,7 @@ import tempfile
 from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from pathlib import Path
+from pprint import pprint
 from textwrap import dedent
 
 import jinja2
@@ -71,7 +72,7 @@ class Block:
         print(f"{level} {self.block_name}: {self.var_deps}")
         if self.parent is None:
             return self.var_deps
-        return {**self.parent._all_var_deps(level + 1), **self.var_deps}
+        return {**self.parent._all_var_deps(level + 1), **self.var_deps}  # noqa: SLF001
 
     def __init__(self, name: str, parent: Block | None = None) -> None:
         self.block_name = name
@@ -181,14 +182,14 @@ class CodeGen:
 
     def _add_default(self) -> None:
         name = self.draw(_ansible_var_names)
-        val = self._draw_value(name, self.defaults_block, False)
+        val = self._draw_value(name, self.defaults_block, defined_at_runtime=False)
         self.defaults_block.content[0][name] = val
         self._add_init_print(name)
         self._used_variables.add(name)
 
     def _add_role_var(self) -> None:
         name = self.draw(_ansible_var_names)
-        val = self._draw_value(name, self.vars_block, False)
+        val = self._draw_value(name, self.vars_block, defined_at_runtime=False)
         self.vars_block.content[0][name] = val
         self._add_init_print(name)
         self._used_variables.add(name)
@@ -317,7 +318,11 @@ class CodeGen:
         return str(self.last_val - 1)
 
     def _draw_value(
-        self, name: str, from_block: Block | None = None, def_at_runtime: bool = True
+        self,
+        name: str,
+        from_block: Block | None = None,
+        *,
+        defined_at_runtime: bool = True,
     ) -> str:
         if from_block is None:
             from_block = self.curr_block
@@ -325,7 +330,7 @@ class CodeGen:
         reusable_vars = [
             var_name for var_name in from_block.all_var_deps if var_name != name
         ]
-        if not def_at_runtime:
+        if not defined_at_runtime:
             # Role vars or role defaults, need to check the chain to prevent
             # recursive definitions
             reusable_vars = [
@@ -362,7 +367,7 @@ class CodeGen:
         return f"{{{{ {reuse_var} }}}}"
 
     def _add_print(
-        self, name: str, to_stack: Block | None = None, prepend: bool = False
+        self, name: str, to_stack: Block | None = None, *, prepend: bool = False
     ) -> None:
         if to_stack is None:
             to_stack = self.curr_block
@@ -430,7 +435,7 @@ def test_inferred_dataflow_matches_actual(playbooks: list[PlaybookFile]) -> None
         try:
             graph = _parse_graph(playbook_dir / "roles" / "test")
         except RecursionError:
-            _ = assume(False)
+            _ = assume(False)  # noqa: FBT003
             return
 
         try:
@@ -566,7 +571,6 @@ def _observe_dataflow(playbook_dir: Path) -> Dataflow:
     assert not proc.returncode, proc.stderr
     out = json.loads(proc.stdout)
     result: list[str] = []
-    from pprint import pprint
 
     pprint(out["plays"][0]["tasks"])
     for t in out["plays"][0]["tasks"]:

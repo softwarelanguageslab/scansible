@@ -17,7 +17,7 @@ from scansible.representations import ast
 from scansible.representations.pdg.representation import ValidTypeStr
 
 _AST_TYPE_NAME_TO_BUILTIN_NAME: dict[str, ValidTypeStr] = {
-    # FIXME this can likely be parsed better
+    # FIXME: this can likely be parsed better
     "IntLiteral": "int",
     "StrLiteral": "str",
     "SeqLiteral": "list",

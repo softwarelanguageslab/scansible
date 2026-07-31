@@ -31,7 +31,7 @@ def describe_extracting_roles():
 
         result = Role.load(ProjectPath.from_root(tmp_path), ctx)
 
-        assert result.path == Path(".")
+        assert result.path == Path()
         tf = result.main_tasks_file
         assert tf is not None
         assert len(result.task_files) == 1
@@ -71,7 +71,7 @@ def describe_extracting_roles():
 
         result = Role.load(ProjectPath.from_root(tmp_path), ctx)
 
-        assert result.path == Path(".")
+        assert result.path == Path()
         assert len(result.task_files) == 1
         assert len(result.default_var_files) == 1
         assert len(result.role_var_files) == 0
@@ -91,7 +91,7 @@ def describe_extracting_roles():
 
         result = Role.load(ProjectPath.from_root(tmp_path), ctx)
 
-        assert result.path == Path(".")
+        assert result.path == Path()
         assert len(result.task_files) == 0
         assert len(result.default_var_files) == 1
         assert len(result.role_var_files) == 0
@@ -119,7 +119,7 @@ def describe_extracting_roles():
 
         result = Role.load(ProjectPath.from_root(tmp_path), ctx)
 
-        assert result.path == Path(".")
+        assert result.path == Path()
         assert result.meta_file is None
         assert len(result.task_files) == 1
         assert len(result.default_var_files) == 1
@@ -146,7 +146,7 @@ def describe_extracting_roles():
 
         result = Role.load(ProjectPath.from_root(tmp_path), ctx, extract_all=True)
 
-        assert result.path == Path(".")
+        assert result.path == Path()
         assert len(result.task_files) == 2
         assert len(result.default_var_files) == 1
         assert len(result.role_var_files) == 0

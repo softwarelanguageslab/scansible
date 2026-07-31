@@ -93,7 +93,7 @@ class UnusedOverriddenRule(Rule):
 
             warning_header = f'Unused variable "{name}@{v2.version}" because it is already defined at higher precedence.'
             warning_expl_lines = [
-                f"Variable {v2!r}, defined in {v2.location!r}, is never used because it is shadowed by {v1!r}, defined in {v1.location!r}, which takes precedence.",
+                f"Variable {v2!r}, defined in {v2.location!r}, is never used because it is shadowed by {v1!r}, defined in {v1.location!r}, which takes precedence."
             ]
 
             yield RuleResult(

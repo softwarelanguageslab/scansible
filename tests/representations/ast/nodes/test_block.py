@@ -18,7 +18,7 @@ def describe_extracting_blocks():
               - name: test2
                 file: {}
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Block.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -41,7 +41,7 @@ def describe_extracting_blocks():
               - name: test3
                 file: {}
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Block.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -65,7 +65,7 @@ def describe_extracting_blocks():
                   - name: test
                     file: {}
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Block.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -90,7 +90,7 @@ def describe_extracting_blocks():
             delegate_to: otherhost
             delegate_facts: yes
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Block.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -100,14 +100,14 @@ def describe_extracting_blocks():
         assert c.raw == "some_condition"
         assert result.notify == ("a handler",)
         assert result.delegate_to == "otherhost"
-        assert result.delegate_facts == BoolLiteral(True)
+        assert result.delegate_facts == BoolLiteral(True)  # noqa: FBT003
 
     def does_not_eagerly_load_import_tasks():
         yaml = """
             block:
               - import_tasks: test
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Block.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -121,7 +121,7 @@ def describe_extracting_blocks():
         yaml = """
             import_tasks: test
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError):
             _ = Block.model_validate(parse_yaml_dict(yaml), context=ctx)
@@ -131,7 +131,7 @@ def describe_extracting_blocks():
             rescue:
                 - file: {}
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError):
             _ = Block.model_validate(parse_yaml_dict(yaml), context=ctx)
@@ -142,7 +142,7 @@ def describe_extracting_blocks():
             rescue:
                 - file: {}
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError):
             _ = Block.model_validate(parse_yaml_dict(yaml), context=ctx)

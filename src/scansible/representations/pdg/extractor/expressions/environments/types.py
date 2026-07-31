@@ -56,10 +56,7 @@ type LocalEnvType = Literal[
 
 
 """Environments which can be stacked, i.e., for which a new environment can be created and destroyed."""
-LOCAL_ENV_TYPES: set[EnvironmentType] = {
-    lit
-    for lit in get_args(LocalEnvType.__value__)  # pyright: ignore[reportAny]
-}
+LOCAL_ENV_TYPES: set[EnvironmentType] = set(get_args(LocalEnvType.__value__))  # pyright: ignore[reportAny]
 
 """Environments which cannot be stacked."""
 GLOBAL_ENV_TYPES = set(EnvironmentType) - LOCAL_ENV_TYPES

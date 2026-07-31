@@ -137,7 +137,7 @@ class Edge(abc.ABC, _FrozenRepresentation, frozen=True):
     @classmethod
     @abc.abstractmethod
     def raise_if_disallowed(cls, source: Node, target: Node) -> None:
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 class ControlFlowEdge(Edge, frozen=True):

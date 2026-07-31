@@ -38,7 +38,7 @@ class VariablesExtractor:
                 # never be reachable in the AST.
                 # TODO: Change this if we'd ever support `host_vars` access, etc.
                 logger.warning(
-                    f"Ignoring variable {var_name!r}: Variable name is not a valid identifier: {e}",
+                    f"Ignoring variable {var_name!r}: Variable name is not a valid identifier: {e}"
                 )
                 continue
             var_node = self.context.vars.define_initialised_variable(

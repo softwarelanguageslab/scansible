@@ -30,7 +30,7 @@ def describe_extracting_handler_files():
               listen: a topic
         """
         _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = HandlerFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
@@ -45,7 +45,7 @@ def describe_extracting_handler_files():
     def allows_handler_files_to_be_empty(tmp_path: Path):
         yaml = "# just a comment"
         _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = HandlerFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
@@ -67,7 +67,7 @@ def describe_extracting_handler_files():
                   listen: block handler
         """
         _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = HandlerFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
@@ -83,7 +83,7 @@ def describe_extracting_handler_files():
     @pytest.mark.parametrize("content", ["hello: world"])  # dict  # string
     def rejects_invalid_files(tmp_path: Path, content: str):
         _ = (tmp_path / "main.yml").write_text(content)
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError, match="Expected a sequence"):
             _ = HandlerFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
@@ -97,7 +97,7 @@ def describe_extracting_handler_files():
                 name: test.txt
         """
         _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-        ctx = ExtractionContext(True)
+        ctx = ExtractionContext(lenient=True)
 
         result = HandlerFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
@@ -117,7 +117,7 @@ def describe_extracting_handler_files():
                     name: test.txt
         """
         _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-        ctx = ExtractionContext(True)
+        ctx = ExtractionContext(lenient=True)
 
         result = HandlerFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 

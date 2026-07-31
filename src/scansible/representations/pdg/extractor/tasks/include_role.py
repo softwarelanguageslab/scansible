@@ -39,10 +39,7 @@ class IncludeRoleExtractor(DynamicIncludesExtractor[ast.Role]):
         )
 
     @override
-    def _get_filename_candidates(
-        self,
-        included_name_pattern: str,
-    ) -> set[str]:
+    def _get_filename_candidates(self, included_name_pattern: str) -> set[str]:
         logger.warning("Conditions for include_role not set yet!")
         return self.context.include_ctx.find_matching_roles(included_name_pattern)
 
@@ -54,6 +51,7 @@ class IncludeRoleExtractor(DynamicIncludesExtractor[ast.Role]):
     def _extract_included_content(
         self, included_content: ast.Role, predecessors: Sequence[rep.ControlNode]
     ) -> ExtractionResult:
-        from ..role import RoleExtractor
+        # Import here to prevent recursive imports
+        from ..role import RoleExtractor  # noqa: PLC0415
 
         return RoleExtractor(self.context, included_content).extract_role(predecessors)

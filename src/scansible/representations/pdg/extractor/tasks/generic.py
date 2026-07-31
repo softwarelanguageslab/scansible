@@ -15,10 +15,10 @@ from .base import TaskExtractor
 class GenericTaskExtractor(TaskExtractor):
     @classmethod
     @override
-    def SUPPORTED_TASK_ATTRIBUTES(cls) -> frozenset[str]:
+    def supported_task_attributes(cls) -> frozenset[str]:
         return (
             super()
-            .SUPPORTED_TASK_ATTRIBUTES()
+            .supported_task_attributes()
             .union(
                 {
                     "vars",

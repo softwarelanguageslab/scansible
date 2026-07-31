@@ -55,10 +55,9 @@ class ReuseChangedVariableRule(Rule):
         # upstream, not here.
         nodes_sorted = sorted(nodes, key=lambda n: n.value_version)
         for v1, v2 in pairwise(nodes_sorted):
-            (
-                value_version_change_reason,
-                value_change_context,
-            ) = determine_value_version_change_reason(graph, v1, v2)
+            (value_version_change_reason, value_change_context) = (
+                determine_value_version_change_reason(graph, v1, v2)
+            )
             if value_version_change_reason != ValueChangeReason.DEPENDENCY_REDEFINED:
                 continue
             assert (

@@ -43,7 +43,7 @@ class VarsPrompt(ASTNode, frozen=True):
     #: Whether to hide the input on the terminal (e.g. for passwords).
     private: BoolLiteral | Expression | None = None
     #: Whether the user needs to re-enter to confirm.
-    confirm: BoolLiteral | Expression = BoolLiteral(False)
+    confirm: BoolLiteral | Expression = BoolLiteral(False)  # noqa: FBT003
     #: Encryption algorithm to use on the value.
     encrypt: StrLiteral | None = None
     #: Salt size to use in encryption.

@@ -31,7 +31,7 @@ def pytest_collection_modifyitems(
             item.add_marker(skip_slow)
 
 
-@pytest.fixture()
+@pytest.fixture
 def g() -> Graph:
     g = create_graph({}, [])
     assert g.num_nodes == 0

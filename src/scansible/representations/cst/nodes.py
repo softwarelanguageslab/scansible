@@ -46,7 +46,7 @@ class YamlBool(YamlNode):
 
     __position__: Position
 
-    def __init__(self, value: bool, position: Position) -> None:
+    def __init__(self, value: bool, position: Position) -> None:  # noqa: FBT001
         self._real_bool = value
         self.__position__ = position
 

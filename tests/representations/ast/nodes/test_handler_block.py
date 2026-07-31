@@ -20,7 +20,7 @@ def describe_extracting_handler_blocks():
                 debug: msg=hi
                 listen: a topic
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = HandlerBlock.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -47,7 +47,7 @@ def describe_extracting_handler_blocks():
               - name: test3
                 debug: msg=hi
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = HandlerBlock.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -72,7 +72,7 @@ def describe_extracting_handler_blocks():
                     debug: msg=hi
                     listen: a topic
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = HandlerBlock.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -99,7 +99,7 @@ def describe_extracting_handler_blocks():
             delegate_to: otherhost
             delegate_facts: yes
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = HandlerBlock.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -109,13 +109,13 @@ def describe_extracting_handler_blocks():
         assert c.raw == "some_condition"
         assert result.notify == ("a handler",)
         assert result.delegate_to == "otherhost"
-        assert result.delegate_facts == BoolLiteral(True)
+        assert result.delegate_facts == BoolLiteral(True)  # noqa: FBT003
 
     def rejects_non_blocks():
         yaml = """
             import_tasks: test
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError):
             _ = HandlerBlock.model_validate(parse_yaml_dict(yaml), context=ctx)
@@ -125,7 +125,7 @@ def describe_extracting_handler_blocks():
             rescue:
                 - debug: msg=hi
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError):
             _ = HandlerBlock.model_validate(parse_yaml_dict(yaml), context=ctx)
@@ -136,7 +136,7 @@ def describe_extracting_handler_blocks():
             rescue:
                 - debug: msg=hi
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError):
             _ = HandlerBlock.model_validate(parse_yaml_dict(yaml), context=ctx)

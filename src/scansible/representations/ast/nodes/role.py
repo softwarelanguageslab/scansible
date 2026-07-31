@@ -36,11 +36,11 @@ def _safe_extract_all[T: ASTFile](
     extractor: Extractor[T], file_paths: Sequence[ProjectPath], ctx: ExtractionContext
 ) -> Sequence[tuple[str, T]]:
     """Run `_safe_extract` over multiple paths, returning only the successes, keyed by path."""
-    results: list[T] = []
-    for file_path in file_paths:
-        if (result := _safe_extract(extractor, file_path, ctx)) is not None:
-            results.append(result)
-    return [(str(file.path), file) for file in results]
+    return [
+        (str(file.path), file)
+        for file_path in file_paths
+        if (file := _safe_extract(extractor, file_path, ctx)) is not None
+    ]
 
 
 # Need arbitrary_types_allowed=True to put SourceFileMap into the model.

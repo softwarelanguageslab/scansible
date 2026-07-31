@@ -41,18 +41,39 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.ruff.lint]
-extend-select = ["I"]
-# F403/F405 complain about star imports and being unable to resolve them,
-# ignore these as they're handled properly by basedpyright
-# RUF022 complains about sorting of __all__, but we want to keep a grouping.
-# TRY004 wants us to use TypeError in Pydantic validators but those don't get caught by Pydantic
-extend-ignore = ["F403", "F405", "RUF022", "TRY004", "DTZ005"]
+# FIXME: The aim is to enable "ALL" and selectively disable the ones we don't want, but there are a lot of existing issues to fix still,
+# so some classes of issues are still disabled.
+extend-select = ["I", "ERA", "YTT", "ANN", "ASYNC", "S", "BLE", "FBT", "B", "A", "COM", "C4", "DTZ", "T10", "EXE", "FA", "INT", "ISC", "ICN", "LOG", "G", "INP", "PIE", "PYI", "PT",
+    "Q", "RSE", "SLF", "SIM", "PTH", "FLY", "PERF", "N", "PGH", "UP", "FURB", "TD", "F", "PLC"]
+extend-ignore = [
+    # F403/F405 complain about star imports and being unable to resolve them,
+    # ignore these as they're handled properly by basedpyright
+    "F403", "F405",
+    # RUF022 complains about sorting of __all__, but we want to keep a grouping.
+    "RUF022",
+    # TRY004 wants us to use TypeError in Pydantic validators but those don't get caught by Pydantic
+    "TRY004",
+    # Warns of Any usage, already covered by Basedpyright
+    "ANN401",
+    # Confuses loguru logger with standard one
+    "PLE1205",
+    # Various unnecessary ones.
+    "DTZ005", "S101", "COM812", "CPY", "FIX", "ISC003", "G004", "E501", "TD003", "TD002", "TD001", "TC006",
+    # FIXME
+    "PT011"
+]
 
 [tool.ruff.lint.per-file-ignores]
-"**/tests/*" = ["D", "INP001", "S101", "PLR2004", "FBT001"]
+"**/tests/*" = ["D", "INP001", "S", "PLR2004", "FBT001", "ANN201", "ANN202", "PLR0915"]
+"!**/tests/*" = ["PT"]
+"scripts/*" = ["INP001"]
+"src/scansible/utils/module_type_info.py" = ["ERA001"]
+"src/scansible/representations/pdg/canonical.py" = ["ERA001"]
+"src/scansible/__init__.py" = ["ERA001"]
 
 [tool.ruff.lint.isort]
 required-imports = ["from __future__ import annotations"]
+split-on-trailing-comma = false
 section-order = ["future", "typing", "standard-library", "third-party", "first-party", "local-folder"]
 
 [tool.ruff.lint.isort.sections]

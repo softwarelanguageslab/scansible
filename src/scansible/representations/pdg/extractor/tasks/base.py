@@ -25,7 +25,7 @@ TaskVarsScopeLevel = Literal[EnvironmentType.TASK_VARS, EnvironmentType.INCLUDE_
 
 class TaskExtractor(abc.ABC):
     @classmethod
-    def SUPPORTED_TASK_ATTRIBUTES(cls) -> frozenset[str]:
+    def supported_task_attributes(cls) -> frozenset[str]:
         # tags are ignored
         return frozenset(
             {"name", "action", "args", "when", "vars", "loop_with", "tags"}
@@ -42,8 +42,7 @@ class TaskExtractor(abc.ABC):
         raise NotImplementedError("To be implemented by subclass")
 
     def extract_conditions(
-        self,
-        conditions: Sequence[ast.Condition | ast.BoolLiteral] | None = None,
+        self, conditions: Sequence[ast.Condition | ast.BoolLiteral] | None = None
     ) -> list[rep.DataNode]:
         if conditions is None:
             conditions = self.task.when
@@ -97,7 +96,7 @@ class TaskExtractor(abc.ABC):
 
     def warn_remaining_kws(self, action: str = "") -> None:
         for other_kw in self.task.model_directives_set:
-            if other_kw not in self.SUPPORTED_TASK_ATTRIBUTES():
+            if other_kw not in self.supported_task_attributes():
                 self.logger.warning(
                     f"Cannot handle {other_kw} on {action or self.task.action} yet!"
                 )

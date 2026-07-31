@@ -166,7 +166,7 @@ def determine_value_version_change_reason(
     unique_e1_uses = sorted(e1_uses - common_uses, key=lambda v: v.name)
     unique_e2_uses = sorted(e2_uses - common_uses, key=lambda v: v.name)
 
-    diff_uses = list(zip(unique_e1_uses, unique_e2_uses))
+    diff_uses = list(zip(unique_e1_uses, unique_e2_uses, strict=True))
 
     redefined = False
     redefined_context: tuple[Variable, Variable] | None = None
@@ -222,13 +222,7 @@ def find_variable_usages(
             )
 
             for control_usage in control_usages:
-                # if indirection_chain is None:
                 usage_descriptions.add(str(control_usage.location))
-                # else:
-                #     usage_descriptions.add(
-                #         control_usage.location
-                #         + f' (via {"->".join(indirection_chain)})'
-                #     )
 
             for indirect_usage in indirect_usages:
                 new_indirection_chain = indirection_chain or []

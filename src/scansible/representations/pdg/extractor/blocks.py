@@ -127,6 +127,7 @@ class BlockExtractor:
         child_list: Sequence[ast.Task | ast.Block],
         predecessors: Sequence[rep.ControlNode],
     ) -> ExtractionResult:
-        from .task_lists import TaskListExtractor
+        # Import here to prevent recursive imports
+        from .task_lists import TaskListExtractor  # noqa: PLC0415
 
         return TaskListExtractor(self.context, child_list).extract_tasks(predecessors)

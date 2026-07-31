@@ -22,7 +22,7 @@ def describe_extracting_tasks():
                 path: test.txt
                 state: present
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -39,7 +39,7 @@ def describe_extracting_tasks():
             file:
                 path: test.txt
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -55,7 +55,7 @@ def describe_extracting_tasks():
             name: Ensure file exists
             file: path=test.txt state=present
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -71,7 +71,7 @@ def describe_extracting_tasks():
             vars:
                 file_path: test.txt
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -89,7 +89,7 @@ def describe_extracting_tasks():
             debug: msg={{ item }}
             loop: [hello, world]
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -107,7 +107,7 @@ def describe_extracting_tasks():
             debug: msg={{ item }}
             loop: '{{ somelist }}'
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -128,7 +128,7 @@ def describe_extracting_tasks():
             loop_control:
                 loop_var: myvar
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -156,7 +156,7 @@ def describe_extracting_tasks():
                 extended_allitems: no
                 break_when: "myvar == 'world'"
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -165,8 +165,8 @@ def describe_extracting_tasks():
         assert result.loop_control.index_var == "myidx"
         assert result.loop_control.label == "{{ myvar }}"
         assert result.loop_control.pause == 2
-        assert result.loop_control.extended == BoolLiteral(True)
-        assert result.loop_control.extended_allitems == BoolLiteral(False)
+        assert result.loop_control.extended == BoolLiteral(True)  # noqa: FBT003
+        assert result.loop_control.extended_allitems == BoolLiteral(False)  # noqa: FBT003
         assert len(result.loop_control.break_when) == 1
         c = result.loop_control.break_when[0]
         assert isinstance(c, Condition)
@@ -178,7 +178,7 @@ def describe_extracting_tasks():
             debug: msg={{ item }}
             poll: not_an_int
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
@@ -189,7 +189,7 @@ def describe_extracting_tasks():
             debug: msg={{ myvar }}
             when: yes
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -205,7 +205,7 @@ def describe_extracting_tasks():
         yaml = """
             import_tasks: tasks.yml
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -221,7 +221,7 @@ def describe_extracting_tasks():
                 msg: hello
             register: '{{ expr }}'
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError, match="Expected a valid identifier"):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
@@ -232,7 +232,7 @@ def describe_extracting_tasks():
             action_that_doesnt_exist:
                 msg: hello
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -246,7 +246,7 @@ def describe_extracting_tasks():
                 name: testrole
                 public: true
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -260,7 +260,7 @@ def describe_extracting_tasks():
                 path: test.txt
             vars: 0
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
@@ -272,7 +272,7 @@ def describe_extracting_tasks():
                 path: test.txt
             loop_control: 0
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
@@ -281,7 +281,7 @@ def describe_extracting_tasks():
         yaml = """
             name: test
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
@@ -294,7 +294,7 @@ def describe_extracting_tasks():
             apt:
                 name: test.txt
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
@@ -308,7 +308,7 @@ def describe_extracting_handlers():
                 path: '{{ file_path }}'
             listen: a topic
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Handler.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -330,7 +330,7 @@ def describe_extracting_handlers():
                 - a topic
                 - another topic
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Handler.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -348,7 +348,7 @@ def describe_parsing_action():
 
     # Yes, all of these are legal :exploding_head:
     @pytest.mark.parametrize(
-        ["task", "expected_action", "expected_args"],
+        ("task", "expected_action", "expected_args"),
         [
             pytest.param(
                 {"debug": {"msg": "hi"}},
@@ -425,9 +425,7 @@ def describe_parsing_action():
         ],
     )
     def extracts_correct_action(
-        task: dict[str, object],
-        expected_action: str,
-        expected_args: dict[str, object],
+        task: dict[str, object], expected_action: str, expected_args: dict[str, object]
     ):
         result = Task.model_validate(task)
 
@@ -436,7 +434,7 @@ def describe_parsing_action():
         assert result.delegate_to is None
 
     @pytest.mark.parametrize(
-        ["task", "expected_action", "expected_args"],
+        ("task", "expected_action", "expected_args"),
         [
             pytest.param(
                 {"local_action": "shell echo hi"},
@@ -462,7 +460,7 @@ def describe_parsing_action():
         assert result.delegate_to == "localhost"
 
     @pytest.mark.parametrize(
-        ["task"],
+        "task",
         [
             pytest.param(
                 {"debug": {"msg": "hi"}, "file": {"path": "..."}},
@@ -508,7 +506,7 @@ def describe_normalization():
                 dest: ...
             when:
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -522,11 +520,11 @@ def describe_normalization():
                 dest: ...
             always_run: yes
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
-        assert result.check_mode == BoolLiteral(False)
+        assert result.check_mode == BoolLiteral(False)  # noqa: FBT003
 
     @pytest.mark.parametrize("method", ["su", "sudo"])
     def transforms_old_become(method: str):
@@ -538,12 +536,12 @@ def describe_normalization():
             {method}_flags: --flag
             {method}_pass: sekrit
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "file"
-        assert result.become == BoolLiteral(True)
+        assert result.become == BoolLiteral(True)  # noqa: FBT003
         assert result.become_user == "me"
         assert result.become_exe == "test"
         assert result.become_flags == "--flag"
@@ -561,19 +559,16 @@ def describe_normalization():
             vars:
                 other: hello
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.action == "file"
-        assert result.become == BoolLiteral(True)
+        assert result.become == BoolLiteral(True)  # noqa: FBT003
         assert result.become_user == "me"
         assert result.become_exe == "test"
         assert result.become_flags == "--flag"
-        assert result.vars == {
-            "other": "hello",
-            "ansible_become_password": "sekrit",
-        }
+        assert result.vars == {"other": "hello", "ansible_become_password": "sekrit"}
 
     @pytest.mark.parametrize(
         "combo", [("su", "sudo"), ("sudo", "become"), ("su", "become")]
@@ -584,7 +579,7 @@ def describe_normalization():
             {combo[0]}: yes
             {combo[1]}: yes
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError, match="Invalid mix of directives"):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
@@ -598,7 +593,7 @@ def describe_normalization():
                 - hello
                 - world
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -615,7 +610,7 @@ def describe_normalization():
         yaml = """
             include: test.yml
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -627,7 +622,7 @@ def describe_normalization():
             include: test.yml
             static: yes
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -639,7 +634,7 @@ def describe_normalization():
             include: test.yml
             static: no
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -652,7 +647,7 @@ def describe_validation():
         yaml = """
             import_playbook: site.yml
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
@@ -662,7 +657,7 @@ def describe_validation():
             include_tasks: test.yml
             static: yes
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError, match="include_tasks with static: yes"):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
@@ -672,7 +667,7 @@ def describe_validation():
             import_tasks: test.yml
             static: no
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError, match="import_tasks with static: no"):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
@@ -683,7 +678,7 @@ def describe_validation():
             loop: [hello, world]
             with_items: [hello, world]
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError, match="duplicate loop statements"):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
@@ -693,7 +688,7 @@ def describe_validation():
             include_tasks: test.yml
             become: yes
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError, match="Unsupported directives"):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
@@ -705,20 +700,20 @@ def describe_common_directives():
             file: {}
             tags: web
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
         assert result.tags == ("web",)
 
-    def normalizes_None_tag():
+    def normalizes_none_tag():
         yaml = """
             file: {}
             tags:
                 - web
                 -
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -729,7 +724,7 @@ def describe_common_directives():
             file: {}
             collections: community.general
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -742,7 +737,7 @@ def describe_common_directives():
                 file:
                     mode: "0644"
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -754,7 +749,7 @@ def describe_common_directives():
             environment:
                 PATH: /custom/bin
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -768,7 +763,7 @@ def describe_common_directives():
                 PYTHONPATH: null
                 VIRTUAL_ENV: "{{ test }}"
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -784,17 +779,14 @@ def describe_common_directives():
 
 
 def describe_vars():
-    @pytest.mark.parametrize(
-        "identifier",
-        ["123test", "un¡code™", "def", "for"],
-    )
+    @pytest.mark.parametrize("identifier", ["123test", "un¡code™", "def", "for"])
     def rejects_invalid_identifiers(identifier: str):
         yaml = f"""
             file: {{}}
             vars:
                 {identifier}: 123
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)

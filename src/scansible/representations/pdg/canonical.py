@@ -1,5 +1,3 @@
-# pyright: reportIgnoreCommentWithoutRule=false, reportUnnecessaryTypeIgnoreComment=false
-
 # FIXME: Commented out because no longer working but may get restored in the future and otherwise causes type/lint errors.
 # Ugly, I know...
 
@@ -433,12 +431,12 @@
 #         # path coercer expands ~ and shell variables, we don't want that.
 #         param_type = "str"
 
-#     validator = DEFAULT_TYPE_VALIDATORS.get(param_type)  # pyright: ignore
+#     validator = DEFAULT_TYPE_VALIDATORS.get(param_type)
 #     if validator is None:
 #         return
 
 #     try:
-#         validated_value = validator(lit.value)  # pyright: ignore
+#         validated_value = validator(lit.value)
 #     except Exception as e:
 #         logger.warning(
 #             f"Parameter {kw.keyword} of value {lit.value!r} to task {task.action} may have a wrong type: {e}"
@@ -460,17 +458,17 @@
 
 # def _create_literal_node(pdg: Graph, value: Any) -> ScalarLiteral | CompositeLiteral:
 #     if isinstance(value, (list, tuple, dict)):
-#         node = CompositeLiteral(type=extract_type_name(value))  # pyright: ignore
+#         node = CompositeLiteral(type=extract_type_name(value))
 #         pdg.add_node(node)
-#         children = (  # pyright: ignore
-#             value.items() if isinstance(value, dict) else enumerate(value)  # pyright: ignore
+#         children = (
+#             value.items() if isinstance(value, dict) else enumerate(value)
 #         )
-#         for child_key, child in children:  # pyright: ignore
+#         for child_key, child in children:
 #             child_node = _create_literal_node(pdg, child)
 #             pdg.add_edge(
 #                 child_node,
 #                 node,
-#                 Composition(index=str(child_key)),  # pyright: ignore
+#                 Composition(index=str(child_key)),
 #             )
 #         return node
 

@@ -1,3 +1,6 @@
+# ruff: disable[PLC0415] - We import modules in the commands themselves for performance reasons: Several packages take a long time to import,
+# importing them top-level would slow down the commands that don't use them.
+
 from __future__ import annotations
 
 from typing import TextIO
@@ -20,7 +23,7 @@ from scansible.constants import DEFAULT_ROLES_PATH
 @click.option(
     "-q", "--quiet", is_flag=True, default=False, help="Print only warnings and errors"
 )
-def cli(verbose: bool, quiet: bool) -> None:
+def cli(*, verbose: bool, quiet: bool) -> None:
     """Static Code Analysis for Ansible."""
     if verbose and quiet:
         raise click.BadOptionUsage(
@@ -105,6 +108,7 @@ def build_pdg(
     project_type: str | None,
     aux_file: TextIO | None,
     errors_file: TextIO | None,
+    *,
     strict: bool,
     # canonicalize: bool,
     # module_kb_path: Path | None,
@@ -120,12 +124,7 @@ def build_pdg(
 
     from .representations.pdg import dump_graph, extract_pdg
 
-    ctx = extract_pdg(
-        project_path,
-        role_search_paths,
-        as_pb=as_pb,
-        lenient=not strict,
-    )
+    ctx = extract_pdg(project_path, role_search_paths, as_pb=as_pb, lenient=not strict)
     pdg = ctx.graph
     logger.info(f"Extracted PDG of {pdg.num_nodes} nodes and {pdg.num_edges} edges")
 
@@ -179,6 +178,7 @@ def check(
     project_path: Path,
     role_search_path: Sequence[Path],
     project_type: str | None,
+    *,
     strict: bool,
     enable_security: bool,
     enable_semantics: bool,
@@ -195,9 +195,7 @@ def check(
 
     reporter = TerminalReporter()
     results = run_all_checks(
-        ctx,
-        enable_security=enable_security,
-        enable_semantics=enable_semantics,
+        ctx, enable_security=enable_security, enable_semantics=enable_semantics
     )
     reporter.report_results(results)
 
@@ -235,6 +233,7 @@ def check_all(
     project_path: Path,
     file_path: Path,
     role_search_path: Sequence[Path],
+    *,
     strict: bool,
     enable_security: bool,
     enable_semantics: bool,
@@ -262,9 +261,7 @@ def check_all(
 
         results.extend(
             run_all_checks(
-                ctx,
-                enable_security=enable_security,
-                enable_semantics=enable_semantics,
+                ctx, enable_security=enable_security, enable_semantics=enable_semantics
             )
         )
 
@@ -309,8 +306,7 @@ def check_all(
     type=click.Path(resolve_path=True, path_type=Path, exists=True, file_okay=False),
 )
 @click.argument(
-    "output_dir",
-    type=click.Path(resolve_path=True, path_type=Path, file_okay=False),
+    "output_dir", type=click.Path(resolve_path=True, path_type=Path, file_okay=False)
 )
 @click.option(
     "--role-search-path",

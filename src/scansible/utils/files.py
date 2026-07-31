@@ -29,9 +29,7 @@ class SourceFileMap[FileType](Mapping[str, FileType]):
     def __init__(
         self, file_list: Iterable[tuple[str, FileType]], *, prefix: str = ""
     ) -> None:
-        self._mapping: Mapping[str, FileType] = FrozenDict(
-            {path: file for path, file in file_list}
-        )
+        self._mapping: Mapping[str, FileType] = FrozenDict(file_list)
         # If prefix is given, prioritise with the prefix but try without the prefix afterwards.
         self._prefixes: Sequence[str] = (prefix, "") if prefix else ("",)
 

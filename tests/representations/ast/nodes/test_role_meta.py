@@ -15,7 +15,7 @@ from scansible.utils import ProjectPath
 def describe_extracting_metadata_file():
     def rejects_empty_metadata(tmp_path: Path):
         _ = (tmp_path / "main.yml").write_text("")
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError):
             _ = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
@@ -23,7 +23,7 @@ def describe_extracting_metadata_file():
     @pytest.mark.parametrize("content", ["- hello\n- world"])  # list  # string
     def rejects_invalid_files(tmp_path: Path, content: str):
         _ = (tmp_path / "main.yml").write_text(content)
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError):
             _ = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
@@ -46,7 +46,7 @@ def describe_extracting_metadata_file():
                             - 8
                 """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-            ctx = ExtractionContext(False)
+            ctx = ExtractionContext(lenient=False)
 
             result = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
@@ -70,7 +70,7 @@ def describe_extracting_metadata_file():
                 dependencies: []
             """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-            ctx = ExtractionContext(False)
+            ctx = ExtractionContext(lenient=False)
 
             result = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
@@ -83,7 +83,7 @@ def describe_extracting_metadata_file():
                     - test2
             """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-            ctx = ExtractionContext(False)
+            ctx = ExtractionContext(lenient=False)
 
             with pytest.raises(ValueError):
                 _ = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
@@ -94,7 +94,7 @@ def describe_extracting_metadata_file():
                     platforms: yes
             """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-            ctx = ExtractionContext(False)
+            ctx = ExtractionContext(lenient=False)
 
             with pytest.raises(ValueError):
                 _ = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
@@ -106,7 +106,7 @@ def describe_extracting_metadata_file():
                     - [hello]
             """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-            ctx = ExtractionContext(False)
+            ctx = ExtractionContext(lenient=False)
 
             with pytest.raises(ValueError):
                 _ = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
@@ -116,7 +116,7 @@ def describe_extracting_metadata_file():
                 dependencies: []
             """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-            ctx = ExtractionContext(False)
+            ctx = ExtractionContext(lenient=False)
 
             result = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
@@ -129,7 +129,7 @@ def describe_extracting_metadata_file():
                         - CentOS6
             """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-            ctx = ExtractionContext(True)
+            ctx = ExtractionContext(lenient=True)
 
             result = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
@@ -143,7 +143,7 @@ def describe_extracting_metadata_file():
                     - testrole
             """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-            ctx = ExtractionContext(False)
+            ctx = ExtractionContext(lenient=False)
 
             result = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
@@ -156,7 +156,7 @@ def describe_extracting_metadata_file():
                     - role: testrole
             """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-            ctx = ExtractionContext(False)
+            ctx = ExtractionContext(lenient=False)
 
             result = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
@@ -169,7 +169,7 @@ def describe_extracting_metadata_file():
                     - 123
             """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-            ctx = ExtractionContext(False)
+            ctx = ExtractionContext(lenient=False)
 
             result = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
@@ -182,7 +182,7 @@ def describe_extracting_metadata_file():
                     - name: testrole
             """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-            ctx = ExtractionContext(False)
+            ctx = ExtractionContext(lenient=False)
 
             result = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
@@ -197,7 +197,7 @@ def describe_extracting_metadata_file():
                       when: "ansible_os_family == 'Debian'"
             """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-            ctx = ExtractionContext(False)
+            ctx = ExtractionContext(lenient=False)
 
             result = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
@@ -217,7 +217,7 @@ def describe_extracting_metadata_file():
                         - "1 + 1 == 2"
             """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-            ctx = ExtractionContext(False)
+            ctx = ExtractionContext(lenient=False)
 
             result = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
@@ -236,7 +236,7 @@ def describe_extracting_metadata_file():
                     - test: nope
             """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-            ctx = ExtractionContext(True)
+            ctx = ExtractionContext(lenient=True)
 
             result = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
@@ -251,7 +251,7 @@ def describe_extracting_metadata_file():
                   platforms: []
             """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-            ctx = ExtractionContext(False)
+            ctx = ExtractionContext(lenient=False)
 
             result = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
@@ -269,7 +269,7 @@ def describe_extracting_metadata_file():
                         test: x
                 """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-            ctx = ExtractionContext(False)
+            ctx = ExtractionContext(lenient=False)
 
             with pytest.raises(ValueError):
                 _ = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
@@ -286,7 +286,7 @@ def describe_extracting_metadata_file():
                         - [a, b]
                 """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-            ctx = ExtractionContext(False)
+            ctx = ExtractionContext(lenient=False)
 
             with pytest.raises(ValueError):
                 _ = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
@@ -303,7 +303,7 @@ def describe_extracting_metadata_file():
                         - when: x is True
                 """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-            ctx = ExtractionContext(False)
+            ctx = ExtractionContext(lenient=False)
 
             with pytest.raises(ValueError):
                 _ = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
@@ -320,7 +320,7 @@ def describe_extracting_metadata_file():
                         - name: [not, a, string]
                 """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-            ctx = ExtractionContext(False)
+            ctx = ExtractionContext(lenient=False)
 
             with pytest.raises(ValueError):
                 _ = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
@@ -341,13 +341,13 @@ def describe_extracting_metadata_file():
                           param_x: 123
                 """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-            ctx = ExtractionContext(False)
+            ctx = ExtractionContext(lenient=False)
 
             result = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
             assert len(result.metablock.dependencies) == 1
             assert result.metablock.dependencies[0].role == "test"
-            assert result.metablock.dependencies[0].become == BoolLiteral(True)
+            assert result.metablock.dependencies[0].become == BoolLiteral(True)  # noqa: FBT003
             assert result.metablock.dependencies[0].params == {"param_x": 123}
 
         def handles_position_argument(tmp_path: Path):
@@ -366,21 +366,19 @@ def describe_extracting_metadata_file():
                           position: "start"
                 """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-            ctx = ExtractionContext(False)
+            ctx = ExtractionContext(lenient=False)
 
             result = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
             assert len(result.metablock.dependencies) == 1
             assert result.metablock.dependencies[0].role == "test"
-            assert result.metablock.dependencies[0].become == BoolLiteral(True)
+            assert result.metablock.dependencies[0].become == BoolLiteral(True)  # noqa: FBT003
             assert result.metablock.dependencies[0].params == {
                 "param_x": 123,
                 "position": "start",
             }
 
-        def supports_new_style_role_requirements(
-            tmp_path: Path,
-        ):
+        def supports_new_style_role_requirements(tmp_path: Path):
             yaml = """
                     galaxy_info:
                         platforms:
@@ -393,16 +391,14 @@ def describe_extracting_metadata_file():
                           version: main
                 """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-            ctx = ExtractionContext(False)
+            ctx = ExtractionContext(lenient=False)
 
             result = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
             assert len(result.metablock.dependencies) == 1
             assert result.metablock.dependencies[0].role == "nginx"
 
-        def supports_string_based_new_style_role_requirements(
-            tmp_path: Path,
-        ):
+        def supports_string_based_new_style_role_requirements(tmp_path: Path):
             yaml = """
                     galaxy_info:
                         platforms:
@@ -414,7 +410,7 @@ def describe_extracting_metadata_file():
                         - git+https://github.com/bennojoy/nginx,main,testrole
                 """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-            ctx = ExtractionContext(False)
+            ctx = ExtractionContext(lenient=False)
 
             result = MetaFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 

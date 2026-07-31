@@ -36,7 +36,7 @@ class DynamicIncludesExtractor[Content](TaskExtractor, abc.ABC):
         self, args: dict[ast.StrLiteral, ast.AnyExpression]
     ) -> ast.AnyExpression:
         """Extract included name from arguments, and pop the argument."""
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @abc.abstractmethod
     def _load_content(
@@ -47,22 +47,17 @@ class DynamicIncludesExtractor[Content](TaskExtractor, abc.ABC):
 
     @abc.abstractmethod
     def _extract_included_content(
-        self,
-        included_content: Content,
-        predecessors: Sequence[rep.ControlNode],
+        self, included_content: Content, predecessors: Sequence[rep.ControlNode]
     ) -> ExtractionResult:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @abc.abstractmethod
-    def _get_filename_candidates(
-        self,
-        included_name_pattern: str,
-    ) -> set[str]:
-        raise NotImplementedError()
+    def _get_filename_candidates(self, included_name_pattern: str) -> set[str]:
+        raise NotImplementedError
 
     @abc.abstractmethod
     def _file_exists(self, name: str) -> bool:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @override
     def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
@@ -100,9 +95,10 @@ class DynamicIncludesExtractor[Content](TaskExtractor, abc.ABC):
                     included_name_expr, predecessors
                 )
 
-            return self._create_result(
-                included_result, predecessors, bool(conditional_nodes)
-            )
+            if conditional_nodes:
+                included_result = included_result.add_next_predecessors(predecessors)
+
+            return included_result
 
     def _check_conditions(self) -> None:
         pass
@@ -136,16 +132,6 @@ class DynamicIncludesExtractor[Content](TaskExtractor, abc.ABC):
             self.context.graph.add_edge(predecessor, task_node, rep.ORDER)
 
         return ExtractionResult.single(task_node)
-
-    def _create_result(
-        self,
-        included_result: ExtractionResult,
-        predecessors: Sequence[rep.ControlNode],
-        conditional_include: bool,
-    ) -> ExtractionResult:
-        if conditional_include:
-            return included_result.add_next_predecessors(predecessors)
-        return included_result
 
     def _simplify_included_name_asts(
         self, name_expr: ast.Expression

@@ -270,12 +270,14 @@ class VarContext:
 
         for var_name in ast.referenced_variables:
             logger.debug(f"Resolving variable {var_name!r}")
-            value_record = self._resolve_expression_value(var_name, should_use_cache)
+            value_record = self._resolve_expression_value(
+                var_name, should_use_cache=should_use_cache
+            )
             logger.debug(f"Determined that {ast.raw!r} uses {value_record!r}")
             yield value_record
 
     def _resolve_expression_value(
-        self, var_name: str, should_use_cache: bool
+        self, var_name: str, *, should_use_cache: bool
     ) -> VariableValueRecord:
         if should_use_cache:
             return self._resolve_expression_cached_value(var_name)
@@ -353,7 +355,9 @@ class VarContext:
         initialiser: ast.AnyExpression,
     ) -> rep.Variable:
         """Define a variable with an initialiser which is lazily evaluated."""
-        return self._define_variable(name, env_type, initialiser, False)
+        return self._define_variable(
+            name, env_type, initialiser, eagerly_evaluated=False
+        )
 
     def define_fact(
         self,
@@ -363,7 +367,9 @@ class VarContext:
         initialiser_node: rep.DataNode,
     ) -> rep.Variable:
         """Define a fact initialised with an eagerly-evaluated expression."""
-        var_node = self._define_variable(name, env_type, initialiser_expr, True)
+        var_node = self._define_variable(
+            name, env_type, initialiser_expr, eagerly_evaluated=True
+        )
         self.extraction_ctx.graph.add_edge(initialiser_node, var_node, rep.DEF)
         return var_node
 
@@ -371,14 +377,15 @@ class VarContext:
         self, name: str, env_type: EnvironmentType
     ) -> rep.Variable:
         """Define a variable injected by the Ansible runtime, i.e., without an explicit initialiser."""
-        return self._define_variable(name, env_type, SENTINEL, True)
+        return self._define_variable(name, env_type, SENTINEL, eagerly_evaluated=True)
 
     def _define_variable(
         self,
         name: str,
         env_type: EnvironmentType,
         initialiser: ast.AnyExpression | Sentinel,
-        eager: bool,
+        *,
+        eagerly_evaluated: bool,
     ) -> rep.Variable:
         """Declare a variable, initialized with the given expression.
 
@@ -415,13 +422,13 @@ class VarContext:
             name,
             var_rev,
             initialiser,
-            eager or not isinstance(initialiser, ast.Expression),
+            eagerly_evaluated or not isinstance(initialiser, ast.Expression),
             env_type,
         )
         self._envs.set_variable_definition(name, def_record)
         self._value_to_var_node[(def_record, 0)] = var_node
 
-        if eager or not isinstance(initialiser, ast.Expression):
+        if eagerly_evaluated or not isinstance(initialiser, ast.Expression):
             # Assume the value is used by the caller is constant if they don't
             # provide an expression. At the very least, the caller should link it
             # with DEF (e.g. set_fact or register) or USE (e.g. undefined variables
@@ -431,7 +438,7 @@ class VarContext:
             val_record = ConstantVariableValueRecord(def_record)
             self._envs.set_constant_variable_value(name, val_record)
 
-            if not eager and not isinstance(initialiser, Sentinel):
+            if not eagerly_evaluated and not isinstance(initialiser, Sentinel):
                 lit_node = self._build_expression(initialiser).data_node
                 self.extraction_ctx.graph.add_edge(lit_node, var_node, rep.DEF)
 
@@ -592,20 +599,20 @@ class VarContext:
             return []
 
         values: Iterable[str]
-        OS_FAMILY_MAP = Distribution.OS_FAMILY_MAP
-        OS_FAMILY = cast(dict[str, str], Distribution.OS_FAMILY)
+        os_family_map = Distribution.OS_FAMILY_MAP
+        os_family = cast(dict[str, str], Distribution.OS_FAMILY)
         if name == "ansible_os_family":
-            distribution = constraints.get("ansible_distribution")
-            if distribution and isinstance(distribution, str):
-                values = [OS_FAMILY[distribution]]
+            distribution_constraint = constraints.get("ansible_distribution")
+            if distribution_constraint and isinstance(distribution_constraint, str):
+                values = [os_family[distribution_constraint]]
             else:
-                values = OS_FAMILY_MAP.keys()
+                values = os_family_map.keys()
         elif name == "ansible_distribution":
-            os_family = constraints.get("ansible_os_family")
-            if os_family and isinstance(os_family, str):
-                values = OS_FAMILY_MAP[os_family]
+            os_family_constraint = constraints.get("ansible_os_family")
+            if os_family_constraint and isinstance(os_family_constraint, str):
+                values = os_family_map[os_family_constraint]
             else:
-                values = OS_FAMILY.keys()
+                values = os_family.keys()
 
         values = [ast.StrLiteral(value) for value in values]
 

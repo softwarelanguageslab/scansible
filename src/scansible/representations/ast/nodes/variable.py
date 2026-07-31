@@ -33,6 +33,4 @@ class VariableFile(ASTFile, frozen=True):
         )
 
 
-__all__ = [
-    "VariableFile",
-]
+__all__ = ["VariableFile"]

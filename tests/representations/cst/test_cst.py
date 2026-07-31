@@ -41,11 +41,11 @@ def describe_scalars():
     def describe_strings():
         @pytest.mark.parametrize(
             "yaml_value",
-            (
+            [
                 pytest.param("hello", id="plain"),
                 pytest.param("'hello'", id="single-quoted"),
                 pytest.param('"hello"', id="double-quoted"),
-            ),
+            ],
         )
         def resolves_to_yaml_str(yaml_value: str):
             result = load(f"key: {yaml_value}")["key"]
@@ -65,14 +65,14 @@ def describe_scalars():
     def describe_ints():
         @pytest.mark.parametrize(
             ("yaml_value", "expected"),
-            (
+            [
                 pytest.param("42", 42, id="decimal"),
                 pytest.param("-7", -7, id="negative"),
                 pytest.param("0x1A", 26, id="hex"),
                 pytest.param("017", 15, id="octal, YAML 1.1 syntax"),
                 pytest.param("1_000", 1000, id="underscored"),
                 pytest.param("1:20:30", 4830, id="sexagesimal, YAML 1.1 only"),
-            ),
+            ],
         )
         def resolves_to_yaml_int(yaml_value: str, expected: int):
             result = load(f"key: {yaml_value}")["key"]
@@ -92,11 +92,11 @@ def describe_scalars():
     def describe_floats():
         @pytest.mark.parametrize(
             ("yaml_value", "expected"),
-            (
+            [
                 pytest.param("1.5", 1.5, id="decimal"),
                 pytest.param("1.5e+10", 1.5e10, id="scientific, signed exponent"),
                 pytest.param(".inf", float("inf"), id="infinity"),
-            ),
+            ],
         )
         def resolves_to_yaml_float(yaml_value: str, expected: float):
             result = load(f"key: {yaml_value}")["key"]
@@ -114,10 +114,10 @@ def describe_scalars():
 
         @pytest.mark.parametrize(
             "yaml_value",
-            (
+            [
                 pytest.param("1.5e10", id="scientific, unsigned exponent"),
                 pytest.param("1e+10", id="scientific, no decimal point"),
-            ),
+            ],
         )
         def does_not_resolve_forms_ansible_rejects(yaml_value: str):
             # Ansible's YAML parser (PyYAML's Resolver) requires a decimal
@@ -131,7 +131,7 @@ def describe_scalars():
     def describe_bools():
         @pytest.mark.parametrize(
             ("yaml_value", "expected"),
-            (
+            [
                 pytest.param("true", True, id="true"),
                 pytest.param("false", False, id="false"),
                 pytest.param("True", True, id="True"),
@@ -139,7 +139,7 @@ def describe_scalars():
                 pytest.param("no", False, id="no"),
                 pytest.param("on", True, id="on"),
                 pytest.param("off", False, id="off"),
-            ),
+            ],
         )
         def resolves_to_yaml_bool(yaml_value: str, expected: bool):
             result = load(f"key: {yaml_value}")["key"]
@@ -151,7 +151,7 @@ def describe_scalars():
             assert hash(result) == hash(expected)
             assert result.__position__.path == "test.yml"
 
-        @pytest.mark.parametrize("yaml_value", ("y", "n", "Y", "N"))
+        @pytest.mark.parametrize("yaml_value", ["y", "n", "Y", "N"])
         def does_not_resolve_bare_y_or_n(yaml_value: str):
             # Unlike the full YAML 1.1 spec, Ansible's parser (PyYAML's
             # Resolver) does not treat bare y/n as booleans, only the full
@@ -164,11 +164,11 @@ def describe_scalars():
     def describe_nulls():
         @pytest.mark.parametrize(
             "yaml_value",
-            (
+            [
                 pytest.param("~", id="tilde"),
                 pytest.param("null", id="null keyword"),
                 pytest.param("", id="empty"),
-            ),
+            ],
         )
         def resolves_to_yaml_none(yaml_value: str):
             result = load(f"key: {yaml_value}")["key"]

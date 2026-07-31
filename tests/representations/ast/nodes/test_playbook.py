@@ -33,7 +33,7 @@ def describe_extracting_plays():
             tasks:
               - import_tasks: test
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -50,7 +50,7 @@ def describe_extracting_plays():
               - block:
                 - import_tasks: test
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -68,7 +68,7 @@ def describe_extracting_plays():
             vars:
               testvar: 123
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -89,7 +89,7 @@ def describe_extracting_plays():
             vars:
               testvar: 123
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -111,7 +111,7 @@ def describe_extracting_plays():
             tasks:
               - import_tasks: test
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -131,7 +131,7 @@ def describe_extracting_plays():
             tasks:
               - import_tasks: test
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -147,7 +147,7 @@ def describe_extracting_plays():
             tasks:
                 - import_tasks: hello
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError):
             _ = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
@@ -159,7 +159,7 @@ def describe_extracting_plays():
             tasks:
                 - import_tasks: hello
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError, match="cannot be empty"):
             _ = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
@@ -175,7 +175,7 @@ def describe_extracting_plays():
             tasks:
               - import_tasks: test
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -185,7 +185,7 @@ def describe_extracting_plays():
         assert result.vars_prompt[0].default == "hello"
 
     @pytest.mark.parametrize(
-        ["vars_files_value", "expected"],
+        ("vars_files_value", "expected"),
         [
             pytest.param("a.yml", (("a.yml",),), id="bare string"),
             pytest.param(["a.yml", "b.yml"], (("a.yml",), ("b.yml",)), id="flat list"),
@@ -195,7 +195,7 @@ def describe_extracting_plays():
     def normalizes_vars_files(
         vars_files_value: object, expected: tuple[tuple[str, ...], ...]
     ):
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Play.model_validate(
             {
@@ -224,7 +224,7 @@ def describe_extracting_plays():
                 service:
                     name: test
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -243,7 +243,7 @@ def describe_extracting_plays():
                         name: test
                     listen: a topic
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -265,7 +265,7 @@ def describe_extracting_plays():
             handlers:
             roles:
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -283,7 +283,7 @@ def describe_extracting_plays():
             tasks:
               - import_tasks: test
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -297,7 +297,7 @@ def describe_extracting_plays():
             tasks:
                 - debug: msg=test
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -312,7 +312,7 @@ def describe_extracting_plays():
             tasks:
                 - debug: msg=test
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError, match="mutually exclusive"):
             _ = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
@@ -326,7 +326,7 @@ def describe_extracting_plays():
             tasks:
               - import_tasks: test
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -341,7 +341,7 @@ def describe_extracting_plays():
             tasks:
               - import_tasks: test
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -355,7 +355,7 @@ def describe_extracting_plays():
             tasks:
               - import_tasks: test
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -372,7 +372,7 @@ def describe_extracting_plays():
             tasks:
               - import_tasks: test
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -387,7 +387,7 @@ def describe_extracting_import_playbook():
         yaml = """
             import_playbook: other.yml
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = ImportPlaybook.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -400,7 +400,7 @@ def describe_extracting_import_playbook():
                 x: 123
             when: condition is True
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = ImportPlaybook.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -409,12 +409,12 @@ def describe_extracting_import_playbook():
         assert len(result.when) == 1
         assert isinstance(result.when[0], Condition)
 
-    @pytest.mark.parametrize("collection", ("ansible.legacy", "ansible.builtin"))
+    @pytest.mark.parametrize("collection", ["ansible.legacy", "ansible.builtin"])
     def normalizes_fully_qualified_names(collection: str):
         yaml = f"""
             {collection}.import_playbook: other.yml
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = ImportPlaybook.model_validate(parse_yaml_dict(yaml), context=ctx)
 
@@ -426,7 +426,7 @@ def describe_extracting_import_playbook():
                 x: 123
             when: condition is True
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError):
             _ = ImportPlaybook.model_validate(parse_yaml_dict(yaml), context=ctx)

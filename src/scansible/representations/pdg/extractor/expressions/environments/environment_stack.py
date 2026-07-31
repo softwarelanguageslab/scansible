@@ -40,7 +40,7 @@ def _values_have_changed(
         )
         return True
     # Pairwise check. We could arguably just do prev_used == curr_used but we want informative debug logs
-    for prev, curr in zip(prev_used, curr_used):
+    for prev, curr in zip(prev_used, curr_used, strict=True):
         if prev != curr:
             logger.debug(
                 f"Previous uses {prev.name}@{prev.revision}.{prev.value_revision}, "
@@ -280,7 +280,7 @@ class EnvironmentStack:
         for used_var in rec.used_variables:
             # Cannot be none, we just checked that they're all visible
             if isinstance(used_var, ChangeableVariableValueRecord):
-                transitive_dependences.append(used_var.template_record)
+                transitive_dependences.append(used_var.template_record)  # noqa: PERF401
 
         return (not transitive_dependences) or all(
             self._all_used_values_are_visible_in_env(env, trans_dep)

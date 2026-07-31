@@ -88,7 +88,7 @@ def describe_dump_node():
         )
 
     @pytest.mark.parametrize(
-        "type, value",
+        ("type_", "value"),
         [
             ("int", 0),
             ("int", 10),
@@ -101,16 +101,16 @@ def describe_dump_node():
         ],
     )
     def should_dump_literal_non_string(
-        type: LiteralT["int", "float", "bool"], value: float | bool
+        type_: LiteralT["int", "float", "bool"], value: float | bool
     ):
-        l = ScalarLiteral(type=type, value=value)
+        l = ScalarLiteral(type=type_, value=value)
         l.node_id = 0
 
         result = dump_node(l)
 
         assert (
             result
-            == f'(n0:ScalarLiteral {{ location: null, node_id: 0, type: "{type}", value: {str(value).lower()} }})'
+            == f'(n0:ScalarLiteral {{ location: null, node_id: 0, type: "{type_}", value: {str(value).lower()} }})'
         )
 
 
@@ -170,9 +170,7 @@ def describe_dump_graph():
 
         assert result == "CREATE " + dump_node(t)
 
-    def should_return_query_for_graph_with_multiple_nodes_without_edges(
-        g: Graph,
-    ):
+    def should_return_query_for_graph_with_multiple_nodes_without_edges(g: Graph):
         t = Task(action="file", name="task name")
         v = Variable(name="avar", version=0, value_version=0, scope_level=1)
         g.add_node(t)

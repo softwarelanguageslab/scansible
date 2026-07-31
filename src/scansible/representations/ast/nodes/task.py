@@ -57,7 +57,7 @@ class LoopControl(ASTNode, frozen=True):
     #: See https://docs.ansible.com/ansible/latest/user_guide/playbooks_loops.html#extended-loop-variables
     extended: BoolLiteral | Expression | None = None
     #: Whether to include `allitems` in the extended version.
-    extended_allitems: BoolLiteral | Expression | None = BoolLiteral(True)
+    extended_allitems: BoolLiteral | Expression | None = BoolLiteral(True)  # noqa: FBT003
     #: Conditions when to break the loop.
     break_when: SeqLiteral[Condition | BoolLiteral] = Field(default_factory=SeqLiteral)
 
@@ -255,7 +255,7 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
             action = args.pop("module")
             arg_list.append(args)
             if "args" in args:
-                # { module: "xyz", args: { ... }}
+                # action is like { module: "xyz", args: { ... }}
                 arg_list.append(args.pop("args"))
 
         if not isinstance(action, str):
@@ -327,10 +327,7 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
     @classmethod
     def _transform_includes(cls, ds: RawDirectives) -> RawDirectives:
         """Transform bare `include` actions and the `static` directive."""
-        if "static" in ds:
-            is_static = bool(ds.pop("static"))
-        else:
-            is_static = None
+        is_static = bool(ds.pop("static")) if "static" in ds else None
 
         action = ds["action"]
         assert isinstance(action, str)

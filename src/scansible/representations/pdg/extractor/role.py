@@ -67,8 +67,7 @@ class RoleExtractor:
                 # role, in which case it's already entered as the role should have
                 # been loaded using IncludeContext.load_and_enter_role.
                 tf_result = TaskListExtractor(
-                    self.context,
-                    self.role.main_tasks_file.tasks,
+                    self.context, self.role.main_tasks_file.tasks
                 ).extract_tasks(result.next_predecessors)
                 result = result.chain(tf_result)
             else:
@@ -79,8 +78,7 @@ class RoleExtractor:
                 with self.context.include_ctx.enter_role_file(hf.path):
                     result = result.chain(
                         HandlerListExtractor(
-                            self.context,
-                            hf.handlers,
+                            self.context, hf.handlers
                         ).extract_handlers(result.next_predecessors)
                     )
 

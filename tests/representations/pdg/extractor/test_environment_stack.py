@@ -29,22 +29,27 @@ def describe_get_variable_initialisers() -> None:
         env_stack.set_variable_definition(
             "test1",
             VariableDefinitionRecord(
-                "test1", 0, expr("{{ 1 + 1 }}"), False, EnvironmentType.TASK_VARS
+                "test1",
+                0,
+                expr("{{ 1 + 1 }}"),
+                eagerly_evaluated=False,
+                env_type=EnvironmentType.TASK_VARS,
             ),
         )
         env_stack.set_variable_definition(
             "test2",
             VariableDefinitionRecord(
-                "test2", 0, expr("{{ 3 + 4 }}"), False, EnvironmentType.INCLUDE_VARS
+                "test2",
+                0,
+                expr("{{ 3 + 4 }}"),
+                eagerly_evaluated=False,
+                env_type=EnvironmentType.INCLUDE_VARS,
             ),
         )
 
         result = env_stack.get_variable_initialisers()
 
-        assert result == {
-            "test1": expr("{{ 1 + 1 }}"),
-            "test2": expr("{{ 3 + 4 }}"),
-        }
+        assert result == {"test1": expr("{{ 1 + 1 }}"), "test2": expr("{{ 3 + 4 }}")}
 
     def should_return_highest_precedence_vars() -> None:
         env_stack = EnvironmentStack()
@@ -52,43 +57,55 @@ def describe_get_variable_initialisers() -> None:
         env_stack.set_variable_definition(
             "test1",
             VariableDefinitionRecord(
-                "test1", 0, expr("{{ 1 + 1 }}"), False, EnvironmentType.TASK_VARS
+                "test1",
+                0,
+                expr("{{ 1 + 1 }}"),
+                eagerly_evaluated=False,
+                env_type=EnvironmentType.TASK_VARS,
             ),
         )
         env_stack.set_variable_definition(
             "test1",
             VariableDefinitionRecord(
-                "test1", 1, expr("{{ 3 + 4 }}"), False, EnvironmentType.INCLUDE_VARS
+                "test1",
+                1,
+                expr("{{ 3 + 4 }}"),
+                eagerly_evaluated=False,
+                env_type=EnvironmentType.INCLUDE_VARS,
             ),
         )
 
         result = env_stack.get_variable_initialisers()
 
-        assert result == {
-            "test1": expr("{{ 3 + 4 }}"),
-        }
+        assert result == {"test1": expr("{{ 3 + 4 }}")}
 
     def should_return_highest_precedence_vars_in_different_order() -> None:
         env_stack = EnvironmentStack()
         env_stack.set_variable_definition(
             "test1",
             VariableDefinitionRecord(
-                "test1", 0, expr("{{ 3 + 4 }}"), False, EnvironmentType.INCLUDE_VARS
+                "test1",
+                0,
+                expr("{{ 3 + 4 }}"),
+                eagerly_evaluated=False,
+                env_type=EnvironmentType.INCLUDE_VARS,
             ),
         )
         env_stack.enter_scope(EnvironmentType.TASK_VARS)
         env_stack.set_variable_definition(
             "test1",
             VariableDefinitionRecord(
-                "test1", 1, expr("{{ 1 + 1 }}"), False, EnvironmentType.TASK_VARS
+                "test1",
+                1,
+                expr("{{ 1 + 1 }}"),
+                eagerly_evaluated=False,
+                env_type=EnvironmentType.TASK_VARS,
             ),
         )
 
         result = env_stack.get_variable_initialisers()
 
-        assert result == {
-            "test1": expr("{{ 3 + 4 }}"),
-        }
+        assert result == {"test1": expr("{{ 3 + 4 }}")}
 
     def should_return_highest_precedence_vars_in_nested_environments() -> None:
         env_stack = EnvironmentStack()
@@ -96,22 +113,28 @@ def describe_get_variable_initialisers() -> None:
         env_stack.set_variable_definition(
             "test1",
             VariableDefinitionRecord(
-                "test1", 0, expr("{{ 1 + 1 }}"), False, EnvironmentType.TASK_VARS
+                "test1",
+                0,
+                expr("{{ 1 + 1 }}"),
+                eagerly_evaluated=False,
+                env_type=EnvironmentType.TASK_VARS,
             ),
         )
         env_stack.enter_scope(EnvironmentType.TASK_VARS)
         env_stack.set_variable_definition(
             "test1",
             VariableDefinitionRecord(
-                "test1", 1, expr("{{ 3 + 4 }}"), False, EnvironmentType.TASK_VARS
+                "test1",
+                1,
+                expr("{{ 3 + 4 }}"),
+                eagerly_evaluated=False,
+                env_type=EnvironmentType.TASK_VARS,
             ),
         )
 
         result = env_stack.get_variable_initialisers()
 
-        assert result == {
-            "test1": expr("{{ 3 + 4 }}"),
-        }
+        assert result == {"test1": expr("{{ 3 + 4 }}")}
 
     def should_not_return_variables_without_initialisers() -> None:
         env_stack = EnvironmentStack()
@@ -119,7 +142,11 @@ def describe_get_variable_initialisers() -> None:
         env_stack.set_variable_definition(
             "test1",
             VariableDefinitionRecord(
-                "test1", 0, SENTINEL, False, EnvironmentType.TASK_VARS
+                "test1",
+                0,
+                SENTINEL,
+                eagerly_evaluated=False,
+                env_type=EnvironmentType.TASK_VARS,
             ),
         )
 
@@ -133,13 +160,21 @@ def describe_get_variable_initialisers() -> None:
         env_stack.set_variable_definition(
             "test1",
             VariableDefinitionRecord(
-                "test1", 0, expr("{{ 1 + 1 }}"), False, EnvironmentType.TASK_VARS
+                "test1",
+                0,
+                expr("{{ 1 + 1 }}"),
+                eagerly_evaluated=False,
+                env_type=EnvironmentType.TASK_VARS,
             ),
         )
         env_stack.set_variable_definition(
             "test1",
             VariableDefinitionRecord(
-                "test1", 1, SENTINEL, False, EnvironmentType.SET_FACTS_REGISTERED
+                "test1",
+                1,
+                SENTINEL,
+                eagerly_evaluated=False,
+                env_type=EnvironmentType.SET_FACTS_REGISTERED,
             ),
         )
 
@@ -162,13 +197,21 @@ def describe_get_visible_definitions() -> None:
         env_stack.set_variable_definition(
             "test1",
             VariableDefinitionRecord(
-                "test1", 0, expr("{{ 1 + 1 }}"), False, EnvironmentType.TASK_VARS
+                "test1",
+                0,
+                expr("{{ 1 + 1 }}"),
+                eagerly_evaluated=False,
+                env_type=EnvironmentType.TASK_VARS,
             ),
         )
         env_stack.set_variable_definition(
             "test2",
             VariableDefinitionRecord(
-                "test2", 0, expr("{{ 3 + 4 }}"), False, EnvironmentType.INCLUDE_VARS
+                "test2",
+                0,
+                expr("{{ 3 + 4 }}"),
+                eagerly_evaluated=False,
+                env_type=EnvironmentType.INCLUDE_VARS,
             ),
         )
 
@@ -182,13 +225,21 @@ def describe_get_visible_definitions() -> None:
         env_stack.set_variable_definition(
             "test1",
             VariableDefinitionRecord(
-                "test1", 0, expr("{{ 1 + 1 }}"), False, EnvironmentType.TASK_VARS
+                "test1",
+                0,
+                expr("{{ 1 + 1 }}"),
+                eagerly_evaluated=False,
+                env_type=EnvironmentType.TASK_VARS,
             ),
         )
         env_stack.set_variable_definition(
             "test1",
             VariableDefinitionRecord(
-                "test1", 1, expr("{{ 3 + 4 }}"), False, EnvironmentType.INCLUDE_VARS
+                "test1",
+                1,
+                expr("{{ 3 + 4 }}"),
+                eagerly_evaluated=False,
+                env_type=EnvironmentType.INCLUDE_VARS,
             ),
         )
 
@@ -201,14 +252,22 @@ def describe_get_visible_definitions() -> None:
         env_stack.set_variable_definition(
             "test1",
             VariableDefinitionRecord(
-                "test1", 0, expr("{{ 3 + 4 }}"), False, EnvironmentType.INCLUDE_VARS
+                "test1",
+                0,
+                expr("{{ 3 + 4 }}"),
+                eagerly_evaluated=False,
+                env_type=EnvironmentType.INCLUDE_VARS,
             ),
         )
         env_stack.enter_scope(EnvironmentType.TASK_VARS)
         env_stack.set_variable_definition(
             "test1",
             VariableDefinitionRecord(
-                "test1", 1, expr("{{ 1 + 1 }}"), False, EnvironmentType.TASK_VARS
+                "test1",
+                1,
+                expr("{{ 1 + 1 }}"),
+                eagerly_evaluated=False,
+                env_type=EnvironmentType.TASK_VARS,
             ),
         )
 
@@ -222,14 +281,22 @@ def describe_get_visible_definitions() -> None:
         env_stack.set_variable_definition(
             "test1",
             VariableDefinitionRecord(
-                "test1", 0, expr("{{ 1 + 1 }}"), False, EnvironmentType.TASK_VARS
+                "test1",
+                0,
+                expr("{{ 1 + 1 }}"),
+                eagerly_evaluated=False,
+                env_type=EnvironmentType.TASK_VARS,
             ),
         )
         env_stack.enter_scope(EnvironmentType.TASK_VARS)
         env_stack.set_variable_definition(
             "test1",
             VariableDefinitionRecord(
-                "test1", 1, expr("{{ 3 + 4 }}"), False, EnvironmentType.TASK_VARS
+                "test1",
+                1,
+                expr("{{ 3 + 4 }}"),
+                eagerly_evaluated=False,
+                env_type=EnvironmentType.TASK_VARS,
             ),
         )
 
@@ -243,7 +310,11 @@ def describe_get_visible_definitions() -> None:
         env_stack.set_variable_definition(
             "test1",
             VariableDefinitionRecord(
-                "test1", 0, SENTINEL, False, EnvironmentType.TASK_VARS
+                "test1",
+                0,
+                SENTINEL,
+                eagerly_evaluated=False,
+                env_type=EnvironmentType.TASK_VARS,
             ),
         )
 
@@ -260,14 +331,18 @@ def describe_get_visible_definitions() -> None:
                 "test1",
                 0,
                 ast.Expression.model_validate("{{ 1 + 1 }}"),
-                False,
-                EnvironmentType.TASK_VARS,
+                eagerly_evaluated=False,
+                env_type=EnvironmentType.TASK_VARS,
             ),
         )
         env_stack.set_variable_definition(
             "test1",
             VariableDefinitionRecord(
-                "test1", 1, SENTINEL, False, EnvironmentType.SET_FACTS_REGISTERED
+                "test1",
+                1,
+                SENTINEL,
+                eagerly_evaluated=False,
+                env_type=EnvironmentType.SET_FACTS_REGISTERED,
             ),
         )
 

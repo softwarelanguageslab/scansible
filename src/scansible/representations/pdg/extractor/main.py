@@ -51,7 +51,7 @@ def extract_pdg(
     else:
         model = ast.extract_role(path, lenient=lenient, extract_all=False)
 
-    return StructuralGraphExtractor(model, role_search_paths, lenient).extract()
+    return StructuralGraphExtractor(model, role_search_paths, lenient=lenient).extract()
 
 
 def _project_is_role(path: Path) -> bool:
@@ -70,10 +70,7 @@ def _project_is_role(path: Path) -> bool:
 @final
 class StructuralGraphExtractor:
     def __init__(
-        self,
-        model: ast.AST,
-        role_search_paths: Sequence[Path],
-        lenient: bool,
+        self, model: ast.AST, role_search_paths: Sequence[Path], *, lenient: bool
     ) -> None:
         self.model = model
         graph = rep.Graph()
@@ -112,13 +109,7 @@ class StructuralGraphExtractor:
         self.context.record_extraction_error(reason, position)
 
     def _extract_role(self) -> None:
-        _ = RoleExtractor(
-            self.context,
-            cast(ast.Role, self.model.root),
-        ).extract_role()
+        _ = RoleExtractor(self.context, cast(ast.Role, self.model.root)).extract_role()
 
     def _extract_playbook(self) -> None:
-        PlaybookExtractor(
-            self.context,
-            cast(ast.Playbook, self.model.root),
-        ).extract()
+        PlaybookExtractor(self.context, cast(ast.Playbook, self.model.root)).extract()

@@ -23,7 +23,7 @@ def generate_report(
 ) -> None:
     collections: list[dict[str, Any]] = []
     for coll in dependencies.collections:
-        collections.append(
+        collections.append(  # noqa: PERF401
             {
                 "name": coll.name,
                 "modules": [
@@ -74,8 +74,16 @@ def generate_report(
             vuln["severity"] = "unknown"
 
     pages = [("index", "Dashboard")]
-    for page_name in ("collections", "roles", "modules", "dependencies", "weaknesses"):
-        pages.append((page_name, page_name[0].upper() + page_name[1:]))
+    pages.extend(
+        (page_name, page_name.title())
+        for page_name in (
+            "collections",
+            "roles",
+            "modules",
+            "dependencies",
+            "weaknesses",
+        )
+    )
 
     smells: list[dict[str, Any]] = []
     for smell in smells_raw:

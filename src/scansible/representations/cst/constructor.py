@@ -40,7 +40,7 @@ class CustomConstructor(SafeConstructor):
     """Custom YAML object constructor that constructs the CST subclasses."""
 
     def __init__(
-        self, preserve_quotes: bool | None = None, loader: YAML | None = None
+        self, *, preserve_quotes: bool | None = None, loader: YAML | None = None
     ) -> None:
         assert isinstance(loader, CustomYAML)
         super().__init__(preserve_quotes, loader)

@@ -22,7 +22,7 @@ def describe_extracting_tasks_file():
                   test: {}
         """
         _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = TaskFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
@@ -34,7 +34,7 @@ def describe_extracting_tasks_file():
     def allows_task_files_to_be_empty(tmp_path: Path):
         yaml = "# just a comment"
         _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = TaskFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
@@ -44,7 +44,7 @@ def describe_extracting_tasks_file():
     @pytest.mark.parametrize("content", ["hello: world"])  # dict  # string
     def rejects_invalid_files(tmp_path: Path, content: str):
         _ = (tmp_path / "main.yml").write_text(content)
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError, match="Expected a sequence"):
             _ = TaskFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
@@ -58,7 +58,7 @@ def describe_extracting_tasks_file():
                 name: test.txt
         """
         _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-        ctx = ExtractionContext(True)
+        ctx = ExtractionContext(lenient=True)
 
         result = TaskFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
@@ -72,7 +72,7 @@ def describe_extracting_tasks_file():
                 - file: {}
         """
         _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-        ctx = ExtractionContext(True)
+        ctx = ExtractionContext(lenient=True)
 
         result = TaskFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 

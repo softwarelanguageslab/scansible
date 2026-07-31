@@ -80,6 +80,6 @@ def describe_extracting_roles():
         assert not result.is_playbook
         assert isinstance(result.root, Role)
         assert result.path == tmp_path
-        assert result.root.path == Path(".")
+        assert result.root.path == Path()
         assert not result.broken_files
         assert not result.broken_tasks

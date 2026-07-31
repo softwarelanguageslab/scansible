@@ -17,12 +17,8 @@ def _match_node(n1: Node, n2: Node, match_locations: bool) -> bool:
     )
 
 
-def assert_graphs_match(
-    g1: Graph,
-    g2: Graph,
-    *,
-    match_locations: bool = False,
-) -> None:
+# FIXME: Could we instead use graph queries? They might be more interpretable.
+def assert_graphs_match(g1: Graph, g2: Graph, *, match_locations: bool = False) -> None:
     __tracebackhide__ = True
 
     # Compare nodes
@@ -116,10 +112,7 @@ NodeSpecs = dict[str, Node]
 EdgeSpecs = Iterable[tuple[str, str, Edge]]
 
 
-def create_graph(
-    nodes: NodeSpecs,
-    edges: EdgeSpecs,
-) -> Graph:
+def create_graph(nodes: NodeSpecs, edges: EdgeSpecs) -> Graph:
     g = Graph()
     g.add_nodes(nodes.values())
     for src, target, edge in edges:

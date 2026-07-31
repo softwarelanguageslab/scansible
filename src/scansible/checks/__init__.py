@@ -30,6 +30,7 @@ def _convert_location(loc: str | None) -> NodeLocation | None:
 
 def run_all_checks(
     extraction_context: ExtractionContext,
+    *,
     enable_security: bool = True,
     enable_semantics: bool = True,
 ) -> list[CheckResult]:

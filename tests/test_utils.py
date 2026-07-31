@@ -22,105 +22,107 @@ def describe_source_file_map() -> None:
     f2 = object()
 
     def describe_empty_file_map() -> None:
-        map = SourceFileMap[TaskFile]([])
+        files = SourceFileMap[TaskFile]([])
 
         def should_be_empty() -> None:
-            assert len(map) == 0
+            assert len(files) == 0
 
         def should_be_falsy() -> None:
-            assert not map
+            assert not files
 
         def should_not_contain_key() -> None:
-            assert "test" not in map
+            assert "test" not in files
 
         def should_raise_keyerror() -> None:
             with pytest.raises(KeyError):
-                map["test"]
+                files["test"]
 
     def describe_populated_file_map() -> None:
-        map = SourceFileMap[object]([("main.yml", f1), ("other.yaml", f2)])
+        files = SourceFileMap[object]([("main.yml", f1), ("other.yaml", f2)])
 
         def should_have_length() -> None:
-            assert len(map) == 2
+            assert len(files) == 2
 
         def should_be_truthy() -> None:
-            assert map
+            assert files
 
         def should_contain_both_keys() -> None:
-            assert "main" in map
-            assert "other" in map
+            assert "main" in files
+            assert "other" in files
 
         def should_not_contain_other_key() -> None:
-            assert "yet-another" not in map
+            assert "yet-another" not in files
 
         def should_return_files() -> None:
-            assert map["main"] is f1
-            assert map["other"] is f2
+            assert files["main"] is f1
+            assert files["other"] is f2
 
     def describe_file_map_with_mixed_extensions() -> None:
-        map = SourceFileMap[object]([("main.yml", f1), ("other.yaml", f2)])
+        files = SourceFileMap[object]([("main.yml", f1), ("other.yaml", f2)])
 
         def should_contain_both_keys() -> None:
-            assert "main" in map
-            assert "other" in map
+            assert "main" in files
+            assert "other" in files
 
         def should_not_contain_other_key() -> None:
-            assert "yet-another" not in map
+            assert "yet-another" not in files
 
         def should_return_files() -> None:
-            assert map["main"] is f1
-            assert map["other"] is f2
+            assert files["main"] is f1
+            assert files["other"] is f2
 
     def describe_file_map_with_conflicting_extensions() -> None:
-        map = SourceFileMap[object]([("main.yml", f1), ("main.yaml", f2)])
+        files = SourceFileMap[object]([("main.yml", f1), ("main.yaml", f2)])
 
         def should_have_length() -> None:
-            assert len(map) == 2
+            assert len(files) == 2
 
         def should_be_truthy() -> None:
-            assert map
+            assert files
 
         def should_contain_key() -> None:
-            assert "main" in map
+            assert "main" in files
 
         def should_prefer_yml() -> None:
-            assert map["main"] is f1
+            assert files["main"] is f1
 
         def should_enable_indexing_with_extension() -> None:
-            assert map["main.yml"] is f1
-            assert map["main.yaml"] is f2
+            assert files["main.yml"] is f1
+            assert files["main.yaml"] is f2
 
     def describe_file_map_with_subdirectory() -> None:
-        map = SourceFileMap[object]([("tasks/main.yml", f1), ("tasks/other.yaml", f2)])
+        files = SourceFileMap[object](
+            [("tasks/main.yml", f1), ("tasks/other.yaml", f2)]
+        )
 
         def should_contain_both_keys() -> None:
-            assert "tasks/main" in map
-            assert "tasks/other" in map
+            assert "tasks/main" in files
+            assert "tasks/other" in files
 
         def should_return_files() -> None:
-            assert map["tasks/main"] is f1
-            assert map["tasks/other"] is f2
+            assert files["tasks/main"] is f1
+            assert files["tasks/other"] is f2
 
     def describe_file_map_with_subdirectory_and_prefix() -> None:
-        map = SourceFileMap[object](
+        files = SourceFileMap[object](
             [("tasks/main.yml", f1), ("tasks/other.yaml", f2)], prefix="tasks/"
         )
 
         def should_contain_both_keys() -> None:
-            assert "main" in map
-            assert "other" in map
+            assert "main" in files
+            assert "other" in files
 
         def should_contain_prefixed_keys() -> None:
-            assert "tasks/main" in map
-            assert "tasks/other" in map
+            assert "tasks/main" in files
+            assert "tasks/other" in files
 
         def should_return_files() -> None:
-            assert map["main"] is f1
-            assert map["other"] is f2
+            assert files["main"] is f1
+            assert files["other"] is f2
 
         def should_return_prefixed_files() -> None:
-            assert map["tasks/main"] is f1
-            assert map["tasks/other"] is f2
+            assert files["tasks/main"] is f1
+            assert files["tasks/other"] is f2
 
 
 def describe_project_path():
@@ -138,7 +140,7 @@ def describe_project_path():
 
         def should_reject_relative_root_paths():
             with pytest.raises(ValueError, match="absolute path"):
-                _ = ProjectPath(Path("."), "test.yml")
+                _ = ProjectPath(Path(), "test.yml")
 
     def describe_from_root():
         def should_construct_correct_path():
@@ -146,7 +148,7 @@ def describe_project_path():
 
             assert pp.root == Path().absolute()
             assert pp.absolute == Path().absolute()
-            assert pp.relative == Path(".")
+            assert pp.relative == Path()
 
     def describe_join():
         @pytest.mark.parametrize(
@@ -168,11 +170,11 @@ def describe_project_path():
             assert pp2.root == rpp.root
             assert pp2.relative == Path("meta/main.yml")
 
-        # FIXME
+        # FIXME: not implemented any longer? Either remove test or fix behaviour
         @pytest.mark.xfail(reason="not implemented any longer")
         def should_reject_child_with_different_parent():
             rpp = ProjectPath.from_root(Path("meta").absolute())
-            with pytest.raises(Exception):  # noqa: B017 # FIXME
+            with pytest.raises(Exception):  # noqa: B017
                 _ = rpp.join(Path("tasks/main.yml").absolute())
 
 
@@ -183,7 +185,8 @@ def describe_find_file():
 
         result = find_file(ProjectPath.from_root(tmp_path), "test")
 
-        assert result and result.relative == Path(f"test.{ext}")
+        assert result is not None
+        assert result.relative == Path(f"test.{ext}")
 
     def should_not_find_files_that_dont_exist(tmp_path: Path):
         result = find_file(ProjectPath.from_root(tmp_path), "test")

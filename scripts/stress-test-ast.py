@@ -1,5 +1,5 @@
 """Script to "stress-test" the AST by running the AST builder on real projects and logging errors."""
-# DISCLAIMER: AI-generated
+# DISCLAIMER: AI-generated  # noqa: ERA001
 
 from __future__ import annotations
 
@@ -266,8 +266,8 @@ def _resolve_repo(data_dir: Path, repo: str) -> Generator[Path]:
         with tarfile.open(archive) as tf:
             try:
                 tf.extractall(tmp, filter="data")
-            except tarfile.LinkOutsideDestinationError:
-                raise FileNotFoundError(f"Bad archive {archive} with symlink")
+            except tarfile.LinkOutsideDestinationError as e:
+                raise FileNotFoundError(f"Bad archive {archive} with symlink") from e
         yield Path(tmp) / repo_dir.name
 
 

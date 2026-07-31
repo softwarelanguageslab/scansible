@@ -79,7 +79,7 @@ class Cache:
 CACHE = Cache()
 
 
-class CollectionNotFound(Exception):
+class CollectionNotFoundError(Exception):
     pass
 
 
@@ -109,7 +109,7 @@ def _find_collection(namespace: str, name: str) -> tuple[Path, Path]:
         if coll_path.is_dir():
             break
     else:
-        raise CollectionNotFound()
+        raise CollectionNotFoundError
 
     base_path = Path("ansible_collections") / namespace / name / "plugins"
 
@@ -135,7 +135,7 @@ def _extract_collection_dependencies(
 
         try:
             input_file = _prepare_input(coll_fqn, d)
-        except CollectionNotFound:
+        except CollectionNotFoundError:
             print(f"Collection {coll_fqn} not in dataset!")
             return {}
 
@@ -143,8 +143,8 @@ def _extract_collection_dependencies(
 
         print(f"Processing {coll_fqn}")
         try:
-            completed_proc = subprocess.run(
-                [
+            completed_proc = subprocess.run(  # noqa: S603
+                [  # noqa: S607
                     "java",
                     f"-Xmx{MODULE_SCA_JAVA_MAX_HEAP_SIZE}",
                     "-jar",

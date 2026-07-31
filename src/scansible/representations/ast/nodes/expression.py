@@ -38,7 +38,7 @@ from scansible.utils import FrozenDict, Position, Positioned
 from ..common import BrokenTask, ExtractionContext
 from .base import ASTNode
 
-_JINJA_ENV = Environment(cache_size=0)
+_JINJA_ENV = Environment(cache_size=0)  # noqa: S701
 
 #: Placeholder position used as the default for directly constructed nodes.
 _SYNTHETIC_POSITION: Final = Position.synthetic()
@@ -354,7 +354,10 @@ class BoolLiteral(Literal):
     __position__: Position
 
     def __init__(
-        self, value: bool, *, position: Position = _SYNTHETIC_POSITION
+        self,
+        value: bool,  # noqa: FBT001
+        *,
+        position: Position = _SYNTHETIC_POSITION,
     ) -> None:
         self._real_bool = value
         self.__position__ = position

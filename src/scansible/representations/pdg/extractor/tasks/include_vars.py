@@ -36,10 +36,7 @@ class IncludeVarsTaskExtractor(DynamicIncludesExtractor[ast.VariableFile]):
         )
 
     @override
-    def _get_filename_candidates(
-        self,
-        included_name_pattern: str,
-    ) -> set[str]:
+    def _get_filename_candidates(self, included_name_pattern: str) -> set[str]:
         logger.warning("Conditions for include_vars not set yet!")
         return self.context.include_ctx.find_matching_var_files(included_name_pattern)
 

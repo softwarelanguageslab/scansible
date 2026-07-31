@@ -15,7 +15,7 @@ from .types import EnvironmentType
 
 
 class Environment:
-    def __init__(self, env_type: EnvironmentType, is_cached: bool = False) -> None:
+    def __init__(self, env_type: EnvironmentType, *, is_cached: bool = False) -> None:
         self.env_type: EnvironmentType = env_type
         self.is_cached: bool = is_cached
         self.cached_results: dict[str, VariableValueRecord] = {}

@@ -17,23 +17,13 @@ def get_node_attributes(n: rep.Node) -> dict[str, str]:
                 "fontsize": "30",
             }
         case rep.Literal():
-            return {
-                "style": "dotted, filled",
-                "fillcolor": "lightgrey",
-            }
+            return {"style": "dotted, filled", "fillcolor": "lightgrey"}
         case rep.IntermediateValue():
-            return {
-                "shape": "circle",
-                "fontsize": "8",
-            }
+            return {"shape": "circle", "fontsize": "8"}
         case rep.Expression():
-            return {
-                "style": "dashed",
-            }
+            return {"style": "dashed"}
         case rep.Variable():
-            return {
-                "style": "dotted",
-            }
+            return {"style": "dotted"}
         case _:
             return {}
 

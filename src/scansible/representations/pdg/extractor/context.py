@@ -50,11 +50,7 @@ class IncludeContext:
         return self._include_stack[-1][1]
 
     def __init__(
-        self,
-        model: ast.AST,
-        role_search_paths: Sequence[Path],
-        *,
-        lenient: bool,
+        self, model: ast.AST, role_search_paths: Sequence[Path], *, lenient: bool
     ) -> None:
         self.lenient = lenient
         self._role_search_paths = role_search_paths
@@ -105,8 +101,7 @@ class IncludeContext:
             # TODO: this is ugly. we can probably use an ExitStack here.
             if role.main_tasks_file is not None:
                 with self._enter_file(
-                    role_base_path.join(role.main_tasks_file.path),
-                    includer_location,
+                    role_base_path.join(role.main_tasks_file.path), includer_location
                 ):
                     yield
             else:
@@ -342,11 +337,11 @@ class IncludeContext:
 
     def _get_role_search_dirs(self) -> Iterable[Path]:
         # Ansible's role resolution order:
-        # - collections (skipped)
-        # - <playbook dir>/roles/{name}
-        # - <default role dir>/{name}
-        # - <current role's parent dir>/{name}
-        # - <playbook dir>/{name}
+        # 1. collections (skipped)
+        # 2. <playbook dir>/roles/{name}
+        # 3. <default role dir>/{name}
+        # 4. <current role's parent dir>/{name}
+        # 5. <playbook dir>/{name}
         if self._playbook_base_path is not None:
             yield self._playbook_base_path.join("roles").absolute
 
@@ -377,19 +372,13 @@ class VisibilityInformation:
     def set_info(
         self, var_name: str, def_version: int, visible_definitions: set[tuple[str, int]]
     ) -> None:
-        assert (
-            var_name,
-            def_version,
-        ) not in self._store, (
+        assert (var_name, def_version) not in self._store, (
             f"Internal Error: Visibility information already set for {var_name}@{def_version}"
         )
         self._store[(var_name, def_version)] = visible_definitions
 
     def get_info(self, var_name: str, def_version: int) -> set[tuple[str, int]]:
-        assert (
-            var_name,
-            def_version,
-        ) in self._store, (
+        assert (var_name, def_version) in self._store, (
             f"Internal Error: Visibility information not stored for {var_name}@{def_version}"
         )
         return self._store[(var_name, def_version)]
@@ -400,17 +389,6 @@ class VisibilityInformation:
             [list(k), [list(v) for v in vals]] for k, vals in self._store.items()
         ]
         return json.dumps(as_lists)
-
-    # FIXME: Never called, and a mess.
-    # @classmethod
-    # def load(cls, payload: str) -> VisibilityInformation:
-    #     inst = VisibilityInformation()
-    #     as_lists = json.loads(payload)
-    #     for k, vals in as_lists:
-    #         name, rev = k
-    #         vals_as_tuples = {(vname, vrev) for vname, vrev in vals}
-    #         inst.set_info(name, rev, vals_as_tuples)
-    #     return inst
 
 
 class ExtractionContext:

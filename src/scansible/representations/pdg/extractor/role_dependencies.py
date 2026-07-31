@@ -25,7 +25,7 @@ def extract_role_dependency(
             except ValueError as e:
                 # TODO: Change this if we'd ever support `host_vars` access, etc; see `variables.py`
                 logger.warning(
-                    f"Ignoring variable {var_name!r}: Variable name is not a valid identifier: {e}",
+                    f"Ignoring variable {var_name!r}: Variable name is not a valid identifier: {e}"
                 )
                 continue
             _ = context.vars.define_initialised_variable(
@@ -42,6 +42,7 @@ def extract_role_dependency(
                 )
                 return ExtractionResult.empty(predecessors)
 
-            from .role import RoleExtractor
+            # Import here to prevent recursive imports
+            from .role import RoleExtractor  # noqa: PLC0415
 
             return RoleExtractor(context, incl_role).extract_role(predecessors)

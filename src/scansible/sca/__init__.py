@@ -57,7 +57,7 @@ def _find_role(name: str) -> Path | None:
 def _extend_role_usages(
     role_path: Path, r: RoleUsage, module_usages: list[ModuleUsage]
 ) -> None:
-    role_modules = extract_modules(role_path, False)
+    role_modules = extract_modules(role_path, return_relative_paths=False)
 
     for mod in role_modules:
         existing_mod = next(
@@ -95,7 +95,7 @@ def _extract_project_dependencies(project: Path) -> ProjectDependencies:
             continue
 
         _extend_role_usages(role_path, r, module_usages)
-        new_ru = extract_roles(role_path, False)
+        new_ru = extract_roles(role_path, return_relative_paths=False)
         for ru in new_ru:
             ex_ru = next((ru2 for ru2 in role_usages if ru.name == ru2.name), None)
             if ex_ru is None:
@@ -169,15 +169,7 @@ def scan_project(
             )
 
     output_dir.mkdir(exist_ok=True, parents=True)
-    generate_report(
-        project.name,
-        output_dir,
-        project_deps,
-        dep_vulns,
-        smells,
-    )
-
-    # json_results = _serialise_results_to_json(module_usages, dependencies, dep_vulns)
+    generate_report(project.name, output_dir, project_deps, dep_vulns, smells)
 
 
 def _detect_smells(
@@ -203,7 +195,9 @@ def is_trivial_module(m: ModuleInfo) -> bool:
     return mname in ANSIBLE_TRIVIAL_MODULES
 
 
-def extract_roles(project: Path, relative_paths: bool = True) -> list[RoleUsage]:
+def extract_roles(
+    project: Path, *, return_relative_paths: bool = True
+) -> list[RoleUsage]:
     first_party_roles = {
         path.name for path, etype in find_entrypoints(project) if etype == "role"
     }
@@ -217,7 +211,7 @@ def extract_roles(project: Path, relative_paths: bool = True) -> list[RoleUsage]
     for r, loc in third_party_roles:
         role_to_usage[r].append(":".join(map(str, loc)))
 
-    if relative_paths:
+    if return_relative_paths:
         return [
             RoleUsage(
                 r, [str(Path(loc).relative_to(project)) for loc in locs], set(), set()
@@ -260,7 +254,9 @@ def _extract_role_includes(project: Path) -> Iterable[tuple[str, Position]]:
                     yield str(item.args[StrLiteral("name")]), item.position
 
 
-def extract_modules(project: Path, relative_paths: bool = True) -> list[ModuleUsage]:
+def extract_modules(
+    project: Path, *, return_relative_paths: bool = True
+) -> list[ModuleUsage]:
     all_tasks = extract_all_tasks(project)
     collection_index = get_collection_index()
     modules = [
@@ -278,7 +274,7 @@ def extract_modules(project: Path, relative_paths: bool = True) -> list[ModuleUs
         tloc = f"{t.__position__.path}:{t.__position__.start.line}"
         usages[mname].append(tloc)
 
-    if relative_paths:
+    if return_relative_paths:
         return [
             ModuleUsage(name, [str(Path(loc).relative_to(project)) for loc in locs])
             for name, locs in usages.items()
@@ -323,7 +319,7 @@ def flatten_tasks(ts: Sequence[Task | Block | HandlerBlock]) -> Iterable[Task]:
 
 
 def try_extract_pb_or_tasks_file(f: Path) -> Playbook | TaskFile | None:
-    ctx = ExtractionContext(False)
+    ctx = ExtractionContext(lenient=False)
     try:
         return TaskFile.load(ProjectPath.from_root(f), ctx)
     except (ValidationError, YAMLError):

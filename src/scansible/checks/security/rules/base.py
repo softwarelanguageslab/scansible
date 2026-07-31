@@ -42,7 +42,6 @@ def _convert_location(loc: NodeLocation | None) -> str:
     if loc is None:
         return "unknown file:-1:-1"
     return str(loc)
-    # return ":".join(map(str, (loc.file, loc.line, loc.column)))
 
 
 class Rule(abc.ABC):

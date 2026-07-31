@@ -33,7 +33,7 @@ from scansible.representations.pdg.extractor.expressions import (
 ContextCreator = Callable[[], tuple[VarContext, Graph]]
 
 
-@pytest.fixture()
+@pytest.fixture
 def create_context(g: Graph, mocker: MockerFixture, tmp_path: Path) -> ContextCreator:
     return lambda: (
         ExtractionContext(
@@ -63,17 +63,18 @@ ident = ast.Identifier
 
 def describe_unmodified() -> None:
     @pytest.mark.parametrize(
-        "expr, type", [("hello", "str"), ("1", "str"), ("True", "str"), ("yes", "str")]
+        ("expr", "type_"),
+        [("hello", "str"), ("1", "str"), ("True", "str"), ("yes", "str")],
     )
     def should_extract_literal(
-        expr: str, type: Literal["str"], create_context: ContextCreator
+        expr: str, type_: Literal["str"], create_context: ContextCreator
     ) -> None:
         ctx, g = create_context()
 
         _ = ctx.build_expression(strlit(expr))
 
         assert_graphs_match(
-            g, create_graph({"lit": ScalarLiteral(type=type, value=expr)}, [])
+            g, create_graph({"lit": ScalarLiteral(type=type_, value=expr)}, [])
         )
 
     def should_declare_literal_variable(create_context: ContextCreator) -> None:
@@ -117,10 +118,7 @@ def describe_unmodified() -> None:
                     "expr": Expression(expr="hello {{ target }}"),
                     "iv": IntermediateValue(identifier=0),
                 },
-                [
-                    ("var", "expr", Input()),
-                    ("expr", "iv", DEF),
-                ],
+                [("var", "expr", Input()), ("expr", "iv", DEF)],
             ),
         )
 
@@ -142,10 +140,7 @@ def describe_unmodified() -> None:
                     "expr": Expression(expr="hello {{ ansible_version }}"),
                     "iv": IntermediateValue(identifier=0),
                 },
-                [
-                    ("var", "expr", Input()),
-                    ("expr", "iv", DEF),
-                ],
+                [("var", "expr", Input()), ("expr", "iv", DEF)],
             ),
         )
 
@@ -167,10 +162,7 @@ def describe_unmodified() -> None:
                     "expr": Expression(expr="hello {{ ansible_os_family }}"),
                     "iv": IntermediateValue(identifier=0),
                 },
-                [
-                    ("var", "expr", Input()),
-                    ("expr", "iv", DEF),
-                ],
+                [("var", "expr", Input()), ("expr", "iv", DEF)],
             ),
         )
 
@@ -212,10 +204,7 @@ def describe_unmodified() -> None:
                     "expression": Expression(expr="hello {{ target }}"),
                     "iv": IntermediateValue(identifier=1),
                 },
-                [
-                    ("target", "expression", Input()),
-                    ("expression", "iv", DEF),
-                ],
+                [("target", "expression", Input()), ("expression", "iv", DEF)],
             ),
         )
 
@@ -259,7 +248,7 @@ def describe_unmodified() -> None:
         )
 
     @pytest.mark.parametrize(
-        "expression, _expected",
+        ("expression", "_expected"),
         [
             ('{{ "/etc/tzinfo" | basename }}', "{{ '/etc/tzinfo' | basename }}"),
             (
@@ -291,7 +280,7 @@ def describe_unmodified() -> None:
 
 def describe_modified() -> None:
     @pytest.mark.parametrize(
-        "expression, _expected, components",
+        ("expression", "_expected", "components"),
         [
             ("The time is {{ now() }}", "The time is {{ now() }}", ("function 'now'",)),
             (
@@ -395,8 +384,7 @@ def describe_modified() -> None:
             create_graph(
                 {
                     "e1": Expression(
-                        expr="{{ now() }}",
-                        impure_components=("function 'now'",),
+                        expr="{{ now() }}", impure_components=("function 'now'",)
                     ),
                     "iv1": IntermediateValue(identifier=1),
                     "when1": Variable(
@@ -683,11 +671,7 @@ def describe_scoping() -> None:
                     "e": Expression(expr="{{ ansible_version }}"),
                     "iv": IntermediateValue(identifier=1),
                 },
-                [
-                    ("l123", "unused", DEF),
-                    ("actual", "e", Input()),
-                    ("e", "iv", DEF),
-                ],
+                [("l123", "unused", DEF), ("actual", "e", Input()), ("e", "iv", DEF)],
             ),
         )
 
@@ -760,11 +744,7 @@ def describe_scoping() -> None:
                     "e": Expression(expr="{{ ansible_os_family }}"),
                     "iv": IntermediateValue(identifier=1),
                 },
-                [
-                    ("l123", "actual", DEF),
-                    ("actual", "e", Input()),
-                    ("e", "iv", DEF),
-                ],
+                [("l123", "actual", DEF), ("actual", "e", Input()), ("e", "iv", DEF)],
             ),
         )
 
@@ -799,11 +779,7 @@ def describe_scoping() -> None:
                     "e": Expression(expr="{{ ansible_os_family }}"),
                     "iv": IntermediateValue(identifier=1),
                 },
-                [
-                    ("l123", "unused", DEF),
-                    ("actual", "e", Input()),
-                    ("e", "iv", DEF),
-                ],
+                [("l123", "unused", DEF), ("actual", "e", Input()), ("e", "iv", DEF)],
             ),
         )
 
@@ -919,11 +895,7 @@ def describe_scoping() -> None:
                     "e1": Expression(expr="1 {{ a }}"),
                     "iv1": IntermediateValue(identifier=1),
                 },
-                [
-                    ("1", "aouter", DEF),
-                    ("aouter", "e1", Input()),
-                    ("e1", "iv1", DEF),
-                ],
+                [("1", "aouter", DEF), ("aouter", "e1", Input()), ("e1", "iv1", DEF)],
             ),
         )
 
@@ -1186,9 +1158,7 @@ def describe_scoping() -> None:
                         value_version=0,
                         scope_level=EnvironmentType.TASK_VARS.value,
                     ),
-                    "ae": Expression(
-                        expr="{{ 'hello' | reverse }}",
-                    ),
+                    "ae": Expression(expr="{{ 'hello' | reverse }}"),
                     "aiv": IntermediateValue(identifier=1),
                     "ai": Variable(
                         name="a",

@@ -1,3 +1,5 @@
+# ruff: disable[N802] -- Otherwise complains about visitor method casing, but we cannot mark them as override as the superclass doesn't have the methods defined
+
 """Extract information from template expressions."""
 
 from __future__ import annotations
@@ -44,18 +46,19 @@ class ASTStringifier(NodeVisitor):
     def visit(self, node: nodes.Node, *args: object, **kwargs: object) -> str:
         return cast(str, super().visit(node, *args, **kwargs))
 
-    def stringify(self, node: nodes.Node, is_conditional: bool) -> str:
+    def stringify(self, node: nodes.Node, *, is_conditional: bool) -> str:
         generated = self.visit(node)
-        self._check_correctness(node, generated, is_conditional)
+        self._check_correctness(node, generated, is_conditional=is_conditional)
         return generated
 
     def _check_correctness(
-        self, node: nodes.Node, generated: str, is_conditional: bool
+        self, node: nodes.Node, generated: str, *, is_conditional: bool
     ) -> None:
+        env = Environment()  # noqa: S701
         reparsed = merge_consecutive_templatedata(
-            Environment().parse(generated)
+            env.parse(generated)
             if not is_conditional
-            else parse_conditional(generated, Environment(), {})[0]
+            else parse_conditional(generated, env, {})[0]
         )
         node = merge_consecutive_templatedata(node)
 
@@ -247,7 +250,7 @@ class ASTStringifier(NodeVisitor):
         tail = "{% endset %}"
         return f"{head}{body}{tail}"
 
-    def visit_Test(self, node: nodes.Test, negate: bool = False, **_: object) -> str:
+    def visit_Test(self, node: nodes.Test, *, negate: bool = False, **_: object) -> str:
         lhs = self.visit(node.node)
         rhs = self._stringify_call(
             node.name, node.args, node.kwargs, node.dyn_args, node.dyn_kwargs
@@ -258,7 +261,7 @@ class ASTStringifier(NodeVisitor):
             return f"{lhs} is {rhs}"
 
     def visit_Filter(
-        self, node: nodes.Filter, parenthesize: bool = False, **_: object
+        self, node: nodes.Filter, *, parenthesize: bool = False, **_: object
     ) -> str:
         filter_call = self._stringify_call(
             node.name, node.args, node.kwargs, node.dyn_args, node.dyn_kwargs
@@ -341,11 +344,7 @@ class NodeReplacer(Protocol):
 
 
 class NodeReplacerVisitor(NodeVisitor):
-    def __init__(
-        self,
-        matcher: NodeMatcher,
-        replacer: NodeReplacer,
-    ) -> None:
+    def __init__(self, matcher: NodeMatcher, replacer: NodeReplacer) -> None:
         self.match: NodeMatcher = matcher
         self.replace: NodeReplacer = replacer
 
@@ -552,7 +551,7 @@ def _find_ast_differences(a: nodes.Node, b: nodes.Node) -> Iterable[str]:
         yield f"{type(a)}: {len(a_children)} vs {len(b_children)} children: {a} vs {b}"
         return
 
-    for a_child, b_child in zip(a_children, b_children):
+    for a_child, b_child in zip(a_children, b_children, strict=True):
         yield from _find_ast_differences(a_child, b_child)
 
 
@@ -665,10 +664,7 @@ class FindUndeclaredVariablesVisitor(NodeVisitor):
 
 @final
 class TemplateExpressionAST:
-    def __init__(
-        self,
-        expression: ast.Expression,
-    ) -> None:
+    def __init__(self, expression: ast.Expression) -> None:
         self.ast_root = expression.template
         self.raw = expression.raw
         self.is_conditional = isinstance(expression, ast.Condition)

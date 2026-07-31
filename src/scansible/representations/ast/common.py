@@ -26,7 +26,7 @@ class ExtractionContext:
     #: List of broken tasks or blocks that could not be parsed/extracted.
     broken_tasks: list[BrokenTask]
 
-    def __init__(self, lenient: bool) -> None:
+    def __init__(self, *, lenient: bool) -> None:
         self.lenient = lenient
         self.broken_files = []
         self.broken_tasks = []

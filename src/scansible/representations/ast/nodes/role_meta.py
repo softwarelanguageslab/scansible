@@ -80,6 +80,7 @@ class RoleRequirement(ASTNode, CommonDirectives, frozen=True):
     when: SeqLiteral[Condition | BoolLiteral] = Field(default_factory=SeqLiteral)
 
     @field_validator("role", mode="after")
+    @classmethod
     def _validate_role_name(cls, value: str) -> str:
         """Reject comma-separated role names, valid only in raw `meta/main.yml` dependency strings."""
         # Commas in role names are only allowed in meta/main.yml dependencies, and should have
@@ -182,7 +183,7 @@ class MetaRoleRequirement(RoleRequirement, frozen=True):
         """Extract the role name from its src specification."""
         # Extraction per ansible.playbook.role.requirement.
         return (
-            src.split("/")[-1]
+            src.rsplit("/", maxsplit=1)[-1]
             .removesuffix(".git")
             .removesuffix(".tar.gz")
             .split(",")[0]

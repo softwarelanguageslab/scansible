@@ -18,7 +18,6 @@ ALL_RULES = [
     UnnecessaryIncludeVarsRule(),
     UnconditionalOverrideRule(),
     UnusedOverriddenRule(),
-    # SanityCheckNumberOfTasksRule(),
 ]
 
 

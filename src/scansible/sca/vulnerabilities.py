@@ -66,7 +66,9 @@ def _get_debian_advisories() -> dict[str, dict[str, Any]]:
 
     adv_path = CACHE_PATH / "debian_advisories.json"
     if not adv_path.is_file():
-        resp = requests.get("https://security-tracker.debian.org/tracker/data/json")
+        resp = requests.get(
+            "https://security-tracker.debian.org/tracker/data/json", timeout=15
+        )
         resp.raise_for_status()
         _ = adv_path.write_text(resp.text)
 
@@ -144,7 +146,8 @@ def _search_ecosystems(ecosystem: str, package: str) -> dict[str, Any] | None:
         return ECOSYSTEMS_CACHE.get(ecosystem, package)
 
     resp = requests.get(
-        f"https://packages.ecosyste.ms/api/v1/registries/{ecosystem}/packages/{package}"
+        f"https://packages.ecosyste.ms/api/v1/registries/{ecosystem}/packages/{package}",
+        timeout=15,
     )
     if resp.status_code == 404:
         return None

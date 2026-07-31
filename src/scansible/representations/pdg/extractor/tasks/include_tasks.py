@@ -34,10 +34,7 @@ class IncludeTaskExtractor(DynamicIncludesExtractor[ast.TaskFile]):
         )
 
     @override
-    def _get_filename_candidates(
-        self,
-        included_name_pattern: str,
-    ) -> set[str]:
+    def _get_filename_candidates(self, included_name_pattern: str) -> set[str]:
         logger.warning("Conditions for include_tasks not fully set yet!")
         return self.context.include_ctx.find_matching_task_files(included_name_pattern)
 
@@ -56,7 +53,8 @@ class IncludeTaskExtractor(DynamicIncludesExtractor[ast.TaskFile]):
     def _extract_included_content(
         self, included_content: ast.TaskFile, predecessors: Sequence[rep.ControlNode]
     ) -> ExtractionResult:
-        from ..task_lists import TaskListExtractor
+        # Import here to prevent recursive imports
+        from ..task_lists import TaskListExtractor  # noqa: PLC0415
 
         return TaskListExtractor(self.context, included_content.tasks).extract_tasks(
             predecessors

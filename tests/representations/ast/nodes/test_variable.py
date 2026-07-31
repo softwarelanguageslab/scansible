@@ -34,7 +34,7 @@ def describe_extracting_variables():
                 this: is
                 a: dict
         """
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
         _ = (tmp_path / "main.yml").write_text(dedent(yaml))
 
         result = VariableFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
@@ -55,7 +55,7 @@ def describe_extracting_variables():
                 62396263313762316136336334303463366465303638626438616530343935623766626534366436
         """
         _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = VariableFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
@@ -73,7 +73,7 @@ def describe_extracting_variables():
             test:
         """
         _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = VariableFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
@@ -85,7 +85,7 @@ def describe_extracting_variables():
             # just a comment
         """
         _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = VariableFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
@@ -112,7 +112,7 @@ def describe_extracting_variables():
                 62396263313762316136336334303463366465303638626438616530343935623766626534366436
         """
         _ = (tmp_path / "main.yml").write_text(dedent(yaml))
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         result = VariableFile.load(ProjectPath(tmp_path, "main.yml"), ctx)
 
@@ -149,7 +149,7 @@ def describe_extracting_variables():
     )
     def rejects_invalid_files(tmp_path: Path, content: str):
         _ = (tmp_path / "main.yml").write_text(content)
-        ctx = ExtractionContext(False)
+        ctx = ExtractionContext(lenient=False)
 
         with pytest.raises(ValueError):
             _ = VariableFile.load(ProjectPath(tmp_path, "main.yml"), ctx)

@@ -10,7 +10,7 @@ from . import nodes
 from .common import ExtractionContext
 
 
-def extract_playbook(path: Path, lenient: bool = True) -> nodes.AST:
+def extract_playbook(path: Path, *, lenient: bool = True) -> nodes.AST:
     """Extract the AST representation of a playbook.
 
     :param path: The path to the playbook.
@@ -18,19 +18,16 @@ def extract_playbook(path: Path, lenient: bool = True) -> nodes.AST:
     """
 
     pb_path = ProjectPath.from_root(path)
-    ctx = ExtractionContext(lenient)
+    ctx = ExtractionContext(lenient=lenient)
     pb = nodes.Playbook.load(pb_path, ctx)
 
     return nodes.AST(
-        root=pb,
-        path=path,
-        broken_files=ctx.broken_files,
-        broken_tasks=ctx.broken_tasks,
+        root=pb, path=path, broken_files=ctx.broken_files, broken_tasks=ctx.broken_tasks
     )
 
 
 def extract_role(
-    path: Path, extract_all: bool = False, lenient: bool = True
+    path: Path, *, extract_all: bool = False, lenient: bool = True
 ) -> nodes.AST:
     """Extract the AST representation of a role.
 
@@ -42,7 +39,7 @@ def extract_role(
     """
 
     role_path = ProjectPath.from_root(path)
-    ctx = ExtractionContext(lenient)
+    ctx = ExtractionContext(lenient=lenient)
     role = nodes.Role.load(role_path, ctx, extract_all)
 
     return nodes.AST(

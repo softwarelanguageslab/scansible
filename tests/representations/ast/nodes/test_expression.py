@@ -217,7 +217,7 @@ def describe_literals():
 
     def describe_bool_literal():
         @pytest.mark.parametrize(
-            ["value", "expected"],
+            ("value", "expected"),
             [
                 pytest.param("yes", True, id="yes"),
                 pytest.param("on", True, id="on"),
@@ -235,12 +235,12 @@ def describe_literals():
             assert result == expected
 
         def is_not_a_bool_subclass():
-            result = TypeAdapter(BoolLiteral).validate_python(True)
+            result = TypeAdapter(BoolLiteral).validate_python(True)  # noqa: FBT003
 
             assert not isinstance(result, bool)
             assert bool(result) is True
             assert str(result) == "True"
-            assert hash(result) == hash(True)
+            assert hash(result) == hash(True)  # noqa: FBT003
 
         def rejects_uncoercible_values():
             with pytest.raises(ValueError):
@@ -420,7 +420,7 @@ def describe_literals():
             assert IntLiteral(123).__position__.is_synthetic
             assert FloatLiteral(4.0).__position__.is_synthetic
             assert PercentLiteral(4.0).__position__.is_synthetic
-            assert BoolLiteral(True).__position__.is_synthetic
+            assert BoolLiteral(True).__position__.is_synthetic  # noqa: FBT003
             assert DateLiteral(date(2026, 1, 1)).__position__.is_synthetic
             assert DatetimeLiteral(
                 datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)

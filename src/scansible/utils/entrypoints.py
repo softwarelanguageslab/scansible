@@ -24,6 +24,7 @@ def is_entrypoint(path: Path) -> bool:
     if path.name.startswith("."):
         return False
 
+    # Ignore files in test directories.
     if "test" in path.name.lower() or "molecule" in path.name.lower():
         return False
 
