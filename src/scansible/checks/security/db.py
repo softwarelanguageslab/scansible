@@ -13,9 +13,8 @@ import kuzu
 
 from scansible.representations.pdg import Graph
 from scansible.representations.pdg.representation import Edge, Node, NodeLocation
-from scansible.types import AnyValue
 
-type DatabaseValue = AnyValue
+type DatabaseValue = object
 
 ## NOTE: Edges in the graph database are named as "e_<edge type>", e.g., "e_Order",
 ## as some edge types conflict with reserved keywords in the graph DB queries (e.g., Order).

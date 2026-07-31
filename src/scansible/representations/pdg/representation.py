@@ -8,12 +8,11 @@ from typing import Literal as LiteralT
 import abc
 import operator
 from collections.abc import Callable, Iterable, Sequence
+from datetime import date, datetime
 from functools import partial
 
 import rustworkx as rx
 from pydantic import BaseModel, Field, StringConstraints, field_validator
-
-from scansible.types import ScalarValue
 
 type ValidTypeStr = LiteralT[
     "str",
@@ -104,7 +103,7 @@ class Literal(DataNode):
 
 
 class ScalarLiteral(Literal):
-    value: ScalarValue = Field(frozen=True)
+    value: str | int | bool | float | date | datetime | None = Field(frozen=True)
 
 
 class CompositeLiteral(Literal):
