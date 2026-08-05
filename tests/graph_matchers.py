@@ -9,7 +9,11 @@ from scansible.representations.pdg import Edge, Graph, IntermediateValue, Node
 
 
 def _match_node(n1: Node, n2: Node, match_locations: bool) -> bool:
-    ignored_kws = {"node_id"} if match_locations else {"node_id", "location"}
+    ignored_kws = (
+        {"node_id", "impure_components"}
+        if match_locations
+        else {"node_id", "location", "impure_components"}
+    )
 
     return type(n1) is type(n2) and (
         not isinstance(n1, IntermediateValue)

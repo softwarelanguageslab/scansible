@@ -28,7 +28,7 @@ def extract_role_dependency(
                     f"Ignoring variable {var_name!r}: Variable name is not a valid identifier: {e}"
                 )
                 continue
-            _ = context.vars.define_initialised_variable(
+            context.vars.define_lazy_variable(
                 var_ident, EnvironmentType.INCLUDE_PARAMS, var_init
             )
 

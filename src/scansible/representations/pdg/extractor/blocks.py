@@ -50,7 +50,7 @@ class BlockExtractor:
             # shadow variables registered in an outer block. However, it's
             # confirmed to be a bug, so we'll handle it as if it were
             # implemented correctly.
-            _ = self.context.vars.define_initialised_variable(
+            self.context.vars.define_lazy_variable(
                 var_name, EnvironmentType.BLOCK_VARS, var_value
             )
 

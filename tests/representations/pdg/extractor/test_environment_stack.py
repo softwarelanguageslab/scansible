@@ -10,9 +10,12 @@ from scansible.representations.pdg.extractor.expressions.environments import (
 from scansible.representations.pdg.extractor.expressions.records import (
     VariableDefinitionRecord,
 )
-from scansible.utils import SENTINEL
+from scansible.representations.pdg.representation import NodeLocation, Variable
 
 expr = ast.Expression.model_validate
+
+FAKE_LOC = NodeLocation(file="test", line=1, column=1)
+FAKE_VAR = Variable(name="test", version=0, value_version=0, scope_level=0)
 
 
 def describe_get_variable_initialisers() -> None:
@@ -32,8 +35,9 @@ def describe_get_variable_initialisers() -> None:
                 "test1",
                 0,
                 expr("{{ 1 + 1 }}"),
-                eagerly_evaluated=False,
                 env_type=EnvironmentType.TASK_VARS,
+                conditions=[],
+                location=FAKE_LOC,
             ),
         )
         env_stack.set_variable_definition(
@@ -42,8 +46,9 @@ def describe_get_variable_initialisers() -> None:
                 "test2",
                 0,
                 expr("{{ 3 + 4 }}"),
-                eagerly_evaluated=False,
                 env_type=EnvironmentType.INCLUDE_VARS,
+                conditions=[],
+                location=FAKE_LOC,
             ),
         )
 
@@ -60,8 +65,9 @@ def describe_get_variable_initialisers() -> None:
                 "test1",
                 0,
                 expr("{{ 1 + 1 }}"),
-                eagerly_evaluated=False,
                 env_type=EnvironmentType.TASK_VARS,
+                conditions=[],
+                location=FAKE_LOC,
             ),
         )
         env_stack.set_variable_definition(
@@ -70,8 +76,9 @@ def describe_get_variable_initialisers() -> None:
                 "test1",
                 1,
                 expr("{{ 3 + 4 }}"),
-                eagerly_evaluated=False,
                 env_type=EnvironmentType.INCLUDE_VARS,
+                conditions=[],
+                location=FAKE_LOC,
             ),
         )
 
@@ -87,8 +94,9 @@ def describe_get_variable_initialisers() -> None:
                 "test1",
                 0,
                 expr("{{ 3 + 4 }}"),
-                eagerly_evaluated=False,
                 env_type=EnvironmentType.INCLUDE_VARS,
+                conditions=[],
+                location=FAKE_LOC,
             ),
         )
         env_stack.enter_scope(EnvironmentType.TASK_VARS)
@@ -98,8 +106,9 @@ def describe_get_variable_initialisers() -> None:
                 "test1",
                 1,
                 expr("{{ 1 + 1 }}"),
-                eagerly_evaluated=False,
                 env_type=EnvironmentType.TASK_VARS,
+                conditions=[],
+                location=FAKE_LOC,
             ),
         )
 
@@ -116,8 +125,9 @@ def describe_get_variable_initialisers() -> None:
                 "test1",
                 0,
                 expr("{{ 1 + 1 }}"),
-                eagerly_evaluated=False,
                 env_type=EnvironmentType.TASK_VARS,
+                conditions=[],
+                location=FAKE_LOC,
             ),
         )
         env_stack.enter_scope(EnvironmentType.TASK_VARS)
@@ -127,8 +137,9 @@ def describe_get_variable_initialisers() -> None:
                 "test1",
                 1,
                 expr("{{ 3 + 4 }}"),
-                eagerly_evaluated=False,
                 env_type=EnvironmentType.TASK_VARS,
+                conditions=[],
+                location=FAKE_LOC,
             ),
         )
 
@@ -144,9 +155,10 @@ def describe_get_variable_initialisers() -> None:
             VariableDefinitionRecord(
                 "test1",
                 0,
-                SENTINEL,
-                eagerly_evaluated=False,
+                FAKE_VAR,
                 env_type=EnvironmentType.TASK_VARS,
+                conditions=[],
+                location=FAKE_LOC,
             ),
         )
 
@@ -163,8 +175,9 @@ def describe_get_variable_initialisers() -> None:
                 "test1",
                 0,
                 expr("{{ 1 + 1 }}"),
-                eagerly_evaluated=False,
                 env_type=EnvironmentType.TASK_VARS,
+                conditions=[],
+                location=FAKE_LOC,
             ),
         )
         env_stack.set_variable_definition(
@@ -172,9 +185,10 @@ def describe_get_variable_initialisers() -> None:
             VariableDefinitionRecord(
                 "test1",
                 1,
-                SENTINEL,
-                eagerly_evaluated=False,
+                FAKE_VAR,
                 env_type=EnvironmentType.SET_FACTS_REGISTERED,
+                conditions=[],
+                location=FAKE_LOC,
             ),
         )
 
@@ -200,8 +214,9 @@ def describe_get_visible_definitions() -> None:
                 "test1",
                 0,
                 expr("{{ 1 + 1 }}"),
-                eagerly_evaluated=False,
                 env_type=EnvironmentType.TASK_VARS,
+                conditions=[],
+                location=FAKE_LOC,
             ),
         )
         env_stack.set_variable_definition(
@@ -210,8 +225,9 @@ def describe_get_visible_definitions() -> None:
                 "test2",
                 0,
                 expr("{{ 3 + 4 }}"),
-                eagerly_evaluated=False,
                 env_type=EnvironmentType.INCLUDE_VARS,
+                conditions=[],
+                location=FAKE_LOC,
             ),
         )
 
@@ -228,8 +244,9 @@ def describe_get_visible_definitions() -> None:
                 "test1",
                 0,
                 expr("{{ 1 + 1 }}"),
-                eagerly_evaluated=False,
                 env_type=EnvironmentType.TASK_VARS,
+                conditions=[],
+                location=FAKE_LOC,
             ),
         )
         env_stack.set_variable_definition(
@@ -238,8 +255,9 @@ def describe_get_visible_definitions() -> None:
                 "test1",
                 1,
                 expr("{{ 3 + 4 }}"),
-                eagerly_evaluated=False,
                 env_type=EnvironmentType.INCLUDE_VARS,
+                conditions=[],
+                location=FAKE_LOC,
             ),
         )
 
@@ -255,8 +273,9 @@ def describe_get_visible_definitions() -> None:
                 "test1",
                 0,
                 expr("{{ 3 + 4 }}"),
-                eagerly_evaluated=False,
                 env_type=EnvironmentType.INCLUDE_VARS,
+                conditions=[],
+                location=FAKE_LOC,
             ),
         )
         env_stack.enter_scope(EnvironmentType.TASK_VARS)
@@ -266,8 +285,9 @@ def describe_get_visible_definitions() -> None:
                 "test1",
                 1,
                 expr("{{ 1 + 1 }}"),
-                eagerly_evaluated=False,
                 env_type=EnvironmentType.TASK_VARS,
+                conditions=[],
+                location=FAKE_LOC,
             ),
         )
 
@@ -284,8 +304,9 @@ def describe_get_visible_definitions() -> None:
                 "test1",
                 0,
                 expr("{{ 1 + 1 }}"),
-                eagerly_evaluated=False,
                 env_type=EnvironmentType.TASK_VARS,
+                conditions=[],
+                location=FAKE_LOC,
             ),
         )
         env_stack.enter_scope(EnvironmentType.TASK_VARS)
@@ -295,8 +316,9 @@ def describe_get_visible_definitions() -> None:
                 "test1",
                 1,
                 expr("{{ 3 + 4 }}"),
-                eagerly_evaluated=False,
                 env_type=EnvironmentType.TASK_VARS,
+                conditions=[],
+                location=FAKE_LOC,
             ),
         )
 
@@ -312,9 +334,10 @@ def describe_get_visible_definitions() -> None:
             VariableDefinitionRecord(
                 "test1",
                 0,
-                SENTINEL,
-                eagerly_evaluated=False,
+                FAKE_VAR,
                 env_type=EnvironmentType.TASK_VARS,
+                conditions=[],
+                location=FAKE_LOC,
             ),
         )
 
@@ -331,8 +354,9 @@ def describe_get_visible_definitions() -> None:
                 "test1",
                 0,
                 ast.Expression.model_validate("{{ 1 + 1 }}"),
-                eagerly_evaluated=False,
                 env_type=EnvironmentType.TASK_VARS,
+                conditions=[],
+                location=FAKE_LOC,
             ),
         )
         env_stack.set_variable_definition(
@@ -340,9 +364,10 @@ def describe_get_visible_definitions() -> None:
             VariableDefinitionRecord(
                 "test1",
                 1,
-                SENTINEL,
-                eagerly_evaluated=False,
+                FAKE_VAR,
                 env_type=EnvironmentType.SET_FACTS_REGISTERED,
+                conditions=[],
+                location=FAKE_LOC,
             ),
         )
 

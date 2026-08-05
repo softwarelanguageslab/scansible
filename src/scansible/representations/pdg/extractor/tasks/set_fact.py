@@ -36,28 +36,27 @@ class SetFactTaskExtractor(TaskExtractor):
         _ = args.pop(ast.StrLiteral("cacheable"), False)
 
         conditions = self.extract_conditions()
+        with self.context.activate_conditions(conditions):
+            # Evaluate all values before defining the variables. Ansible does
+            # the same. We need to do this as one variable may be defined in
+            # terms of another variable that's `set_fact`ed
+            name_to_value: dict[ast.StrLiteral, rep.DataNode] = {}
+            for var_name, var_value in args.items():
+                try:
+                    name_to_value[var_name] = self.context.vars.build_expression(
+                        var_value
+                    )
+                except RecursiveDefinitionError as e:
+                    self.logger.error(e)
+                    continue
 
-        # Evaluate all values before defining the variables. Ansible does
-        # the same. We need to do this as one variable may be defined in
-        # terms of another variable that's `set_fact`ed
-        name_to_value: dict[ast.StrLiteral, rep.DataNode] = {}
-        for var_name, var_value in args.items():
-            try:
-                name_to_value[var_name] = self.context.vars.build_expression(var_value)
-            except RecursiveDefinitionError as e:
-                self.logger.error(e)
-                continue
-
-        for var_name, value_node in name_to_value.items():
-            var_node = self.context.vars.define_fact(
-                var_name,
-                EnvironmentType.SET_FACTS_REGISTERED,
-                args[var_name],
-                value_node,
-            )
-            with self.context.activate_conditions(conditions):
-                for condition_node in self.context.active_conditions:
-                    self.context.graph.add_edge(condition_node, var_node, rep.WHEN)
+            for var_name, value_node in name_to_value.items():
+                var_node = self.context.vars.define_eager_variable(
+                    var_name,
+                    EnvironmentType.SET_FACTS_REGISTERED,
+                    conditions=self.context.active_conditions,
+                )
+                self.context.graph.add_edge(value_node, var_node, rep.DEF)
 
         self.warn_remaining_kws()
         return ExtractionResult.empty(predecessors)
@@ -70,7 +69,7 @@ class SetFactTaskExtractor(TaskExtractor):
 
         loop_source_var, loop_var_name, loop_with = source_and_name
         with self.context.vars.enter_scope(EnvironmentType.INCLUDE_PARAMS):
-            loop_target_var = self.context.vars.define_injected_variable(
+            loop_target_var = self.context.vars.define_eager_variable(
                 loop_var_name, EnvironmentType.INCLUDE_PARAMS
             )
             self.context.graph.add_edge(

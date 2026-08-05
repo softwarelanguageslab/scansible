@@ -6,7 +6,6 @@ from loguru import logger
 
 from scansible.representations import ast
 
-from .. import representation as rep
 from .context import ExtractionContext
 from .expressions import EnvironmentType
 from .result import ExtractionResult
@@ -41,9 +40,10 @@ class VariablesExtractor:
                     f"Ignoring variable {var_name!r}: Variable name is not a valid identifier: {e}"
                 )
                 continue
-            var_node = self.context.vars.define_initialised_variable(
-                var_ident, scope_level, var_init
+            self.context.vars.define_lazy_variable(
+                var_ident,
+                scope_level,
+                var_init,
+                conditions=self.context.active_conditions,
             )
-            for condition in self.context.active_conditions:
-                self.context.graph.add_edge(condition, var_node, rep.WHEN)
         return ExtractionResult.empty()

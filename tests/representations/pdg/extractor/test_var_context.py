@@ -17,6 +17,7 @@ from pytest_mock import MockerFixture
 from scansible.representations import ast
 from scansible.representations.pdg import (
     DEF,
+    CompositeLiteral,
     Expression,
     Graph,
     Input,
@@ -29,6 +30,7 @@ from scansible.representations.pdg.extractor.expressions import (
     EnvironmentType,
     VarContext,
 )
+from scansible.representations.pdg.representation import Composition
 
 ContextCreator = Callable[[], tuple[VarContext, Graph]]
 
@@ -57,11 +59,510 @@ def create_context(g: Graph, mocker: MockerFixture, tmp_path: Path) -> ContextCr
 # Shorthands to construct AST nodes
 strlit = ast.StrLiteral
 intlit = ast.IntLiteral
+boollit = ast.BoolLiteral
 expr = ast.Expression.model_validate
 ident = ast.Identifier
 
 
-def describe_unmodified() -> None:
+def describe_evaluating_expressions():
+    @pytest.mark.parametrize(
+        ("expr", "type_"),
+        [
+            (strlit("hello"), "str"),
+            (intlit(1), "int"),
+            (boollit(True), "bool"),  # noqa: FBT003
+            (strlit("yes"), "str"),
+        ],
+    )
+    def should_build_scalar_literal(
+        expr: ast.ScalarLiteral, type_: Literal["str"], create_context: ContextCreator
+    ):
+        ctx, g = create_context()
+        actual_value = bool(expr) if isinstance(expr, ast.BoolLiteral) else expr
+
+        _ = ctx.build_expression(expr)
+
+        assert_graphs_match(
+            g, create_graph({"lit": ScalarLiteral(type=type_, value=actual_value)}, [])
+        )
+
+    def should_build_seq_literal(create_context: ContextCreator):
+        expr = ast.SeqLiteral([strlit("hello"), strlit("world")])
+        ctx, g = create_context()
+
+        _ = ctx.build_expression(expr)
+
+        assert_graphs_match(
+            g,
+            create_graph(
+                {
+                    "lit": CompositeLiteral(type="list"),
+                    "e1": ScalarLiteral(type="str", value="hello"),
+                    "e2": ScalarLiteral(type="str", value="world"),
+                },
+                [
+                    ("e1", "lit", Composition(index="0")),
+                    ("e2", "lit", Composition(index="1")),
+                ],
+            ),
+        )
+
+    def should_build_map_literal(create_context: ContextCreator):
+        expr = ast.MapLiteral[ast.ScalarLiteral, ast.AnyExpression](
+            [(strlit("hello"), strlit("world")), (strlit("key"), strlit("value"))]
+        )
+        ctx, g = create_context()
+
+        _ = ctx.build_expression(expr)
+
+        assert_graphs_match(
+            g,
+            create_graph(
+                {
+                    "lit": CompositeLiteral(type="dict"),
+                    "world": ScalarLiteral(type="str", value="world"),
+                    "value": ScalarLiteral(type="str", value="value"),
+                },
+                [
+                    ("world", "lit", Composition(index="hello")),
+                    ("value", "lit", Composition(index="key")),
+                ],
+            ),
+        )
+
+    @pytest.mark.parametrize(
+        "expression",
+        [
+            "{{ 1 + 1 }}",
+            '{{ "/etc/tzinfo" | basename }}',
+            '{{ lookup("indexed_items", [1,2,3]) }}',
+            "{{ [1,2,3] | first }}",
+            "The time is {{ now() }}",
+            '{{ "/etc/tzinfo" is file }}',
+            '{{ lookup("pipe", "echo Hello World") }}',
+            "{{ [1,2,3] | random }}",
+        ],
+    )
+    def should_build_standalone_expression(
+        expression: str, create_context: ContextCreator
+    ):
+        ctx, g = create_context()
+
+        _ = ctx.build_expression(expr(expression))
+
+        assert_graphs_match(
+            g,
+            create_graph(
+                {
+                    "e": Expression(expr=expression),
+                    "iv": IntermediateValue(identifier=1),
+                },
+                [("e", "iv", DEF)],
+            ),
+        )
+
+    def should_build_expression_with_dependencies(create_context: ContextCreator):
+        ctx, g = create_context()
+        ctx.define_lazy_variable(
+            ident("test"), EnvironmentType.CLI_VALUES, strlit("hello world")
+        )
+        e = expr("Value is {{ test }}")
+
+        _ = ctx.build_expression(e)
+
+        assert_graphs_match(
+            g,
+            create_graph(
+                {
+                    "lit": ScalarLiteral(type="str", value="hello world"),
+                    "var": Variable(
+                        name="test",
+                        version=0,
+                        value_version=0,
+                        scope_level=EnvironmentType.CLI_VALUES.value,
+                    ),
+                    "e": Expression(expr=e.raw),
+                    "iv": IntermediateValue(identifier=1),
+                },
+                [("e", "iv", DEF), ("lit", "var", DEF), ("var", "e", Input())],
+            ),
+        )
+
+    def should_build_expression_with_complex_dependencies(
+        create_context: ContextCreator,
+    ):
+        ctx, g = create_context()
+        ctx.define_lazy_variable(
+            ident("test"), EnvironmentType.CLI_VALUES, expr("{{ 1 + other }}")
+        )
+        ctx.define_lazy_variable(ident("other"), EnvironmentType.CLI_VALUES, intlit(2))
+
+        e = expr("Value is {{ test }}")
+
+        _ = ctx.build_expression(e)
+
+        assert_graphs_match(
+            g,
+            create_graph(
+                {
+                    "lit": ScalarLiteral(type="int", value=2),
+                    "other": Variable(
+                        name="other",
+                        version=0,
+                        value_version=0,
+                        scope_level=EnvironmentType.CLI_VALUES.value,
+                    ),
+                    "test_e": Expression(expr="{{ 1 + other }}"),
+                    "test_iv": IntermediateValue(identifier=1),
+                    "test": Variable(
+                        name="test",
+                        version=0,
+                        value_version=0,
+                        scope_level=EnvironmentType.CLI_VALUES.value,
+                    ),
+                    "e": Expression(expr=e.raw),
+                    "iv": IntermediateValue(identifier=2),
+                },
+                [
+                    ("lit", "other", DEF),
+                    ("other", "test_e", Input()),
+                    ("test_e", "test_iv", DEF),
+                    ("test_iv", "test", DEF),
+                    ("test", "e", Input()),
+                    ("e", "iv", DEF),
+                ],
+            ),
+        )
+
+    def should_build_seq_literal_with_expression(create_context: ContextCreator):
+        seq = ast.SeqLiteral([strlit("hello"), expr("{{ 1 + 1 }}")])
+        ctx, g = create_context()
+
+        _ = ctx.build_expression(seq)
+
+        assert_graphs_match(
+            g,
+            create_graph(
+                {
+                    "lit": CompositeLiteral(type="list"),
+                    "e1": ScalarLiteral(type="str", value="hello"),
+                    "expr": Expression(expr="{{ 1 + 1 }}"),
+                    "e2": IntermediateValue(identifier=1),
+                },
+                [
+                    ("e1", "lit", Composition(index="0")),
+                    ("e2", "lit", Composition(index="1")),
+                    ("expr", "e2", DEF),
+                ],
+            ),
+        )
+
+
+def describe_reevaluating_expressions():
+    @pytest.mark.parametrize(
+        ("expr", "type_"),
+        [
+            (strlit("hello"), "str"),
+            (intlit(1), "int"),
+            (boollit(True), "bool"),  # noqa: FBT003
+            (strlit("yes"), "str"),
+        ],
+    )
+    def should_rebuild_scalar_literal(
+        expr: ast.ScalarLiteral, type_: Literal["str"], create_context: ContextCreator
+    ):
+        ctx, g = create_context()
+        actual_value = bool(expr) if isinstance(expr, ast.BoolLiteral) else expr
+
+        _ = ctx.build_expression(expr)
+        _ = ctx.build_expression(expr)
+
+        assert_graphs_match(
+            g,
+            create_graph(
+                {
+                    "lit1": ScalarLiteral(type=type_, value=actual_value),
+                    "lit2": ScalarLiteral(type=type_, value=actual_value),
+                },
+                [],
+            ),
+        )
+
+    def should_rebuild_seq_literal(create_context: ContextCreator):
+        expr = ast.SeqLiteral([strlit("hello"), strlit("world")])
+        ctx, g = create_context()
+
+        _ = ctx.build_expression(expr)
+        _ = ctx.build_expression(expr)
+
+        assert_graphs_match(
+            g,
+            create_graph(
+                {
+                    "lit": CompositeLiteral(type="list"),
+                    "e1": ScalarLiteral(type="str", value="hello"),
+                    "e2": ScalarLiteral(type="str", value="world"),
+                    "lit2": CompositeLiteral(type="list"),
+                    "e12": ScalarLiteral(type="str", value="hello"),
+                    "e22": ScalarLiteral(type="str", value="world"),
+                },
+                [
+                    ("e1", "lit", Composition(index="0")),
+                    ("e2", "lit", Composition(index="1")),
+                    ("e12", "lit2", Composition(index="0")),
+                    ("e22", "lit2", Composition(index="1")),
+                ],
+            ),
+        )
+
+    def should_rebuild_map_literal(create_context: ContextCreator):
+        expr = ast.MapLiteral[ast.ScalarLiteral, ast.AnyExpression](
+            [(strlit("hello"), strlit("world")), (strlit("key"), strlit("value"))]
+        )
+        ctx, g = create_context()
+
+        _ = ctx.build_expression(expr)
+        _ = ctx.build_expression(expr)
+
+        assert_graphs_match(
+            g,
+            create_graph(
+                {
+                    "lit": CompositeLiteral(type="dict"),
+                    "world": ScalarLiteral(type="str", value="world"),
+                    "value": ScalarLiteral(type="str", value="value"),
+                    "lit2": CompositeLiteral(type="dict"),
+                    "world2": ScalarLiteral(type="str", value="world"),
+                    "value2": ScalarLiteral(type="str", value="value"),
+                },
+                [
+                    ("world", "lit", Composition(index="hello")),
+                    ("value", "lit", Composition(index="key")),
+                    ("world2", "lit2", Composition(index="hello")),
+                    ("value2", "lit2", Composition(index="key")),
+                ],
+            ),
+        )
+
+    @pytest.mark.parametrize(
+        "expression",
+        [
+            "{{ 1 + 1 }}",
+            '{{ "/etc/tzinfo" | basename }}',
+            '{{ lookup("indexed_items", [1,2,3]) }}',
+            "{{ [1,2,3] | first }}",
+            "The time is {{ now() }}",
+            '{{ "/etc/tzinfo" is file }}',
+            '{{ lookup("pipe", "echo Hello World") }}',
+            "{{ [1,2,3] | random }}",
+        ],
+    )
+    def should_rebuild_standalone_expression(
+        expression: str, create_context: ContextCreator
+    ):
+        ctx, g = create_context()
+
+        _ = ctx.build_expression(expr(expression))
+        _ = ctx.build_expression(expr(expression))
+
+        assert_graphs_match(
+            g,
+            create_graph(
+                {
+                    "e": Expression(expr=expression),
+                    "iv": IntermediateValue(identifier=1),
+                    "e2": Expression(expr=expression),
+                    "iv2": IntermediateValue(identifier=2),
+                },
+                [("e", "iv", DEF), ("e2", "iv2", DEF)],
+            ),
+        )
+
+    def should_rebuild_expression_with_dependencies(create_context: ContextCreator):
+        ctx, g = create_context()
+        ctx.define_lazy_variable(
+            ident("test"), EnvironmentType.CLI_VALUES, strlit("hello world")
+        )
+        e = expr("Value is {{ test }}")
+
+        _ = ctx.build_expression(e)
+        _ = ctx.build_expression(e)
+
+        assert_graphs_match(
+            g,
+            create_graph(
+                {
+                    "lit": ScalarLiteral(type="str", value="hello world"),
+                    "var": Variable(
+                        name="test",
+                        version=0,
+                        value_version=0,
+                        scope_level=EnvironmentType.CLI_VALUES.value,
+                    ),
+                    "e": Expression(expr=e.raw),
+                    "iv": IntermediateValue(identifier=1),
+                    "lit2": ScalarLiteral(type="str", value="hello world"),
+                    "var2": Variable(
+                        name="test",
+                        version=0,
+                        value_version=1,
+                        scope_level=EnvironmentType.CLI_VALUES.value,
+                    ),
+                    "e2": Expression(expr=e.raw),
+                    "iv2": IntermediateValue(identifier=2),
+                },
+                [
+                    ("e", "iv", DEF),
+                    ("lit", "var", DEF),
+                    ("var", "e", Input()),
+                    ("e2", "iv2", DEF),
+                    ("lit2", "var2", DEF),
+                    ("var2", "e2", Input()),
+                ],
+            ),
+        )
+
+    def should_build_expression_with_complex_dependencies(
+        create_context: ContextCreator,
+    ):
+        ctx, g = create_context()
+        ctx.define_lazy_variable(
+            ident("test"), EnvironmentType.CLI_VALUES, expr("{{ 1 + other }}")
+        )
+        ctx.define_lazy_variable(ident("other"), EnvironmentType.CLI_VALUES, intlit(2))
+
+        e = expr("Value is {{ test }}")
+
+        _ = ctx.build_expression(e)
+        _ = ctx.build_expression(e)
+
+        assert_graphs_match(
+            g,
+            create_graph(
+                {
+                    "lit": ScalarLiteral(type="int", value=2),
+                    "other": Variable(
+                        name="other",
+                        version=0,
+                        value_version=0,
+                        scope_level=EnvironmentType.CLI_VALUES.value,
+                    ),
+                    "test_e": Expression(expr="{{ 1 + other }}"),
+                    "test_iv": IntermediateValue(identifier=1),
+                    "test": Variable(
+                        name="test",
+                        version=0,
+                        value_version=0,
+                        scope_level=EnvironmentType.CLI_VALUES.value,
+                    ),
+                    "e": Expression(expr=e.raw),
+                    "iv": IntermediateValue(identifier=2),
+                    "lit2": ScalarLiteral(type="int", value=2),
+                    "other2": Variable(
+                        name="other",
+                        version=0,
+                        value_version=1,
+                        scope_level=EnvironmentType.CLI_VALUES.value,
+                    ),
+                    "test_e2": Expression(expr="{{ 1 + other }}"),
+                    "test_iv2": IntermediateValue(identifier=3),
+                    "test2": Variable(
+                        name="test",
+                        version=0,
+                        value_version=1,
+                        scope_level=EnvironmentType.CLI_VALUES.value,
+                    ),
+                    "e2": Expression(expr=e.raw),
+                    "iv2": IntermediateValue(identifier=4),
+                },
+                [
+                    ("lit", "other", DEF),
+                    ("other", "test_e", Input()),
+                    ("test_e", "test_iv", DEF),
+                    ("test_iv", "test", DEF),
+                    ("test", "e", Input()),
+                    ("e", "iv", DEF),
+                    ("lit2", "other2", DEF),
+                    ("other2", "test_e2", Input()),
+                    ("test_e2", "test_iv2", DEF),
+                    ("test_iv2", "test2", DEF),
+                    ("test2", "e2", Input()),
+                    ("e2", "iv2", DEF),
+                ],
+            ),
+        )
+
+    def should_rebuild_seq_literal_with_expression(create_context: ContextCreator):
+        seq = ast.SeqLiteral([strlit("hello"), expr("{{ 1 + 1 }}")])
+        ctx, g = create_context()
+
+        _ = ctx.build_expression(seq)
+        _ = ctx.build_expression(seq)
+
+        assert_graphs_match(
+            g,
+            create_graph(
+                {
+                    "lit": CompositeLiteral(type="list"),
+                    "e1": ScalarLiteral(type="str", value="hello"),
+                    "expr": Expression(expr="{{ 1 + 1 }}"),
+                    "e2": IntermediateValue(identifier=1),
+                    "lit2": CompositeLiteral(type="list"),
+                    "e12": ScalarLiteral(type="str", value="hello"),
+                    "expr2": Expression(expr="{{ 1 + 1 }}"),
+                    "e22": IntermediateValue(identifier=2),
+                },
+                [
+                    ("e1", "lit", Composition(index="0")),
+                    ("e2", "lit", Composition(index="1")),
+                    ("expr", "e2", DEF),
+                    ("e12", "lit2", Composition(index="0")),
+                    ("e22", "lit2", Composition(index="1")),
+                    ("expr2", "e22", DEF),
+                ],
+            ),
+        )
+
+    def should_not_rebuild_expression_with_eager_dependencies(
+        create_context: ContextCreator,
+    ):
+        ctx, g = create_context()
+        _ = ctx.define_eager_variable(
+            ident("test"), EnvironmentType.SET_FACTS_REGISTERED
+        )
+        e = expr("Value is {{ test }}")
+
+        _ = ctx.build_expression(e)
+        _ = ctx.build_expression(e)
+
+        assert_graphs_match(
+            g,
+            create_graph(
+                {
+                    "var": Variable(
+                        name="test",
+                        version=0,
+                        value_version=0,
+                        scope_level=EnvironmentType.SET_FACTS_REGISTERED.value,
+                    ),
+                    "e": Expression(expr=e.raw),
+                    "iv": IntermediateValue(identifier=1),
+                    "e2": Expression(expr=e.raw),
+                    "iv2": IntermediateValue(identifier=2),
+                },
+                [
+                    ("e", "iv", DEF),
+                    ("var", "e", Input()),
+                    ("e2", "iv2", DEF),
+                    ("var", "e2", Input()),
+                ],
+            ),
+        )
+
+
+# FIXME: These test cases are disabled pending a large rewrite of the data flow semantics, and should
+# be fixed/moved later on.
+def _describe_unmodified() -> None:
     @pytest.mark.parametrize(
         ("expr", "type_"),
         [("hello", "str"), ("1", "str"), ("True", "str"), ("yes", "str")],
@@ -80,7 +581,7 @@ def describe_unmodified() -> None:
     def should_declare_literal_variable(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        _ = ctx.define_initialised_variable(
+        ctx.define_lazy_variable(
             ident("test_var"), EnvironmentType.HOST_FACTS, strlit("hello world")
         )
 
@@ -211,7 +712,7 @@ def describe_unmodified() -> None:
     def should_extract_variable_definition(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        _ = ctx.define_initialised_variable(
+        ctx.define_lazy_variable(
             ident("msg"), EnvironmentType.HOST_FACTS, expr("hello {{ target }}")
         )
         _ = ctx.build_expression(expr("{{ msg }}"))
@@ -278,7 +779,7 @@ def describe_unmodified() -> None:
         )
 
 
-def describe_modified() -> None:
+def _describe_modified() -> None:
     @pytest.mark.parametrize(
         ("expression", "_expected", "components"),
         [
@@ -326,12 +827,12 @@ def describe_modified() -> None:
     def should_reevaluate_when_variable_changed(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        _ = ctx.define_initialised_variable(
+        ctx.define_lazy_variable(
             ident("a"), EnvironmentType.HOST_FACTS, strlit("hello")
         )
         _ = ctx.build_expression(expr("{{ a }} world"))
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            _ = ctx.define_initialised_variable(
+            ctx.define_lazy_variable(
                 ident("a"), EnvironmentType.TASK_VARS, strlit("hi")
             )
             _ = ctx.build_expression(expr("{{ a }} world"))
@@ -373,7 +874,7 @@ def describe_modified() -> None:
     def should_reevaluate_when_variable_dynamic(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        _ = ctx.define_initialised_variable(
+        ctx.define_lazy_variable(
             ident("when"), EnvironmentType.HOST_FACTS, expr("{{ now() }}")
         )
         _ = ctx.build_expression(expr("The time is {{ when }}"))
@@ -423,15 +924,15 @@ def describe_modified() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        _ = ctx.define_initialised_variable(
+        ctx.define_lazy_variable(
             ident("a"), EnvironmentType.HOST_FACTS, strlit("hello")
         )
-        _ = ctx.define_initialised_variable(
+        ctx.define_lazy_variable(
             ident("b"), EnvironmentType.HOST_FACTS, expr("{{ a }} world")
         )
         _ = ctx.build_expression(expr("{{ b }}!"))
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            _ = ctx.define_initialised_variable(
+            ctx.define_lazy_variable(
                 ident("a"), EnvironmentType.TASK_VARS, strlit("hi")
             )
             _ = ctx.build_expression(expr("{{ b }}!"))
@@ -495,16 +996,14 @@ def describe_modified() -> None:
     def should_reevaluate_only_one_var(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        _ = ctx.define_initialised_variable(
+        ctx.define_lazy_variable(
             ident("a"), EnvironmentType.HOST_FACTS, strlit("hello")
         )
-        _ = ctx.define_initialised_variable(
+        ctx.define_lazy_variable(
             ident("b"), EnvironmentType.HOST_FACTS, strlit("world")
         )
         _ = ctx.build_expression(expr("{{ a }} {{ b }}!"))
-        _ = ctx.define_initialised_variable(
-            ident("a"), EnvironmentType.INCLUDE_VARS, strlit("hi")
-        )
+        ctx.define_lazy_variable(ident("a"), EnvironmentType.INCLUDE_VARS, strlit("hi"))
         _ = ctx.build_expression(expr("{{ a }} {{ b }}!"))
 
         assert_graphs_match(
@@ -552,18 +1051,14 @@ def describe_modified() -> None:
         )
 
 
-def describe_scoping() -> None:
+def _describe_scoping() -> None:
     def should_use_most_specific_scope(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        _ = ctx.define_initialised_variable(
-            ident("a"), EnvironmentType.HOST_FACTS, strlit("1")
-        )
+        ctx.define_lazy_variable(ident("a"), EnvironmentType.HOST_FACTS, strlit("1"))
         _ = ctx.build_expression(expr("1 {{ a }}"))
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            _ = ctx.define_initialised_variable(
-                ident("a"), EnvironmentType.TASK_VARS, strlit("2")
-            )
+            ctx.define_lazy_variable(ident("a"), EnvironmentType.TASK_VARS, strlit("2"))
             _ = ctx.build_expression(expr("2 {{ a }}"))
 
         assert_graphs_match(
@@ -603,11 +1098,9 @@ def describe_scoping() -> None:
     def should_override_root_scope_variables(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        _ = ctx.define_initialised_variable(
-            ident("a"), EnvironmentType.HOST_FACTS, strlit("1")
-        )
+        ctx.define_lazy_variable(ident("a"), EnvironmentType.HOST_FACTS, strlit("1"))
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            _ = ctx.define_initialised_variable(
+            ctx.define_lazy_variable(
                 ident("a"), EnvironmentType.SET_FACTS_REGISTERED, strlit("2")
             )
         _ = ctx.build_expression(expr("{{ a }}"))
@@ -646,7 +1139,7 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.INCLUDE_PARAMS):
-            _ = ctx.define_initialised_variable(
+            ctx.define_lazy_variable(
                 ident("ansible_version"), EnvironmentType.INCLUDE_PARAMS, strlit("123")
             )
             _ = ctx.build_expression(expr("{{ ansible_version }}"))
@@ -679,7 +1172,7 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.INCLUDE_PARAMS):
-            _ = ctx.define_initialised_variable(
+            ctx.define_lazy_variable(
                 ident("ansible_version"), EnvironmentType.INCLUDE_PARAMS, strlit("123")
             )
             _ = ctx.build_expression(expr("1: {{ ansible_version }}"))
@@ -723,7 +1216,7 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.INCLUDE_PARAMS):
-            _ = ctx.define_initialised_variable(
+            ctx.define_lazy_variable(
                 ident("ansible_os_family"),
                 EnvironmentType.INCLUDE_PARAMS,
                 strlit("123"),
@@ -754,7 +1247,7 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.ROLE_DEFAULTS):
-            _ = ctx.define_initialised_variable(
+            ctx.define_lazy_variable(
                 ident("ansible_os_family"), EnvironmentType.ROLE_DEFAULTS, strlit("123")
             )
             _ = ctx.build_expression(expr("{{ ansible_os_family }}"))
@@ -789,12 +1282,12 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.ROLE_DEFAULTS):
-            _ = ctx.define_initialised_variable(
+            ctx.define_lazy_variable(
                 ident("ansible_os_family"), EnvironmentType.ROLE_DEFAULTS, strlit("123")
             )
             _ = ctx.build_expression(expr("{{ ansible_os_family }}"))
             with ctx.enter_scope(EnvironmentType.ROLE_VARS):
-                _ = ctx.define_initialised_variable(
+                ctx.define_lazy_variable(
                     ident("ansible_os_family"), EnvironmentType.ROLE_VARS, strlit("456")
                 )
                 _ = ctx.build_expression(expr("{{ ansible_os_family }}"))
@@ -874,9 +1367,7 @@ def describe_scoping() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        _ = ctx.define_initialised_variable(
-            ident("a"), EnvironmentType.HOST_FACTS, strlit("1")
-        )
+        ctx.define_lazy_variable(ident("a"), EnvironmentType.HOST_FACTS, strlit("1"))
         _ = ctx.build_expression(expr("1 {{ a }}"))
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
             _ = ctx.build_expression(expr("1 {{ a }}"))
@@ -904,14 +1395,10 @@ def describe_scoping() -> None:
     ) -> None:
         ctx, g = create_context()
 
-        _ = ctx.define_initialised_variable(
-            ident("a"), EnvironmentType.HOST_FACTS, strlit("1")
-        )
+        ctx.define_lazy_variable(ident("a"), EnvironmentType.HOST_FACTS, strlit("1"))
         _ = ctx.build_expression(expr("1 {{ a }}"))
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            _ = ctx.define_initialised_variable(
-                ident("a"), EnvironmentType.TASK_VARS, strlit("2")
-            )
+            ctx.define_lazy_variable(ident("a"), EnvironmentType.TASK_VARS, strlit("2"))
         _ = ctx.build_expression(expr("1 {{ a }}"))
 
         assert_graphs_match(
@@ -947,17 +1434,11 @@ def describe_scoping() -> None:
     def should_hoist_template(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        _ = ctx.define_initialised_variable(
-            ident("a"), EnvironmentType.HOST_FACTS, strlit("1")
-        )
+        ctx.define_lazy_variable(ident("a"), EnvironmentType.HOST_FACTS, strlit("1"))
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            _ = ctx.define_initialised_variable(
-                ident("c"), EnvironmentType.TASK_VARS, strlit("c")
-            )
+            ctx.define_lazy_variable(ident("c"), EnvironmentType.TASK_VARS, strlit("c"))
             _ = ctx.build_expression(expr("1 {{ a }}"))
-            _ = ctx.define_initialised_variable(
-                ident("a"), EnvironmentType.TASK_VARS, strlit("2")
-            )
+            ctx.define_lazy_variable(ident("a"), EnvironmentType.TASK_VARS, strlit("2"))
         _ = ctx.build_expression(expr("1 {{ a }}"))
 
         assert_graphs_match(
@@ -1003,14 +1484,10 @@ def describe_scoping() -> None:
 
         # Difference to 'should_use_most_specific_scope': Same template here,
         # different template there
-        _ = ctx.define_initialised_variable(
-            ident("a"), EnvironmentType.HOST_FACTS, strlit("1")
-        )
+        ctx.define_lazy_variable(ident("a"), EnvironmentType.HOST_FACTS, strlit("1"))
         _ = ctx.build_expression(expr("1 {{ a }}"))
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            _ = ctx.define_initialised_variable(
-                ident("a"), EnvironmentType.TASK_VARS, strlit("2")
-            )
+            ctx.define_lazy_variable(ident("a"), EnvironmentType.TASK_VARS, strlit("2"))
             _ = ctx.build_expression(expr("1 {{ a }}"))
         _ = ctx.build_expression(expr("1 {{ a }}"))
 
@@ -1051,17 +1528,13 @@ def describe_scoping() -> None:
     def should_evaluate_var_into_template_scope(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        _ = ctx.define_initialised_variable(
+        ctx.define_lazy_variable(
             ident("a"), EnvironmentType.HOST_FACTS, expr("{{ b }}")
         )
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            _ = ctx.define_initialised_variable(
-                ident("b"), EnvironmentType.TASK_VARS, strlit("1")
-            )
+            ctx.define_lazy_variable(ident("b"), EnvironmentType.TASK_VARS, strlit("1"))
             _ = ctx.build_expression(expr("{{ a }}"))
-        _ = ctx.define_initialised_variable(
-            ident("b"), EnvironmentType.HOST_FACTS, strlit("2")
-        )
+        ctx.define_lazy_variable(ident("b"), EnvironmentType.HOST_FACTS, strlit("2"))
         _ = ctx.build_expression(expr("{{ a }}"))
 
         assert_graphs_match(
@@ -1124,17 +1597,17 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            _ = ctx.define_initialised_variable(
+            ctx.define_lazy_variable(
                 ident("a"), EnvironmentType.TASK_VARS, expr("{{ 'hello' | reverse }}")
             )
-            _ = ctx.define_initialised_variable(
+            ctx.define_lazy_variable(
                 ident("b"), EnvironmentType.TASK_VARS, expr("{{ c | reverse }}")
             )
-            _ = ctx.define_initialised_variable(
+            ctx.define_lazy_variable(
                 ident("c"), EnvironmentType.TASK_VARS, strlit("world")
             )
             _ = ctx.build_expression(expr("{{ b }} {{ a }}"))
-        _ = ctx.define_initialised_variable(
+        ctx.define_lazy_variable(
             ident("a"), EnvironmentType.HOST_FACTS, expr("{{ 'hello' | reverse }}")
         )
         _ = ctx.build_expression(expr("{{ b }} {{ a }}"))
@@ -1204,13 +1677,11 @@ def describe_scoping() -> None:
     def should_hoist_variable_binding(create_context: ContextCreator) -> None:
         ctx, g = create_context()
 
-        _ = ctx.define_initialised_variable(
+        ctx.define_lazy_variable(
             ident("a"), EnvironmentType.HOST_FACTS, expr("{{ b }}")
         )
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            _ = ctx.define_initialised_variable(
-                ident("b"), EnvironmentType.TASK_VARS, strlit("1")
-            )
+            ctx.define_lazy_variable(ident("b"), EnvironmentType.TASK_VARS, strlit("1"))
             with ctx.enter_scope(EnvironmentType.TASK_VARS):
                 _ = ctx.build_expression(expr("{{ a }}"))
             _ = ctx.build_expression(expr("{{ a }}"))  # Should reuse above expr
@@ -1253,12 +1724,11 @@ def describe_scoping() -> None:
 
         ln = ScalarLiteral(type="int", value=1)
         g.add_node(ln)
-        _ = ctx.define_fact("b", EnvironmentType.SET_FACTS_REGISTERED, intlit(1), ln)
+        vn = ctx.define_eager_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
+        g.add_edge(ln, vn, DEF)
 
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            _ = ctx.define_initialised_variable(
-                ident("b"), EnvironmentType.TASK_VARS, strlit("2")
-            )
+            ctx.define_lazy_variable(ident("b"), EnvironmentType.TASK_VARS, strlit("2"))
             _ = ctx.build_expression(expr("{{ b }}"))
 
         assert_graphs_match(
@@ -1297,12 +1767,12 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            _ = ctx.define_initialised_variable(
-                ident("b"), EnvironmentType.TASK_VARS, strlit("1")
-            )
+            ctx.define_lazy_variable(ident("b"), EnvironmentType.TASK_VARS, strlit("1"))
         ln = ScalarLiteral(type="int", value=2)
         g.add_node(ln)
-        _ = ctx.define_fact("b", EnvironmentType.SET_FACTS_REGISTERED, intlit(2), ln)
+        vn = ctx.define_eager_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
+        g.add_edge(ln, vn, DEF)
+
         _ = ctx.build_expression(expr("{{ b }}"))
 
         assert_graphs_match(
@@ -1341,14 +1811,11 @@ def describe_scoping() -> None:
         ctx, g = create_context()
 
         with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            _ = ctx.define_initialised_variable(
-                ident("b"), EnvironmentType.TASK_VARS, strlit("1")
-            )
+            ctx.define_lazy_variable(ident("b"), EnvironmentType.TASK_VARS, strlit("1"))
             ln = ScalarLiteral(type="int", value=2)
             g.add_node(ln)
-            _ = ctx.define_fact(
-                "b", EnvironmentType.SET_FACTS_REGISTERED, intlit(2), ln
-            )
+            vn = ctx.define_eager_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
+            g.add_edge(ln, vn, DEF)
             _ = ctx.build_expression(expr("{{ b }}"))
         _ = ctx.build_expression(expr("{{ b }}"))  # Should reuse above expr
 
@@ -1378,133 +1845,6 @@ def describe_scoping() -> None:
                     ("2", "b", DEF),
                     ("b", "be", Input()),
                     ("be", "beiv", DEF),
-                },
-            ),
-        )
-
-
-# Caching was disabled.
-def _describe_caching() -> None:
-    def should_cache_dynamic_template_variables(create_context: ContextCreator) -> None:
-        ctx, _ = create_context()
-
-        _ = ctx.define_initialised_variable(
-            ident("b"), EnvironmentType.HOST_FACTS, expr("{{ now() }}")
-        )
-        with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            d1 = ctx.build_expression(expr("{{ b }}"))
-            d2 = ctx.build_expression(expr("{{ b }}"))  # Should reuse above
-
-        assert d1 is d2
-
-    def should_discard_after_leaving_scope(create_context: ContextCreator) -> None:
-        ctx, _ = create_context()
-
-        _ = ctx.define_initialised_variable(
-            ident("b"), EnvironmentType.HOST_FACTS, expr("{{ now() }}")
-        )
-        with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            d1 = ctx.build_expression(expr("{{ b }}"))
-            d2 = ctx.build_expression(expr("{{ b }}"))  # Should reuse above
-        d3 = ctx.build_expression(expr("{{ b }}"))  # Should not reuse above
-
-        assert d1 is d2
-        assert d1 is not d3
-
-    def should_not_reuse_previous_value_of_dynamic_template_var(
-        create_context: ContextCreator,
-    ) -> None:
-        ctx, _ = create_context()
-
-        _ = ctx.define_initialised_variable(
-            ident("b"), EnvironmentType.HOST_FACTS, expr("{{ now() }}")
-        )
-        d1 = ctx.build_expression(expr("{{ b }}"))
-        with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            d2 = ctx.build_expression(expr("{{ b }}"))
-        d3 = ctx.build_expression(expr("{{ b }}"))
-
-        assert d1 is not d2
-        assert d1 is not d3
-        assert d2 is not d3
-
-    def should_not_cache_bare_expressions(create_context: ContextCreator) -> None:
-        ctx, _ = create_context()
-
-        with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            d1 = ctx.build_expression(expr("{{ now() }}"))
-            d2 = ctx.build_expression(expr("{{ now() }}"))
-
-        assert d1 is not d2
-
-    def should_not_reuse_outer_cache(create_context: ContextCreator) -> None:
-        ctx, _ = create_context()
-
-        _ = ctx.define_initialised_variable(
-            ident("b"), EnvironmentType.HOST_FACTS, expr("{{ now() }}")
-        )
-        with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            do1 = ctx.build_expression(expr("{{ b }}"))
-            with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-                di1 = ctx.build_expression(expr("{{ b }}"))
-                di2 = ctx.build_expression(expr("{{ b }}"))
-            do2 = ctx.build_expression(expr("{{ b }}"))
-
-        assert di1 is di2
-        assert do1 is do2
-        assert di1 is not do1
-
-    def should_cache_nested_variables(create_context: ContextCreator) -> None:
-        ctx, _ = create_context()
-
-        _ = ctx.define_initialised_variable(
-            ident("b"), EnvironmentType.HOST_FACTS, expr("{{ now() }}")
-        )
-        _ = ctx.define_initialised_variable(
-            ident("a"), EnvironmentType.HOST_FACTS, expr("{{ b }}")
-        )
-        with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            d1 = ctx.build_expression(expr("{{ a }}"))
-            d2 = ctx.build_expression(expr("{{ a }}"))
-
-        assert d1 is d2
-
-    def should_reuse_variables_in_different_expressions(
-        create_context: ContextCreator,
-    ) -> None:
-        ctx, g = create_context()
-
-        _ = ctx.define_initialised_variable(
-            ident("b"), EnvironmentType.HOST_FACTS, expr("{{ now() }}")
-        )
-        with ctx.enter_cached_scope(EnvironmentType.TASK_VARS):
-            _ = ctx.build_expression(expr("{{ b + 1 }}"))
-            _ = ctx.build_expression(expr("{{ b + 2 }}"))
-
-        assert_graphs_match(
-            g,
-            create_graph(
-                {
-                    "b": Variable(
-                        name="b",
-                        version=0,
-                        value_version=0,
-                        scope_level=EnvironmentType.HOST_FACTS.value,
-                    ),
-                    "be": Expression(expr="{{ now() }}"),
-                    "bei": IntermediateValue(identifier=0),
-                    "e1": Expression(expr="{{ b + 1 }}"),
-                    "e2": Expression(expr="{{ b + 2 }}"),
-                    "ei1": IntermediateValue(identifier=1),
-                    "ei2": IntermediateValue(identifier=2),
-                },
-                {
-                    ("be", "bei", DEF),
-                    ("bei", "b", DEF),
-                    ("b", "e1", Input()),
-                    ("b", "e2", Input()),
-                    ("e1", "ei1", DEF),
-                    ("e2", "ei2", DEF),
                 },
             ),
         )

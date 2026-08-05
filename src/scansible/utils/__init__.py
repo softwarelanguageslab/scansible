@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import override
-
 import io
 from collections.abc import Generator
 from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
@@ -20,15 +18,6 @@ from .files import find_file as find_file
 from .position import LineColumn as LineColumn
 from .position import Position as Position
 from .position import Positioned as Positioned
-
-
-class Sentinel:
-    @override
-    def __repr__(self) -> str:
-        return "SENTINEL"
-
-
-SENTINEL = Sentinel()
 
 
 @contextmanager

@@ -14,22 +14,13 @@ from ansible.module_utils.facts.system.distribution import (  # pyright: ignore[
 from loguru import logger
 
 from scansible.representations import ast
-from scansible.utils import SENTINEL, Sentinel
 
 from ... import representation as rep
 from .constants import MAGIC_VAR_NAMES, UNQUALIFIED_HOST_FACT_NAMES
 from .environments import EnvironmentStack, EnvironmentType
 from .environments.types import LocalEnvType
 from .expression_types import extract_type_name
-from .records import (
-    ChangeableVariableValueRecord,
-    ConstantVariableValueRecord,
-    LiteralEvaluationResult,
-    TemplateEvaluationResult,
-    TemplateResult,
-    VariableDefinitionRecord,
-    VariableValueRecord,
-)
+from .records import VariableDefinitionRecord
 from .templates import TemplateExpressionAST
 
 if TYPE_CHECKING:
@@ -77,7 +68,6 @@ class VarContext:
         self.extraction_ctx = context
         self._next_def_revisions: _DefRevisionMap = defaultdict(lambda: 0)
         self._next_val_revisions: _ValRevisionMap = defaultdict(lambda: 0)
-        self._value_to_var_node: _ValueToVarMap = {}
 
     def _get_next_def_revision(self, var_name: str) -> int:
         self._next_def_revisions[var_name] += 1
@@ -87,73 +77,15 @@ class VarContext:
         self._next_val_revisions[var_def] += 1
         return self._next_val_revisions[var_def] - 1
 
-    def _get_var_node_for_value(
-        self,
-        var_def: VariableDefinitionRecord,
-        val_revision: int,
-        *,
-        allow_undefined: bool = True,
-    ) -> rep.Variable:
-        var_node = self._value_to_var_node.get((var_def, val_revision))
-        assert allow_undefined or var_node is not None, (
-            "Internal error: var node undefined"
-        )
-
-        if var_node is None:
-            assert val_revision > 0, "Internal error: First variable node undefined"
-            logger.debug("Creating new variable node to represent value")
-            old_var_node = self._get_var_node_for_value(
-                var_def, 0, allow_undefined=False
-            )
-
-            var_node = rep.Variable(
-                name=var_def.name,
-                version=var_def.revision,
-                value_version=val_revision,
-                scope_level=var_def.env_type.value,
-                location=old_var_node.location,
-            )
-
-            self.extraction_ctx.graph.add_node(var_node)
-            self._value_to_var_node[(var_def, val_revision)] = var_node
-            self._copy_cond_edges(old_var_node, var_node)
-        else:
-            logger.debug(f"Using existing variable node {var_node!r}")
-
-        return var_node
-
-    def _copy_cond_edges(
-        self, old_var_node: rep.Variable, new_var_node: rep.Variable
-    ) -> None:
-        # TODO: Change this once VarContext stores the conditions itself.
-        # Copy over all WHEN edges applied by the caller of this class as they should
-        # apply to any new variable value revision as well. WHEN only
-        # applies to definitions, not individual possible values. We'll
-        # retrieve these from the first variable node, as that will be the one
-        # manipulated by the caller.
-        for predecessor in self.extraction_ctx.graph.get_predecessors(
-            old_var_node, edge=rep.WHEN
-        ):
-            self.extraction_ctx.graph.add_edge(predecessor, new_var_node, rep.WHEN)
-
     @contextmanager
     def enter_scope(self, env_type: LocalEnvType) -> Generator[None]:
         self._envs.enter_scope(env_type)
         yield
         self._envs.exit_scope()
 
-    @contextmanager
-    def enter_cached_scope(self, env_type: LocalEnvType) -> Generator[None]:
-        self._envs.enter_cached_scope(env_type)
-        yield
-        self._envs.exit_scope()
-
     def build_expression(self, expr: ast.AnyExpression) -> rep.DataNode:
-        return self._build_expression(expr).data_node
-
-    def _build_expression(self, expr: ast.AnyExpression) -> TemplateResult:
         if isinstance(expr, ast.Expression):
-            return self._resolve_expression(TemplateExpressionAST(expr))
+            return self._build_expression(TemplateExpressionAST(expr))
         if isinstance(expr, ast.SeqLiteral):
             return self._build_sequence_expression(expr)
         elif isinstance(expr, ast.MapLiteral):
@@ -163,40 +95,34 @@ class VarContext:
 
     def _build_mapping_expression(
         self, expr: ast.MapLiteral[ast.ScalarLiteral, ast.AnyExpression]
-    ) -> TemplateEvaluationResult:
+    ) -> rep.DataNode:
         parent_node = rep.CompositeLiteral(type=extract_type_name(expr))
         self.extraction_ctx.graph.add_node(parent_node)
 
-        all_used_vars: list[VariableValueRecord] = []
         for k, v in expr.items():
-            val_tr = self._build_expression(v)
-            all_used_vars.extend(val_tr.used_variables)
+            child_node = self.build_expression(v)
             key_str = str(k)
-
             self.extraction_ctx.graph.add_edge(
-                val_tr.data_node, parent_node, rep.Composition(index=key_str)
+                child_node, parent_node, rep.Composition(index=key_str)
             )
 
-        return TemplateEvaluationResult(parent_node, parent_node, all_used_vars)
+        return parent_node
 
     def _build_sequence_expression(
         self, expr: ast.SeqLiteral[ast.AnyExpression]
-    ) -> TemplateEvaluationResult:
+    ) -> rep.DataNode:
         parent_node = rep.CompositeLiteral(type=extract_type_name(expr))
         self.extraction_ctx.graph.add_node(parent_node)
 
-        all_used_vars: list[VariableValueRecord] = []
         for i, e in enumerate(expr):
-            val_tr = self._build_expression(e)
-            all_used_vars.extend(val_tr.used_variables)
-
+            child_node = self.build_expression(e)
             self.extraction_ctx.graph.add_edge(
-                val_tr.data_node, parent_node, rep.Composition(index=str(i))
+                child_node, parent_node, rep.Composition(index=str(i))
             )
 
-        return TemplateEvaluationResult(parent_node, parent_node, all_used_vars)
+        return parent_node
 
-    def _build_scalar_literal(self, expr: ast.ScalarLiteral) -> TemplateResult:
+    def _build_scalar_literal(self, expr: ast.ScalarLiteral) -> rep.DataNode:
         location = self.extraction_ctx.get_location(expr)
         type_ = extract_type_name(expr)
 
@@ -207,81 +133,17 @@ class VarContext:
             lit = rep.ScalarLiteral(type=type_, value=expr, location=location)
 
         self.extraction_ctx.graph.add_node(lit)
-        return LiteralEvaluationResult(lit)
+        return lit
 
-    def _resolve_expression(
-        self, ast: TemplateExpressionAST
-    ) -> TemplateEvaluationResult:
+    def _build_expression(self, ast: TemplateExpressionAST) -> rep.DataNode:
         """Parse a template, add required nodes to the graph, and return the record."""
         logger.debug(f"Building expression {ast.raw!r}")
 
-        used_values = list(self._resolve_expression_values(ast))
+        used_variables = [
+            self._resolve_variable_reference(var_name)
+            for var_name in ast.referenced_variables
+        ]
 
-        tr = self._envs.get_expression_evaluation_result(ast.raw, used_values)
-        if tr is None:
-            logger.debug(f"First evaluation of expression {ast.raw!r} in this context")
-            return self._create_new_expression_result(ast, used_values)
-
-        logger.debug(f"Re-evaluation of {tr!r} for expression {ast.raw!r}")
-        if not ast.is_pure:
-            logger.debug(f"Expression {ast.raw!r} may be impure, creating new result")
-            return self._create_reevaluated_impure_expression_result(tr)
-
-        logger.debug(f"Expression {ast.raw!r} is pure, reusing prior evaluation")
-        return tr
-
-    def _resolve_expression_values(
-        self, ast: TemplateExpressionAST
-    ) -> Iterable[VariableValueRecord]:
-        # Disable cache approximation as it's very inaccurate
-        should_use_cache = False  # is_top_level and self._scopes.last_scope.is_cached
-
-        for var_name in ast.referenced_variables:
-            logger.debug(f"Resolving variable {var_name!r}")
-            value_record = self._resolve_expression_value(
-                var_name, should_use_cache=should_use_cache
-            )
-            logger.debug(f"Determined that {ast.raw!r} uses {value_record!r}")
-            yield value_record
-
-    def _resolve_expression_value(
-        self, var_name: str, *, should_use_cache: bool
-    ) -> VariableValueRecord:
-        if should_use_cache:
-            return self._resolve_expression_cached_value(var_name)
-        else:
-            return self._resolve_expression_uncached_value(var_name)
-
-    def _resolve_expression_uncached_value(self, var_name: str) -> VariableValueRecord:
-        # If the variable is initialised with an expression, this will
-        # recursively evaluate the expression to give an up-to-date value.
-        # The value might be reused from a previous evaluation.
-        try:
-            return self._get_variable_value_record(var_name)
-        except RecursionError:
-            raise RecursiveDefinitionError(
-                f"Self-referential definition detected for {var_name!r}"
-            ) from None
-
-    def _resolve_expression_cached_value(self, var_name: str) -> VariableValueRecord:
-        # Try loading from the cache
-        vr = self._envs.top_environment.cached_results.get(var_name, None)
-        if vr is not None:
-            logger.debug(f"Variable {var_name!r} cached in current env, reusing {vr!r}")
-            return vr
-
-        # Cache miss, proceed as normal
-        vr = self._resolve_expression_uncached_value(var_name)
-
-        # Store the variable in the cache for potential later reuse
-        logger.debug(f"Saving {vr!r} in cache for reuse")
-        self._envs.top_environment.cached_results[var_name] = vr
-
-        return vr
-
-    def _create_new_expression_result(
-        self, ast: TemplateExpressionAST, used_values: list[VariableValueRecord]
-    ) -> TemplateEvaluationResult:
         en = rep.Expression(
             expr=ast.raw,
             impure_components=ast.impure_components,
@@ -293,125 +155,98 @@ class VarContext:
         self.extraction_ctx.graph.add_node(iv)
         self.extraction_ctx.graph.add_edge(en, iv, rep.DEF)
 
-        for used_value in used_values:
-            var_node = self._get_var_node_for_value(
-                used_value.variable_definition,
-                used_value.value_revision,
-                allow_undefined=False,
-            )
+        for var_node in used_variables:
             self.extraction_ctx.graph.add_edge(var_node, en, rep.Input())
 
-        tr = TemplateEvaluationResult(iv, en, used_values)
-        self._envs.set_expression_evaluation_result(ast.raw, tr)
-        return tr
+        return iv
 
-    def _create_reevaluated_impure_expression_result(
-        self, tr: TemplateEvaluationResult
-    ) -> TemplateEvaluationResult:
-        iv = rep.IntermediateValue(identifier=self.extraction_ctx.next_iv_id())
-        logger.debug(f"Using IV {iv!r}")
+    def _resolve_variable_reference(self, var_name: str) -> rep.Variable:
+        # If the variable is initialised with an expression, this will
+        # recursively evaluate the expression to give an up-to-date value.
+        # However, this may cause a recursion error in case the variable is
+        # self-referential.
+        try:
+            return self._get_variable_value(var_name)
+        except RecursionError:
+            raise RecursiveDefinitionError(
+                f"Self-referential definition detected for {var_name!r}"
+            ) from None
 
-        self.extraction_ctx.graph.add_node(iv)
-        self.extraction_ctx.graph.add_edge(tr.expr_node, iv, rep.DEF)
-        return tr.__replace__(data_node=iv)
-
-    def define_initialised_variable(
+    def define_lazy_variable(
         self,
         name: ast.Identifier,
         env_type: EnvironmentType,
         initialiser: ast.AnyExpression,
-    ) -> rep.Variable:
-        """Define a variable with an initialiser which is lazily evaluated."""
-        return self._define_variable(
-            name, env_type, initialiser, eagerly_evaluated=False
-        )
-
-    def define_fact(
-        self,
-        name: str,
-        env_type: EnvironmentType,
-        initialiser_expr: ast.AnyExpression,
-        initialiser_node: rep.DataNode,
-    ) -> rep.Variable:
-        """Define a fact initialised with an eagerly-evaluated expression."""
-        var_node = self._define_variable(
-            name, env_type, initialiser_expr, eagerly_evaluated=True
-        )
-        self.extraction_ctx.graph.add_edge(initialiser_node, var_node, rep.DEF)
-        return var_node
-
-    def define_injected_variable(
-        self, name: str, env_type: EnvironmentType
-    ) -> rep.Variable:
-        """Define a variable injected by the Ansible runtime, i.e., without an explicit initialiser."""
-        return self._define_variable(name, env_type, SENTINEL, eagerly_evaluated=True)
-
-    def _define_variable(
-        self,
-        name: str,
-        env_type: EnvironmentType,
-        initialiser: ast.AnyExpression | Sentinel,
         *,
-        eagerly_evaluated: bool,
-    ) -> rep.Variable:
-        """Declare a variable, initialized with the given expression.
+        conditions: Sequence[rep.DataNode] | None = None,
+    ) -> None:
+        """Define a variable with an initialiser which is lazily evaluated.
 
-        Expression may be empty if not available.
-
-        Returns the newly created variable, may be added by to the graph by
-        the client. If not added to the graph by the client, will be added
-        when a template that uses this variable is evaluated.
+        The variable node will be added to the graph on-demand when dereferenced.
         """
-        logger.debug(
-            f"Defining variable {name!r} of type {initialiser.__class__.__name__} "
-            + f"in env of type {env_type.name}"
-        )
+        revision = self._get_next_def_revision(name)
+        logger.debug(f"Selected revision {revision} for {name}")
+        self._define_variable(name, revision, env_type, initialiser, conditions)
 
-        var_rev = self._get_next_def_revision(name)
-        logger.debug(f"Selected revision {var_rev} for {name}")
+    def define_eager_variable(
+        self,
+        name: str,
+        env_type: EnvironmentType,
+        *,
+        conditions: Sequence[rep.DataNode] | None = None,
+    ) -> rep.Variable:
+        """Define a variable whose value is already eagerly evaluated.
+
+        Callers are responsible for linking the defining node, if any.
+        """
+        revision = self._get_next_def_revision(name)
+        logger.debug(f"Selected revision {revision} for {name}")
         var_node = rep.Variable(
             name=name,
-            version=var_rev,
+            version=revision,
             value_version=0,
             scope_level=env_type.value,
             location=self.extraction_ctx.get_location(name),
         )
         self.extraction_ctx.graph.add_node(var_node)
+        for cond in conditions or []:
+            self.extraction_ctx.graph.add_edge(cond, var_node, rep.WHEN)
+        self._define_variable(name, revision, env_type, var_node, conditions)
+        return var_node
+
+    def _define_variable(
+        self,
+        name: str,
+        revision: int,
+        env_type: EnvironmentType,
+        value: ast.AnyExpression | rep.Variable,
+        conditions: Sequence[rep.DataNode] | None,
+    ) -> None:
+        """Declare a variable, bound to the given value.
+
+        The value is either an actual variable node, in case the variable is injected with an eagerly-evaluated
+        value, or an expression to be lazily evaluated when the variable is dereferenced.
+        """
+        logger.debug(f"Defining variable {name!r} in env of type {env_type.name}")
 
         # Store auxiliary information about which other variables are available
         # at the time this variable is registered, i.e. the ones that are
         # "visible" to the current definition.
         self.extraction_ctx.visibility_information.set_info(
-            name, var_rev, self._envs.get_currently_visible_definitions()
+            name, revision, self._envs.get_currently_visible_definitions()
         )
 
         def_record = VariableDefinitionRecord(
             name,
-            var_rev,
-            initialiser,
-            eagerly_evaluated or not isinstance(initialiser, ast.Expression),
+            revision,
+            value,
             env_type,
+            tuple(conditions or []),
+            self.extraction_ctx.get_location(name),
         )
         self._envs.set_variable_definition(name, def_record)
-        self._value_to_var_node[(def_record, 0)] = var_node
 
-        if eagerly_evaluated or not isinstance(initialiser, ast.Expression):
-            # Assume the value is used by the caller is constant if they don't
-            # provide an expression. At the very least, the caller should link it
-            # with DEF (e.g. set_fact or register) or USE (e.g. undefined variables
-            # in evaluate_template).
-            # If the variable isn't a constant value, we'll only create value
-            # records whenever it's evaluated.
-            val_record = ConstantVariableValueRecord(def_record)
-            self._envs.set_constant_variable_value(name, val_record)
-
-            if not eagerly_evaluated and not isinstance(initialiser, Sentinel):
-                lit_node = self._build_expression(initialiser).data_node
-                self.extraction_ctx.graph.add_edge(lit_node, var_node, rep.DEF)
-
-        return var_node
-
-    def _get_variable_value_record(self, name: str) -> VariableValueRecord:
+    def _get_variable_value(self, name: str) -> rep.Variable:
         """Get a variable value record for a variable.
 
         If the variable is undefined, declares a new variable.
@@ -428,71 +263,41 @@ class VarContext:
         # Check for magic variables and likely host vars, and prevent using an
         # attempted but unused override. This will define the correct definition
         # in the appropriate environment, which may not have been done yet.
+        # FIXME: Move the responsibility to the environment context instead.
         if _is_ignored_override_of_special_variable(name, vdef):
             logger.debug(
                 f"Wrong definition for special variable {name!r}, defining new one."
             )
             return self._define_constant_and_get_value(name)
-        if vdef.eagerly_evaluated:
-            return self._get_variable_value_without_initialiser(vdef)
 
-        # Evaluate the expression, perhaps re-evaluating if necessary. If the
-        # expression was already evaluated previously and still has the same
-        # value, this will just return the previous record.
-        assert not isinstance(vdef.initialiser, Sentinel)
-        template_record = self._build_expression(vdef.initialiser)
+        if isinstance(vdef.value, rep.Variable):
+            return vdef.value
 
-        # Try to find a pre-existing value record for this template record. If
-        # it exists, we've already evaluated this variable before and we can
-        # just reuse the previous one.
-        vval = self._envs.get_variable_value_for_cached_expression(
-            name, vdef.revision, template_record
-        )
-        if vval is None:
-            return self._create_new_variable_value(vdef, template_record)
-
-        logger.debug(f"Found pre-existing value {vval!r}, reusing")
-        assert isinstance(vval, ChangeableVariableValueRecord), (
-            "Expected evaluated value to be changeable"
-        )
-        return vval
-
-    def _create_new_variable_value(
-        self, vdef: VariableDefinitionRecord, template_record: TemplateResult
-    ) -> VariableValueRecord:
-        # No variable value record exists yet, so we need to create a new one.
-        # We'll also need to add a new variable node to the graph, although we
-        # may be able to reuse the one added while registering the variable in
-        # case it hasn't been used before.
+        # Evaluate the expression and assign it to the variable.
         value_revision = self._get_next_val_revision(vdef)
         logger.debug(
             f"Creating new value for {vdef.name!r} with value revision {value_revision}"
         )
-        value_record = ChangeableVariableValueRecord(
-            vdef, value_revision, template_record
-        )
-        self._envs.set_changeable_variable_value(vdef.name, value_record)
 
-        var_node = self._get_var_node_for_value(vdef, value_revision)
-        assert var_node.version == vdef.revision, (
-            "Internal Error: Bad reuse of var node, revision differs"
+        data_node = self.build_expression(vdef.value)
+        var_node = rep.Variable(
+            name=vdef.name,
+            version=vdef.revision,
+            value_version=value_revision,
+            scope_level=vdef.env_type.value,
+            location=vdef.location,
         )
-        assert var_node.value_version == value_revision, (
-            "Internal Error: Bad reuse of var node, val revision differs"
-        )
+        self.extraction_ctx.graph.add_node(var_node)
+        self.extraction_ctx.graph.add_edge(data_node, var_node, rep.DEF)
+        # Link conditions
+        for cond in vdef.conditions:
+            self.extraction_ctx.graph.add_edge(cond, var_node, rep.WHEN)
+        return var_node
 
-        # Link the edge
-        self.extraction_ctx.graph.add_edge(template_record.data_node, var_node, rep.DEF)
-        return value_record
-
-    def _get_undefined_variable_value(self, name: str) -> ConstantVariableValueRecord:
-        assert not self._envs.has_variable_value(name), (
-            f"Internal Error: Variable {name!r} has no definition but does have value"
-        )
-
+    def _get_undefined_variable_value(self, name: str) -> rep.Variable:
         return self._define_constant_and_get_value(name)
 
-    def _define_constant_and_get_value(self, name: str) -> ConstantVariableValueRecord:
+    def _define_constant_and_get_value(self, name: str) -> rep.Variable:
         if _is_magic_variable(name):
             env_type = EnvironmentType.MAGIC_VARS
         elif _is_likely_host_fact(name):
@@ -504,29 +309,7 @@ class VarContext:
             )
             env_type = EnvironmentType.UNDEFINED
 
-        _ = self.define_injected_variable(name, env_type)
-        # Retrieve the value record that should've been created
-        vval = self._envs.get_variable_value_for_constant_definition(
-            name, self._next_def_revisions[name] - 1
-        )
-        assert vval is not None, "Internal Error: No value for newly-defined var"
-        return vval
-
-    def _get_variable_value_without_initialiser(
-        self, vdef: VariableDefinitionRecord
-    ) -> ConstantVariableValueRecord:
-        # No template expression, so it cannot be evaluated. There must be
-        # a constant value record for it, we'll return that.
-        vval = self._envs.get_variable_value_for_constant_definition(
-            vdef.name, vdef.revision
-        )
-        assert vval is not None and isinstance(vval, ConstantVariableValueRecord), (
-            f"Internal Error: Could not find constant value for variable without expression ({vdef.name!r})"
-        )
-        logger.debug(
-            f"Variable {vdef.name!r} has no initialiser, using constant value record {vval!r}"
-        )
-        return vval
+        return self.define_eager_variable(name, env_type)
 
     def get_initialisers(
         self, name: str, constraints: Mapping[str, ast.AnyExpression]
@@ -554,8 +337,8 @@ class VarContext:
                 )
             ]
 
-        if not isinstance(vdef.initialiser, Sentinel):
-            return [(vdef.initialiser, {name: vdef.initialiser}, [])]
+        if not isinstance(vdef.value, rep.Variable):
+            return [(vdef.value, {name: vdef.value}, [])]
 
         return []
 
