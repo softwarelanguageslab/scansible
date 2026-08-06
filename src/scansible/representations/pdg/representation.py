@@ -50,6 +50,14 @@ class NodeLocation(_FrozenRepresentation, frozen=True):
 
         return base
 
+    @classmethod
+    def synthetic(cls) -> NodeLocation:
+        return cls(file="<unknown>", line=-1, column=-1)
+
+    @property
+    def is_synthetic(self) -> bool:
+        return self.file == "<unknown>"
+
 
 class Node(_BaseRepresentation):
     """Base nodes."""

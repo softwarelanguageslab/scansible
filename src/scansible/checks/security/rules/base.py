@@ -39,7 +39,7 @@ def _validate_query_result[T](result_type: type[T]) -> DatabaseResultConverter[T
 
 
 def _convert_location(loc: NodeLocation | None) -> str:
-    if loc is None:
+    if loc is None or loc.is_synthetic:
         return "unknown file:-1:-1"
     return str(loc)
 
@@ -67,7 +67,7 @@ class Rule(abc.ABC):
         node_location = db.get_location(node_id)
         # Node may not have location information stored (e.g., scalar literals),
         # so get location of the node it is assigned to.
-        while node_location is None or node_location.file == "unknown file":
+        while node_location is None or node_location.is_synthetic:
             assigned_nodes = db.query(
                 _validate_query_result(LocationQueryResult),
                 "MATCH (n) -[:e_Def|e_Keyword]->(n2) WHERE n.node_id = $node_id RETURN n2.node_id",

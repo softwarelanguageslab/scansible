@@ -448,15 +448,13 @@ class ExtractionContext:
         return self._next_iv_id - 1
 
     def get_location(self, ds: object) -> rep.NodeLocation:
-        file = "unknown file"
-        line = -1
-        column = -1
-
         if isinstance(ds, Positioned) and not ds.__position__.is_synthetic:
             file = str(ds.__position__.path)
             line, column = ds.__position__.start.line, ds.__position__.start.column
         elif hasattr(ds, "location"):
             file, line, column = cast(tuple[str, int, int], ds.location)  # pyright: ignore[reportAttributeAccessIssue]
+        else:
+            return rep.NodeLocation.synthetic()
 
         return rep.NodeLocation(
             file=file,

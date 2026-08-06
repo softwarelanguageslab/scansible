@@ -16,7 +16,6 @@ from loguru import logger
 from scansible.representations import ast
 
 from ... import representation as rep
-from .constants import MAGIC_VAR_NAMES, UNQUALIFIED_HOST_FACT_NAMES
 from .environments import EnvironmentStack, EnvironmentType
 from .environments.types import LocalEnvType
 from .expression_types import extract_type_name
@@ -31,30 +30,8 @@ class RecursiveDefinitionError(Exception):
     pass
 
 
-def _is_magic_variable(name: str) -> bool:
-    return name in MAGIC_VAR_NAMES
-
-
-def _is_likely_host_fact(name: str) -> bool:
-    # Approximate: There are a lot of host facts, but they should always start
-    # with "ansible_". This is only called for undefined variable names anyway.
-    return name in UNQUALIFIED_HOST_FACT_NAMES or name.startswith("ansible_")
-
-
-def _is_ignored_override_of_special_variable(
-    name: str, vdef: VariableDefinitionRecord
-) -> bool:
-    return (
-        _is_magic_variable(name) and vdef.env_type is not EnvironmentType.MAGIC_VARS
-    ) or (
-        _is_likely_host_fact(name)
-        and vdef.env_type.value < EnvironmentType.HOST_FACTS.value
-    )
-
-
 _DefRevisionMap = dict[str, int]
 _ValRevisionMap = dict[VariableDefinitionRecord, int]
-_ValueToVarMap = dict[tuple[VariableDefinitionRecord, int], rep.Variable]
 
 
 # TODO: Maybe simplify single-variable templates ("{{ var }}") to bypass
@@ -156,6 +133,8 @@ class VarContext:
         self.extraction_ctx.graph.add_edge(en, iv, rep.DEF)
 
         for var_node in used_variables:
+            # Ensure the node is always added
+            self.extraction_ctx.graph.add_node(var_node)
             self.extraction_ctx.graph.add_edge(var_node, en, rep.Input())
 
         return iv
@@ -244,7 +223,7 @@ class VarContext:
             tuple(conditions or []),
             self.extraction_ctx.get_location(name),
         )
-        self._envs.set_variable_definition(name, def_record)
+        self._envs.set_variable_definition(def_record)
 
     def _get_variable_value(self, name: str) -> rep.Variable:
         """Get a variable value record for a variable.
@@ -260,15 +239,6 @@ class VarContext:
             return self._get_undefined_variable_value(name)
 
         logger.debug(f"Found existing variable {vdef!r}")
-        # Check for magic variables and likely host vars, and prevent using an
-        # attempted but unused override. This will define the correct definition
-        # in the appropriate environment, which may not have been done yet.
-        # FIXME: Move the responsibility to the environment context instead.
-        if _is_ignored_override_of_special_variable(name, vdef):
-            logger.debug(
-                f"Wrong definition for special variable {name!r}, defining new one."
-            )
-            return self._define_constant_and_get_value(name)
 
         if isinstance(vdef.value, rep.Variable):
             return vdef.value
@@ -295,21 +265,13 @@ class VarContext:
         return var_node
 
     def _get_undefined_variable_value(self, name: str) -> rep.Variable:
-        return self._define_constant_and_get_value(name)
-
-    def _define_constant_and_get_value(self, name: str) -> rep.Variable:
-        if _is_magic_variable(name):
-            env_type = EnvironmentType.MAGIC_VARS
-        elif _is_likely_host_fact(name):
-            env_type = EnvironmentType.HOST_FACTS
-        else:
-            logger.debug(
-                f"Variable {name} has not yet been defined, "
-                + "registering new value at lowest precedence level"
-            )
-            env_type = EnvironmentType.UNDEFINED
-
-        return self.define_eager_variable(name, env_type)
+        logger.debug(f"Variable {name} has not yet been defined")
+        return rep.Variable(
+            name=name,
+            version=0,
+            value_version=0,
+            scope_level=EnvironmentType.UNDEFINED.value,
+        )
 
     def get_initialisers(
         self, name: str, constraints: Mapping[str, ast.AnyExpression]
@@ -329,7 +291,10 @@ class VarContext:
         # TODO: Conditional definitions.
         vdef = self._envs.get_variable_definition(name)
 
-        if vdef is None or _is_ignored_override_of_special_variable(name, vdef):
+        if vdef is None or vdef.env_type in (
+            EnvironmentType.MAGIC_VARS,
+            EnvironmentType.HOST_FACTS,
+        ):
             return [
                 (init, {name: init}, conditions)
                 for init, conditions in self._get_constrained_magic_initialisers(
