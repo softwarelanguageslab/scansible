@@ -6,16 +6,16 @@ from loguru import logger
 
 from scansible.representations import ast
 
-from .context import ExtractionContext
-from .result import ExtractionResult
+from .context import BuildContext
+from .result import BuildResult
 from .semantics import EnvironmentType
 
 
 @final
-class VariablesExtractor:
+class VariablesBuilder:
     def __init__(
         self,
-        context: ExtractionContext,
+        context: BuildContext,
         variables: (
             ast.MapLiteral[ast.Identifier, ast.AnyExpression]
             | ast.MapLiteral[ast.ScalarLiteral, ast.AnyExpression]
@@ -24,7 +24,7 @@ class VariablesExtractor:
         self.context = context
         self.variables = variables
 
-    def extract_variables(self, scope_level: EnvironmentType) -> ExtractionResult:
+    def build_variables(self, scope_level: EnvironmentType) -> BuildResult:
         for var_name, var_init in self.variables.items():
             try:
                 var_ident = ast.Identifier.from_object(var_name)
@@ -46,4 +46,4 @@ class VariablesExtractor:
                 var_init,
                 conditions=self.context.active_conditions,
             )
-        return ExtractionResult.empty()
+        return BuildResult.empty()

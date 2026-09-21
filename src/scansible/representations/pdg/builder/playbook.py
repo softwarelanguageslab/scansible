@@ -8,22 +8,22 @@ from loguru import logger
 
 from scansible.representations import ast
 
-from .context import ExtractionContext
-from .handler_lists import HandlerListExtractor
-from .result import ExtractionResult
-from .role_dependencies import extract_role_dependency
+from .context import BuildContext
+from .handler_lists import HandlerListBuilder
+from .result import BuildResult
+from .role_dependencies import build_role_dependency
 from .semantics import EnvironmentType
-from .task_lists import TaskListExtractor
-from .variables import VariablesExtractor
+from .task_lists import TaskListBuilder
+from .variables import VariablesBuilder
 
 
 @final
-class PlaybookExtractor:
-    def __init__(self, context: ExtractionContext, playbook: ast.Playbook) -> None:
+class PlaybookBuilder:
+    def __init__(self, context: BuildContext, playbook: ast.Playbook) -> None:
         self.context = context
         self.playbook = playbook
 
-    def extract(self) -> None:
+    def build(self) -> None:
         # TODO: Inventory vars, group vars, etc. Can we determine these?
         # For playbooks, they can be in group_vars and host_vars relative to the playbook root dir.
         # The "all" file (possibly with .yaml/.yml/.json, but not necessarily) contains variables
@@ -39,21 +39,21 @@ class PlaybookExtractor:
                 self.context.vars.enter_scope(EnvironmentType.PLAY_VARS_PROMPT),
                 self.context.vars.enter_scope(EnvironmentType.PLAY_VARS_FILES),
             ):
-                # Extract variables first. Order doesn't really matter.
+                # Build variables first. Order doesn't really matter.
 
                 # - Play variables
-                _ = VariablesExtractor(self.context, play.vars).extract_variables(
+                _ = VariablesBuilder(self.context, play.vars).build_variables(
                     EnvironmentType.PLAY_VARS
                 )
 
                 # - Play vars_prompt
                 # HACK: These prompts don't always use the default, but we're acting as if it's always the default that's used. TODO: Better representation!
-                _ = VariablesExtractor(
+                _ = VariablesBuilder(
                     self.context,
                     ast.MapLiteral(
                         (prompt.name, prompt.default) for prompt in play.vars_prompt
                     ),
-                ).extract_variables(EnvironmentType.PLAY_VARS_PROMPT)
+                ).build_variables(EnvironmentType.PLAY_VARS_PROMPT)
 
                 # - Play vars_files
                 # TODO: Not clear whether this follows Ansible's search mechanism.
@@ -73,9 +73,9 @@ class PlaybookExtractor:
                             if file_content is None:
                                 continue
 
-                            _ = VariablesExtractor(
+                            _ = VariablesBuilder(
                                 self.context, file_content.variables
-                            ).extract_variables(EnvironmentType.PLAY_VARS_FILES)
+                            ).build_variables(EnvironmentType.PLAY_VARS_FILES)
                             break
                     else:
                         logger.bind(location=play.position).error(
@@ -96,42 +96,38 @@ class PlaybookExtractor:
 
                 # TODO: It may be possible to notify a role handlers from within
                 # a play.
-                result = TaskListExtractor(self.context, play.pre_tasks).extract_tasks(
-                    []
-                )
-                result = self._extract_handlers(play.handlers, result)
-                result = result.chain(self._extract_roles(play.roles, result))
+                result = TaskListBuilder(self.context, play.pre_tasks).build_tasks([])
+                result = self._build_handlers(play.handlers, result)
+                result = result.chain(self._build_roles(play.roles, result))
                 result = result.chain(
-                    TaskListExtractor(self.context, play.tasks).extract_tasks(
+                    TaskListBuilder(self.context, play.tasks).build_tasks(
                         result.next_predecessors
                     )
                 )
-                result = self._extract_handlers(play.handlers, result)
+                result = self._build_handlers(play.handlers, result)
                 result = result.chain(
-                    TaskListExtractor(self.context, play.post_tasks).extract_tasks(
+                    TaskListBuilder(self.context, play.post_tasks).build_tasks(
                         result.next_predecessors
                     )
                 )
-                result = self._extract_handlers(play.handlers, result)
+                result = self._build_handlers(play.handlers, result)
 
-    def _extract_roles(
-        self, roles: Sequence[ast.RoleRequirement], result: ExtractionResult
-    ) -> ExtractionResult:
+    def _build_roles(
+        self, roles: Sequence[ast.RoleRequirement], result: BuildResult
+    ) -> BuildResult:
         for role_dep in roles:
             result = result.chain(
-                extract_role_dependency(
-                    self.context, role_dep, result.next_predecessors
-                )
+                build_role_dependency(self.context, role_dep, result.next_predecessors)
             )
         return result
 
-    def _extract_handlers(
+    def _build_handlers(
         self,
         handlers: Sequence[ast.Handler | ast.HandlerBlock],
-        result: ExtractionResult,
-    ) -> ExtractionResult:
+        result: BuildResult,
+    ) -> BuildResult:
         return result.chain(
-            HandlerListExtractor(self.context, handlers).extract_handlers(
+            HandlerListBuilder(self.context, handlers).build_handlers(
                 result.next_predecessors
             )
         )

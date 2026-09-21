@@ -7,12 +7,12 @@ from collections.abc import Sequence
 from scansible.representations import ast
 
 from ... import representation as rep
-from ..result import ExtractionResult
+from ..result import BuildResult
 from ..semantics import EnvironmentType, RecursiveDefinitionError
-from .base import TaskExtractor
+from .base import TaskBuilder
 
 
-class GenericTaskExtractor(TaskExtractor):
+class GenericTaskBuilder(TaskBuilder):
     @classmethod
     @override
     def supported_task_attributes(cls) -> frozenset[str]:
@@ -35,29 +35,29 @@ class GenericTaskExtractor(TaskExtractor):
         )
 
     @override
-    def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
-        self.logger.debug(f"Extracting task with name {self.task.name!r}")
+    def build_task(self, predecessors: Sequence[rep.ControlNode]) -> BuildResult:
+        self.logger.debug(f"Building task with name {self.task.name!r}")
         with self.setup_task_vars_scope(EnvironmentType.TASK_VARS):
             if self.task.loop:
-                result = self._extract_looping_task(predecessors)
+                result = self._build_looping_task(predecessors)
             else:
-                result = self._extract_single_task(predecessors)
+                result = self._build_single_task(predecessors)
 
             self.warn_remaining_kws("generic tasks")
             return result
 
-    def _extract_single_task(
+    def _build_single_task(
         self, predecessors: Sequence[rep.ControlNode]
-    ) -> ExtractionResult:
+    ) -> BuildResult:
         if "loop_control" in self.task.model_directives_set:
             self.logger.warning("Found loop_control without loop")
 
-        return self._extract_bare_task(predecessors)
+        return self._build_bare_task(predecessors)
 
-    def _extract_looping_task(
+    def _build_looping_task(
         self, predecessors: Sequence[rep.ControlNode]
-    ) -> ExtractionResult:
-        source_and_name = self.extract_looping_info()
+    ) -> BuildResult:
+        source_and_name = self.build_looping_info()
         assert source_and_name is not None, "Internal error"
 
         loop_source_var, loop_var_name, loop_with = source_and_name
@@ -72,7 +72,7 @@ class GenericTaskExtractor(TaskExtractor):
             )
 
             with self.context.activate_loop(loop_source_var):
-                inner_result = self._extract_bare_task(predecessors)
+                inner_result = self._build_bare_task(predecessors)
             # Add a loop edge to indicate single-task loop.
             assert len(inner_result.added_control_nodes) == 1
             self.context.graph.add_edge(
@@ -83,9 +83,7 @@ class GenericTaskExtractor(TaskExtractor):
 
         return inner_result
 
-    def _extract_bare_task(
-        self, predecessors: Sequence[rep.ControlNode]
-    ) -> ExtractionResult:
+    def _build_bare_task(self, predecessors: Sequence[rep.ControlNode]) -> BuildResult:
         tn = rep.Task(
             name=self.task.name, action=self.task.action, location=self.location
         )
@@ -95,7 +93,7 @@ class GenericTaskExtractor(TaskExtractor):
             self.context.graph.add_edge(pred, tn, rep.ORDER)
 
         # Link conditions
-        condition_nodes = self.extract_conditions()
+        condition_nodes = self.build_conditions()
         with self.context.activate_conditions(condition_nodes):
             for condition_node in self.context.active_conditions:
                 self.context.graph.add_edge(condition_node, tn, rep.WHEN)
@@ -134,7 +132,7 @@ class GenericTaskExtractor(TaskExtractor):
                     continue
                 self.context.graph.add_edge(val_node, tn, rep.Keyword(keyword=misc_kw))
 
-        result = ExtractionResult.single(tn)
+        result = BuildResult.single(tn)
         # If the task is executed conditionally, the next predecessor may also
         # be any of the previous ones if the task was skipped.
         if condition_nodes:

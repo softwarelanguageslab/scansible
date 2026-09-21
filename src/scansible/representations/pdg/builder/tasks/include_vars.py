@@ -10,14 +10,14 @@ from loguru import logger
 from scansible.representations import ast
 
 from ... import representation as rep
-from ..result import ExtractionResult
+from ..result import BuildResult
 from ..semantics import EnvironmentType
-from ..variables import VariablesExtractor
-from ._dynamic_includes import DynamicIncludesExtractor
+from ..variables import VariablesBuilder
+from ._dynamic_includes import DynamicIncludesBuilder
 
 
 @final
-class IncludeVarsTaskExtractor(DynamicIncludesExtractor[ast.VariableFile]):
+class IncludeVarsTaskBuilder(DynamicIncludesBuilder[ast.VariableFile]):
     CONTENT_TYPE = "variable file"
     TASK_VARS_SCOPE_LEVEL = EnvironmentType.TASK_VARS
 
@@ -45,13 +45,13 @@ class IncludeVarsTaskExtractor(DynamicIncludesExtractor[ast.VariableFile]):
         return self.context.include_ctx.find_var_file(name) is not None
 
     @override
-    def _extract_included_content(
+    def _build_included_content(
         self,
         included_content: ast.VariableFile,
         predecessors: Sequence[rep.ControlNode],
-    ) -> ExtractionResult:
+    ) -> BuildResult:
         return (
-            VariablesExtractor(self.context, included_content.variables)
-            .extract_variables(EnvironmentType.INCLUDE_VARS)
+            VariablesBuilder(self.context, included_content.variables)
+            .build_variables(EnvironmentType.INCLUDE_VARS)
             .replace_next_predecessors(predecessors)
         )

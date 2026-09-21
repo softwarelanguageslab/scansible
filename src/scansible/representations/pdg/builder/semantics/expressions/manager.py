@@ -15,7 +15,7 @@ from ..variables import EnvironmentType, VariableDefinitionRecord
 from .templates import TemplateExpressionAST
 
 if TYPE_CHECKING:
-    from ...context import ExtractionContext
+    from ...context import BuildContext
 
 
 class RecursiveDefinitionError(Exception):
@@ -52,8 +52,8 @@ def extract_type_name(value: ast.AnyExpression) -> rep.ValidTypeStr:
 class ExpressionManager:
     """Manages expression evaluation."""
 
-    def __init__(self, context: ExtractionContext) -> None:
-        self.extraction_ctx = context
+    def __init__(self, context: BuildContext) -> None:
+        self.build_ctx = context
         self._next_val_revisions: _ValRevisionMap = defaultdict(lambda: 0)
 
     def _get_next_val_revision(self, var_def: VariableDefinitionRecord) -> int:
@@ -74,12 +74,12 @@ class ExpressionManager:
         self, expr: ast.MapLiteral[ast.ScalarLiteral, ast.AnyExpression]
     ) -> rep.DataNode:
         parent_node = rep.CompositeLiteral(type=extract_type_name(expr))
-        self.extraction_ctx.graph.add_node(parent_node)
+        self.build_ctx.graph.add_node(parent_node)
 
         for k, v in expr.items():
             child_node = self.build_expression(v)
             key_str = str(k)
-            self.extraction_ctx.graph.add_edge(
+            self.build_ctx.graph.add_edge(
                 child_node, parent_node, rep.Composition(index=key_str)
             )
 
@@ -89,18 +89,18 @@ class ExpressionManager:
         self, expr: ast.SeqLiteral[ast.AnyExpression]
     ) -> rep.DataNode:
         parent_node = rep.CompositeLiteral(type=extract_type_name(expr))
-        self.extraction_ctx.graph.add_node(parent_node)
+        self.build_ctx.graph.add_node(parent_node)
 
         for i, e in enumerate(expr):
             child_node = self.build_expression(e)
-            self.extraction_ctx.graph.add_edge(
+            self.build_ctx.graph.add_edge(
                 child_node, parent_node, rep.Composition(index=str(i))
             )
 
         return parent_node
 
     def _build_scalar_literal(self, expr: ast.ScalarLiteral) -> rep.DataNode:
-        location = self.extraction_ctx.get_location(expr)
+        location = self.build_ctx.get_location(expr)
         type_ = extract_type_name(expr)
 
         # FIXME: Hack
@@ -109,7 +109,7 @@ class ExpressionManager:
         else:
             lit = rep.ScalarLiteral(type=type_, value=expr, location=location)
 
-        self.extraction_ctx.graph.add_node(lit)
+        self.build_ctx.graph.add_node(lit)
         return lit
 
     def _build_expression(self, ast: TemplateExpressionAST) -> rep.DataNode:
@@ -124,18 +124,18 @@ class ExpressionManager:
         en = rep.Expression(
             expr=ast.raw,
             impure_components=ast.impure_components,
-            location=self.extraction_ctx.get_location(ast.raw),
+            location=self.build_ctx.get_location(ast.raw),
         )
-        iv = rep.IntermediateValue(identifier=self.extraction_ctx.next_iv_id())
+        iv = rep.IntermediateValue(identifier=self.build_ctx.next_iv_id())
         logger.debug(f"Using IV {iv!r}")
-        self.extraction_ctx.graph.add_node(en)
-        self.extraction_ctx.graph.add_node(iv)
-        self.extraction_ctx.graph.add_edge(en, iv, rep.DEF)
+        self.build_ctx.graph.add_node(en)
+        self.build_ctx.graph.add_node(iv)
+        self.build_ctx.graph.add_edge(en, iv, rep.DEF)
 
         for var_node in used_variables:
             # Ensure the node is always added
-            self.extraction_ctx.graph.add_node(var_node)
-            self.extraction_ctx.graph.add_edge(var_node, en, rep.Input())
+            self.build_ctx.graph.add_node(var_node)
+            self.build_ctx.graph.add_edge(var_node, en, rep.Input())
 
         return iv
 
@@ -159,7 +159,7 @@ class ExpressionManager:
         initializer, if necessary.
         """
         logger.debug(f"Resolving variable {name}")
-        vdef = self.extraction_ctx.vars.lookup_variable(name)
+        vdef = self.build_ctx.vars.lookup_variable(name)
 
         if vdef is None:
             return self._get_undefined_variable_value(name)
@@ -183,11 +183,11 @@ class ExpressionManager:
             scope_level=vdef.env_type.value,
             location=vdef.location,
         )
-        self.extraction_ctx.graph.add_node(var_node)
-        self.extraction_ctx.graph.add_edge(data_node, var_node, rep.DEF)
+        self.build_ctx.graph.add_node(var_node)
+        self.build_ctx.graph.add_edge(data_node, var_node, rep.DEF)
         # Link conditions
         for cond in vdef.conditions:
-            self.extraction_ctx.graph.add_edge(cond, var_node, rep.WHEN)
+            self.build_ctx.graph.add_edge(cond, var_node, rep.WHEN)
         return var_node
 
     def _get_undefined_variable_value(self, name: str) -> rep.Variable:

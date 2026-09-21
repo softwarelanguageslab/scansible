@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import override
 
-from scansible.representations.pdg.extractor.context import VisibilityInformation
+from scansible.representations.pdg.builder.context import VisibilityInformation
 from scansible.representations.pdg.representation import Graph, NodeLocation, Task
 
 from .base import Rule, RuleResult
@@ -27,7 +27,7 @@ class SanityCheckNumberOfTasksRule(Rule):
                 rule_category="Sanity checks",
                 rule_name=rule_name,
                 rule_subname=rule_subname,
-                rule_header="Found no or very few tasks, something may have gone wrong with extraction",
+                rule_header="Found no or very few tasks, something may have gone wrong with PDG building.",
                 rule_message="",
                 location=NodeLocation(file="tasks/main.yml", line=1, column=1),
             )

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from scansible.representations.pdg.extractor.semantics import EnvironmentType
+from scansible.representations.pdg.builder.semantics import EnvironmentType
 from scansible.representations.pdg.representation import (
     ControlNode,
     DataFlowEdge,

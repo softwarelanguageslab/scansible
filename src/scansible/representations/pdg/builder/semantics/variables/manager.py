@@ -22,7 +22,7 @@ from .environment import (
 )
 
 if TYPE_CHECKING:
-    from ...context import ExtractionContext
+    from ...context import BuildContext
 
 
 _DefRevisionMap = dict[str, int]
@@ -32,9 +32,9 @@ _DefRevisionMap = dict[str, int]
 class VariableManager:
     """Managers variable definitions and lookups."""
 
-    def __init__(self, context: ExtractionContext) -> None:
+    def __init__(self, context: BuildContext) -> None:
         self._envs = EnvironmentStack()
-        self.extraction_ctx = context
+        self.build_ctx = context
         self._next_def_revisions: _DefRevisionMap = defaultdict(lambda: 0)
 
     def _get_next_def_revision(self, var_name: str) -> int:
@@ -82,11 +82,11 @@ class VariableManager:
             version=revision,
             value_version=0,
             scope_level=env_type.value,
-            location=self.extraction_ctx.get_location(name),
+            location=self.build_ctx.get_location(name),
         )
-        self.extraction_ctx.graph.add_node(var_node)
+        self.build_ctx.graph.add_node(var_node)
         for cond in conditions or []:
-            self.extraction_ctx.graph.add_edge(cond, var_node, rep.WHEN)
+            self.build_ctx.graph.add_edge(cond, var_node, rep.WHEN)
         self._define_variable(name, revision, env_type, var_node, conditions)
         return var_node
 
@@ -108,7 +108,7 @@ class VariableManager:
         # Store auxiliary information about which other variables are available
         # at the time this variable is registered, i.e. the ones that are
         # "visible" to the current definition.
-        self.extraction_ctx.visibility_information.set_info(
+        self.build_ctx.visibility_information.set_info(
             name, revision, self._envs.get_currently_visible_definitions()
         )
 
@@ -118,7 +118,7 @@ class VariableManager:
             value,
             env_type,
             tuple(conditions or []),
-            self.extraction_ctx.get_location(name),
+            self.build_ctx.get_location(name),
         )
         self._envs.set_variable_definition(def_record)
 

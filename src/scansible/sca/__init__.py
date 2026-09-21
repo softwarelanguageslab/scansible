@@ -23,7 +23,7 @@ from scansible.representations.ast import (
     StrLiteral,
     TaskFile,
 )
-from scansible.representations.pdg.extractor.main import extract_pdg
+from scansible.representations.pdg.builder.main import build_pdg
 from scansible.sca.constants import (
     ANSIBLE_ROLE_INCLUDE_MODULES,
     ANSIBLE_TRIVIAL_MODULES,
@@ -183,7 +183,7 @@ def _detect_smells(
 
     for entrypoint, project_type in entrypoints:
         as_pb = project_type == "playbook"
-        ctx = extract_pdg(entrypoint, role_search_paths, as_pb=as_pb)
+        ctx = build_pdg(entrypoint, role_search_paths, as_pb=as_pb)
 
         CONSOLE.print(f"Running checks on {project_type} {entrypoint}")
         yield from run_all_checks(ctx.graph)

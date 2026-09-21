@@ -7,17 +7,17 @@ from loguru import logger
 from scansible.representations import ast
 
 from .. import representation as rep
-from .context import ExtractionContext
-from .result import ExtractionResult
+from .context import BuildContext
+from .result import BuildResult
 from .semantics import EnvironmentType
 
 
 # TODO: Distinguish between public and private role includes.
-def extract_role_dependency(
-    context: ExtractionContext,
+def build_role_dependency(
+    context: BuildContext,
     dep: ast.RoleRequirement,
     predecessors: Sequence[rep.ControlNode],
-) -> ExtractionResult:
+) -> BuildResult:
     with context.vars.enter_scope(EnvironmentType.INCLUDE_PARAMS):
         for var_name, var_init in dep.params.items():
             try:
@@ -40,9 +40,9 @@ def extract_role_dependency(
                 logger.bind(location=dep.position).error(
                     f"Could not resolve {dep.role!r} to role"
                 )
-                return ExtractionResult.empty(predecessors)
+                return BuildResult.empty(predecessors)
 
             # Import here to prevent recursive imports
-            from .role import RoleExtractor  # noqa: PLC0415
+            from .role import RoleBuilder  # noqa: PLC0415
 
-            return RoleExtractor(context, incl_role).extract_role(predecessors)
+            return RoleBuilder(context, incl_role).build_role(predecessors)

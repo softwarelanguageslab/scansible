@@ -7,12 +7,12 @@ from scansible.utils import ensure_sequence, join_sequences
 from ..representation import ControlNode
 
 
-class ExtractionResult:
-    """The result of an extraction of an element."""
+class BuildResult:
+    """The result of building an element."""
 
-    #: The control nodes added in this extraction.
+    #: The control nodes added in this build step.
     added_control_nodes: Sequence[ControlNode]
-    #: The next control flow predecessors after this extraction.
+    #: The next control flow predecessors after this build step.
     next_predecessors: Sequence[ControlNode]
 
     def __init__(
@@ -24,24 +24,22 @@ class ExtractionResult:
         self.next_predecessors = ensure_sequence(next_predecessors)
 
     @classmethod
-    def single(cls, node: ControlNode) -> ExtractionResult:
+    def single(cls, node: ControlNode) -> BuildResult:
         return cls(node, node)
 
     @classmethod
-    def empty(
-        cls, predecessors: Sequence[ControlNode] | None = None
-    ) -> ExtractionResult:
+    def empty(cls, predecessors: Sequence[ControlNode] | None = None) -> BuildResult:
         return cls([], [] if predecessors is None else predecessors)
 
     def add_control_nodes(
         self, nodes: ControlNode | Sequence[ControlNode]
-    ) -> ExtractionResult:
+    ) -> BuildResult:
         """Add new control nodes to result."""
         return self._extend(added_control_nodes=nodes)
 
     def add_next_predecessors(
         self, nodes: ControlNode | Sequence[ControlNode]
-    ) -> ExtractionResult:
+    ) -> BuildResult:
         """Add new next predecessors to result, keeping the pre-existing ones."""
         return self._extend(
             next_predecessors=join_sequences(
@@ -51,11 +49,11 @@ class ExtractionResult:
 
     def replace_next_predecessors(
         self, nodes: ControlNode | Sequence[ControlNode]
-    ) -> ExtractionResult:
+    ) -> BuildResult:
         """Replace next predecessors with new sequence."""
         return self._extend(next_predecessors=nodes)
 
-    def merge(self, other: ExtractionResult) -> ExtractionResult:
+    def merge(self, other: BuildResult) -> BuildResult:
         """Merge two results, merging the contents of their fields.
 
         Next predecessors are also merged."""
@@ -66,7 +64,7 @@ class ExtractionResult:
             ),
         )
 
-    def chain(self, other: ExtractionResult) -> ExtractionResult:
+    def chain(self, other: BuildResult) -> BuildResult:
         """Chain two results, discarding `self`'s next predecessors in favour of `other`'s.
 
         Throws error if other's next predecessors are empty while the current's next predecessors are not.
@@ -85,8 +83,8 @@ class ExtractionResult:
         *,
         added_control_nodes: ControlNode | Sequence[ControlNode] | None = None,
         next_predecessors: ControlNode | Sequence[ControlNode] | None = None,
-    ) -> ExtractionResult:
-        return ExtractionResult(
+    ) -> BuildResult:
+        return BuildResult(
             join_sequences(
                 self.added_control_nodes, ensure_sequence(added_control_nodes)
             ),

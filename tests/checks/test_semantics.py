@@ -8,12 +8,12 @@ import pytest
 
 from scansible.checks import CheckResult
 from scansible.checks.semantics import run_all_checks as orig_run_all_checks
-from scansible.representations.pdg import extract_pdg
-from scansible.representations.pdg.extractor.context import ExtractionContext
+from scansible.representations.pdg import build_pdg
+from scansible.representations.pdg.builder.context import BuildContext
 from scansible.representations.pdg.representation import NodeLocation
 
 
-def run_all_checks(ctx: ExtractionContext) -> list[CheckResult]:
+def run_all_checks(ctx: BuildContext) -> list[CheckResult]:
     orig_results = orig_run_all_checks(ctx.graph, ctx.visibility_information)
     return [
         CheckResult(f"{res.rule_category}: {res.rule_name}", res.location)
@@ -21,8 +21,8 @@ def run_all_checks(ctx: ExtractionContext) -> list[CheckResult]:
     ]
 
 
-def build_graph(path: Path) -> ExtractionContext:
-    return extract_pdg(path, [])
+def build_graph(path: Path) -> BuildContext:
+    return build_pdg(path, [])
 
 
 def write_yaml(content: str, path: Path) -> None:

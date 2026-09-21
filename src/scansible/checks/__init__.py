@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
-from scansible.representations.pdg.extractor.context import ExtractionContext
+from scansible.representations.pdg.builder.context import BuildContext
 
 from . import security as security
 from . import semantics as semantics
@@ -29,14 +29,14 @@ def _convert_location(loc: str | None) -> NodeLocation | None:
 
 
 def run_all_checks(
-    extraction_context: ExtractionContext,
+    build_context: BuildContext,
     *,
     enable_security: bool = True,
     enable_semantics: bool = True,
 ) -> list[CheckResult]:
     results: list[CheckResult] = []
     if enable_security:
-        for res in security.run_all_checks(extraction_context.graph):
+        for res in security.run_all_checks(build_context.graph):
             description = f"{res.rule_name}: {res.__class__.rule_description}"
             results.append(
                 CheckResult(description, _convert_location(res.sink_location))
@@ -49,7 +49,7 @@ def run_all_checks(
         results.extend(
             CheckResult(f"{res.rule_category}: {res.rule_header}", res.location)
             for res in semantics.run_all_checks(
-                extraction_context.graph, extraction_context.visibility_information
+                build_context.graph, build_context.visibility_information
             )
         )
     return results

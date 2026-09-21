@@ -12,36 +12,31 @@ from scansible.representations import ast
 from scansible.utils import Position
 
 from .. import representation as rep
-from .context import ExtractionContext
-from .playbook import PlaybookExtractor
-from .role import RoleExtractor
+from .context import BuildContext
+from .playbook import PlaybookBuilder
+from .role import RoleBuilder
 
 
-def extract_pdg(
+def build_pdg(
     path: Path,
     role_search_paths: Sequence[Path],
     *,
     as_pb: bool | None = None,
     lenient: bool = True,
-) -> ExtractionContext:
+) -> BuildContext:
     """
-    Extract a PDG for a project at a given path.
+    Build a PDG for a project at a given path.
 
     :param      path:                      The path to the project.
-    :type       path:                      Path
     :param      role_search_paths:         The role search paths.
-    :type       role_search_paths:         { type_description }
     :param      as_pb:                     Whether the project should be
-                                           extracted as a playbook (if True), a
+                                           built as a playbook (if True), a
                                            role (if False), or autodetection
                                            (default).
-    :type       as_pb:                     bool | None
-    :param      lenient:                   Whether the extraction should be
+    :param      lenient:                   Whether the builder should be
                                            lenient.
-    :type       lenient:                   bool
 
-    :returns:   The extraction context resulting from extraction.
-    :rtype:     ExtractionContext
+    :returns:   The build context resulting from build process.
     """
     if as_pb is None:
         as_pb = not _project_is_role(path)
@@ -51,7 +46,7 @@ def extract_pdg(
     else:
         model = ast.extract_role(path, lenient=lenient, extract_all=False)
 
-    return StructuralGraphExtractor(model, role_search_paths, lenient=lenient).extract()
+    return PDGBuilder(model, role_search_paths, lenient=lenient).build()
 
 
 def _project_is_role(path: Path) -> bool:
@@ -68,7 +63,7 @@ def _project_is_role(path: Path) -> bool:
 
 
 @final
-class StructuralGraphExtractor:
+class PDGBuilder:
     def __init__(
         self, model: ast.AST, role_search_paths: Sequence[Path], *, lenient: bool
     ) -> None:
@@ -80,11 +75,9 @@ class StructuralGraphExtractor:
         for bf in model.broken_files:
             logger.bind(location=bf.path).error(bf.reason)
 
-        self.context = ExtractionContext(
-            graph, model, role_search_paths, lenient=lenient
-        )
+        self.context = BuildContext(graph, model, role_search_paths, lenient=lenient)
 
-    def extract(self) -> ExtractionContext:
+    def build(self) -> BuildContext:
         # Set up capturing warning and error messages so they can be added to
         # the context.
         log_handle = logger.add(
@@ -92,9 +85,9 @@ class StructuralGraphExtractor:
         )
 
         if self.model.is_playbook:
-            self._extract_playbook()
+            self._build_playbook()
         else:
-            self._extract_role()
+            self._build_role()
 
         logger.remove(log_handle)
 
@@ -106,10 +99,10 @@ class StructuralGraphExtractor:
         if isinstance(location, Position) and not location.is_synthetic:
             position = location
         reason = str(message)
-        self.context.record_extraction_error(reason, position)
+        self.context.record_build_error(reason, position)
 
-    def _extract_role(self) -> None:
-        _ = RoleExtractor(self.context, cast(ast.Role, self.model.root)).extract_role()
+    def _build_role(self) -> None:
+        _ = RoleBuilder(self.context, cast(ast.Role, self.model.root)).build_role()
 
-    def _extract_playbook(self) -> None:
-        PlaybookExtractor(self.context, cast(ast.Playbook, self.model.root)).extract()
+    def _build_playbook(self) -> None:
+        PlaybookBuilder(self.context, cast(ast.Playbook, self.model.root)).build()

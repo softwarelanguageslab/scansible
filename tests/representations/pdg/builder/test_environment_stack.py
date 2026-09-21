@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from scansible.representations import ast
-from scansible.representations.pdg.extractor.semantics.variables.environment import (
+from scansible.representations.pdg.builder.semantics.variables.environment import (
     EnvironmentStack,
     EnvironmentType,
     VariableDefinitionRecord,

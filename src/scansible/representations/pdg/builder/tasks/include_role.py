@@ -10,14 +10,14 @@ from loguru import logger
 from scansible.representations import ast
 
 from ... import representation as rep
-from ..result import ExtractionResult
-from ._dynamic_includes import DynamicIncludesExtractor
+from ..result import BuildResult
+from ._dynamic_includes import DynamicIncludesBuilder
 
 
 # TODO: Properly distinguish between private and public role includes, i.e.,
 # whether the scopes pop.
 @final
-class IncludeRoleExtractor(DynamicIncludesExtractor[ast.Role]):
+class IncludeRoleBuilder(DynamicIncludesBuilder[ast.Role]):
     CONTENT_TYPE = "role"
 
     @override
@@ -48,10 +48,10 @@ class IncludeRoleExtractor(DynamicIncludesExtractor[ast.Role]):
         return self.context.include_ctx.find_role(name) is not None
 
     @override
-    def _extract_included_content(
+    def _build_included_content(
         self, included_content: ast.Role, predecessors: Sequence[rep.ControlNode]
-    ) -> ExtractionResult:
+    ) -> BuildResult:
         # Import here to prevent recursive imports
-        from ..role import RoleExtractor  # noqa: PLC0415
+        from ..role import RoleBuilder  # noqa: PLC0415
 
-        return RoleExtractor(self.context, included_content).extract_role(predecessors)
+        return RoleBuilder(self.context, included_content).build_role(predecessors)

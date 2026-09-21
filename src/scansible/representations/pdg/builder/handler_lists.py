@@ -9,26 +9,24 @@ from loguru import logger
 from scansible.representations import ast
 
 from .. import representation as rep
-from .context import ExtractionContext
-from .result import ExtractionResult
-from .tasks import task_extractor_factory
+from .context import BuildContext
+from .result import BuildResult
+from .tasks import task_builder_factory
 
 
 @final
-class HandlerListExtractor:
+class HandlerListBuilder:
     def __init__(
         self,
-        context: ExtractionContext,
+        context: BuildContext,
         handlers: Sequence[ast.Handler | ast.HandlerBlock],
     ) -> None:
         self.context = context
         self.handlers = handlers
 
-    def extract_handlers(
-        self, predecessors: Sequence[rep.ControlNode]
-    ) -> ExtractionResult:
+    def build_handlers(self, predecessors: Sequence[rep.ControlNode]) -> BuildResult:
         # FIXME: Handler blocks are only superficially supported here: rescue/always
-        # are extracted as if they were normal handlers, even though real Ansible never
+        # are built as if they were normal handlers, even though real Ansible never
         # executes them for handler blocks, and a handler block's own name is (incorrectly)
         # treated as a notify topic below -- only the nested handlers' own name/listen should count.
         # TODO: I'm assuming that the handlers are only the top-level ones, i.e. a handler block
@@ -37,21 +35,21 @@ class HandlerListExtractor:
         # TODO: The above with import_tasks in handlers.
         # TODO: The conditions here can be improved.
 
-        result = ExtractionResult.empty(predecessors)
+        result = BuildResult.empty(predecessors)
 
         # For each handler, we insert a condition node first, since handlers don't always execute.
         # TODO: Link the conditions to the tasks that notify the handlers.
 
         for child in self.handlers:
             if isinstance(child, ast.HandlerBlock):
-                # FIXME: A dedicated HandlerBlock extractor should exist to properly
+                # FIXME: A dedicated HandlerBlock builder should exist to properly
                 # handle rescue/always non-execution; for now, flatten everything into
-                # the parent handler list so extraction doesn't crash.
-                child_result = HandlerListExtractor(
+                # the parent handler list so building doesn't crash.
+                child_result = HandlerListBuilder(
                     self.context, [*child.block, *child.rescue, *child.always]
-                ).extract_handlers(predecessors)
+                ).build_handlers(predecessors)
             else:
-                child_result = task_extractor_factory(self.context, child).extract_task(
+                child_result = task_builder_factory(self.context, child).build_task(
                     predecessors
                 )
 

@@ -11,12 +11,12 @@ from scansible.representations import ast
 from scansible.utils import actions
 
 from ... import representation as rep
-from ..result import ExtractionResult
-from ._dynamic_includes import DynamicIncludesExtractor
+from ..result import BuildResult
+from ._dynamic_includes import DynamicIncludesBuilder
 
 
 @final
-class IncludeTaskExtractor(DynamicIncludesExtractor[ast.TaskFile]):
+class IncludeTaskBuilder(DynamicIncludesBuilder[ast.TaskFile]):
     CONTENT_TYPE = "task file"
 
     @override
@@ -50,12 +50,12 @@ class IncludeTaskExtractor(DynamicIncludesExtractor[ast.TaskFile]):
             )
 
     @override
-    def _extract_included_content(
+    def _build_included_content(
         self, included_content: ast.TaskFile, predecessors: Sequence[rep.ControlNode]
-    ) -> ExtractionResult:
+    ) -> BuildResult:
         # Import here to prevent recursive imports
-        from ..task_lists import TaskListExtractor  # noqa: PLC0415
+        from ..task_lists import TaskListBuilder  # noqa: PLC0415
 
-        return TaskListExtractor(self.context, included_content.tasks).extract_tasks(
+        return TaskListBuilder(self.context, included_content.tasks).build_tasks(
             predecessors
         )

@@ -7,35 +7,33 @@ from collections.abc import Sequence
 from scansible.representations import ast
 
 from ... import representation as rep
-from ..result import ExtractionResult
+from ..result import BuildResult
 from ..semantics import EnvironmentType, RecursiveDefinitionError
-from .base import TaskExtractor
+from .base import TaskBuilder
 
 
 @final
-class SetFactTaskExtractor(TaskExtractor):
+class SetFactTaskBuilder(TaskBuilder):
     @classmethod
     @override
     def supported_task_attributes(cls) -> frozenset[str]:
         return super().supported_task_attributes().union({"loop", "loop_control"})
 
     @override
-    def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
+    def build_task(self, predecessors: Sequence[rep.ControlNode]) -> BuildResult:
         with self.setup_task_vars_scope(EnvironmentType.TASK_VARS):
             if self.task.loop:
-                return self._extract_looping_task(predecessors)
-            return self._extract_bare_task(predecessors)
+                return self._build_looping_task(predecessors)
+            return self._build_bare_task(predecessors)
 
-    def _extract_bare_task(
-        self, predecessors: Sequence[rep.ControlNode]
-    ) -> ExtractionResult:
+    def _build_bare_task(self, predecessors: Sequence[rep.ControlNode]) -> BuildResult:
         args = dict(self.task.args)
         # `cacheable` is a module parameter, not a fact.
         # TODO: Cacheable facts may have different precedence under certain
         # circumstances.
         _ = args.pop(ast.StrLiteral("cacheable"), False)
 
-        conditions = self.extract_conditions()
+        conditions = self.build_conditions()
         with self.context.activate_conditions(conditions):
             # Evaluate all values before defining the variables. Ansible does
             # the same. We need to do this as one variable may be defined in
@@ -59,12 +57,12 @@ class SetFactTaskExtractor(TaskExtractor):
                 self.context.graph.add_edge(value_node, var_node, rep.DEF)
 
         self.warn_remaining_kws()
-        return ExtractionResult.empty(predecessors)
+        return BuildResult.empty(predecessors)
 
-    def _extract_looping_task(
+    def _build_looping_task(
         self, predecessors: Sequence[rep.ControlNode]
-    ) -> ExtractionResult:
-        source_and_name = self.extract_looping_info()
+    ) -> BuildResult:
+        source_and_name = self.build_looping_info()
         assert source_and_name is not None, "Internal error"
 
         loop_source_var, loop_var_name, loop_with = source_and_name
@@ -77,4 +75,4 @@ class SetFactTaskExtractor(TaskExtractor):
             )
 
             with self.context.activate_loop(loop_source_var):
-                return self._extract_bare_task(predecessors)
+                return self._build_bare_task(predecessors)

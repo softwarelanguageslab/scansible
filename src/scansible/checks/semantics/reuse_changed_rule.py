@@ -6,7 +6,7 @@ from collections import defaultdict
 from collections.abc import Collection, Iterable
 from itertools import pairwise
 
-from scansible.representations.pdg.extractor.context import VisibilityInformation
+from scansible.representations.pdg.builder.context import VisibilityInformation
 from scansible.representations.pdg.representation import Graph, Variable
 
 from .base import Rule, RuleResult

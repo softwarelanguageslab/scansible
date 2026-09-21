@@ -4,7 +4,7 @@ import abc
 
 from pydantic import BaseModel
 
-from scansible.representations.pdg.extractor.context import VisibilityInformation
+from scansible.representations.pdg.builder.context import VisibilityInformation
 from scansible.representations.pdg.representation import Graph, NodeLocation
 
 

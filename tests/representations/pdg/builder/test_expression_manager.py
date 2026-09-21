@@ -25,8 +25,8 @@ from scansible.representations.pdg import (
     ScalarLiteral,
     Variable,
 )
-from scansible.representations.pdg.extractor.context import ExtractionContext
-from scansible.representations.pdg.extractor.semantics import (
+from scansible.representations.pdg.builder.context import BuildContext
+from scansible.representations.pdg.builder.semantics import (
     EnvironmentType,
     ExpressionManager,
     VariableManager,
@@ -40,7 +40,7 @@ ContextCreator = Callable[[], tuple[ExpressionManager, VariableManager, Graph]]
 def create_context(g: Graph, mocker: MockerFixture, tmp_path: Path) -> ContextCreator:
     return lambda: (
         (
-            ctx := ExtractionContext(
+            ctx := BuildContext(
                 g,
                 mocker.Mock(
                     **cast(  # pyright: ignore[reportAny]

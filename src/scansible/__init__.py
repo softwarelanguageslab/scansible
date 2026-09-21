@@ -87,7 +87,7 @@ def cli(*, verbose: bool, quiet: bool) -> None:
 @click.option(
     "--strict/--lenient",
     default=False,
-    help="Whether extraction and building should be strict. This aborts processing files if a single task in that file is malformed. (default: lenient)",
+    help="Whether AST extraction and PDG building should be strict. This aborts processing files if a single task in that file is malformed. (default: lenient)",
 )
 # @click.option(
 #     "--canonicalize/--no-canonicalize",
@@ -122,11 +122,11 @@ def build_pdg(
     # if canonicalize and not module_kb_path:
     #     raise ValueError("--module-kb-path is required when --canonicalize is set")
 
-    from .representations.pdg import dump_graph, extract_pdg
+    from .representations.pdg import build_pdg, dump_graph
 
-    ctx = extract_pdg(project_path, role_search_paths, as_pb=as_pb, lenient=not strict)
+    ctx = build_pdg(project_path, role_search_paths, as_pb=as_pb, lenient=not strict)
     pdg = ctx.graph
-    logger.info(f"Extracted PDG of {pdg.num_nodes} nodes and {pdg.num_edges} edges")
+    logger.info(f"Built PDG of {pdg.num_nodes} nodes and {pdg.num_edges} edges")
 
     # if canonicalize:
     #     assert module_kb_path
@@ -138,7 +138,7 @@ def build_pdg(
     if aux_file is not None:
         _ = aux_file.write(ctx.visibility_information.dump())
     if errors_file is not None:
-        _ = errors_file.write(ctx.summarise_extraction_errors())
+        _ = errors_file.write(ctx.summarise_build_errors())
 
 
 @cli.command
@@ -162,7 +162,7 @@ def build_pdg(
 @click.option(
     "--strict/--lenient",
     default=False,
-    help="Whether extraction and building should be strict. This aborts processing files if a single task in that file is malformed. (default: lenient)",
+    help="Whether AST extraction and PDG building should be strict. This aborts processing files if a single task in that file is malformed. (default: lenient)",
 )
 @click.option(
     "--enable-security/--skip-security",
@@ -187,9 +187,9 @@ def check(
     as_pb = None if project_type is None else project_type == "playbook"
     role_search_paths = list(role_search_path) + [Path(p) for p in DEFAULT_ROLES_PATH]
 
-    from .representations.pdg import extract_pdg
+    from .representations.pdg import build_pdg
 
-    ctx = extract_pdg(project_path, role_search_paths, as_pb=as_pb, lenient=not strict)
+    ctx = build_pdg(project_path, role_search_paths, as_pb=as_pb, lenient=not strict)
 
     from .checks import TerminalReporter, run_all_checks
 
@@ -217,7 +217,7 @@ def check(
 @click.option(
     "--strict/--lenient",
     default=False,
-    help="Whether extraction and building should be strict. This aborts processing files if a single task in that file is malformed. (default: lenient)",
+    help="Whether AST extraction and PDG building should be strict. This aborts processing files if a single task in that file is malformed. (default: lenient)",
 )
 @click.option(
     "--enable-security/--skip-security",
@@ -242,7 +242,7 @@ def check_all(
     role_search_paths = list(role_search_path) + [Path(p) for p in DEFAULT_ROLES_PATH]
 
     from .checks import CheckResult, TerminalReporter, run_all_checks
-    from .representations.pdg import extract_pdg
+    from .representations.pdg import build_pdg
     from .utils.entrypoints import find_entrypoints
 
     # FIXME: Why does this check exist?
@@ -255,9 +255,7 @@ def check_all(
 
     for entrypoint, project_type in entrypoints:
         as_pb = project_type == "playbook"
-        ctx = extract_pdg(
-            entrypoint, role_search_paths, as_pb=as_pb, lenient=not strict
-        )
+        ctx = build_pdg(entrypoint, role_search_paths, as_pb=as_pb, lenient=not strict)
 
         results.extend(
             run_all_checks(
@@ -385,7 +383,7 @@ def bulk_build(
     fields `repo`, `relative_path`, `type`.
     Resulting PDGs are stored in Neo4j format in OUTPUT_PATH, which should be
     a directory and will be created if it does not exist. Each entrypoint will
-    be extracted separately.
+    be built separately.
     """
 
     # if canonicalize and not module_kb_path:
@@ -398,7 +396,7 @@ def bulk_build(
     #     assert module_kb_path
     #     module_kb = ModuleKnowledgeBase.load_from_file(module_kb_path)
 
-    from .representations.pdg import dump_graph, extract_pdg
+    from .representations.pdg import build_pdg, dump_graph
 
     with (
         (output_path / "failed.csv").open("wt") as failed_out_f,
@@ -423,7 +421,7 @@ def bulk_build(
             logger.remove()
             _ = logger.add(log_path, level="INFO")
             try:
-                ctx = extract_pdg(
+                ctx = build_pdg(
                     entrypoint_path,
                     role_search_paths=role_search_path,
                     lenient=True,
@@ -431,7 +429,7 @@ def bulk_build(
                 )
                 pdg = ctx.graph
                 logger.info(
-                    f"Extracted PDG of {pdg.num_nodes} nodes and {pdg.num_edges} edges"
+                    f"Built PDG of {pdg.num_nodes} nodes and {pdg.num_edges} edges"
                 )
 
                 # if canonicalize:

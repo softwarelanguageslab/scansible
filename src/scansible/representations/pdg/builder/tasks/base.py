@@ -11,10 +11,10 @@ from loguru import logger
 from scansible.representations import ast
 
 from ... import representation as rep
-from ..context import ExtractionContext
-from ..result import ExtractionResult
+from ..context import BuildContext
+from ..result import BuildResult
 from ..semantics import EnvironmentType, RecursiveDefinitionError
-from ..variables import VariablesExtractor
+from ..variables import VariablesBuilder
 
 if TYPE_CHECKING:
     # Not exported outside of stub files.
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 TaskVarsScopeLevel = Literal[EnvironmentType.TASK_VARS, EnvironmentType.INCLUDE_PARAMS]
 
 
-class TaskExtractor(abc.ABC):
+class TaskBuilder(abc.ABC):
     @classmethod
     def supported_task_attributes(cls) -> frozenset[str]:
         # tags are ignored
@@ -31,17 +31,17 @@ class TaskExtractor(abc.ABC):
             {"name", "action", "args", "when", "vars", "loop_with", "tags"}
         )
 
-    def __init__(self, context: ExtractionContext, task: ast.BaseTask) -> None:
-        self.context: ExtractionContext = context
+    def __init__(self, context: BuildContext, task: ast.BaseTask) -> None:
+        self.context: BuildContext = context
         self.task: ast.BaseTask = task
         self.location: rep.NodeLocation = context.get_location(task)
         self.logger: Logger = logger.bind(location=task.position)
 
     @abc.abstractmethod
-    def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
+    def build_task(self, predecessors: Sequence[rep.ControlNode]) -> BuildResult:
         raise NotImplementedError("To be implemented by subclass")
 
-    def extract_conditions(
+    def build_conditions(
         self, conditions: Sequence[ast.Condition | ast.BoolLiteral] | None = None
     ) -> list[rep.DataNode]:
         if conditions is None:
@@ -60,7 +60,7 @@ class TaskExtractor(abc.ABC):
 
         return condition_value_nodes
 
-    def extract_looping_info(
+    def build_looping_info(
         self,
     ) -> tuple[rep.DataNode, ast.Identifier, ast.StrLiteral | None] | None:
         loop_expr = self.task.loop
@@ -89,7 +89,7 @@ class TaskExtractor(abc.ABC):
     def setup_task_vars_scope(self, scope_level: TaskVarsScopeLevel) -> Generator[None]:
         # TODO: Revisit this when we re-introduce caching, sometimes the scope may be cached.
         with self.context.vars.enter_scope(scope_level):
-            _ = VariablesExtractor(self.context, self.task.vars).extract_variables(
+            _ = VariablesBuilder(self.context, self.task.vars).build_variables(
                 scope_level
             )
             yield

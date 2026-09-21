@@ -169,7 +169,7 @@ class IncludeContext:
         for bt in model.broken_tasks:
             logger.error(bt.reason)
         for bf in model.broken_files:
-            logger.error(f"Could not extract {bf.path}: {bf.reason}")
+            logger.error(f"Could not extract AST for {bf.path}: {bf.reason}")
 
         role = cast(ast.Role, model.root)
         with self._enter_role(role, real_path, includer_location):
@@ -391,7 +391,7 @@ class VisibilityInformation:
         return json.dumps(as_lists)
 
 
-class ExtractionContext:
+class BuildContext:
     vars: VariableManager
     expr: ExpressionManager
     graph: rep.Graph
@@ -465,10 +465,10 @@ class ExtractionContext:
             includer_location=self.include_ctx.last_include_location,
         )
 
-    def record_extraction_error(self, reason: str, position: Position | None) -> None:
+    def record_build_error(self, reason: str, position: Position | None) -> None:
         self.errors.append((reason, position))
 
-    def summarise_extraction_errors(self) -> str:
+    def summarise_build_errors(self) -> str:
         reason_to_location: dict[str, list[Position | None]] = defaultdict(list)
         for reason, location in self.errors:
             reason_to_location[reason.strip()].append(location)

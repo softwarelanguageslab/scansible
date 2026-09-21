@@ -9,35 +9,35 @@ from loguru import logger
 from scansible.representations import ast
 
 from .. import representation as rep
-from .context import ExtractionContext
-from .handler_lists import HandlerListExtractor
-from .result import ExtractionResult
-from .role_dependencies import extract_role_dependency
+from .context import BuildContext
+from .handler_lists import HandlerListBuilder
+from .result import BuildResult
+from .role_dependencies import build_role_dependency
 from .semantics import EnvironmentType
-from .task_lists import TaskListExtractor
-from .variables import VariablesExtractor
+from .task_lists import TaskListBuilder
+from .variables import VariablesBuilder
 
 
 @final
-class RoleExtractor:
-    def __init__(self, context: ExtractionContext, role: ast.Role) -> None:
+class RoleBuilder:
+    def __init__(self, context: BuildContext, role: ast.Role) -> None:
         self.context = context
         self.role = role
 
-    def extract_role(
+    def build_role(
         self, predecessors: Sequence[rep.ControlNode] | None = None
-    ) -> ExtractionResult:
+    ) -> BuildResult:
         if predecessors is None:
             predecessors = []
 
-        result = ExtractionResult.empty(predecessors)
+        result = BuildResult.empty(predecessors)
 
         # TODO: Do role variables of the current role get loaded before or after the dependencies?
         if (mf := self.role.meta_file) is not None:
             with self.context.include_ctx.enter_role_file(mf.path):
                 for dep in mf.metablock.dependencies:
                     result = result.chain(
-                        extract_role_dependency(
+                        build_role_dependency(
                             self.context, dep, result.next_predecessors
                         )
                     )
@@ -48,16 +48,16 @@ class RoleExtractor:
         ):
             if (df := self.role.main_defaults_file) is not None:
                 with self.context.include_ctx.enter_role_file(df.path):
-                    df_result = VariablesExtractor(
+                    df_result = VariablesBuilder(
                         self.context, df.variables
-                    ).extract_variables(EnvironmentType.ROLE_DEFAULTS)
+                    ).build_variables(EnvironmentType.ROLE_DEFAULTS)
                     result = result.merge(df_result)
 
             if (vf := self.role.main_vars_file) is not None:
                 with self.context.include_ctx.enter_role_file(vf.path):
-                    vf_result = VariablesExtractor(
+                    vf_result = VariablesBuilder(
                         self.context, vf.variables
-                    ).extract_variables(EnvironmentType.ROLE_VARS)
+                    ).build_variables(EnvironmentType.ROLE_VARS)
                     result = result.merge(vf_result)
 
             if self.role.main_tasks_file is not None:
@@ -66,9 +66,9 @@ class RoleExtractor:
                 # entered in the IncludeContext constructor; 2) This is an included
                 # role, in which case it's already entered as the role should have
                 # been loaded using IncludeContext.load_and_enter_role.
-                tf_result = TaskListExtractor(
+                tf_result = TaskListBuilder(
                     self.context, self.role.main_tasks_file.tasks
-                ).extract_tasks(result.next_predecessors)
+                ).build_tasks(result.next_predecessors)
                 result = result.chain(tf_result)
             else:
                 logger.warning("No main task file")
@@ -77,9 +77,9 @@ class RoleExtractor:
             if (hf := self.role.main_handlers_file) is not None:
                 with self.context.include_ctx.enter_role_file(hf.path):
                     result = result.chain(
-                        HandlerListExtractor(
-                            self.context, hf.handlers
-                        ).extract_handlers(result.next_predecessors)
+                        HandlerListBuilder(self.context, hf.handlers).build_handlers(
+                            result.next_predecessors
+                        )
                     )
 
         return result

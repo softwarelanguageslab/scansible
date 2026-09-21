@@ -4,8 +4,8 @@ from typing import override
 
 from collections import defaultdict
 
-from scansible.representations.pdg.extractor.context import VisibilityInformation
-from scansible.representations.pdg.extractor.semantics import EnvironmentType
+from scansible.representations.pdg.builder.context import VisibilityInformation
+from scansible.representations.pdg.builder.semantics import EnvironmentType
 from scansible.representations.pdg.representation import (
     Def,
     Expression,

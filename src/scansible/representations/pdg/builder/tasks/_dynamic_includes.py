@@ -14,11 +14,11 @@ from loguru import logger
 from scansible.representations import ast
 
 from ... import representation as rep
-from ..result import ExtractionResult
+from ..result import BuildResult
 from ..semantics.expressions import TemplateExpressionAST, simplify_expression
 from ..semantics.expressions.simplification import SimplifiedExpression
 from ..semantics.variables import EnvironmentType
-from .base import TaskExtractor, TaskVarsScopeLevel
+from .base import TaskBuilder, TaskVarsScopeLevel
 
 
 def _is_too_general_filename_pattern(pattern: str) -> bool:
@@ -26,7 +26,7 @@ def _is_too_general_filename_pattern(pattern: str) -> bool:
     return len(parts) <= 2 and parts[0] in (".+", "(.+)")
 
 
-class DynamicIncludesExtractor[Content](TaskExtractor, abc.ABC):
+class DynamicIncludesBuilder[Content](TaskBuilder, abc.ABC):
     CONTENT_TYPE: ClassVar[str]
     TASK_VARS_SCOPE_LEVEL: ClassVar[TaskVarsScopeLevel] = EnvironmentType.INCLUDE_PARAMS
 
@@ -45,9 +45,9 @@ class DynamicIncludesExtractor[Content](TaskExtractor, abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def _extract_included_content(
+    def _build_included_content(
         self, included_content: Content, predecessors: Sequence[rep.ControlNode]
-    ) -> ExtractionResult:
+    ) -> BuildResult:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -59,13 +59,13 @@ class DynamicIncludesExtractor[Content](TaskExtractor, abc.ABC):
         raise NotImplementedError
 
     @override
-    def extract_task(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
+    def build_task(self, predecessors: Sequence[rep.ControlNode]) -> BuildResult:
         with self.setup_task_vars_scope(self.TASK_VARS_SCOPE_LEVEL):
-            result = self._do_extract(predecessors)
+            result = self._do_build(predecessors)
             self.warn_remaining_kws()
             return result
 
-    def _do_extract(self, predecessors: Sequence[rep.ControlNode]) -> ExtractionResult:
+    def _do_build(self, predecessors: Sequence[rep.ControlNode]) -> BuildResult:
         args = dict(self.task.args)
 
         included_name_expr = self._extract_included_name(args)
@@ -78,7 +78,7 @@ class DynamicIncludesExtractor[Content](TaskExtractor, abc.ABC):
 
         self.logger.debug(included_name_expr)
 
-        conditional_nodes = self.extract_conditions()
+        conditional_nodes = self.build_conditions()
         with self.context.activate_conditions(conditional_nodes):
             self._check_conditions()
 
@@ -102,9 +102,9 @@ class DynamicIncludesExtractor[Content](TaskExtractor, abc.ABC):
     def _check_conditions(self) -> None:
         pass
 
-    def _load_and_extract_content(
+    def _load_and_build_content(
         self, included_name: ast.StrLiteral, predecessors: Sequence[rep.ControlNode]
-    ) -> ExtractionResult:
+    ) -> BuildResult:
         with self._load_content(included_name) as included_content:
             if included_content is None:
                 self.logger.error(f"{self.CONTENT_TYPE} not found: {included_name}")
@@ -113,11 +113,11 @@ class DynamicIncludesExtractor[Content](TaskExtractor, abc.ABC):
             self.logger.info(
                 f"Following include of {self.CONTENT_TYPE} {included_name}"
             )
-            return self._extract_included_content(included_content, predecessors)
+            return self._build_included_content(included_content, predecessors)
 
     def _create_placeholder_task(
         self, included_name: ast.AnyExpression, predecessors: Sequence[rep.ControlNode]
-    ) -> ExtractionResult:
+    ) -> BuildResult:
         task_node = rep.Task(
             action=self.task.action, name=self.task.name, location=self.location
         )
@@ -130,7 +130,7 @@ class DynamicIncludesExtractor[Content](TaskExtractor, abc.ABC):
         for predecessor in predecessors:
             self.context.graph.add_edge(predecessor, task_node, rep.ORDER)
 
-        return ExtractionResult.single(task_node)
+        return BuildResult.single(task_node)
 
     def _simplify_included_name_asts(
         self, name_expr: ast.Expression
@@ -144,7 +144,7 @@ class DynamicIncludesExtractor[Content](TaskExtractor, abc.ABC):
         self,
         name_expr: ast.StrLiteral | ast.Expression,
         predecessors: Sequence[rep.ControlNode],
-    ) -> ExtractionResult:
+    ) -> BuildResult:
         if isinstance(name_expr, ast.StrLiteral):
             return self._process_literal_include(name_expr, predecessors)
 
@@ -163,7 +163,7 @@ class DynamicIncludesExtractor[Content](TaskExtractor, abc.ABC):
         name_expr: ast.Expression,
         candidates: set[SimplifiedExpression],
         predecessors: Sequence[rep.ControlNode],
-    ) -> ExtractionResult:
+    ) -> BuildResult:
         included_names = set(self._find_filename_candidates(candidates))
         if not included_names:
             logger.warning(
@@ -172,17 +172,15 @@ class DynamicIncludesExtractor[Content](TaskExtractor, abc.ABC):
             )
             return self._create_placeholder_task(name_expr, predecessors)
 
-        inner_results: list[ExtractionResult] = []
+        inner_results: list[BuildResult] = []
         for included_name, extra_conditions in included_names:
             if extra_conditions:
-                conditional_nodes = self.extract_conditions(extra_conditions)
+                conditional_nodes = self.build_conditions(extra_conditions)
             else:
                 conditional_nodes = []
 
             with self.context.activate_conditions(conditional_nodes):
-                inner_result = self._load_and_extract_content(
-                    included_name, predecessors
-                )
+                inner_result = self._load_and_build_content(included_name, predecessors)
                 inner_results.append(inner_result)
 
         return reduce(lambda r1, r2: r1.merge(r2), inner_results)
@@ -208,5 +206,5 @@ class DynamicIncludesExtractor[Content](TaskExtractor, abc.ABC):
 
     def _process_literal_include(
         self, name_expr: ast.StrLiteral, predecessors: Sequence[rep.ControlNode]
-    ) -> ExtractionResult:
-        return self._load_and_extract_content(name_expr, predecessors)
+    ) -> BuildResult:
+        return self._load_and_build_content(name_expr, predecessors)

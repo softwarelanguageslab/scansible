@@ -30,9 +30,9 @@ from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from scansible.representations.pdg import representation as rep
-from scansible.representations.pdg.extractor import extract_pdg
-from scansible.representations.pdg.extractor.semantics import EnvironmentType
-from scansible.representations.pdg.extractor.semantics.expressions.templates import (
+from scansible.representations.pdg.builder import build_pdg
+from scansible.representations.pdg.builder.semantics import EnvironmentType
+from scansible.representations.pdg.builder.semantics.expressions.templates import (
     TemplateExpressionAST,
 )
 from scansible.representations.pdg.io.neo4j import dump_graph
@@ -473,7 +473,7 @@ def _setup_env(playbooks: list[PlaybookFile]) -> Generator[Path]:
 
 
 def _parse_graph(playbook_dir: Path) -> rep.Graph:
-    return extract_pdg(playbook_dir.resolve(), [Path()]).graph
+    return build_pdg(playbook_dir.resolve(), [Path()]).graph
 
 
 def _infer_dataflow(graph: rep.Graph) -> Dataflow:

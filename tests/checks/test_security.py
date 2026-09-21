@@ -25,13 +25,13 @@ from scansible.checks.security.rules.unrestricted_ip_address import (
     UnrestrictedIPAddressRule,
 )
 from scansible.checks.security.rules.weak_crypto import WeakCryptoAlgorithmRule
-from scansible.representations.pdg import extract_pdg
+from scansible.representations.pdg import build_pdg
 
 
 @contextmanager
 def temp_import_pb(path: Path) -> Generator[GraphDatabase]:
     logger.remove()
-    pdg_ctx = extract_pdg(path, [])
+    pdg_ctx = build_pdg(path, [])
     _ = logger.add(sys.stderr, format="{level} {message}", level="DEBUG")
     with GraphDatabase(pdg_ctx.graph) as graph_db:
         yield graph_db

@@ -9,13 +9,13 @@ from loguru import logger
 from scansible.representations import ast
 
 from .. import representation as rep
-from .context import ExtractionContext
-from .result import ExtractionResult
+from .context import BuildContext
+from .result import BuildResult
 from .semantics import EnvironmentType, RecursiveDefinitionError
 
 
 @final
-class BlockExtractor:
+class BlockBuilder:
     SUPPORTED_BLOCK_ATTRIBUTES = frozenset(
         (
             "name",
@@ -29,21 +29,17 @@ class BlockExtractor:
         )
     )
 
-    def __init__(self, context: ExtractionContext, block: ast.Block) -> None:
+    def __init__(self, context: BuildContext, block: ast.Block) -> None:
         self.context = context
         self.block = block
         self.location = context.get_location(block)
         self.logger = logger.bind(location=block.position)
 
-    def extract_block(
-        self, predecessors: Sequence[rep.ControlNode]
-    ) -> ExtractionResult:
+    def build_block(self, predecessors: Sequence[rep.ControlNode]) -> BuildResult:
         with self.context.vars.enter_scope(EnvironmentType.BLOCK_VARS):
-            return self._extract_block(predecessors)
+            return self._build_block(predecessors)
 
-    def _extract_block(
-        self, predecessors: Sequence[rep.ControlNode]
-    ) -> ExtractionResult:
+    def _build_block(self, predecessors: Sequence[rep.ControlNode]) -> BuildResult:
         for var_name, var_value in self.block.vars.items():
             # Apparently Ansible doesn't implement overriding of block-scoped
             # variables properly. Variables registered in an inner block don't
@@ -56,7 +52,7 @@ class BlockExtractor:
 
         # A block without a list of tasks should be impossible
         # TODO: Typing here is messed up, since Block's children could be handlers too.
-        result = self._extract_children(self.block.block, predecessors)
+        result = self._build_children(self.block.block, predecessors)
 
         # Predecessors of the first rescue child can be any of the nodes
         # in the main block, since any of the children could have failed.
@@ -69,7 +65,7 @@ class BlockExtractor:
             # two potential predecessors: The last task of the block, and the
             # last task of the rescue.
             result = result.merge(
-                self._extract_children(self.block.rescue, result.added_control_nodes)
+                self._build_children(self.block.rescue, result.added_control_nodes)
             )
 
         # Predecessors of the always block is either the last main block task,
@@ -82,7 +78,7 @@ class BlockExtractor:
             # If there's an always block, the next predecessors of the next element
             # will always be the last task of the always block, so use `chain`.
             result = result.chain(
-                self._extract_children(self.block.always, result.next_predecessors)
+                self._build_children(self.block.always, result.next_predecessors)
             )
 
         for misc_kw in ("become", "become_user", "become_method"):
@@ -122,12 +118,12 @@ class BlockExtractor:
 
         return result
 
-    def _extract_children(
+    def _build_children(
         self,
         child_list: Sequence[ast.Task | ast.Block],
         predecessors: Sequence[rep.ControlNode],
-    ) -> ExtractionResult:
+    ) -> BuildResult:
         # Import here to prevent recursive imports
-        from .task_lists import TaskListExtractor  # noqa: PLC0415
+        from .task_lists import TaskListBuilder  # noqa: PLC0415
 
-        return TaskListExtractor(self.context, child_list).extract_tasks(predecessors)
+        return TaskListBuilder(self.context, child_list).build_tasks(predecessors)
