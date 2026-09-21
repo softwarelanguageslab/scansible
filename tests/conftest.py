@@ -7,7 +7,7 @@ import pytest
 from graph_matchers import create_graph  # pyright: ignore[reportImplicitRelativeImport]
 from loguru import logger
 
-from scansible.representations.pdg import Graph
+from scansible.pdg import Graph
 
 logger.remove()
 _ = logger.add(sys.stderr, format="{level} {message}", level="DEBUG")

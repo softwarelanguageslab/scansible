@@ -7,12 +7,7 @@ from textwrap import dedent
 
 import pytest
 
-from scansible.representations.ast import (
-    ExtractionContext,
-    Handler,
-    HandlerBlock,
-    HandlerFile,
-)
+from scansible.ast import ExtractionContext, Handler, HandlerBlock, HandlerFile
 from scansible.utils import ProjectPath
 
 

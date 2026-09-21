@@ -9,7 +9,7 @@ from textwrap import dedent
 from loguru import logger
 from pydantic import TypeAdapter
 
-from scansible.representations.pdg.representation import NodeLocation
+from scansible.pdg.representation import NodeLocation
 
 from ..db import DatabaseResultConverter, DatabaseValue, GraphDatabase
 

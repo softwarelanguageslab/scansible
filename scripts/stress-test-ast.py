@@ -28,7 +28,7 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from ruamel.yaml import YAMLError
 
-from scansible.representations import ast
+from scansible import ast
 from scansible.utils import Positioned
 
 #: Rules to ignore known-genuine validation errors, as (field-path regex,

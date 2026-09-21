@@ -10,7 +10,7 @@ import pytest
 from _pytest.fixtures import FixtureRequest
 from pytest_describe import behaves_like
 
-from scansible.representations.pdg import representation as rep
+from scansible.pdg import representation as rep
 
 
 class NodeFactory(Protocol):

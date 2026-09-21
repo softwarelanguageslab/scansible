@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from scansible.representations.pdg import Graph
-from scansible.representations.pdg.builder.context import VisibilityInformation
+from scansible.pdg import Graph
+from scansible.pdg.builder.context import VisibilityInformation
 
 from .base import RuleResult
 from .override_unused_rule import UnusedOverriddenRule

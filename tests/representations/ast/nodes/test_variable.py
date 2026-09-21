@@ -8,8 +8,8 @@ from textwrap import dedent
 
 import pytest
 
-from scansible.representations.ast import ExtractionContext, VariableFile
-from scansible.representations.ast.nodes.expression import (
+from scansible.ast import ExtractionContext, VariableFile
+from scansible.ast.nodes.expression import (
     BoolLiteral,
     DateLiteral,
     DatetimeLiteral,

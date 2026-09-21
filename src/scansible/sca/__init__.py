@@ -10,11 +10,8 @@ from pydantic import ValidationError
 from rich.markup import escape
 from ruamel.yaml import YAMLError
 
-from scansible.checks.security import run_all_checks
-from scansible.checks.security.rules.base import RuleResult
-from scansible.constants import DEFAULT_ROLES_PATH
-from scansible.representations.ast import BaseTask as Task
-from scansible.representations.ast import (
+from scansible.ast import BaseTask as Task
+from scansible.ast import (
     Block,
     ExtractionContext,
     HandlerBlock,
@@ -23,7 +20,10 @@ from scansible.representations.ast import (
     StrLiteral,
     TaskFile,
 )
-from scansible.representations.pdg.builder.main import build_pdg
+from scansible.checks.security import run_all_checks
+from scansible.checks.security.rules.base import RuleResult
+from scansible.constants import DEFAULT_ROLES_PATH
+from scansible.pdg.builder.main import build_pdg
 from scansible.sca.constants import (
     ANSIBLE_ROLE_INCLUDE_MODULES,
     ANSIBLE_TRIVIAL_MODULES,

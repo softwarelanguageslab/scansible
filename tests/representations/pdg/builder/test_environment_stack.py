@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from scansible.representations import ast
-from scansible.representations.pdg.builder.semantics.variables.environment import (
+from scansible import ast
+from scansible.pdg.builder.semantics.variables.environment import (
     EnvironmentStack,
     EnvironmentType,
     VariableDefinitionRecord,
 )
-from scansible.representations.pdg.representation import NodeLocation, Variable
+from scansible.pdg.representation import NodeLocation, Variable
 
 expr = ast.Expression.model_validate
 

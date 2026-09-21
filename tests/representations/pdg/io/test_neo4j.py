@@ -6,7 +6,7 @@ from typing import Literal as LiteralT
 
 import pytest
 
-from scansible.representations.pdg import (
+from scansible.pdg import (
     DEF,
     ORDER,
     USE,
@@ -19,7 +19,7 @@ from scansible.representations.pdg import (
     Task,
     Variable,
 )
-from scansible.representations.pdg.io.neo4j import dump_edge, dump_graph, dump_node
+from scansible.pdg.io.neo4j import dump_edge, dump_graph, dump_node
 
 
 @pytest.fixture

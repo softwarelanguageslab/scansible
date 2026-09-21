@@ -19,8 +19,6 @@ import jinja2
 import pytest
 import yaml
 
-from scansible.representations import ast
-
 try:
     from yaml import CDumper as Dumper
 except ImportError:
@@ -29,13 +27,12 @@ except ImportError:
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
-from scansible.representations.pdg import representation as rep
-from scansible.representations.pdg.builder import build_pdg
-from scansible.representations.pdg.builder.semantics import EnvironmentType
-from scansible.representations.pdg.builder.semantics.expressions.templates import (
-    TemplateExpressionAST,
-)
-from scansible.representations.pdg.io.neo4j import dump_graph
+from scansible import ast
+from scansible.pdg import representation as rep
+from scansible.pdg.builder import build_pdg
+from scansible.pdg.builder.semantics import EnvironmentType
+from scansible.pdg.builder.semantics.expressions.templates import TemplateExpressionAST
+from scansible.pdg.io.neo4j import dump_graph
 
 _considered_scopes = [
     EnvironmentType.TASK_VARS,

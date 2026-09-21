@@ -8,7 +8,7 @@ from graph_matchers import (  # pyright: ignore[reportImplicitRelativeImport]
     create_graph,
 )
 
-from scansible.representations.pdg import (
+from scansible.pdg import (
     DEF,
     ORDER,
     ORDER_TRANS,

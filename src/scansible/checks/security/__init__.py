@@ -4,7 +4,7 @@ from datetime import datetime
 
 from loguru import logger
 
-from scansible.representations.pdg import Graph
+from scansible.pdg import Graph
 
 from .db import GraphDatabase
 from .rules import Rule, RuleResult, get_all_rules

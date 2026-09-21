@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Callable, Iterable
 
-from scansible.representations.pdg import Graph, Variable
-from scansible.representations.pdg.builder.semantics import EnvironmentType
+from scansible.pdg import Graph, Variable
+from scansible.pdg.builder.semantics import EnvironmentType
 
 
 def is_globally_scoped(scope: int) -> bool:

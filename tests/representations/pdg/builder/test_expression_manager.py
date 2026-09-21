@@ -14,8 +14,8 @@ from graph_matchers import (  # pyright: ignore[reportImplicitRelativeImport]
 )
 from pytest_mock import MockerFixture
 
-from scansible.representations import ast
-from scansible.representations.pdg import (
+from scansible import ast
+from scansible.pdg import (
     DEF,
     CompositeLiteral,
     Expression,
@@ -25,13 +25,13 @@ from scansible.representations.pdg import (
     ScalarLiteral,
     Variable,
 )
-from scansible.representations.pdg.builder.context import BuildContext
-from scansible.representations.pdg.builder.semantics import (
+from scansible.pdg.builder.context import BuildContext
+from scansible.pdg.builder.semantics import (
     EnvironmentType,
     ExpressionManager,
     VariableManager,
 )
-from scansible.representations.pdg.representation import Composition
+from scansible.pdg.representation import Composition
 
 ContextCreator = Callable[[], tuple[ExpressionManager, VariableManager, Graph]]
 

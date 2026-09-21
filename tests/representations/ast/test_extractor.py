@@ -13,13 +13,7 @@ from _constants import (  # pyright: ignore[reportImplicitRelativeImport]
     TASKS,
 )
 
-from scansible.representations.ast import (
-    Play,
-    Playbook,
-    Role,
-    extract_playbook,
-    extract_role,
-)
+from scansible.ast import Play, Playbook, Role, extract_playbook, extract_role
 
 
 def describe_extracting_playbook():

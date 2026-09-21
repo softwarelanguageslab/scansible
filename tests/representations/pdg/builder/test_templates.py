@@ -7,10 +7,8 @@ from typing import NamedTuple
 import pytest
 from jinja2.compiler import DependencyFinderVisitor
 
-from scansible.representations import ast
-from scansible.representations.pdg.builder.semantics.expressions.templates import (
-    TemplateExpressionAST,
-)
+from scansible import ast
+from scansible.pdg.builder.semantics.expressions.templates import TemplateExpressionAST
 
 
 class Case(NamedTuple):

@@ -11,8 +11,8 @@ from pathlib import Path
 
 import kuzu
 
-from scansible.representations.pdg import Graph
-from scansible.representations.pdg.representation import Edge, Node, NodeLocation
+from scansible.pdg import Graph
+from scansible.pdg.representation import Edge, Node, NodeLocation
 
 type DatabaseValue = object
 

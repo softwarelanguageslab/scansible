@@ -25,7 +25,7 @@ from scansible.checks.security.rules.unrestricted_ip_address import (
     UnrestrictedIPAddressRule,
 )
 from scansible.checks.security.rules.weak_crypto import WeakCryptoAlgorithmRule
-from scansible.representations.pdg import build_pdg
+from scansible.pdg import build_pdg
 
 
 @contextmanager
@@ -1107,18 +1107,20 @@ def describe_glitch_test_cases() -> None:
         with temp_import_pb(pb_path) as graph_db:
             results = run_all_checks(graph_db)
 
-        assert results == [
-            RuleResult(
-                WeakCryptoAlgorithmRule.name,
-                WeakCryptoAlgorithmRule.description,
-                "pb.yml:6:38",
-                "pb.yml:8:19",
-            ),
-            # Due to the variable name also being matched.
-            RuleResult(
-                WeakCryptoAlgorithmRule.name,
-                WeakCryptoAlgorithmRule.description,
-                "pb.yml:9:26",
-                "pb.yml:8:19",
-            ),
-        ]
+        assert sorted(results) == sorted(
+            [
+                RuleResult(
+                    WeakCryptoAlgorithmRule.name,
+                    WeakCryptoAlgorithmRule.description,
+                    "pb.yml:6:38",
+                    "pb.yml:8:19",
+                ),
+                # Due to the variable name also being matched.
+                RuleResult(
+                    WeakCryptoAlgorithmRule.name,
+                    WeakCryptoAlgorithmRule.description,
+                    "pb.yml:9:26",
+                    "pb.yml:8:19",
+                ),
+            ]
+        )

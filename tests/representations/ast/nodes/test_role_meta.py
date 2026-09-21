@@ -7,8 +7,8 @@ from textwrap import dedent
 
 import pytest
 
-from scansible.representations.ast import ExtractionContext, MetaFile
-from scansible.representations.ast.nodes.expression import BoolLiteral, Condition
+from scansible.ast import ExtractionContext, MetaFile
+from scansible.ast.nodes.expression import BoolLiteral, Condition
 from scansible.utils import ProjectPath
 
 

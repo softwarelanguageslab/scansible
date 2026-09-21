@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import rich
 
-from scansible.representations.pdg.representation import NodeLocation
+from scansible.pdg.representation import NodeLocation
 
 if TYPE_CHECKING:
     from . import CheckResult

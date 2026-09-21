@@ -122,7 +122,7 @@ def build_pdg(
     # if canonicalize and not module_kb_path:
     #     raise ValueError("--module-kb-path is required when --canonicalize is set")
 
-    from .representations.pdg import build_pdg, dump_graph
+    from .pdg import build_pdg, dump_graph
 
     ctx = build_pdg(project_path, role_search_paths, as_pb=as_pb, lenient=not strict)
     pdg = ctx.graph
@@ -187,7 +187,7 @@ def check(
     as_pb = None if project_type is None else project_type == "playbook"
     role_search_paths = list(role_search_path) + [Path(p) for p in DEFAULT_ROLES_PATH]
 
-    from .representations.pdg import build_pdg
+    from .pdg import build_pdg
 
     ctx = build_pdg(project_path, role_search_paths, as_pb=as_pb, lenient=not strict)
 
@@ -242,7 +242,7 @@ def check_all(
     role_search_paths = list(role_search_path) + [Path(p) for p in DEFAULT_ROLES_PATH]
 
     from .checks import CheckResult, TerminalReporter, run_all_checks
-    from .representations.pdg import build_pdg
+    from .pdg import build_pdg
     from .utils.entrypoints import find_entrypoints
 
     # FIXME: Why does this check exist?
@@ -396,7 +396,7 @@ def bulk_build(
     #     assert module_kb_path
     #     module_kb = ModuleKnowledgeBase.load_from_file(module_kb_path)
 
-    from .representations.pdg import build_pdg, dump_graph
+    from .pdg import build_pdg, dump_graph
 
     with (
         (output_path / "failed.csv").open("wt") as failed_out_f,

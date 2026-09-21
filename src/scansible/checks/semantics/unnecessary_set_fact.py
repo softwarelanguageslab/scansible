@@ -2,16 +2,9 @@ from __future__ import annotations
 
 from typing import override
 
-from scansible.representations.pdg.builder.context import VisibilityInformation
-from scansible.representations.pdg.builder.semantics import EnvironmentType
-from scansible.representations.pdg.representation import (
-    Def,
-    Expression,
-    Graph,
-    Literal,
-    Task,
-    Variable,
-)
+from scansible.pdg.builder.context import VisibilityInformation
+from scansible.pdg.builder.semantics import EnvironmentType
+from scansible.pdg.representation import Def, Expression, Graph, Literal, Task, Variable
 
 from .base import Rule, RuleResult
 from .utils import get_def_conditions, get_def_expression, get_used_variables

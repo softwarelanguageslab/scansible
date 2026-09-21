@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from scansible.representations.ast import TaskFile
+from scansible.ast import TaskFile
 from scansible.utils import (
     ProjectPath,
     SourceFileMap,

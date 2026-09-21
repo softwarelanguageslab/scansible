@@ -14,7 +14,7 @@ from _constants import (  # pyright: ignore[reportImplicitRelativeImport]
     TASKS,
 )
 
-from scansible.representations.ast import ExtractionContext, Role
+from scansible.ast import ExtractionContext, Role
 from scansible.utils import ProjectPath
 
 

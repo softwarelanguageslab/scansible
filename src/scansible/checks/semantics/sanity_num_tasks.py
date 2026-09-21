@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import override
 
-from scansible.representations.pdg.builder.context import VisibilityInformation
-from scansible.representations.pdg.representation import Graph, NodeLocation, Task
+from scansible.pdg.builder.context import VisibilityInformation
+from scansible.pdg.representation import Graph, NodeLocation, Task
 
 from .base import Rule, RuleResult
 

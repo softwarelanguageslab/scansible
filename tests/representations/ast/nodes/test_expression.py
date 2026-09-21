@@ -9,8 +9,8 @@ from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImpo
 from jinja2 import nodes as j2_nodes
 from pydantic import TypeAdapter
 
-from scansible.representations.ast import ExtractionContext, Task
-from scansible.representations.ast.nodes.expression import (
+from scansible.ast import ExtractionContext, Task
+from scansible.ast.nodes.expression import (
     BoolLiteral,
     Condition,
     DateLiteral,

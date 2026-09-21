@@ -8,7 +8,7 @@ from textwrap import dedent
 import pytest
 from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImport]
 
-from scansible.representations.ast import (
+from scansible.ast import (
     Block,
     ExtractionContext,
     Handler,
@@ -17,11 +17,8 @@ from scansible.representations.ast import (
     Playbook,
     Task,
 )
-from scansible.representations.ast.nodes.expression import Condition
-from scansible.representations.ast.nodes.playbook import (
-    ImportPlaybook,
-    PlayRoleRequirement,
-)
+from scansible.ast.nodes.expression import Condition
+from scansible.ast.nodes.playbook import ImportPlaybook, PlayRoleRequirement
 from scansible.utils import ProjectPath
 
 

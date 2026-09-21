@@ -8,9 +8,9 @@ import pytest
 
 from scansible.checks import CheckResult
 from scansible.checks.semantics import run_all_checks as orig_run_all_checks
-from scansible.representations.pdg import build_pdg
-from scansible.representations.pdg.builder.context import BuildContext
-from scansible.representations.pdg.representation import NodeLocation
+from scansible.pdg import build_pdg
+from scansible.pdg.builder.context import BuildContext
+from scansible.pdg.representation import NodeLocation
 
 
 def run_all_checks(ctx: BuildContext) -> list[CheckResult]:

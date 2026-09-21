@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImport]
 
-from scansible.representations.ast import ExtractionContext, Handler, Task
-from scansible.representations.ast.nodes.expression import (
+from scansible.ast import ExtractionContext, Handler, Task
+from scansible.ast.nodes.expression import (
     BoolLiteral,
     Condition,
     Expression,

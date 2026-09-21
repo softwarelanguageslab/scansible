@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 from ruamel.yaml import YAMLError
 
-from scansible.representations.cst import (
+from scansible.cst import (
     YamlBool,
     YamlDate,
     YamlDatetime,
@@ -25,7 +25,7 @@ from scansible.representations.cst import (
     YamlVaultValue,
     parse_file,
 )
-from scansible.representations.cst.constructor import CustomYAML
+from scansible.cst.constructor import CustomYAML
 from scansible.utils import ProjectPath
 
 

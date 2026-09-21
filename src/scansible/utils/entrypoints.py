@@ -9,7 +9,7 @@ from pathlib import Path
 
 from ruamel.yaml import YAMLError
 
-from scansible.representations.cst import parse_file
+from scansible.cst import parse_file
 from scansible.utils import ProjectPath
 
 

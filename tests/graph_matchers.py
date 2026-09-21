@@ -5,7 +5,7 @@ from __future__ import annotations
 import operator
 from collections.abc import Iterable
 
-from scansible.representations.pdg import Edge, Graph, IntermediateValue, Node
+from scansible.pdg import Edge, Graph, IntermediateValue, Node
 
 
 def _match_node(n1: Node, n2: Node, match_locations: bool) -> bool:

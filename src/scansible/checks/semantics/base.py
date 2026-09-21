@@ -4,8 +4,8 @@ import abc
 
 from pydantic import BaseModel
 
-from scansible.representations.pdg.builder.context import VisibilityInformation
-from scansible.representations.pdg.representation import Graph, NodeLocation
+from scansible.pdg.builder.context import VisibilityInformation
+from scansible.pdg.representation import Graph, NodeLocation
 
 
 class RuleResult(BaseModel, frozen=True, strict=True, extra="forbid"):

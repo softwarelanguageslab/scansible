@@ -68,7 +68,7 @@ extend-ignore = [
 "!**/tests/*" = ["PT"]
 "scripts/*" = ["INP001"]
 "src/scansible/utils/module_type_info.py" = ["ERA001"]
-"src/scansible/representations/pdg/canonical.py" = ["ERA001"]
+"src/scansible/pdg/canonical.py" = ["ERA001"]
 "src/scansible/__init__.py" = ["ERA001"]
 
 [tool.ruff.lint.isort]

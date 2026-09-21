@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
-from scansible.representations.pdg.builder.context import BuildContext
+from scansible.pdg.builder.context import BuildContext
 
 from . import security as security
 from . import semantics as semantics
