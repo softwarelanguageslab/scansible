@@ -31,8 +31,8 @@ from hypothesis import strategies as st
 
 from scansible.representations.pdg import representation as rep
 from scansible.representations.pdg.extractor import extract_pdg
-from scansible.representations.pdg.extractor.expressions import EnvironmentType
-from scansible.representations.pdg.extractor.expressions.templates import (
+from scansible.representations.pdg.extractor.semantics import EnvironmentType
+from scansible.representations.pdg.extractor.semantics.expressions.templates import (
     TemplateExpressionAST,
 )
 from scansible.representations.pdg.io.neo4j import dump_graph

@@ -10,8 +10,8 @@ from loguru import logger
 from scansible.representations import ast
 
 from ... import representation as rep
-from ..expressions import EnvironmentType
 from ..result import ExtractionResult
+from ..semantics import EnvironmentType
 from ..variables import VariablesExtractor
 from ._dynamic_includes import DynamicIncludesExtractor
 

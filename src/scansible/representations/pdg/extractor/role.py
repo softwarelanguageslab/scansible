@@ -10,10 +10,10 @@ from scansible.representations import ast
 
 from .. import representation as rep
 from .context import ExtractionContext
-from .expressions import EnvironmentType
 from .handler_lists import HandlerListExtractor
 from .result import ExtractionResult
 from .role_dependencies import extract_role_dependency
+from .semantics import EnvironmentType
 from .task_lists import TaskListExtractor
 from .variables import VariablesExtractor
 

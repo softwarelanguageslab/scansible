@@ -27,7 +27,7 @@ from scansible.utils import (
 )
 
 from .. import representation as rep
-from .expressions import VarContext
+from .semantics import ExpressionManager, VariableManager
 
 
 @final
@@ -392,7 +392,8 @@ class VisibilityInformation:
 
 
 class ExtractionContext:
-    vars: VarContext
+    vars: VariableManager
+    expr: ExpressionManager
     graph: rep.Graph
     include_ctx: IncludeContext
     model_root: ast.Role | ast.Playbook
@@ -414,7 +415,8 @@ class ExtractionContext:
         *,
         lenient: bool,
     ) -> None:
-        self.vars = VarContext(self)
+        self.vars = VariableManager(self)
+        self.expr = ExpressionManager(self)
         self.graph = graph
         self.model_root = model.root
         self.include_ctx = IncludeContext(model, role_search_paths, lenient=lenient)

@@ -8,8 +8,8 @@ from scansible.representations import ast
 
 from .. import representation as rep
 from .context import ExtractionContext
-from .expressions import EnvironmentType
 from .result import ExtractionResult
+from .semantics import EnvironmentType
 
 
 # TODO: Distinguish between public and private role includes.

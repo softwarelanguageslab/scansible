@@ -4,7 +4,7 @@ from collections import defaultdict
 from collections.abc import Callable, Iterable
 
 from scansible.representations.pdg import Graph, Variable
-from scansible.representations.pdg.extractor.expressions import EnvironmentType
+from scansible.representations.pdg.extractor.semantics import EnvironmentType
 
 
 def is_globally_scoped(scope: int) -> bool:

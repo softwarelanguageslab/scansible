@@ -7,8 +7,8 @@ from loguru import logger
 from scansible.representations import ast
 
 from .context import ExtractionContext
-from .expressions import EnvironmentType
 from .result import ExtractionResult
+from .semantics import EnvironmentType
 
 
 @final

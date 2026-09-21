@@ -26,32 +26,36 @@ from scansible.representations.pdg import (
     Variable,
 )
 from scansible.representations.pdg.extractor.context import ExtractionContext
-from scansible.representations.pdg.extractor.expressions import (
+from scansible.representations.pdg.extractor.semantics import (
     EnvironmentType,
-    VarContext,
+    ExpressionManager,
+    VariableManager,
 )
 from scansible.representations.pdg.representation import Composition
 
-ContextCreator = Callable[[], tuple[VarContext, Graph]]
+ContextCreator = Callable[[], tuple[ExpressionManager, VariableManager, Graph]]
 
 
 @pytest.fixture
 def create_context(g: Graph, mocker: MockerFixture, tmp_path: Path) -> ContextCreator:
     return lambda: (
-        ExtractionContext(
-            g,
-            mocker.Mock(
-                **cast(  # pyright: ignore[reportAny]
-                    dict[str, Any],  # pyright: ignore[reportExplicitAny]
-                    {
-                        "path": tmp_path,
-                        "root.main_tasks_file.path": Path("tasks/main.yml"),
-                    },
-                )
-            ),
-            mocker.Mock(),
-            lenient=True,
-        ).vars,
+        (
+            ctx := ExtractionContext(
+                g,
+                mocker.Mock(
+                    **cast(  # pyright: ignore[reportAny]
+                        dict[str, Any],  # pyright: ignore[reportExplicitAny]
+                        {
+                            "path": tmp_path,
+                            "root.main_tasks_file.path": Path("tasks/main.yml"),
+                        },
+                    )
+                ),
+                mocker.Mock(),
+                lenient=True,
+            )
+        ).expr,
+        ctx.vars,
         g,
     )
 
@@ -77,7 +81,7 @@ def describe_evaluating_expressions():
     def should_build_scalar_literal(
         expr: ast.ScalarLiteral, type_: Literal["str"], create_context: ContextCreator
     ):
-        ctx, g = create_context()
+        ctx, _, g = create_context()
         actual_value = bool(expr) if isinstance(expr, ast.BoolLiteral) else expr
 
         _ = ctx.build_expression(expr)
@@ -88,7 +92,7 @@ def describe_evaluating_expressions():
 
     def should_build_seq_literal(create_context: ContextCreator):
         expr = ast.SeqLiteral([strlit("hello"), strlit("world")])
-        ctx, g = create_context()
+        ctx, _, g = create_context()
 
         _ = ctx.build_expression(expr)
 
@@ -111,7 +115,7 @@ def describe_evaluating_expressions():
         expr = ast.MapLiteral[ast.ScalarLiteral, ast.AnyExpression](
             [(strlit("hello"), strlit("world")), (strlit("key"), strlit("value"))]
         )
-        ctx, g = create_context()
+        ctx, _, g = create_context()
 
         _ = ctx.build_expression(expr)
 
@@ -146,7 +150,7 @@ def describe_evaluating_expressions():
     def should_build_standalone_expression(
         expression: str, create_context: ContextCreator
     ):
-        ctx, g = create_context()
+        ctx, _, g = create_context()
 
         _ = ctx.build_expression(expr(expression))
 
@@ -162,8 +166,8 @@ def describe_evaluating_expressions():
         )
 
     def should_build_expression_with_dependencies(create_context: ContextCreator):
-        ctx, g = create_context()
-        ctx.define_lazy_variable(
+        ctx, var, g = create_context()
+        var.define_lazy_variable(
             ident("test"), EnvironmentType.CLI_VALUES, strlit("hello world")
         )
         e = expr("Value is {{ test }}")
@@ -191,11 +195,11 @@ def describe_evaluating_expressions():
     def should_build_expression_with_complex_dependencies(
         create_context: ContextCreator,
     ):
-        ctx, g = create_context()
-        ctx.define_lazy_variable(
+        ctx, var, g = create_context()
+        var.define_lazy_variable(
             ident("test"), EnvironmentType.CLI_VALUES, expr("{{ 1 + other }}")
         )
-        ctx.define_lazy_variable(ident("other"), EnvironmentType.CLI_VALUES, intlit(2))
+        var.define_lazy_variable(ident("other"), EnvironmentType.CLI_VALUES, intlit(2))
 
         e = expr("Value is {{ test }}")
 
@@ -236,7 +240,7 @@ def describe_evaluating_expressions():
 
     def should_build_seq_literal_with_expression(create_context: ContextCreator):
         seq = ast.SeqLiteral([strlit("hello"), expr("{{ 1 + 1 }}")])
-        ctx, g = create_context()
+        ctx, _, g = create_context()
 
         _ = ctx.build_expression(seq)
 
@@ -260,7 +264,7 @@ def describe_evaluating_expressions():
     def should_build_expression_with_magic_variables(
         create_context: ContextCreator,
     ) -> None:
-        ctx, g = create_context()
+        ctx, _, g = create_context()
 
         _ = ctx.build_expression(expr("hello {{ ansible_version }}"))
 
@@ -282,7 +286,7 @@ def describe_evaluating_expressions():
         )
 
     def should_build_expression_with_host_facts(create_context: ContextCreator) -> None:
-        ctx, g = create_context()
+        ctx, _, g = create_context()
 
         _ = ctx.build_expression(expr("hello {{ ansible_os_family }}"))
 
@@ -306,7 +310,7 @@ def describe_evaluating_expressions():
     def should_build_expression_with_undefined_variables(
         create_context: ContextCreator,
     ) -> None:
-        ctx, g = create_context()
+        ctx, _, g = create_context()
 
         _ = ctx.build_expression(expr("hello {{ target }}"))
 
@@ -341,7 +345,7 @@ def describe_reevaluating_expressions():
     def should_rebuild_scalar_literal(
         expr: ast.ScalarLiteral, type_: Literal["str"], create_context: ContextCreator
     ):
-        ctx, g = create_context()
+        ctx, _, g = create_context()
         actual_value = bool(expr) if isinstance(expr, ast.BoolLiteral) else expr
 
         _ = ctx.build_expression(expr)
@@ -360,7 +364,7 @@ def describe_reevaluating_expressions():
 
     def should_rebuild_seq_literal(create_context: ContextCreator):
         expr = ast.SeqLiteral([strlit("hello"), strlit("world")])
-        ctx, g = create_context()
+        ctx, _, g = create_context()
 
         _ = ctx.build_expression(expr)
         _ = ctx.build_expression(expr)
@@ -389,7 +393,7 @@ def describe_reevaluating_expressions():
         expr = ast.MapLiteral[ast.ScalarLiteral, ast.AnyExpression](
             [(strlit("hello"), strlit("world")), (strlit("key"), strlit("value"))]
         )
-        ctx, g = create_context()
+        ctx, _, g = create_context()
 
         _ = ctx.build_expression(expr)
         _ = ctx.build_expression(expr)
@@ -430,7 +434,7 @@ def describe_reevaluating_expressions():
     def should_rebuild_standalone_expression(
         expression: str, create_context: ContextCreator
     ):
-        ctx, g = create_context()
+        ctx, _, g = create_context()
 
         _ = ctx.build_expression(expr(expression))
         _ = ctx.build_expression(expr(expression))
@@ -449,8 +453,8 @@ def describe_reevaluating_expressions():
         )
 
     def should_rebuild_expression_with_dependencies(create_context: ContextCreator):
-        ctx, g = create_context()
-        ctx.define_lazy_variable(
+        ctx, var, g = create_context()
+        var.define_lazy_variable(
             ident("test"), EnvironmentType.CLI_VALUES, strlit("hello world")
         )
         e = expr("Value is {{ test }}")
@@ -495,11 +499,11 @@ def describe_reevaluating_expressions():
     def should_rebuild_expression_with_complex_dependencies(
         create_context: ContextCreator,
     ):
-        ctx, g = create_context()
-        ctx.define_lazy_variable(
+        ctx, var, g = create_context()
+        var.define_lazy_variable(
             ident("test"), EnvironmentType.CLI_VALUES, expr("{{ 1 + other }}")
         )
-        ctx.define_lazy_variable(ident("other"), EnvironmentType.CLI_VALUES, intlit(2))
+        var.define_lazy_variable(ident("other"), EnvironmentType.CLI_VALUES, intlit(2))
 
         e = expr("Value is {{ test }}")
 
@@ -564,7 +568,7 @@ def describe_reevaluating_expressions():
 
     def should_rebuild_seq_literal_with_expression(create_context: ContextCreator):
         seq = ast.SeqLiteral([strlit("hello"), expr("{{ 1 + 1 }}")])
-        ctx, g = create_context()
+        ctx, _, g = create_context()
 
         _ = ctx.build_expression(seq)
         _ = ctx.build_expression(seq)
@@ -596,8 +600,8 @@ def describe_reevaluating_expressions():
     def should_not_rebuild_expression_with_eager_dependencies(
         create_context: ContextCreator,
     ):
-        ctx, g = create_context()
-        _ = ctx.define_eager_variable(
+        ctx, var, g = create_context()
+        _ = var.define_eager_variable(
             ident("test"), EnvironmentType.SET_FACTS_REGISTERED
         )
         e = expr("Value is {{ test }}")
@@ -632,14 +636,14 @@ def describe_reevaluating_expressions():
     def should_rebuild_expression_when_variable_changed(
         create_context: ContextCreator,
     ) -> None:
-        ctx, g = create_context()
+        ctx, var, g = create_context()
 
-        ctx.define_lazy_variable(
+        var.define_lazy_variable(
             ident("a"), EnvironmentType.PB_GROUP_VARS, strlit("hello")
         )
         _ = ctx.build_expression(expr("{{ a }} world"))
-        with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_lazy_variable(
+        with var.enter_scope(EnvironmentType.TASK_VARS):
+            var.define_lazy_variable(
                 ident("a"), EnvironmentType.TASK_VARS, strlit("hi")
             )
             _ = ctx.build_expression(expr("{{ a }} world"))
@@ -686,14 +690,14 @@ def describe_reevaluating_expressions():
 def _describe_scoping() -> None:
 
     def should_not_hoist_template_if_overridden(create_context: ContextCreator) -> None:
-        ctx, g = create_context()
+        ctx, var, g = create_context()
 
         # Difference to 'should_use_most_specific_scope': Same template here,
         # different template there
-        ctx.define_lazy_variable(ident("a"), EnvironmentType.HOST_FACTS, strlit("1"))
+        var.define_lazy_variable(ident("a"), EnvironmentType.HOST_FACTS, strlit("1"))
         _ = ctx.build_expression(expr("1 {{ a }}"))
-        with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_lazy_variable(ident("a"), EnvironmentType.TASK_VARS, strlit("2"))
+        with var.enter_scope(EnvironmentType.TASK_VARS):
+            var.define_lazy_variable(ident("a"), EnvironmentType.TASK_VARS, strlit("2"))
             _ = ctx.build_expression(expr("1 {{ a }}"))
         _ = ctx.build_expression(expr("1 {{ a }}"))
 
@@ -732,15 +736,15 @@ def _describe_scoping() -> None:
         )
 
     def should_evaluate_var_into_template_scope(create_context: ContextCreator) -> None:
-        ctx, g = create_context()
+        ctx, var, g = create_context()
 
-        ctx.define_lazy_variable(
+        var.define_lazy_variable(
             ident("a"), EnvironmentType.HOST_FACTS, expr("{{ b }}")
         )
-        with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_lazy_variable(ident("b"), EnvironmentType.TASK_VARS, strlit("1"))
+        with var.enter_scope(EnvironmentType.TASK_VARS):
+            var.define_lazy_variable(ident("b"), EnvironmentType.TASK_VARS, strlit("1"))
             _ = ctx.build_expression(expr("{{ a }}"))
-        ctx.define_lazy_variable(ident("b"), EnvironmentType.HOST_FACTS, strlit("2"))
+        var.define_lazy_variable(ident("b"), EnvironmentType.HOST_FACTS, strlit("2"))
         _ = ctx.build_expression(expr("{{ a }}"))
 
         assert_graphs_match(
@@ -800,20 +804,20 @@ def _describe_scoping() -> None:
         )
 
     def should_reuse_nested_templates(create_context: ContextCreator) -> None:
-        ctx, g = create_context()
+        ctx, var, g = create_context()
 
-        with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_lazy_variable(
+        with var.enter_scope(EnvironmentType.TASK_VARS):
+            var.define_lazy_variable(
                 ident("a"), EnvironmentType.TASK_VARS, expr("{{ 'hello' | reverse }}")
             )
-            ctx.define_lazy_variable(
+            var.define_lazy_variable(
                 ident("b"), EnvironmentType.TASK_VARS, expr("{{ c | reverse }}")
             )
-            ctx.define_lazy_variable(
+            var.define_lazy_variable(
                 ident("c"), EnvironmentType.TASK_VARS, strlit("world")
             )
             _ = ctx.build_expression(expr("{{ b }} {{ a }}"))
-        ctx.define_lazy_variable(
+        var.define_lazy_variable(
             ident("a"), EnvironmentType.HOST_FACTS, expr("{{ 'hello' | reverse }}")
         )
         _ = ctx.build_expression(expr("{{ b }} {{ a }}"))
@@ -881,14 +885,14 @@ def _describe_scoping() -> None:
         )
 
     def should_hoist_variable_binding(create_context: ContextCreator) -> None:
-        ctx, g = create_context()
+        ctx, var, g = create_context()
 
-        ctx.define_lazy_variable(
+        var.define_lazy_variable(
             ident("a"), EnvironmentType.HOST_FACTS, expr("{{ b }}")
         )
-        with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_lazy_variable(ident("b"), EnvironmentType.TASK_VARS, strlit("1"))
-            with ctx.enter_scope(EnvironmentType.TASK_VARS):
+        with var.enter_scope(EnvironmentType.TASK_VARS):
+            var.define_lazy_variable(ident("b"), EnvironmentType.TASK_VARS, strlit("1"))
+            with var.enter_scope(EnvironmentType.TASK_VARS):
                 _ = ctx.build_expression(expr("{{ a }}"))
             _ = ctx.build_expression(expr("{{ a }}"))  # Should reuse above expr
 
@@ -926,15 +930,15 @@ def _describe_scoping() -> None:
         )
 
     def should_respect_precedence(create_context: ContextCreator) -> None:
-        ctx, g = create_context()
+        ctx, var, g = create_context()
 
         ln = ScalarLiteral(type="int", value=1)
         g.add_node(ln)
-        vn = ctx.define_eager_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
+        vn = var.define_eager_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
         g.add_edge(ln, vn, DEF)
 
-        with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_lazy_variable(ident("b"), EnvironmentType.TASK_VARS, strlit("2"))
+        with var.enter_scope(EnvironmentType.TASK_VARS):
+            var.define_lazy_variable(ident("b"), EnvironmentType.TASK_VARS, strlit("2"))
             _ = ctx.build_expression(expr("{{ b }}"))
 
         assert_graphs_match(
@@ -970,13 +974,13 @@ def _describe_scoping() -> None:
     def should_respect_precedence_register_element(
         create_context: ContextCreator,
     ) -> None:
-        ctx, g = create_context()
+        ctx, var, g = create_context()
 
-        with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_lazy_variable(ident("b"), EnvironmentType.TASK_VARS, strlit("1"))
+        with var.enter_scope(EnvironmentType.TASK_VARS):
+            var.define_lazy_variable(ident("b"), EnvironmentType.TASK_VARS, strlit("1"))
         ln = ScalarLiteral(type="int", value=2)
         g.add_node(ln)
-        vn = ctx.define_eager_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
+        vn = var.define_eager_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
         g.add_edge(ln, vn, DEF)
 
         _ = ctx.build_expression(expr("{{ b }}"))
@@ -1014,13 +1018,13 @@ def _describe_scoping() -> None:
     def should_respect_precedence_overriding_in_template(
         create_context: ContextCreator,
     ) -> None:
-        ctx, g = create_context()
+        ctx, var, g = create_context()
 
-        with ctx.enter_scope(EnvironmentType.TASK_VARS):
-            ctx.define_lazy_variable(ident("b"), EnvironmentType.TASK_VARS, strlit("1"))
+        with var.enter_scope(EnvironmentType.TASK_VARS):
+            var.define_lazy_variable(ident("b"), EnvironmentType.TASK_VARS, strlit("1"))
             ln = ScalarLiteral(type="int", value=2)
             g.add_node(ln)
-            vn = ctx.define_eager_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
+            vn = var.define_eager_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
             g.add_edge(ln, vn, DEF)
             _ = ctx.build_expression(expr("{{ b }}"))
         _ = ctx.build_expression(expr("{{ b }}"))  # Should reuse above expr

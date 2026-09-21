@@ -12,8 +12,8 @@ from loguru import logger
 from scansible.representations import ast
 from scansible.utils import FrozenDict, first, join_sequences
 
+from ..variables import VariableManager
 from .templates import TemplateExpressionAST
-from .var_context import VarContext
 
 
 @dataclass(frozen=True)
@@ -54,7 +54,7 @@ class SimplifiedExpression:
 
 
 def simplify_expression(
-    ast: nodes.Template, var_ctx: VarContext
+    ast: nodes.Template, var_ctx: VariableManager
 ) -> set[SimplifiedExpression]:
     """Simplify an expression by performing constant propagation.
 
@@ -80,7 +80,7 @@ def simplify_expression(
 
 
 def _simplify(
-    expr: SimplifiedExpression, var_ctx: VarContext
+    expr: SimplifiedExpression, var_ctx: VariableManager
 ) -> Iterable[SimplifiedExpression]:
     """Replace top-level variable references with their initialisers.
 
@@ -121,7 +121,7 @@ def _simplify(
 
 
 def _get_inlined_candidates(
-    var_ref: nodes.Name, var_ctx: VarContext, expr: SimplifiedExpression
+    var_ref: nodes.Name, var_ctx: VariableManager, expr: SimplifiedExpression
 ) -> Iterable[SimplifiedExpression | None]:
     """Inline a variable reference node, return a simplified expression of the
     inlined reference. Expands the input expression's var mappings and conditions

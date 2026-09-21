@@ -12,8 +12,8 @@ from scansible.representations import ast
 
 from ... import representation as rep
 from ..context import ExtractionContext
-from ..expressions import EnvironmentType, RecursiveDefinitionError
 from ..result import ExtractionResult
+from ..semantics import EnvironmentType, RecursiveDefinitionError
 from ..variables import VariablesExtractor
 
 if TYPE_CHECKING:
@@ -51,7 +51,7 @@ class TaskExtractor(abc.ABC):
         for condition in conditions:
             # Create an IV for each condition and link it to the conditional node.
             try:
-                condition_value_node = self.context.vars.build_expression(condition)
+                condition_value_node = self.context.expr.build_expression(condition)
             except RecursiveDefinitionError as e:
                 self.logger.error(e)
                 continue
@@ -68,7 +68,7 @@ class TaskExtractor(abc.ABC):
             return None
 
         try:
-            loop_source_var = self.context.vars.build_expression(loop_expr)
+            loop_source_var = self.context.expr.build_expression(loop_expr)
         except RecursiveDefinitionError as e:
             self.logger.error(e)
             if self.context.include_ctx.lenient:

@@ -6,7 +6,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 
 from scansible.representations.pdg.extractor.context import VisibilityInformation
-from scansible.representations.pdg.extractor.expressions import EnvironmentType
+from scansible.representations.pdg.extractor.semantics import EnvironmentType
 from scansible.representations.pdg.representation import Graph, Variable
 
 from .base import Rule, RuleResult

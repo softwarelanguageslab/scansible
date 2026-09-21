@@ -10,8 +10,8 @@ from scansible.representations import ast
 
 from .. import representation as rep
 from .context import ExtractionContext
-from .expressions import EnvironmentType, RecursiveDefinitionError
 from .result import ExtractionResult
+from .semantics import EnvironmentType, RecursiveDefinitionError
 
 
 @final
@@ -104,7 +104,7 @@ class BlockExtractor:
                     continue
 
                 try:
-                    value = prev_value or self.context.vars.build_expression(kw_val)
+                    value = prev_value or self.context.expr.build_expression(kw_val)
                 except RecursiveDefinitionError as e:
                     self.logger.error(e)
                     continue

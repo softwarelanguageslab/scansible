@@ -8,7 +8,7 @@ import pytest
 from jinja2.compiler import DependencyFinderVisitor
 
 from scansible.representations import ast
-from scansible.representations.pdg.extractor.expressions.templates import (
+from scansible.representations.pdg.extractor.semantics.expressions.templates import (
     TemplateExpressionAST,
 )
 

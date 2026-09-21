@@ -7,8 +7,8 @@ from collections.abc import Sequence
 from scansible.representations import ast
 
 from ... import representation as rep
-from ..expressions import EnvironmentType, RecursiveDefinitionError
 from ..result import ExtractionResult
+from ..semantics import EnvironmentType, RecursiveDefinitionError
 from .base import TaskExtractor
 
 
@@ -107,7 +107,7 @@ class GenericTaskExtractor(TaskExtractor):
         # Link data flow
         for arg_name, arg_value in self.task.args.items():
             try:
-                arg_node = self.context.vars.build_expression(arg_value)
+                arg_node = self.context.expr.build_expression(arg_value)
             except RecursiveDefinitionError as e:
                 self.logger.error(e)
                 continue
@@ -126,7 +126,7 @@ class GenericTaskExtractor(TaskExtractor):
         for misc_kw in misc_kws:
             if misc_kw in self.task.model_fields_set:
                 try:
-                    val_node = self.context.vars.build_expression(
+                    val_node = self.context.expr.build_expression(
                         cast(ast.AnyExpression, getattr(self.task, misc_kw))
                     )
                 except RecursiveDefinitionError as e:

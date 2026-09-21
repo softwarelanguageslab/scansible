@@ -12,13 +12,12 @@ from jinja2 import nodes
 from loguru import logger
 
 from scansible.representations import ast
-from scansible.representations.pdg.extractor.expressions.simplification import (
-    SimplifiedExpression,
-)
 
 from ... import representation as rep
-from ..expressions import EnvironmentType, TemplateExpressionAST, simplify_expression
 from ..result import ExtractionResult
+from ..semantics.expressions import TemplateExpressionAST, simplify_expression
+from ..semantics.expressions.simplification import SimplifiedExpression
+from ..semantics.variables import EnvironmentType
 from .base import TaskExtractor, TaskVarsScopeLevel
 
 
@@ -122,7 +121,7 @@ class DynamicIncludesExtractor[Content](TaskExtractor, abc.ABC):
         task_node = rep.Task(
             action=self.task.action, name=self.task.name, location=self.location
         )
-        included_name_node = self.context.vars.build_expression(included_name)
+        included_name_node = self.context.expr.build_expression(included_name)
         self.context.graph.add_node(task_node)
         self.context.graph.add_edge(
             included_name_node, task_node, rep.Keyword(keyword="_raw_params")

@@ -7,8 +7,8 @@ from collections.abc import Sequence
 from scansible.representations import ast
 
 from ... import representation as rep
-from ..expressions import EnvironmentType, RecursiveDefinitionError
 from ..result import ExtractionResult
+from ..semantics import EnvironmentType, RecursiveDefinitionError
 from .base import TaskExtractor
 
 
@@ -43,7 +43,7 @@ class SetFactTaskExtractor(TaskExtractor):
             name_to_value: dict[ast.StrLiteral, rep.DataNode] = {}
             for var_name, var_value in args.items():
                 try:
-                    name_to_value[var_name] = self.context.vars.build_expression(
+                    name_to_value[var_name] = self.context.expr.build_expression(
                         var_value
                     )
                 except RecursiveDefinitionError as e:
