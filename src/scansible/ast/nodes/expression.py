@@ -33,21 +33,21 @@ from pydantic import (
 from pydantic_core import core_schema
 
 from scansible.cst import YamlUnsafeStr, YamlVaultValue
-from scansible.utils import FrozenDict, Position, Positioned
+from scansible.utils import FrozenDict, HasLocation, Location
 
 from ..common import BrokenTask, ExtractionContext
 from .base import ASTNode
 
 _JINJA_ENV = Environment(cache_size=0)  # noqa: S701
 
-#: Placeholder position used as the default for directly constructed nodes.
-_SYNTHETIC_POSITION: Final = Position.synthetic()
+#: Placeholder location used as the default for directly constructed nodes.
+_SYNTHETIC_LOCATION: Final = Location.synthetic()
 
 
-def _get_position(value: object) -> Position:
-    if isinstance(value, Positioned):
-        return value.__position__
-    return Position.synthetic()
+def _get_location(value: object) -> Location:
+    if isinstance(value, HasLocation):
+        return value.__location__
+    return Location.synthetic()
 
 
 def _is_literal(raw: str, template: j2_nodes.Template) -> bool:
@@ -101,7 +101,7 @@ class Expression(ASTNode, frozen=True, arbitrary_types_allowed=True):
         return {
             "raw": data,
             "template": cls._parse_expression(data),
-            "__position__": _get_position(data),
+            "__location__": _get_location(data),
         }
 
 
@@ -144,14 +144,14 @@ class Condition(Expression, frozen=True):
         return j2_nodes.Template([template.body[0].test])
 
 
-class Identifier(str, Positioned):
+class Identifier(str, HasLocation):
     """AST node representing an identifier, e.g., a variable name."""
 
-    __position__: Position
+    __location__: Location
 
-    def __new__(cls, value: str, *, position: Position = _SYNTHETIC_POSITION) -> Self:
+    def __new__(cls, value: str, *, location: Location = _SYNTHETIC_LOCATION) -> Self:
         obj = str.__new__(cls, value)
-        obj.__position__ = position
+        obj.__location__ = location
         return obj
 
     @classmethod
@@ -166,7 +166,7 @@ class Identifier(str, Positioned):
             if keyword.iskeyword(value):
                 raise ValueError(f"{value} is a reserved keyword")
 
-            return cls(value, position=_get_position(value))
+            return cls(value, location=_get_location(value))
 
         return core_schema.no_info_after_validator_function(
             validate, core_schema.any_schema()
@@ -178,10 +178,10 @@ class Identifier(str, Positioned):
         return TypeAdapter(cls).validate_python(o)
 
 
-class Literal(Positioned, Protocol):
+class Literal(HasLocation, Protocol):
     """AST node representing a literal value."""
 
-    __position__: Position
+    __location__: Location
 
     @classmethod
     @abstractmethod
@@ -194,19 +194,19 @@ class Literal(Positioned, Protocol):
         cls,
         original_value: Any,  # pyright: ignore[reportExplicitAny, reportAny]
         coerced_value: Any,  # pyright: ignore[reportExplicitAny, reportAny]
-        position: Position,
+        location: Location,
     ) -> Self:
-        """Construct an instance of the class, given the original and coerced value and its position."""
-        return cls(coerced_value, position=position)  # pyright: ignore[reportCallIssue]
+        """Construct an instance of the class, given the original and coerced value and its location."""
+        return cls(coerced_value, location=location)  # pyright: ignore[reportCallIssue]
 
     @classmethod
     def _construct_and_wrap(cls, original_value: object, coerced_value: object) -> Self:
-        """Construct an instance, deriving its position from the original value.
+        """Construct an instance, deriving its location from the original value.
 
         Unlikely to need overriding, instead, override `_construct`.
         """
         return cls._construct(
-            original_value, coerced_value, _get_position(original_value)
+            original_value, coerced_value, _get_location(original_value)
         )
 
     @classmethod
@@ -242,21 +242,21 @@ class StrLiteral(str, Literal):
     approximate it as a string.
     """
 
-    __position__: Position
+    __location__: Location
     #: Whether this string is in fact a vault-encrypted value.
     is_vaulted: Final[bool] = False
 
-    def __new__(cls, value: str, *, position: Position = _SYNTHETIC_POSITION) -> Self:
+    def __new__(cls, value: str, *, location: Location = _SYNTHETIC_LOCATION) -> Self:
         obj = str.__new__(cls, value)
-        obj.__position__ = position
+        obj.__location__ = location
         return obj
 
     @classmethod
     @override
     def _construct(
-        cls, original_value: object, coerced_value: str, position: Position
+        cls, original_value: object, coerced_value: str, location: Location
     ) -> Self:
-        obj = cls(coerced_value, position=position)
+        obj = cls(coerced_value, location=location)
         obj.is_vaulted = isinstance(original_value, YamlVaultValue)  # pyright: ignore[reportAttributeAccessIssue]
         return obj
 
@@ -277,11 +277,11 @@ class StrLiteral(str, Literal):
 class IntLiteral(int, Literal):
     """AST node representing a literal integer."""
 
-    __position__: Position
+    __location__: Location
 
-    def __new__(cls, value: int, *, position: Position = _SYNTHETIC_POSITION) -> Self:
+    def __new__(cls, value: int, *, location: Location = _SYNTHETIC_LOCATION) -> Self:
         obj = int.__new__(cls, value)
-        obj.__position__ = position
+        obj.__location__ = location
         return obj
 
     @classmethod
@@ -305,11 +305,11 @@ class IntLiteral(int, Literal):
 class FloatLiteral(float, Literal):
     """AST node representing a literal float."""
 
-    __position__: Position
+    __location__: Location
 
-    def __new__(cls, value: float, *, position: Position = _SYNTHETIC_POSITION) -> Self:
+    def __new__(cls, value: float, *, location: Location = _SYNTHETIC_LOCATION) -> Self:
         obj = float.__new__(cls, value)
-        obj.__position__ = position
+        obj.__location__ = location
         return obj
 
     @classmethod
@@ -325,11 +325,11 @@ class FloatLiteral(float, Literal):
 class PercentLiteral(float, Literal):
     """AST node representing a literal percentage."""
 
-    __position__: Position
+    __location__: Location
 
-    def __new__(cls, value: float, *, position: Position = _SYNTHETIC_POSITION) -> Self:
+    def __new__(cls, value: float, *, location: Location = _SYNTHETIC_LOCATION) -> Self:
         obj = float.__new__(cls, value)
-        obj.__position__ = position
+        obj.__location__ = location
         return obj
 
     @classmethod
@@ -351,16 +351,16 @@ class BoolLiteral(Literal):
     """
 
     _real_bool: bool
-    __position__: Position
+    __location__: Location
 
     def __init__(
         self,
         value: bool,  # noqa: FBT001
         *,
-        position: Position = _SYNTHETIC_POSITION,
+        location: Location = _SYNTHETIC_LOCATION,
     ) -> None:
         self._real_bool = value
-        self.__position__ = position
+        self.__location__ = location
 
     def __bool__(self) -> bool:
         return self._real_bool
@@ -400,11 +400,11 @@ class BoolLiteral(Literal):
 class DateLiteral(date, Literal):
     """AST node representing a literal date."""
 
-    __position__: Position
+    __location__: Location
 
-    def __new__(cls, value: date, *, position: Position = _SYNTHETIC_POSITION) -> Self:
+    def __new__(cls, value: date, *, location: Location = _SYNTHETIC_LOCATION) -> Self:
         obj = date.__new__(cls, value.year, value.month, value.day)
-        obj.__position__ = position
+        obj.__location__ = location
         return obj
 
     @classmethod
@@ -419,10 +419,10 @@ class DateLiteral(date, Literal):
 class DatetimeLiteral(datetime, Literal):
     """AST node representing a literal datetime."""
 
-    __position__: Position
+    __location__: Location
 
     def __new__(
-        cls, value: datetime, *, position: Position = _SYNTHETIC_POSITION
+        cls, value: datetime, *, location: Location = _SYNTHETIC_LOCATION
     ) -> Self:
         obj = datetime.__new__(
             cls,
@@ -435,7 +435,7 @@ class DatetimeLiteral(datetime, Literal):
             value.microsecond,
             value.tzinfo,
         )
-        obj.__position__ = position
+        obj.__location__ = location
         return obj
 
     @classmethod
@@ -450,13 +450,13 @@ class DatetimeLiteral(datetime, Literal):
 class SeqLiteral[T](tuple[T, ...], Literal):
     """AST node representing a literal sequence."""
 
-    __position__: Position
+    __location__: Location
 
     def __new__(
-        cls, value: Iterable[T] = (), *, position: Position = _SYNTHETIC_POSITION
+        cls, value: Iterable[T] = (), *, location: Location = _SYNTHETIC_LOCATION
     ) -> Self:
         obj = tuple.__new__(cls, value)  # pyright: ignore[reportUnknownMemberType]
-        obj.__position__ = position
+        obj.__location__ = location
         return obj
 
     @classmethod
@@ -545,19 +545,19 @@ class LenientSeqLiteral[T](SeqLiteral[T]):
 class MapLiteral[K, V](FrozenDict[K, V], Literal):
     """AST node representing a literal mapping."""
 
-    __position__: Position
+    __location__: Location
 
     def __init__(
         self,
         value: Mapping[K, V] | Iterable[tuple[K, V]] | None = None,
         *,
-        position: Position = _SYNTHETIC_POSITION,
+        location: Location = _SYNTHETIC_LOCATION,
     ) -> None:
         if value is not None:
             super().__init__(value)
         else:
             super().__init__()
-        self.__position__ = position
+        self.__location__ = location
 
     @classmethod
     @override

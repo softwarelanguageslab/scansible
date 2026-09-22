@@ -33,7 +33,7 @@ class BlockBuilder:
         self.context = context
         self.block = block
         self.location = context.get_location(block)
-        self.logger = logger.bind(location=block.position)
+        self.logger = logger.bind(location=block.location)
 
     def build_block(self, predecessors: Sequence[rep.ControlNode]) -> BuildResult:
         with self.context.vars.enter_scope(EnvironmentType.BLOCK_VARS):

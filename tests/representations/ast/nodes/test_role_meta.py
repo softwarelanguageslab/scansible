@@ -58,8 +58,8 @@ def describe_extracting_metadata_file():
             assert result.metablock.platforms[1].version == "7"
             assert result.metablock.platforms[2].name == "Fedora"
             assert result.metablock.platforms[2].version == "8"
-            assert not result.metablock.platforms[0].position.is_synthetic
-            assert result.metablock.platforms[0].position.start.line == 8
+            assert not result.metablock.platforms[0].location.is_synthetic
+            assert result.metablock.platforms[0].location.start.line == 8
             assert not result.metablock.dependencies
 
         def normalizes_missing_platforms_property(tmp_path: Path):
@@ -350,8 +350,8 @@ def describe_extracting_metadata_file():
             assert result.metablock.dependencies[0].become == BoolLiteral(True)  # noqa: FBT003
             assert result.metablock.dependencies[0].params == {"param_x": 123}
 
-        def handles_position_argument(tmp_path: Path):
-            """`position` as an argument may conflict with our model's attributes."""
+        def handles_location_argument(tmp_path: Path):
+            """`location` as an argument may conflict with our model's attributes."""
             yaml = """
                     galaxy_info:
                         platforms:
@@ -363,7 +363,7 @@ def describe_extracting_metadata_file():
                         - role: test
                           become: yes
                           param_x: 123
-                          position: "start"
+                          location: "start"
                 """
             _ = (tmp_path / "main.yml").write_text(dedent(yaml))
             ctx = ExtractionContext(lenient=False)
@@ -375,7 +375,7 @@ def describe_extracting_metadata_file():
             assert result.metablock.dependencies[0].become == BoolLiteral(True)  # noqa: FBT003
             assert result.metablock.dependencies[0].params == {
                 "param_x": 123,
-                "position": "start",
+                "location": "start",
             }
 
         def supports_new_style_role_requirements(tmp_path: Path):

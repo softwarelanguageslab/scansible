@@ -182,11 +182,7 @@ class GraphDatabase:
             yield edge_type, edge_file
 
     def _populate_node_locations(self) -> None:
-        self._node_locations = {
-            node.node_id: node.location
-            for node in self._pdg.nodes
-            if node.location is not None
-        }
+        self._node_locations = {node.node_id: node.location for node in self._pdg.nodes}
 
     def __enter__(self) -> Self:
         self._db = kuzu.Database(":memory:")
@@ -217,5 +213,5 @@ class GraphDatabase:
         _close_all(raw_results)
         return results
 
-    def get_location(self, node_id: int) -> NodeLocation | None:
-        return self._node_locations.get(node_id)
+    def get_location(self, node_id: int) -> NodeLocation:
+        return self._node_locations[node_id]

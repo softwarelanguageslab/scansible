@@ -9,7 +9,7 @@ import loguru
 from loguru import logger
 
 from scansible import ast
-from scansible.utils import Position
+from scansible.utils import Location
 
 from .. import representation as rep
 from .context import BuildContext
@@ -94,12 +94,12 @@ class PDGBuilder:
         return self.context
 
     def _capture_log_message(self, message: loguru.Message) -> None:
-        location = message.record.get("extra", {}).get("location")
-        position: Position | None = None
-        if isinstance(location, Position) and not location.is_synthetic:
-            position = location
+        bound_location = message.record.get("extra", {}).get("location")
+        location = (
+            bound_location if bound_location is not None else Location.synthetic()
+        )
         reason = str(message)
-        self.context.record_build_error(reason, position)
+        self.context.record_build_error(reason, location)
 
     def _build_role(self) -> None:
         _ = RoleBuilder(self.context, cast(ast.Role, self.model.root)).build_role()

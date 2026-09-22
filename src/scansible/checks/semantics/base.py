@@ -14,7 +14,7 @@ class RuleResult(BaseModel, frozen=True, strict=True, extra="forbid"):
     rule_header: str
     rule_message: str
 
-    location: NodeLocation | None
+    location: NodeLocation
 
 
 class Rule(abc.ABC):

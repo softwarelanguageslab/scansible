@@ -12,6 +12,7 @@ from scansible.ast.nodes.expression import (
     Expression,
     StrLiteral,
 )
+from scansible.utils import LineColumn, Location
 
 
 def describe_extracting_tasks():
@@ -29,11 +30,11 @@ def describe_extracting_tasks():
         assert result.action == "file"
         assert result.args == {"path": "test.txt", "state": "present"}
         assert result.name == "Ensure file exists"
-        assert not result.position.is_synthetic
-        assert result.position.start.line == 2
-        assert result.position.start.column == 1
+        assert not result.location.is_synthetic
+        assert result.location.start.line == 2
+        assert result.location.start.column == 1
 
-    def retains_position():
+    def retains_location():
         yaml = """
             name: Ensure file exists
             file:
@@ -43,12 +44,18 @@ def describe_extracting_tasks():
 
         result = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
-        assert result.action.__position__ == ("test.yaml", (3, 1), (3, 5))
+        assert result.action.__location__ == Location(
+            path="test.yaml", start=LineColumn(3, 1), end=LineColumn(3, 5)
+        )
         [(arg_name, arg_value)] = result.args.items()
         assert isinstance(arg_name, StrLiteral)
-        assert arg_name.__position__ == ("test.yaml", (4, 5), (4, 9))
+        assert arg_name.__location__ == Location(
+            path="test.yaml", start=LineColumn(4, 5), end=LineColumn(4, 9)
+        )
         assert isinstance(arg_value, StrLiteral)
-        assert arg_value.__position__ == ("test.yaml", (4, 11), (4, 19))
+        assert arg_value.__location__ == Location(
+            path="test.yaml", start=LineColumn(4, 11), end=LineColumn(4, 19)
+        )
 
     def extracts_standard_task_with_action_shorthand():
         yaml = """

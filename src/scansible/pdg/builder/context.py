@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import cast
-
 import textwrap
 from collections import defaultdict
 from collections.abc import Generator, Sequence
@@ -9,7 +7,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from scansible import ast
-from scansible.utils import Position, Positioned, join_sequences
+from scansible.utils import HasLocation, Location, join_sequences
 
 from .. import representation as rep
 from .semantics import ExpressionManager, InclusionManager, VariableManager
@@ -21,7 +19,7 @@ class BuildContext:
     graph: rep.Graph
     include_ctx: InclusionManager
     model_root: ast.Role | ast.Playbook
-    errors: list[tuple[str, Position | None]]
+    errors: list[tuple[str, Location]]
     _next_iv_id: int
 
     handler_notifications: dict[str, set[rep.Task]]
@@ -70,35 +68,27 @@ class BuildContext:
         return self._next_iv_id - 1
 
     def get_location(self, ds: object) -> rep.NodeLocation:
-        if isinstance(ds, Positioned) and not ds.__position__.is_synthetic:
-            file = str(ds.__position__.path)
-            line, column = ds.__position__.start.line, ds.__position__.start.column
-        elif hasattr(ds, "location"):
-            file, line, column = cast(tuple[str, int, int], ds.location)  # pyright: ignore[reportAttributeAccessIssue]
-        else:
-            return rep.NodeLocation.synthetic()
+        loc = ds.__location__ if isinstance(ds, HasLocation) else Location.synthetic()
 
         return rep.NodeLocation(
-            file=file,
-            line=line,
-            column=column,
+            path=loc.path,
+            start=loc.start,
+            end=loc.end,
             includer_location=self.include_ctx.last_include_location,
         )
 
-    def record_build_error(self, reason: str, position: Position | None) -> None:
-        self.errors.append((reason, position))
+    def record_build_error(self, reason: str, location: Location) -> None:
+        self.errors.append((reason, location))
 
     def summarise_build_errors(self) -> str:
-        reason_to_location: dict[str, list[Position | None]] = defaultdict(list)
+        reason_to_location: dict[str, list[Location]] = defaultdict(list)
         for reason, location in self.errors:
             reason_to_location[reason.strip()].append(location)
 
         parts: list[str] = []
         for reason, locations in sorted(reason_to_location.items()):
-            num_unknown = len([loc for loc in locations if loc is None])
-            loc_strs = sorted(
-                {":".join(map(str, loc)) for loc in locations if loc is not None}
-            )
+            num_unknown = len([loc for loc in locations if loc.is_synthetic])
+            loc_strs = sorted({str(loc) for loc in locations if not loc.is_synthetic})
             if num_unknown:
                 prefix = "and " if loc_strs else ""
                 loc_strs.append(f"{prefix}{num_unknown} unknown location(s)")

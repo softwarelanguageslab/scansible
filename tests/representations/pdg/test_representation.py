@@ -11,6 +11,14 @@ from _pytest.fixtures import FixtureRequest
 from pytest_describe import behaves_like
 
 from scansible.pdg import representation as rep
+from scansible.utils import LineColumn
+
+FAKE_LOC = rep.NodeLocation(
+    path="test.yml", start=LineColumn(1, 1), end=LineColumn(1, 1)
+)
+OTHER_FAKE_LOC = rep.NodeLocation(
+    path="test.yml", start=LineColumn(5, 1), end=LineColumn(5, 1)
+)
 
 
 class NodeFactory(Protocol):
@@ -20,42 +28,42 @@ class NodeFactory(Protocol):
 # Shared behaviour for nodes
 def a_node() -> None:
     def should_be_constructible(factory: NodeFactory) -> None:
-        node = factory(rep.NodeLocation(file="test.yml", line=0, column=0))
+        node = factory(FAKE_LOC)
 
         assert node is not None
 
     def should_not_be_hashable_before_node_id_is_set(factory: NodeFactory) -> None:
-        node = factory(rep.NodeLocation(file="test.yml", line=0, column=0))
+        node = factory(FAKE_LOC)
 
         with pytest.raises(ValueError, match="partially initialised"):
             _ = hash(node)
 
     def should_be_hashable_after_node_id_is_set(factory: NodeFactory) -> None:
-        node = factory(rep.NodeLocation(file="test.yml", line=0, column=0))
+        node = factory(FAKE_LOC)
         node.node_id = 0
 
         assert hash(node) is not None
 
     def should_support_equality(factory: NodeFactory) -> None:
-        node1 = factory(rep.NodeLocation(file="test.yml", line=0, column=0))
-        node2 = factory(rep.NodeLocation(file="test.yml", line=0, column=0))
+        node1 = factory(FAKE_LOC)
+        node2 = factory(FAKE_LOC)
 
         assert node1 == node2
 
     def should_be_unique_if_different_location(factory: NodeFactory) -> None:
-        node1 = factory(rep.NodeLocation(file="test.yml", line=0, column=0))
-        node2 = factory(rep.NodeLocation(file="test.yml", line=1, column=0))
+        node1 = factory(FAKE_LOC)
+        node2 = factory(OTHER_FAKE_LOC)
 
         assert node1 != node2
 
     def should_be_same_if_same_location(factory: NodeFactory) -> None:
-        node1 = factory(rep.NodeLocation(file="test.yml", line=0, column=0))
-        node2 = factory(rep.NodeLocation(file="test.yml", line=0, column=0))
+        node1 = factory(FAKE_LOC)
+        node2 = factory(FAKE_LOC)
 
         assert node1 == node2
 
     def should_have_id(factory: NodeFactory) -> None:
-        node = factory(rep.NodeLocation(file="test.yml", line=0, column=0))
+        node = factory(FAKE_LOC)
 
         assert isinstance(node.node_id, int)
 
@@ -197,14 +205,8 @@ def describe_add_node() -> None:
 
     def should_add_two_equivalent_nodes_with_different_locations(g: rep.Graph) -> None:
         n1, n2 = (
-            rep.Task(
-                action="file",
-                location=rep.NodeLocation(file="test.yml", line=1, column=1),
-            ),
-            rep.Task(
-                action="file",
-                location=rep.NodeLocation(file="test.yml", line=5, column=1),
-            ),
+            rep.Task(action="file", location=FAKE_LOC),
+            rep.Task(action="file", location=OTHER_FAKE_LOC),
         )
         g.add_node(n1)
         g.add_node(n2)
@@ -246,14 +248,8 @@ def describe_add_nodes() -> None:
 
     def should_add_two_equivalent_nodes_with_different_location(g: rep.Graph) -> None:
         n1, n2 = (
-            rep.Task(
-                action="file",
-                location=rep.NodeLocation(file="test.yml", line=1, column=1),
-            ),
-            rep.Task(
-                action="file",
-                location=rep.NodeLocation(file="test.yml", line=5, column=1),
-            ),
+            rep.Task(action="file", location=FAKE_LOC),
+            rep.Task(action="file", location=OTHER_FAKE_LOC),
         )
         g.add_nodes([n1, n2])
 

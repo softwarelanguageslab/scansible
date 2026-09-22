@@ -29,7 +29,7 @@ from rich.syntax import Syntax
 from ruamel.yaml import YAMLError
 
 from scansible import ast
-from scansible.utils import Positioned
+from scansible.utils import HasLocation
 
 #: Rules to ignore known-genuine validation errors, as (field-path regex,
 #: error-detail regex) pairs. A ValidationError is only ignored if every one
@@ -120,13 +120,13 @@ def _group_key(err: ErrorDetails) -> object:
 
     A field typed as a plain (non-discriminated) `Union` produces one
     sub-error per variant pydantic tried, all for the same offending value.
-    Prefer the value's source position (hashable, value-comparable) over
+    Prefer the value's source location (hashable, value-comparable) over
     `id()`, which would risk conflating two unrelated fields that happen to
     both fail on a shared singleton (e.g. `None`).
     """
     value = err["input"]  # pyright: ignore[reportAny]
-    if isinstance(value, Positioned) and not value.__position__.is_synthetic:
-        return value.__position__
+    if isinstance(value, HasLocation) and not value.__location__.is_synthetic:
+        return value.__location__
     return id(value)
 
 
@@ -154,27 +154,27 @@ def _print_input(
 def _print_input_snippet(
     console: rich.console.Console, entry_root: Path, value: object
 ) -> None:
-    """Show a few lines of source around a value's position, if it has one."""
-    if not isinstance(value, Positioned) or value.__position__.is_synthetic:
+    """Show a few lines of source around a value's location, if it has one."""
+    if not isinstance(value, HasLocation) or value.__location__.is_synthetic:
         return
-    pos = value.__position__
+    loc = value.__location__
     try:
-        code = (entry_root / pos.path).read_text()
+        code = (entry_root / loc.path).read_text()
     except OSError:
         return
-    lo = max(1, pos.start.line - 5)
-    hi = pos.end.line + 5
+    lo = max(1, loc.start.line - 5)
+    hi = loc.end.line + 5
     syntax = Syntax(
         code,
         "yaml",
         line_numbers=True,
         line_range=(lo, hi),
-        highlight_lines=set(range(pos.start.line, pos.end.line + 1)),
+        highlight_lines=set(range(loc.start.line, loc.end.line + 1)),
     )
     console.print(
         Panel(
             syntax,
-            title=f"{pos.path}:{pos.start.line}:{pos.start.column}",
+            title=f"{loc.path}:{loc.start.line}:{loc.start.column}",
             title_align="left",
             border_style="dim",
             padding=(0, 1),

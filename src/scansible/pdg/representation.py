@@ -2,17 +2,26 @@
 
 from __future__ import annotations
 
-from typing import Annotated, final, overload, override
+from typing import Annotated, Self, final, overload, override
 from typing import Literal as LiteralT
 
 import abc
 import operator
 from collections.abc import Callable, Iterable, Sequence
+from dataclasses import dataclass
 from datetime import date, datetime
 from functools import partial
 
 import rustworkx as rx
-from pydantic import BaseModel, Field, StringConstraints, field_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
+
+from scansible.utils import Location
 
 type ValidTypeStr = LiteralT[
     "str",
@@ -36,27 +45,23 @@ class _FrozenRepresentation(BaseModel, frozen=True, strict=True, extra="forbid")
     pass
 
 
-class NodeLocation(_FrozenRepresentation, frozen=True):
-    file: str
-    line: int
-    column: int
+@dataclass(frozen=True, slots=True)
+class NodeLocation(Location):
+    """A source code `Location`, extended with the chain of `include`s (if any) through which the location was reached."""
+
+    #: The location of the `include_tasks`/`include_role`/... directive that
+    #: caused the file containing this location to be included, if any. `None`
+    #: means this location wasn't reached through an include (e.g. it's in the
+    #: root playbook/role).
     includer_location: NodeLocation | None = None
 
     @override
     def __str__(self) -> str:
-        base = f"{self.file}:{self.line}:{self.column}"
+        base = super().__str__()
         if self.includer_location:
             base += f"\n\tvia {self.includer_location}"
 
         return base
-
-    @classmethod
-    def synthetic(cls) -> NodeLocation:
-        return cls(file="<unknown>", line=-1, column=-1)
-
-    @property
-    def is_synthetic(self) -> bool:
-        return self.file == "<unknown>"
 
 
 class Node(_BaseRepresentation):
@@ -64,7 +69,15 @@ class Node(_BaseRepresentation):
 
     # TODO: Prevent reassignment to node_id once instantiated
     node_id: int = Field(init=False, default=-1)
-    location: NodeLocation | None = Field(default=None, kw_only=True, frozen=True)
+    location: NodeLocation = Field(
+        default_factory=NodeLocation.synthetic, kw_only=True, frozen=True
+    )
+
+    @model_validator(mode="after")
+    def _alias_location(self) -> Self:
+        """Alias the `location` property to `__location__` to adhere to the `HasLocation` protocol."""
+        self.__location__: Location = self.location
+        return self
 
     @override
     def __hash__(self) -> int:

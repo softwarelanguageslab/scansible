@@ -9,6 +9,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from scansible.checks.security.rules.base import RuleResult
+from scansible.pdg.representation import NodeLocation
 from scansible.sca.constants import HTML_CLASS_SEVERITY
 
 from .types import ProjectDependencies, Vulnerability
@@ -117,13 +118,12 @@ def generate_report(
         _ = (output_dir / f"{html_file}.html").write_text(content)
 
 
-def _read_code(loc: str | None, num_lines: int) -> tuple[str, int, int]:
-    if loc is None:
+def _read_code(loc: NodeLocation, num_lines: int) -> tuple[str, int, int]:
+    if loc.is_synthetic:
         return "NOT FOUND!", 0, 0
 
-    *file_path_str, lineno_raw, _ = loc.split(":")
-    lineno = int(lineno_raw) - 1
-    file_path = Path(":".join(file_path_str))
+    lineno = loc.start.line - 1
+    file_path = Path(loc.path)
     try:
         text = file_path.read_text()
     except OSError:

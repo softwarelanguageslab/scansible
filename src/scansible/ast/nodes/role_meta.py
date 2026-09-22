@@ -54,7 +54,7 @@ class _RawPlatform(ASTNode, frozen=True):
     def expand(self) -> Sequence[Platform]:
         """Expand a single raw platform instance to a flattened list of platforms."""
         return [
-            Platform(name=self.name, version=version, __position__=self.position)
+            Platform(name=self.name, version=version, __location__=self.location)
             for version in self.versions
         ]
 
@@ -96,7 +96,7 @@ class RoleRequirement(ASTNode, CommonDirectives, frozen=True):
         if not isinstance(value, dict):
             return value
 
-        valid_attr_names = cls.model_fields.keys() - {"position"}
+        valid_attr_names = cls.model_fields.keys() - {"location"}
         new_value = {"params": {}}
         for k, v in value.items():
             if k in valid_attr_names:

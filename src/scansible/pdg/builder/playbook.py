@@ -78,7 +78,7 @@ class PlaybookBuilder:
                             ).build_variables(EnvironmentType.PLAY_VARS_FILES)
                             break
                     else:
-                        logger.bind(location=play.position).error(
+                        logger.bind(location=play.location).error(
                             f"Could not load play vars_file {vars_file!r}"  # pyright: ignore[reportPossiblyUnboundVariable]
                         )
 

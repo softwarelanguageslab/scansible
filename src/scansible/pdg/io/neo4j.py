@@ -8,8 +8,6 @@ from .. import representation as rep
 
 
 def dump_value(v: object, attr_key: str) -> str:
-    if attr_key == "location" and isinstance(v, dict) and v["file"] == "unknown file":
-        return "NULL"
     if isinstance(v, (tuple, list, dict)):
         # Need to wrap [] and {} into quotes.
         return dump_value(json.dumps(v), attr_key)
@@ -27,6 +25,10 @@ def dump_node(n: rep.Node) -> str:
     node_label = n.__class__.__name__
     node_id = n.node_id
     node_attrs = n.model_dump()
+    # A synthetic (i.e. unknown) location carries no useful information, so
+    # export it as absent rather than as a placeholder location value.
+    if n.location.is_synthetic:
+        node_attrs["location"] = None
 
     attr_content = _create_attr_content(node_attrs)
 

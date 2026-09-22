@@ -52,15 +52,15 @@ def describe_scalars():
 
             assert isinstance(result, YamlStr)
             assert result == "hello"
-            assert result.__position__.path == "test.yml"
+            assert result.__location__.path == "test.yml"
 
-        def preserves_multiline_position_for_block_literals():
+        def preserves_multiline_location_for_block_literals():
             result = load("key: |\n  line1\n  line2\n")["key"]
 
             assert isinstance(result, YamlStr)
             assert result == "line1\nline2\n"
-            assert result.__position__.start == (1, 6)
-            assert result.__position__.end == (4, 1)
+            assert result.__location__.start == (1, 6)
+            assert result.__location__.end == (4, 1)
 
     def describe_ints():
         @pytest.mark.parametrize(
@@ -79,7 +79,7 @@ def describe_scalars():
 
             assert isinstance(result, YamlInt)
             assert result == expected
-            assert result.__position__.path == "test.yml"
+            assert result.__location__.path == "test.yml"
 
         def does_not_resolve_yaml_1_2_octal_syntax():
             # 0o17 is YAML 1.2 octal syntax; Ansible parses YAML 1.1, whose octal
@@ -103,14 +103,14 @@ def describe_scalars():
 
             assert isinstance(result, YamlFloat)
             assert result == expected
-            assert result.__position__.path == "test.yml"
+            assert result.__location__.path == "test.yml"
 
         def resolves_nan():
             result = load("key: .nan")["key"]
 
             assert isinstance(result, YamlFloat)
             assert math.isnan(result)
-            assert result.__position__.path == "test.yml"
+            assert result.__location__.path == "test.yml"
 
         @pytest.mark.parametrize(
             "yaml_value",
@@ -149,7 +149,7 @@ def describe_scalars():
             assert bool(result) is expected
             assert result == expected
             assert hash(result) == hash(expected)
-            assert result.__position__.path == "test.yml"
+            assert result.__location__.path == "test.yml"
 
         @pytest.mark.parametrize("yaml_value", ["y", "n", "Y", "N"])
         def does_not_resolve_bare_y_or_n(yaml_value: str):
@@ -178,7 +178,7 @@ def describe_scalars():
             assert result.__eq__(None) is True
             assert bool(result) is False
             assert hash(result) == hash(None)
-            assert result.__position__.path == "test.yml"
+            assert result.__location__.path == "test.yml"
 
     def describe_dates():
         def resolves_date_only_to_yaml_date():
@@ -187,8 +187,8 @@ def describe_scalars():
             assert isinstance(result, YamlDate)
             assert not isinstance(result, YamlDatetime)
             assert result.isoformat() == "2020-01-02"
-            assert result.__position__.start == (1, 6)
-            assert result.__position__.end == (1, 16)
+            assert result.__location__.start == (1, 6)
+            assert result.__location__.end == (1, 16)
 
         def resolves_full_timestamp_to_yaml_datetime():
             result = load("key: 2020-01-02T03:04:05Z")["key"]
@@ -197,20 +197,20 @@ def describe_scalars():
             assert result.hour == 3
             assert result.minute == 4
             assert result.second == 5
-            assert result.__position__.start == (1, 6)
-            assert result.__position__.end == (1, 26)
+            assert result.__location__.start == (1, 6)
+            assert result.__location__.end == (1, 26)
 
 
 def describe_vault_and_unsafe():
-    def resolves_vault_value_with_multiline_position():
+    def resolves_vault_value_with_multiline_location():
         result = load("key: !vault |\n  $ANSIBLE_VAULT;1.1;AES256\n  613233343536\n")[
             "key"
         ]
 
         assert isinstance(result, YamlVaultValue)
         assert result == "$ANSIBLE_VAULT;1.1;AES256\n613233343536\n"
-        assert result.__position__.start == (1, 6)
-        assert result.__position__.end == (4, 1)
+        assert result.__location__.start == (1, 6)
+        assert result.__location__.end == (4, 1)
 
     def resolves_vault_encrypted_tag_the_same_way():
         result = load("key: !vault-encrypted plaintext")["key"]
@@ -223,8 +223,8 @@ def describe_vault_and_unsafe():
 
         assert isinstance(result, YamlUnsafeStr)
         assert result == "some value"
-        assert result.__position__.start == (1, 6)
-        assert result.__position__.end == (1, 26)
+        assert result.__location__.start == (1, 6)
+        assert result.__location__.end == (1, 26)
 
 
 def describe_collections():
@@ -233,26 +233,26 @@ def describe_collections():
 
         assert isinstance(result["a"], YamlMap)
         assert result["a"] == {}
-        assert result["a"].__position__.start == (1, 4)
-        assert result["a"].__position__.end == (1, 6)
+        assert result["a"].__location__.start == (1, 4)
+        assert result["a"].__location__.end == (1, 6)
 
         assert isinstance(result["b"], YamlSeq)
         assert result["b"] == []
-        assert result["b"].__position__.start == (2, 4)
-        assert result["b"].__position__.end == (2, 6)
+        assert result["b"].__location__.start == (2, 4)
+        assert result["b"].__location__.end == (2, 6)
 
     def resolves_flow_style_map_and_seq():
         result = load("a: {x: 1, y: 2}\nb: [1, 2, 3]\n")
 
         assert isinstance(result["a"], YamlMap)
         assert result["a"] == {"x": 1, "y": 2}
-        assert result["a"].__position__.start == (1, 4)
-        assert result["a"].__position__.end == (1, 16)
+        assert result["a"].__location__.start == (1, 4)
+        assert result["a"].__location__.end == (1, 16)
 
         assert isinstance(result["b"], YamlSeq)
         assert result["b"] == [1, 2, 3]
-        assert result["b"].__position__.start == (2, 4)
-        assert result["b"].__position__.end == (2, 13)
+        assert result["b"].__location__.start == (2, 4)
+        assert result["b"].__location__.end == (2, 13)
 
     def resolves_map_keys_of_non_string_scalar_types():
         result = load("1: a\n2: b\n")
@@ -260,35 +260,35 @@ def describe_collections():
         keys = list(result.keys())
         assert keys == [1, 2]
         assert all(isinstance(key, YamlInt) for key in keys)
-        assert keys[0].__position__.start == (1, 1)
-        assert keys[1].__position__.start == (2, 1)
+        assert keys[0].__location__.start == (1, 1)
+        assert keys[1].__location__.start == (2, 1)
 
-    def resolves_nested_block_structures_with_position_per_node():
+    def resolves_nested_block_structures_with_location_per_node():
         result = load(
             "top:\n  - name: one\n    value: 1\n  - name: two\n    value: 2\n"
         )
 
         top = result["top"]
         assert isinstance(top, YamlSeq)
-        assert top.__position__.start == (2, 3)
-        assert top.__position__.end == (6, 1)
+        assert top.__location__.start == (2, 3)
+        assert top.__location__.end == (6, 1)
 
         item0: Any = cast(Any, top[0])
         assert isinstance(item0, YamlMap)
-        assert item0.__position__.start == (2, 5)
-        assert item0.__position__.end == (4, 3)
-        assert cast(Any, item0["name"]).__position__.start == (2, 11)
-        assert cast(Any, item0["value"]).__position__.start == (3, 12)
+        assert item0.__location__.start == (2, 5)
+        assert item0.__location__.end == (4, 3)
+        assert cast(Any, item0["name"]).__location__.start == (2, 11)
+        assert cast(Any, item0["value"]).__location__.start == (3, 12)
 
-    def shares_position_between_anchor_and_alias():
+    def shares_location_between_anchor_and_alias():
         # Documenting existing/intended ruamel behavior: an aliased node
         # resolves to the *same object* as its anchor definition, so it also
-        # shares its position rather than pointing at the alias reference.
+        # shares its location rather than pointing at the alias reference.
         result = load("a: &anchor 5\nb: *anchor\n")
 
         assert result["a"] is result["b"]
-        assert result["b"].__position__.start == (1, 4)
-        assert result["b"].__position__.end == (1, 13)
+        assert result["b"].__location__.start == (1, 4)
+        assert result["b"].__location__.end == (1, 13)
 
 
 def describe_parse_file():
@@ -299,8 +299,8 @@ def describe_parse_file():
 
         assert result == {"key": "value"}
         assert isinstance(result, YamlMap)
-        assert result.__position__.path == "test.yml"
-        assert cast(Any, result["key"]).__position__.path == "test.yml"
+        assert result.__location__.path == "test.yml"
+        assert cast(Any, result["key"]).__location__.path == "test.yml"
 
     def uses_relative_path_for_nested_files(tmp_path: Path):
         (tmp_path / "sub").mkdir()
@@ -309,7 +309,7 @@ def describe_parse_file():
         result = parse_file(ProjectPath(tmp_path, "sub/nested.yml"))
 
         assert isinstance(result, YamlMap)
-        assert result.__position__.path == str(Path("sub") / "nested.yml")
+        assert result.__location__.path == str(Path("sub") / "nested.yml")
 
     def raises_on_invalid_yaml(tmp_path: Path):
         _ = (tmp_path / "bad.yml").write_text("hello:\n-world")

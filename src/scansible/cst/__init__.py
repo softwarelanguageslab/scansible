@@ -1,7 +1,7 @@
 """Concrete Syntax Tree (CST) representation for Ansible code.
 
 The CST is essentially a parsed YAML document with custom subclasses for the data types,
-enriched with source code position information.
+enriched with source code location information.
 """
 
 from __future__ import annotations

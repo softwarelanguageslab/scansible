@@ -16,11 +16,11 @@ class TerminalReporter:
         if not results:
             console.print("[green]No warnings found, keep it up!")
         for name, loc in sorted(set(results), key=lambda p: str(p[1])):
-            if loc is None:
+            if loc.is_synthetic:
                 console.print(f"[bold red]{name}[/bold red]", width=999)
             else:
                 console.print(
-                    f"[gray]{loc.file}:{loc.line}:{loc.column}[/gray] - [bold red]{name}[/bold red]",
+                    f"[gray]{loc.path}:{loc.start.line}:{loc.start.column}[/gray] - [bold red]{name}[/bold red]",
                     width=999,
                 )
                 if loc.includer_location is not None:
@@ -29,6 +29,6 @@ class TerminalReporter:
     def print_includer_loc(
         self, loc: NodeLocation, console: rich.console.Console
     ) -> None:
-        console.print(f"\t[gray]via {loc.file}:{loc.line}:{loc.column}")
+        console.print(f"\t[gray]via {loc.path}:{loc.start.line}:{loc.start.column}")
         if loc.includer_location is not None:
             self.print_includer_loc(loc.includer_location, console)

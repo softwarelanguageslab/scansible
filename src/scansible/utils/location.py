@@ -1,8 +1,10 @@
-"""Utilities for source code position tracking."""
+"""Utilities for source code location tracking."""
 
 from __future__ import annotations
 
-from typing import NamedTuple, Protocol, runtime_checkable
+from typing import NamedTuple, Protocol, Self, override, runtime_checkable
+
+from dataclasses import dataclass
 
 from ruamel.yaml import StreamMark
 
@@ -20,8 +22,9 @@ class LineColumn(NamedTuple):
         return cls(line=mark.line + 1, column=mark.column + 1)
 
 
-class Position(NamedTuple):
-    """Source code position of an entity."""
+@dataclass(frozen=True, slots=True)
+class Location:
+    """Source code location of an entity."""
 
     #: Relative path to the file in which this entity occurs.
     path: str
@@ -31,17 +34,21 @@ class Position(NamedTuple):
     end: LineColumn
 
     @classmethod
-    def synthetic(cls) -> Position:
+    def synthetic(cls) -> Self:
         return cls("<unknown>", LineColumn(-1, -1), LineColumn(-1, -1))
 
     @property
     def is_synthetic(self) -> bool:
-        """Whether the position is a placeholder, i.e. not derived from an actual source location."""
+        """Whether the location is a placeholder, i.e. not derived from an actual source location."""
         return self.path == "<unknown>"
+
+    @override
+    def __str__(self) -> str:
+        return f"{self.path}:{self.start.line}:{self.start.column}"
 
 
 @runtime_checkable
-class Positioned(Protocol):
-    """Mixin for elements with a code position."""
+class HasLocation(Protocol):
+    """Mixin for elements with a code location."""
 
-    __position__: Position
+    __location__: Location

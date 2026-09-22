@@ -25,6 +25,7 @@ from scansible.ast.nodes.expression import (
     SeqLiteral,
     StrLiteral,
 )
+from scansible.utils import LineColumn, Location
 
 
 def describe_expression():
@@ -66,18 +67,20 @@ def describe_expression():
             assert isinstance(node, j2_nodes.TemplateData)
             assert node.data == "Literal"
 
-        def derives_position_from_a_yaml_node():
+        def derives_location_from_a_yaml_node():
             value = parse_yaml_dict("x: '{{ myvar }}'")["x"]
 
             result = Expression.model_validate(value)
 
-            assert not result.position.is_synthetic
-            assert result.position == ("test.yaml", (1, 4), (1, 17))
+            assert not result.location.is_synthetic
+            assert result.location == Location(
+                path="test.yaml", start=LineColumn(1, 4), end=LineColumn(1, 17)
+            )
 
-        def uses_a_synthetic_position_for_plain_strings():
+        def uses_a_synthetic_location_for_plain_strings():
             result = Expression.model_validate("{{ myvar }}")
 
-            assert result.position.is_synthetic
+            assert result.location.is_synthetic
 
     def describe_invalid():
         def rejects_non_string_input():
@@ -356,8 +359,8 @@ def describe_literals():
 
             assert result == {"a": 1}
 
-    def describe_position_tracking():
-        def tracks_positions_for_scalar_literals():
+    def describe_location_tracking():
+        def tracks_locations_for_scalar_literals():
             yaml = """
                 a: hello
                 b: 123
@@ -370,29 +373,41 @@ def describe_literals():
 
             a = TypeAdapter(StrLiteral).validate_python(values["a"])
             assert a == "hello"
-            assert a.__position__ == ("test.yaml", (2, 4), (2, 9))
+            assert a.__location__ == Location(
+                path="test.yaml", start=LineColumn(2, 4), end=LineColumn(2, 9)
+            )
 
             b = TypeAdapter(IntLiteral).validate_python(values["b"])
             assert b == 123
-            assert b.__position__ == ("test.yaml", (3, 4), (3, 7))
+            assert b.__location__ == Location(
+                path="test.yaml", start=LineColumn(3, 4), end=LineColumn(3, 7)
+            )
 
             c = TypeAdapter(FloatLiteral).validate_python(values["c"])
             assert c == 4.0
-            assert c.__position__ == ("test.yaml", (4, 4), (4, 8))
+            assert c.__location__ == Location(
+                path="test.yaml", start=LineColumn(4, 4), end=LineColumn(4, 8)
+            )
 
             d = TypeAdapter(BoolLiteral).validate_python(values["d"])
             assert d == True
-            assert d.__position__ == ("test.yaml", (5, 4), (5, 7))
+            assert d.__location__ == Location(
+                path="test.yaml", start=LineColumn(5, 4), end=LineColumn(5, 7)
+            )
 
             e = TypeAdapter(DateLiteral).validate_python(values["e"])
             assert e == date(2026, 1, 1)
-            assert e.__position__ == ("test.yaml", (6, 4), (6, 14))
+            assert e.__location__ == Location(
+                path="test.yaml", start=LineColumn(6, 4), end=LineColumn(6, 14)
+            )
 
             f = TypeAdapter(DatetimeLiteral).validate_python(values["f"])
             assert f == datetime(2026, 1, 2, 3, 4, 5, tzinfo=f.tzinfo)
-            assert f.__position__ == ("test.yaml", (7, 4), (7, 24))
+            assert f.__location__ == Location(
+                path="test.yaml", start=LineColumn(7, 4), end=LineColumn(7, 24)
+            )
 
-        def tracks_positions_for_composite_literals():
+        def tracks_locations_for_composite_literals():
             yaml = """
                 g:
                     - 123
@@ -405,27 +420,31 @@ def describe_literals():
 
             g = TypeAdapter(SeqLiteral[IntLiteral]).validate_python(values["g"])
             assert g == (123, 456)
-            assert g.__position__ == ("test.yaml", (3, 5), (5, 1))
+            assert g.__location__ == Location(
+                path="test.yaml", start=LineColumn(3, 5), end=LineColumn(5, 1)
+            )
 
             h = TypeAdapter(MapLiteral[StrLiteral, IntLiteral]).validate_python(
                 values["h"]
             )
             assert h == {"x": 1, "y": 2}
-            assert h.__position__ == ("test.yaml", (6, 5), (8, 1))
+            assert h.__location__ == Location(
+                path="test.yaml", start=LineColumn(6, 5), end=LineColumn(8, 1)
+            )
 
-        def has_a_synthetic_position_by_default():
-            # Directly constructed (non-validated) nodes must still satisfy `Positioned`.
-            assert Identifier("item").__position__.is_synthetic
-            assert StrLiteral("hello").__position__.is_synthetic
-            assert IntLiteral(123).__position__.is_synthetic
-            assert FloatLiteral(4.0).__position__.is_synthetic
-            assert PercentLiteral(4.0).__position__.is_synthetic
-            assert BoolLiteral(True).__position__.is_synthetic  # noqa: FBT003
-            assert DateLiteral(date(2026, 1, 1)).__position__.is_synthetic
+        def has_a_synthetic_location_by_default():
+            # Directly constructed (non-validated) nodes must still satisfy `HasLocation`.
+            assert Identifier("item").__location__.is_synthetic
+            assert StrLiteral("hello").__location__.is_synthetic
+            assert IntLiteral(123).__location__.is_synthetic
+            assert FloatLiteral(4.0).__location__.is_synthetic
+            assert PercentLiteral(4.0).__location__.is_synthetic
+            assert BoolLiteral(True).__location__.is_synthetic  # noqa: FBT003
+            assert DateLiteral(date(2026, 1, 1)).__location__.is_synthetic
             assert DatetimeLiteral(
                 datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
-            ).__position__.is_synthetic
-            assert SeqLiteral[IntLiteral]((IntLiteral(1),)).__position__.is_synthetic
+            ).__location__.is_synthetic
+            assert SeqLiteral[IntLiteral]((IntLiteral(1),)).__location__.is_synthetic
             assert MapLiteral[StrLiteral, IntLiteral](
                 {StrLiteral("a"): IntLiteral(1)}
-            ).__position__.is_synthetic
+            ).__location__.is_synthetic

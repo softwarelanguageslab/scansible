@@ -63,7 +63,9 @@ class VariableManager:
         revision = self._get_next_def_revision(name)
         logger.debug(f"Selected revision {revision} for {name}")
         shadows = self._get_shadowed_revision(name)
-        self._define_variable(name, revision, env_type, initialiser, conditions, shadows)
+        self._define_variable(
+            name, revision, env_type, initialiser, conditions, shadows
+        )
 
     def define_eager_variable(
         self,

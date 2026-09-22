@@ -29,7 +29,7 @@ from scansible.sca.constants import (
     ANSIBLE_TRIVIAL_MODULES,
     CONSOLE,
 )
-from scansible.utils import Position, ProjectPath
+from scansible.utils import Location, ProjectPath
 from scansible.utils.entrypoints import find_entrypoints
 
 from .collection_info import get_collection_index
@@ -209,7 +209,7 @@ def extract_roles(
 
     role_to_usage: dict[str, list[str]] = defaultdict(list)
     for r, loc in third_party_roles:
-        role_to_usage[r].append(":".join(map(str, loc)))
+        role_to_usage[r].append(str(loc))
 
     if return_relative_paths:
         return [
@@ -222,7 +222,7 @@ def extract_roles(
         return [RoleUsage(r, locs, set(), set()) for r, locs in role_to_usage.items()]
 
 
-def _extract_role_includes(project: Path) -> Iterable[tuple[str, Position]]:
+def _extract_role_includes(project: Path) -> Iterable[tuple[str, Location]]:
     all_yaml_files = list(find_all_yaml_files(project))
 
     worklist: list[Play | Task] = []
@@ -247,11 +247,11 @@ def _extract_role_includes(project: Path) -> Iterable[tuple[str, Position]]:
                 worklist.extend(flatten_tasks(item.handlers))
 
                 for r in item.roles:
-                    yield r.role, item.position
+                    yield r.role, item.location
 
             case Task():
                 if item.action in ANSIBLE_ROLE_INCLUDE_MODULES:
-                    yield str(item.args[StrLiteral("name")]), item.position
+                    yield str(item.args[StrLiteral("name")]), item.location
 
 
 def extract_modules(
@@ -271,8 +271,7 @@ def extract_modules(
         if is_trivial_module(m):
             continue
         mname = f"{m.collection}.{m.name}"
-        tloc = f"{t.__position__.path}:{t.__position__.start.line}"
-        usages[mname].append(tloc)
+        usages[mname].append(str(t.__location__))
 
     if return_relative_paths:
         return [

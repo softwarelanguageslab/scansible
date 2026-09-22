@@ -37,7 +37,7 @@ def build_role_dependency(
             dep.role, context.get_location(dep.role)
         ) as incl_role:
             if not incl_role:
-                logger.bind(location=dep.position).error(
+                logger.bind(location=dep.location).error(
                     f"Could not resolve {dep.role!r} to role"
                 )
                 return BuildResult.empty(predecessors)

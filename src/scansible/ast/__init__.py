@@ -15,7 +15,7 @@ further analysis. This validation is implemented with Pydantic and custom
 validators (see below).
 
 Nodes representing an entire file derive from `ASTFile`. Nodes appearing
-within a file derive from `ASTNode`, and contain source `position`
+within a file derive from `ASTNode`, and contain source `location`
 information.
 
 ## Expressions and literals
@@ -24,9 +24,9 @@ Scalar and composite values (`Identifier`, `StrLiteral`, `IntLiteral`, ...,
 `SeqLiteral`, `MapLiteral`) are deliberately *not* `ASTNode`/`BaseModel`
 subclasses: they need to behave like the underlying Python type they wrap
 (e.g. a `StrLiteral` must be usable as an actual `str`), which a Pydantic
-`BaseModel` cannot also be. Instead, they implement the `Positioned`
+`BaseModel` cannot also be. Instead, they implement the `HasLocation`
 protocol directly and supply a custom `__get_pydantic_core_schema__`, so
-they can be used as ordinary field types while still carrying `position`
+they can be used as ordinary field types while still carrying `location`
 information (see `nodes/expression.py`).
 
 `Expression` and `Condition`, by contrast, are `ASTNode` instances: they

@@ -227,19 +227,19 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
             ds.pop("action")
         )
         arg_list.extend(action_args)
-        # FIXME: We need to propagate positions manually as
+        # FIXME: We need to propagate locations manually as
         # 1) `parse_kv` and `split_args` operate on `str`, not `YamlStr`
         # and 2) `YamlStr.split` and other operations don't propagate yet.
-        orig_position = action.__position__
+        orig_location = action.__location__
 
         # action could be "xyz" or "xyz a=b c=d", split it.
         try:
             [action, *freeform_args] = cast(list[str], split_args(action))
         except AnsibleParserError as e:
             raise ValueError("Malformed action string") from e
-        arg_list.append(YamlStr(" ".join(freeform_args), position=orig_position))
+        arg_list.append(YamlStr(" ".join(freeform_args), location=orig_location))
 
-        ds["action"] = YamlStr(action, position=orig_position)
+        ds["action"] = YamlStr(action, location=orig_location)
         ds["args"] = cls._combine_args(action, *arg_list)
 
         return ds
@@ -292,15 +292,15 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
     def _parse_args(cls, action: str, args: str) -> Mapping[YamlScalar, YamlValue]:
         """Parse a raw `key=value` argument string, treating `action` specially if it's a freeform action."""
         check_raw = actions.is_freeform_action(action)
-        # Coerce to YamlStr because we shouldn't assume it actually is before accessing position information.
+        # Coerce to YamlStr because we shouldn't assume it actually is before accessing location information.
         args = YamlStr(args)
         try:
             parsed = cast(dict[str, str], parse_kv(args, check_raw))
-            # Re-introduce positions that got lost during `parse_kv`.
+            # Re-introduce locations that got lost during `parse_kv`.
             return YamlMap(
                 (
-                    YamlStr(k, position=args.__position__),
-                    YamlStr(v, position=args.__position__),
+                    YamlStr(k, location=args.__location__),
+                    YamlStr(v, location=args.__location__),
                 )
                 for k, v in parsed.items()
             )
@@ -353,7 +353,7 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
             # semantics than our approximation here.
             ds["action"] = YamlStr(
                 "import_tasks" if is_static else "include_tasks",
-                position=action.__position__,
+                location=action.__location__,
             )
         elif actions.is_include_tasks(action) and is_static is True:
             raise ValueError("include_tasks with static: yes")

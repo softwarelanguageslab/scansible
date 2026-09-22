@@ -256,11 +256,7 @@ def check_all(
 
     reporter = TerminalReporter()
     reporter.report_results(
-        [
-            result
-            for result in results
-            if result.location is not None and result.location.file == str(file_path)
-        ]
+        [result for result in results if result.location.path == str(file_path)]
     )
 
 

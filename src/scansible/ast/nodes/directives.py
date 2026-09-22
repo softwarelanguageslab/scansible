@@ -163,6 +163,6 @@ class CommonDirectives(BaseModel, frozen=True):
             # if `always_run: yes` -> `check_mode: no`.
             # not sure if `always_run: no` necessarily means `check_mode: yes` or
             # just "use default behaviour".
-            ds["check_mode"] = YamlBool(False, position=always_run.__position__)  # noqa: FBT003
+            ds["check_mode"] = YamlBool(False, location=always_run.__location__)  # noqa: FBT003
 
         return ds

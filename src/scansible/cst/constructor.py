@@ -2,7 +2,7 @@
 
 """Custom YAML object constructor.
 
-This constructor creates objects while keeping track of their positions in the file.
+This constructor creates objects while keeping track of their locations in the file.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from ruamel.yaml.nodes import Node
 from ruamel.yaml.resolver import BaseResolver
 from yaml.resolver import Resolver as _PyYAMLResolver
 
-from scansible.utils import LineColumn, Position
+from scansible.utils import LineColumn, Location
 
 from .nodes import (
     YamlBool,
@@ -45,39 +45,39 @@ class CustomConstructor(SafeConstructor):
         assert isinstance(loader, CustomYAML)
         super().__init__(preserve_quotes, loader)
 
-    def _get_position(self, node: Node) -> Position:
+    def _get_location(self, node: Node) -> Location:
         start = LineColumn.from_yaml_mark(node.start_mark)
         end = LineColumn.from_yaml_mark(node.end_mark)
-        return Position(path=self.loader.current_file_name, start=start, end=end)
+        return Location(path=self.loader.current_file_name, start=start, end=end)
 
     @override
     def construct_yaml_str(self, node: Node) -> YamlStr:
         value = super().construct_yaml_str(node)
-        obj = YamlStr(value, position=self._get_position(node))
+        obj = YamlStr(value, location=self._get_location(node))
         return obj
 
     @override
     def construct_yaml_int(self, node: Node) -> YamlInt:
         value = super().construct_yaml_int(node)
-        obj = YamlInt(value, position=self._get_position(node))
+        obj = YamlInt(value, location=self._get_location(node))
         return obj
 
     @override
     def construct_yaml_float(self, node: Node) -> YamlFloat:
         value = super().construct_yaml_float(node)
-        obj = YamlFloat(value, position=self._get_position(node))
+        obj = YamlFloat(value, location=self._get_location(node))
         return obj
 
     @override
     def construct_yaml_bool(self, node: Node) -> YamlBool:  # pyright: ignore[reportIncompatibleMethodOverride]
         value = super().construct_yaml_bool(node)
-        obj = YamlBool(value, position=self._get_position(node))
+        obj = YamlBool(value, location=self._get_location(node))
         return obj
 
     @override
     def construct_yaml_null(self, node: Node) -> YamlNone:
         super().construct_yaml_null(node)
-        obj = YamlNone(position=self._get_position(node))
+        obj = YamlNone(location=self._get_location(node))
         return obj
 
     @override
@@ -85,29 +85,29 @@ class CustomConstructor(SafeConstructor):
         value = super().construct_yaml_timestamp(node, values)
         # `datetime` is a subclass of `date`, so it must be checked first.
         if isinstance(value, datetime):
-            obj = YamlDatetime(value, position=self._get_position(node))
+            obj = YamlDatetime(value, location=self._get_location(node))
         else:
             assert isinstance(value, date)
-            obj = YamlDate(value, position=self._get_position(node))
+            obj = YamlDate(value, location=self._get_location(node))
         return obj
 
     @override
     def construct_yaml_map(self, node: Node) -> Iterable[YamlMap]:  # pyright: ignore[reportMissingTypeArgument]
-        data = YamlMap(position=self._get_position(node))
+        data = YamlMap(location=self._get_location(node))
         yield data
         value = self.construct_mapping(node)
         data.update(value)
 
     @override
     def construct_yaml_seq(self, node: Node) -> Iterable[YamlSeq]:  # pyright: ignore[reportMissingTypeArgument]
-        data = YamlSeq(position=self._get_position(node))
+        data = YamlSeq(location=self._get_location(node))
         yield data
         value = self.construct_sequence(node)
         data.extend(value)
 
     def construct_vault_value(self, node: Node) -> YamlVaultValue:
         value = self.construct_scalar(node)
-        obj = YamlVaultValue(value, position=self._get_position(node))
+        obj = YamlVaultValue(value, location=self._get_location(node))
         return obj
 
     def construct_unsafe_value(self, node: Node) -> YamlUnsafeStr:
@@ -115,7 +115,7 @@ class CustomConstructor(SafeConstructor):
         # to each YamlNode indicating whether it's unsafe, and set the attribute for any contained value?
         # FIXME: This might also contain other data types?
         value = self.construct_scalar(node)
-        obj = YamlUnsafeStr(value, position=self._get_position(node))
+        obj = YamlUnsafeStr(value, location=self._get_location(node))
         return obj
 
 

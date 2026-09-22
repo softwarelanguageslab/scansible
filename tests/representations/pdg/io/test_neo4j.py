@@ -20,6 +20,7 @@ from scansible.pdg import (
     Variable,
 )
 from scansible.pdg.io.neo4j import dump_edge, dump_graph, dump_node
+from scansible.utils import LineColumn
 
 
 @pytest.fixture
@@ -65,7 +66,9 @@ def describe_dump_node():
         t = Task(
             action="file",
             name="task name",
-            location=NodeLocation(file="test.yml", line=1, column=10),
+            location=NodeLocation(
+                path="test.yml", start=LineColumn(1, 10), end=LineColumn(1, 10)
+            ),
         )
         t.node_id = 0
 
@@ -73,7 +76,7 @@ def describe_dump_node():
 
         assert (
             result
-            == '(n0:Task { action: "file", location: "{\\"file\\": \\"test.yml\\", \\"line\\": 1, \\"column\\": 10, \\"includer_location\\": null}", name: "task name", node_id: 0 })'
+            == '(n0:Task { action: "file", location: "{\\"path\\": \\"test.yml\\", \\"start\\": [1, 10], \\"end\\": [1, 10], \\"includer_location\\": null}", name: "task name", node_id: 0 })'
         )
 
     def should_dump_literal_string():

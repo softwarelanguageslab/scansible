@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import override
 
 from scansible.pdg.representation import Graph, NodeLocation, Task
+from scansible.utils import LineColumn
 
 from .base import Rule, RuleResult
 
@@ -28,6 +29,10 @@ class SanityCheckNumberOfTasksRule(Rule):
                 rule_subname=rule_subname,
                 rule_header="Found no or very few tasks, something may have gone wrong with PDG building.",
                 rule_message="",
-                location=NodeLocation(file="tasks/main.yml", line=1, column=1),
+                location=NodeLocation(
+                    path="tasks/main.yml",
+                    start=LineColumn(1, 1),
+                    end=LineColumn(1, 1),
+                ),
             )
         ]

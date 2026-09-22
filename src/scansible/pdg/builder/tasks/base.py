@@ -35,7 +35,7 @@ class TaskBuilder(abc.ABC):
         self.context: BuildContext = context
         self.task: ast.BaseTask = task
         self.location: rep.NodeLocation = context.get_location(task)
-        self.logger: Logger = logger.bind(location=task.position)
+        self.logger: Logger = logger.bind(location=task.location)
 
     @abc.abstractmethod
     def build_task(self, predecessors: Sequence[rep.ControlNode]) -> BuildResult:

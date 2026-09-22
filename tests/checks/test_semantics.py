@@ -11,6 +11,7 @@ from scansible.checks.semantics import run_all_checks as orig_run_all_checks
 from scansible.pdg import build_pdg
 from scansible.pdg.builder.context import BuildContext
 from scansible.pdg.representation import NodeLocation
+from scansible.utils import LineColumn
 
 
 def run_all_checks(ctx: BuildContext) -> list[CheckResult]:
@@ -52,7 +53,9 @@ def describe_unsafe_reuse_rules() -> None:
         assert results == [
             CheckResult(
                 "Unsafe reuse: Impure expression",
-                NodeLocation(file="pb.yml", line=4, column=17),
+                NodeLocation(
+                    path="pb.yml", start=LineColumn(4, 17), end=LineColumn(4, 20)
+                ),
             )
         ]
 
@@ -85,7 +88,9 @@ def describe_unsafe_reuse_rules() -> None:
         assert results == [
             CheckResult(
                 "Unsafe reuse: Redefined dependence",
-                NodeLocation(file="pb.yml", line=5, column=17),
+                NodeLocation(
+                    path="pb.yml", start=LineColumn(5, 17), end=LineColumn(5, 17)
+                ),
             )
         ]
 
@@ -116,7 +121,9 @@ def describe_unintended_override_rules() -> None:
         assert results == [
             CheckResult(
                 "Unintended override: Unconditional override",
-                NodeLocation(file="pb.yml", line=9, column=21),
+                NodeLocation(
+                    path="pb.yml", start=LineColumn(9, 21), end=LineColumn(9, 21)
+                ),
             )
         ]
 
@@ -142,7 +149,9 @@ def describe_unintended_override_rules() -> None:
         assert results == [
             CheckResult(
                 "Unintended override: Unused because shadowed",
-                NodeLocation(file="pb.yml", line=9, column=21),
+                NodeLocation(
+                    path="pb.yml", start=LineColumn(9, 21), end=LineColumn(9, 21)
+                ),
             )
         ]
 
@@ -167,7 +176,9 @@ def describe_too_high_precedence_rules() -> None:
         assert results == [
             CheckResult(
                 "Unnecessarily high precedence: Unnecessary set_fact",
-                NodeLocation(file="pb.yml", line=5, column=21),
+                NodeLocation(
+                    path="pb.yml", start=LineColumn(5, 21), end=LineColumn(5, 24)
+                ),
             )
         ]
 
@@ -228,10 +239,14 @@ def describe_too_high_precedence_rules() -> None:
             CheckResult(
                 "Unnecessarily high precedence: Unnecessary include_vars",
                 NodeLocation(
-                    file="vars.yml",
-                    line=1,
-                    column=1,
-                    includer_location=NodeLocation(file="pb.yml", line=4, column=19),
+                    path="vars.yml",
+                    start=LineColumn(1, 1),
+                    end=LineColumn(1, 2),
+                    includer_location=NodeLocation(
+                        path="pb.yml",
+                        start=LineColumn(4, 19),
+                        end=LineColumn(5, 17),
+                    ),
                 ),
             )
         ]

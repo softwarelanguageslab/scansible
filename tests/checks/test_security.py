@@ -41,16 +41,39 @@ def write_pb(content: str, path: Path) -> None:
     _ = path.write_text(content)
 
 
-def run_all_checks(db: GraphDatabase) -> list[RuleResult]:
+#: A `RuleResult`, but with each `NodeLocation` collapsed down to its
+#: `path:line:column` string to avoid deep positioning checks in tests.
+type StringifiedResult = tuple[str, str, str, str]
+
+
+def _make_result(
+    name: str, description: str, source: str, sink: str
+) -> StringifiedResult:
+    return (name, description, source, sink)
+
+
+def _stringify(results: list[RuleResult]) -> list[StringifiedResult]:
+    return [
+        _make_result(
+            r.rule_name,
+            r.rule_description,
+            str(r.source_location),
+            str(r.sink_location),
+        )
+        for r in results
+    ]
+
+
+def run_all_checks(db: GraphDatabase) -> list[StringifiedResult]:
     results: list[RuleResult] = []
     for rule in rules.get_all_rules():
         results.extend(rule.run(db))
-    return results
+    return _stringify(results)
 
 
 def describe_hardcoded_secret_rule() -> None:
     _result = partial(
-        RuleResult, HardcodedSecretRule.name, HardcodedSecretRule.description
+        _make_result, HardcodedSecretRule.name, HardcodedSecretRule.description
     )
 
     def matches_literal_on_task(tmp_path: Path) -> None:
@@ -67,7 +90,7 @@ def describe_hardcoded_secret_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = HardcodedSecretRule().run(graph_db)
+            results = _stringify(HardcodedSecretRule().run(graph_db))
 
         assert results == [_result("pb.yml:7:31", "pb.yml:4:19")]
 
@@ -87,7 +110,7 @@ def describe_hardcoded_secret_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = HardcodedSecretRule().run(graph_db)
+            results = _stringify(HardcodedSecretRule().run(graph_db))
 
         assert results == [_result("pb.yml:4:24", "pb.yml:6:19")]
 
@@ -108,7 +131,7 @@ def describe_hardcoded_secret_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = HardcodedSecretRule().run(graph_db)
+            results = _stringify(HardcodedSecretRule().run(graph_db))
 
         assert results == [_result("pb.yml:4:24", "pb.yml:7:19")]
 
@@ -125,7 +148,7 @@ def describe_hardcoded_secret_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = HardcodedSecretRule().run(graph_db)
+            results = _stringify(HardcodedSecretRule().run(graph_db))
 
         assert results == [_result("pb.yml:4:34", "pb.yml:4:17")]
 
@@ -143,7 +166,7 @@ def describe_hardcoded_secret_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = HardcodedSecretRule().run(graph_db)
+            results = _stringify(HardcodedSecretRule().run(graph_db))
 
         assert results == [_result("pb.yml:4:24", "pb.yml:5:17")]
 
@@ -160,7 +183,7 @@ def describe_hardcoded_secret_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = HardcodedSecretRule().run(graph_db)
+            results = _stringify(HardcodedSecretRule().run(graph_db))
 
         assert not results
 
@@ -179,7 +202,7 @@ def describe_hardcoded_secret_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = HardcodedSecretRule().run(graph_db)
+            results = _stringify(HardcodedSecretRule().run(graph_db))
 
         assert not results
 
@@ -196,7 +219,7 @@ def describe_hardcoded_secret_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = HardcodedSecretRule().run(graph_db)
+            results = _stringify(HardcodedSecretRule().run(graph_db))
 
         assert not results
 
@@ -213,7 +236,7 @@ def describe_hardcoded_secret_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = HardcodedSecretRule().run(graph_db)
+            results = _stringify(HardcodedSecretRule().run(graph_db))
 
         assert not results
 
@@ -231,13 +254,15 @@ def describe_hardcoded_secret_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = HardcodedSecretRule().run(graph_db)
+            results = _stringify(HardcodedSecretRule().run(graph_db))
 
         assert not results
 
 
 def describe_empty_password_rule() -> None:
-    _result = partial(RuleResult, EmptyPasswordRule.name, EmptyPasswordRule.description)
+    _result = partial(
+        _make_result, EmptyPasswordRule.name, EmptyPasswordRule.description
+    )
 
     def matches_literal_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -253,7 +278,7 @@ def describe_empty_password_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = EmptyPasswordRule().run(graph_db)
+            results = _stringify(EmptyPasswordRule().run(graph_db))
 
         assert results == [_result("pb.yml:7:31", "pb.yml:4:19")]
 
@@ -271,7 +296,7 @@ def describe_empty_password_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = EmptyPasswordRule().run(graph_db)
+            results = _stringify(EmptyPasswordRule().run(graph_db))
 
         assert results == [_result("pb.yml:7:31", "pb.yml:4:19")]
 
@@ -289,7 +314,7 @@ def describe_empty_password_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = EmptyPasswordRule().run(graph_db)
+            results = _stringify(EmptyPasswordRule().run(graph_db))
 
         assert results == [_result("pb.yml:4:19", "pb.yml:4:19")]
 
@@ -309,7 +334,7 @@ def describe_empty_password_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = EmptyPasswordRule().run(graph_db)
+            results = _stringify(EmptyPasswordRule().run(graph_db))
 
         assert results == [_result("pb.yml:4:24", "pb.yml:6:19")]
 
@@ -330,7 +355,7 @@ def describe_empty_password_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = EmptyPasswordRule().run(graph_db)
+            results = _stringify(EmptyPasswordRule().run(graph_db))
 
         assert results == [_result("pb.yml:4:24", "pb.yml:7:19")]
 
@@ -347,7 +372,7 @@ def describe_empty_password_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = EmptyPasswordRule().run(graph_db)
+            results = _stringify(EmptyPasswordRule().run(graph_db))
 
         assert results == [_result("pb.yml:4:34", "pb.yml:4:17")]
 
@@ -365,14 +390,14 @@ def describe_empty_password_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = EmptyPasswordRule().run(graph_db)
+            results = _stringify(EmptyPasswordRule().run(graph_db))
 
         assert results == [_result("pb.yml:4:24", "pb.yml:5:17")]
 
 
 def describe_admin_by_default_rule() -> None:
     _result = partial(
-        RuleResult, AdminByDefaultRule.name, AdminByDefaultRule.description
+        _make_result, AdminByDefaultRule.name, AdminByDefaultRule.description
     )
 
     def matches_literal_on_task(tmp_path: Path) -> None:
@@ -387,7 +412,7 @@ def describe_admin_by_default_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = AdminByDefaultRule().run(graph_db)
+            results = _stringify(AdminByDefaultRule().run(graph_db))
 
         assert results == [_result("pb.yml:5:32", "pb.yml:4:19")]
 
@@ -405,14 +430,14 @@ def describe_admin_by_default_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = AdminByDefaultRule().run(graph_db)
+            results = _stringify(AdminByDefaultRule().run(graph_db))
 
         assert results == [_result("pb.yml:4:28", "pb.yml:6:19")]
 
 
 def describe_http_without_tls_or_ssl_rule() -> None:
     _result = partial(
-        RuleResult, HTTPWithoutSSLTLSRule.name, HTTPWithoutSSLTLSRule.description
+        _make_result, HTTPWithoutSSLTLSRule.name, HTTPWithoutSSLTLSRule.description
     )
 
     def matches_literal_on_task(tmp_path: Path) -> None:
@@ -427,7 +452,7 @@ def describe_http_without_tls_or_ssl_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = HTTPWithoutSSLTLSRule().run(graph_db)
+            results = _stringify(HTTPWithoutSSLTLSRule().run(graph_db))
 
         assert results == [_result("pb.yml:5:26", "pb.yml:4:19")]
 
@@ -445,7 +470,7 @@ def describe_http_without_tls_or_ssl_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = HTTPWithoutSSLTLSRule().run(graph_db)
+            results = _stringify(HTTPWithoutSSLTLSRule().run(graph_db))
 
         assert results == [_result("pb.yml:4:27", "pb.yml:6:19")]
 
@@ -463,7 +488,7 @@ def describe_http_without_tls_or_ssl_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = HTTPWithoutSSLTLSRule().run(graph_db)
+            results = _stringify(HTTPWithoutSSLTLSRule().run(graph_db))
 
         assert results == [_result("pb.yml:7:26", "pb.yml:6:19")]
 
@@ -482,7 +507,7 @@ def describe_http_without_tls_or_ssl_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = HTTPWithoutSSLTLSRule().run(graph_db)
+            results = _stringify(HTTPWithoutSSLTLSRule().run(graph_db))
 
         assert results == [_result("pb.yml:5:22", "pb.yml:7:19")]
 
@@ -498,7 +523,7 @@ def describe_http_without_tls_or_ssl_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = HTTPWithoutSSLTLSRule().run(graph_db)
+            results = _stringify(HTTPWithoutSSLTLSRule().run(graph_db))
 
         assert not results
 
@@ -514,7 +539,7 @@ def describe_http_without_tls_or_ssl_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = HTTPWithoutSSLTLSRule().run(graph_db)
+            results = _stringify(HTTPWithoutSSLTLSRule().run(graph_db))
 
         assert not results
 
@@ -530,7 +555,7 @@ def describe_http_without_tls_or_ssl_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = HTTPWithoutSSLTLSRule().run(graph_db)
+            results = _stringify(HTTPWithoutSSLTLSRule().run(graph_db))
 
         assert not results
 
@@ -549,7 +574,7 @@ def describe_http_without_tls_or_ssl_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = HTTPWithoutSSLTLSRule().run(graph_db)
+            results = _stringify(HTTPWithoutSSLTLSRule().run(graph_db))
 
         assert not results
 
@@ -565,7 +590,7 @@ def describe_http_without_tls_or_ssl_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = HTTPWithoutSSLTLSRule().run(graph_db)
+            results = _stringify(HTTPWithoutSSLTLSRule().run(graph_db))
 
         assert not results
 
@@ -589,14 +614,14 @@ def describe_http_without_tls_or_ssl_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = HTTPWithoutSSLTLSRule().run(graph_db)
+            results = _stringify(HTTPWithoutSSLTLSRule().run(graph_db))
 
         assert results == [_result("pb.yml:4:22", "pb.yml:10:19")]
 
 
 def describe_missing_integrity_check_rule() -> None:
     _result = partial(
-        RuleResult,
+        _make_result,
         MissingIntegrityCheckRule.name,
         MissingIntegrityCheckRule.description,
     )
@@ -613,7 +638,7 @@ def describe_missing_integrity_check_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = MissingIntegrityCheckRule().run(graph_db)
+            results = _stringify(MissingIntegrityCheckRule().run(graph_db))
 
         assert results == [_result("pb.yml:5:26", "pb.yml:4:19")]
 
@@ -631,7 +656,7 @@ def describe_missing_integrity_check_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = MissingIntegrityCheckRule().run(graph_db)
+            results = _stringify(MissingIntegrityCheckRule().run(graph_db))
 
         assert results == [_result("pb.yml:4:27", "pb.yml:6:19")]
 
@@ -649,7 +674,7 @@ def describe_missing_integrity_check_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = MissingIntegrityCheckRule().run(graph_db)
+            results = _stringify(MissingIntegrityCheckRule().run(graph_db))
 
         assert results == [_result("pb.yml:7:26", "pb.yml:6:19")]
 
@@ -666,7 +691,7 @@ def describe_missing_integrity_check_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = MissingIntegrityCheckRule().run(graph_db)
+            results = _stringify(MissingIntegrityCheckRule().run(graph_db))
 
         assert results == [_result("pb.yml:6:31", "pb.yml:4:19")]
 
@@ -683,7 +708,7 @@ def describe_missing_integrity_check_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = MissingIntegrityCheckRule().run(graph_db)
+            results = _stringify(MissingIntegrityCheckRule().run(graph_db))
 
         assert results == [_result("pb.yml:6:40", "pb.yml:4:19")]
 
@@ -702,7 +727,7 @@ def describe_missing_integrity_check_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = MissingIntegrityCheckRule().run(graph_db)
+            results = _stringify(MissingIntegrityCheckRule().run(graph_db))
 
         assert results == [_result("pb.yml:4:25", "pb.yml:6:19")]
 
@@ -719,7 +744,7 @@ def describe_missing_integrity_check_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = MissingIntegrityCheckRule().run(graph_db)
+            results = _stringify(MissingIntegrityCheckRule().run(graph_db))
 
         assert not results
 
@@ -736,7 +761,7 @@ def describe_missing_integrity_check_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = MissingIntegrityCheckRule().run(graph_db)
+            results = _stringify(MissingIntegrityCheckRule().run(graph_db))
 
         assert not results
 
@@ -753,7 +778,7 @@ def describe_missing_integrity_check_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = MissingIntegrityCheckRule().run(graph_db)
+            results = _stringify(MissingIntegrityCheckRule().run(graph_db))
 
         assert not results
 
@@ -769,14 +794,14 @@ def describe_missing_integrity_check_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = MissingIntegrityCheckRule().run(graph_db)
+            results = _stringify(MissingIntegrityCheckRule().run(graph_db))
 
         assert not results
 
 
 def describe_unrestricted_ip_address_rule() -> None:
     _result = partial(
-        RuleResult,
+        _make_result,
         UnrestrictedIPAddressRule.name,
         UnrestrictedIPAddressRule.description,
     )
@@ -793,7 +818,7 @@ def describe_unrestricted_ip_address_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = UnrestrictedIPAddressRule().run(graph_db)
+            results = _stringify(UnrestrictedIPAddressRule().run(graph_db))
 
         assert results == [_result("pb.yml:5:27", "pb.yml:4:19")]
 
@@ -811,7 +836,7 @@ def describe_unrestricted_ip_address_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = UnrestrictedIPAddressRule().run(graph_db)
+            results = _stringify(UnrestrictedIPAddressRule().run(graph_db))
 
         assert results == [_result("pb.yml:4:31", "pb.yml:6:19")]
 
@@ -829,14 +854,14 @@ def describe_unrestricted_ip_address_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = UnrestrictedIPAddressRule().run(graph_db)
+            results = _stringify(UnrestrictedIPAddressRule().run(graph_db))
 
         assert not results
 
 
 def describe_weak_crypto_rule() -> None:
     _result = partial(
-        RuleResult, WeakCryptoAlgorithmRule.name, WeakCryptoAlgorithmRule.description
+        _make_result, WeakCryptoAlgorithmRule.name, WeakCryptoAlgorithmRule.description
     )
 
     def matches_literal_on_task(tmp_path: Path) -> None:
@@ -852,7 +877,7 @@ def describe_weak_crypto_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = WeakCryptoAlgorithmRule().run(graph_db)
+            results = _stringify(WeakCryptoAlgorithmRule().run(graph_db))
 
         assert results == [_result("pb.yml:6:31", "pb.yml:4:19")]
 
@@ -871,7 +896,7 @@ def describe_weak_crypto_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = WeakCryptoAlgorithmRule().run(graph_db)
+            results = _stringify(WeakCryptoAlgorithmRule().run(graph_db))
 
         assert results == [_result("pb.yml:4:32", "pb.yml:6:19")]
 
@@ -888,7 +913,7 @@ def describe_weak_crypto_rule() -> None:
             pb_path,
         )
         with temp_import_pb(pb_path) as graph_db:
-            results = WeakCryptoAlgorithmRule().run(graph_db)
+            results = _stringify(WeakCryptoAlgorithmRule().run(graph_db))
 
         assert results == [_result("pb.yml:6:31", "pb.yml:4:19")]
 
@@ -911,7 +936,7 @@ def describe_glitch_test_cases() -> None:
             results = run_all_checks(graph_db)
 
         assert results == [
-            RuleResult(
+            _make_result(
                 AdminByDefaultRule.name,
                 AdminByDefaultRule.description,
                 "pb.yml:5:32",
@@ -947,7 +972,7 @@ def describe_glitch_test_cases() -> None:
             results = run_all_checks(graph_db)
 
         assert results == [
-            RuleResult(
+            _make_result(
                 EmptyPasswordRule.name,
                 EmptyPasswordRule.description,
                 "pb.yml:4:19",
@@ -983,7 +1008,7 @@ def describe_glitch_test_cases() -> None:
             results = run_all_checks(graph_db)
 
         assert results == [
-            RuleResult(
+            _make_result(
                 HardcodedSecretRule.name,
                 HardcodedSecretRule.description,
                 "pb.yml:10:33",
@@ -1019,7 +1044,7 @@ def describe_glitch_test_cases() -> None:
             results = run_all_checks(graph_db)
 
         assert results == [
-            RuleResult(
+            _make_result(
                 HTTPWithoutSSLTLSRule.name,
                 HTTPWithoutSSLTLSRule.description,
                 "pb.yml:6:26",
@@ -1074,7 +1099,7 @@ def describe_glitch_test_cases() -> None:
             results = run_all_checks(graph_db)
 
         assert results == [
-            RuleResult(
+            _make_result(
                 UnrestrictedIPAddressRule.name,
                 UnrestrictedIPAddressRule.description,
                 "pb.yml:6:39",
@@ -1109,14 +1134,14 @@ def describe_glitch_test_cases() -> None:
 
         assert sorted(results) == sorted(
             [
-                RuleResult(
+                _make_result(
                     WeakCryptoAlgorithmRule.name,
                     WeakCryptoAlgorithmRule.description,
                     "pb.yml:6:38",
                     "pb.yml:8:19",
                 ),
                 # Due to the variable name also being matched.
-                RuleResult(
+                _make_result(
                     WeakCryptoAlgorithmRule.name,
                     WeakCryptoAlgorithmRule.description,
                     "pb.yml:9:26",

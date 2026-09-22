@@ -14,16 +14,15 @@ from scansible.pdg.representation import NodeLocation
 from ..db import DatabaseResultConverter, DatabaseValue, GraphDatabase
 
 
-# TODO: Locations should use NodeLocation.
 class RuleResult(NamedTuple):
     #: The rule that was triggered.
     rule_name: str
     #: Rule description
     rule_description: str
     #: Location in the code of the source of the smell
-    source_location: str | None
+    source_location: NodeLocation
     #: Location in the code of the sink of the smell
-    sink_location: str | None
+    sink_location: NodeLocation
 
 
 type RuleParameters = Mapping[str, DatabaseValue]
@@ -36,12 +35,6 @@ LocationQueryResult = tuple[int]
 
 def _validate_query_result[T](result_type: type[T]) -> DatabaseResultConverter[T]:
     return TypeAdapter(result_type).validate_python
-
-
-def _convert_location(loc: NodeLocation | None) -> str:
-    if loc is None or loc.is_synthetic:
-        return "unknown file:-1:-1"
-    return str(loc)
 
 
 class Rule(abc.ABC):
@@ -62,12 +55,12 @@ class Rule(abc.ABC):
     def query(self) -> RuleQuery:
         raise NotImplementedError("To be implemented by subclass")
 
-    def _get_location(self, db: GraphDatabase, node_id: int) -> NodeLocation | None:
+    def _get_location(self, db: GraphDatabase, node_id: int) -> NodeLocation:
         """Get source code location of a node."""
         node_location = db.get_location(node_id)
         # Node may not have location information stored (e.g., scalar literals),
         # so get location of the node it is assigned to.
-        while node_location is None or node_location.is_synthetic:
+        while node_location.is_synthetic:
             assigned_nodes = db.query(
                 _validate_query_result(LocationQueryResult),
                 "MATCH (n) -[:e_Def|e_Keyword]->(n2) WHERE n.node_id = $node_id RETURN n2.node_id",
@@ -103,8 +96,8 @@ class Rule(abc.ABC):
                 RuleResult(
                     self.short_name,
                     self.description,
-                    _convert_location(self._get_location(graph_db, source)),
-                    _convert_location(self._get_location(graph_db, sink)),
+                    self._get_location(graph_db, source),
+                    self._get_location(graph_db, sink),
                 )
             )
 
