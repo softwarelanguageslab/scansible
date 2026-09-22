@@ -8,7 +8,6 @@ from collections import defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import Enum
-from functools import reduce
 from itertools import chain
 
 from loguru import logger
@@ -91,6 +90,8 @@ class VariableDefinitionRecord:
     conditions: Sequence[rep.DataNode]
     #: The location where the variable is defined.
     location: rep.NodeLocation
+    #: Revision of the same-named definition visible when this one was registered, if any.
+    shadows: int | None = None
 
 
 class Environment(abc.ABC):
@@ -295,20 +296,6 @@ class EnvironmentStack:
     def set_variable_definition(self, rec: VariableDefinitionRecord) -> None:
         """Define the given variable in the innermost environment."""
         self._get_topmost_environment(rec.env_type).set_variable_definition(rec)
-
-    def _get_all_visible_definitions(self) -> dict[str, VariableDefinitionRecord]:
-        return reduce(
-            operator.or_,  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
-            (
-                env.get_all_variable_definitions()
-                for env in reversed(self.precedence_chain)
-            ),
-        )
-
-    def get_currently_visible_definitions(self) -> set[tuple[str, int]]:
-        """Get the set of all variable definitions that are in scope at this point in the evaluation."""
-        all_vars = self._get_all_visible_definitions()
-        return {(vdef.name, vdef.revision) for vdef in all_vars.values()}
 
     def enter_scope(self, env_type: LocalEnvType) -> None:
         """Enter a new environment of the given type and add it to the stack."""

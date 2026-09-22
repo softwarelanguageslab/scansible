@@ -47,7 +47,7 @@ def describe_dump_node():
 
         assert (
             result
-            == '(n0:Variable { location: null, name: "test", node_id: 0, scope_level: 1, value_version: 0, version: 0 })'
+            == '(n0:Variable { location: null, name: "test", node_id: 0, scope_level: 1, shadows: null, value_version: 0, version: 0 })'
         )
 
     def should_dump_task():

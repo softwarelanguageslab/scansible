@@ -6,7 +6,6 @@ from collections import defaultdict
 from collections.abc import Collection, Iterable
 from itertools import pairwise
 
-from scansible.pdg.builder.context import VisibilityInformation
 from scansible.pdg.representation import Graph, Variable
 
 from .base import Rule, RuleResult
@@ -19,7 +18,7 @@ from .utils import (
 
 class ReuseChangedVariableRule(Rule):
     @override
-    def scan(self, graph: Graph, visinfo: VisibilityInformation) -> list[RuleResult]:
+    def scan(self, graph: Graph) -> list[RuleResult]:
         var_nodes = graph.get_nodes(Variable)
 
         # Mapping from (variable name, definition version) to all variables in graph with those properties.

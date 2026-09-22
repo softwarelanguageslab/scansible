@@ -665,6 +665,7 @@ def describe_reevaluating_expressions():
                         version=1,
                         value_version=0,
                         scope_level=EnvironmentType.TASK_VARS.value,
+                        shadows=0,
                     ),
                     "l2": ScalarLiteral(type="str", value="hi"),
                     "e2": Expression(expr="{{ a }} world"),

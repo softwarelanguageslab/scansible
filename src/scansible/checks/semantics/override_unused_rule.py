@@ -5,7 +5,6 @@ from typing import override
 from collections import defaultdict
 from collections.abc import Iterable
 
-from scansible.pdg.builder.context import VisibilityInformation
 from scansible.pdg.builder.semantics import EnvironmentType
 from scansible.pdg.representation import Graph, Variable
 
@@ -22,7 +21,7 @@ class UnusedOverriddenRule(Rule):
     """
 
     @override
-    def scan(self, graph: Graph, visinfo: VisibilityInformation) -> list[RuleResult]:
+    def scan(self, graph: Graph) -> list[RuleResult]:
         var_nodes = graph.get_nodes(Variable)
 
         # Grouping. We need the different values to find usages for reporting
@@ -37,7 +36,7 @@ class UnusedOverriddenRule(Rule):
 
         results: list[RuleResult] = []
         for name, related_nodes in var_name_to_vars.items():
-            results.extend(self.scan_vars(graph, name, related_nodes, visinfo))
+            results.extend(self.scan_vars(graph, name, related_nodes))
         return results
 
     def scan_vars(
@@ -45,7 +44,6 @@ class UnusedOverriddenRule(Rule):
         graph: Graph,
         name: str,
         nodes: dict[int, list[Variable]],
-        visinfo: VisibilityInformation,
     ) -> Iterable[RuleResult]:
         # If there are no redefinitions, we don't need to check anything
         if len(nodes) <= 1:
@@ -56,14 +54,9 @@ class UnusedOverriddenRule(Rule):
             v2 = vals_v2_lst[0]
             vals_v2 = set(vals_v2_lst)
 
-            # Find the v2 which would conflict with this definition
-            visibles = visinfo.get_info(v2.name, v2.version)
-            for cand_name, cand_version in visibles:
-                if cand_name != v2.name:
-                    continue
-                vals_v1_lst = nodes[cand_version]
-                break
-            else:
+            # Find the definition which would conflict with this one, if any
+            vals_v1_lst = nodes.get(v2.shadows) if v2.shadows is not None else None
+            if vals_v1_lst is None:
                 # Doesn't conflict with anything with the same name
                 continue
 

@@ -4,7 +4,6 @@ from typing import override
 
 from collections import defaultdict
 
-from scansible.pdg.builder.context import VisibilityInformation
 from scansible.pdg.builder.semantics import EnvironmentType
 from scansible.pdg.representation import Def, Expression, Graph, Literal, Task, Variable
 
@@ -62,7 +61,7 @@ def is_pure_expr(graph: Graph, expr: Expression) -> bool:
 
 class UnnecessaryIncludeVarsRule(Rule):
     @override
-    def scan(self, graph: Graph, visinfo: VisibilityInformation) -> list[RuleResult]:
+    def scan(self, graph: Graph) -> list[RuleResult]:
         included_vars = [
             node
             for node in graph.get_nodes(Variable)

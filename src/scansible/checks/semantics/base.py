@@ -4,7 +4,6 @@ import abc
 
 from pydantic import BaseModel
 
-from scansible.pdg.builder.context import VisibilityInformation
 from scansible.pdg.representation import Graph, NodeLocation
 
 
@@ -20,6 +19,4 @@ class RuleResult(BaseModel, frozen=True, strict=True, extra="forbid"):
 
 class Rule(abc.ABC):
     @abc.abstractmethod
-    def scan(
-        self, graph: Graph, visinfo: VisibilityInformation
-    ) -> list[RuleResult]: ...
+    def scan(self, graph: Graph) -> list[RuleResult]: ...

@@ -62,7 +62,8 @@ class VariableManager:
         """
         revision = self._get_next_def_revision(name)
         logger.debug(f"Selected revision {revision} for {name}")
-        self._define_variable(name, revision, env_type, initialiser, conditions)
+        shadows = self._get_shadowed_revision(name)
+        self._define_variable(name, revision, env_type, initialiser, conditions, shadows)
 
     def define_eager_variable(
         self,
@@ -77,18 +78,25 @@ class VariableManager:
         """
         revision = self._get_next_def_revision(name)
         logger.debug(f"Selected revision {revision} for {name}")
+        shadows = self._get_shadowed_revision(name)
         var_node = rep.Variable(
             name=name,
             version=revision,
             value_version=0,
             scope_level=env_type.value,
+            shadows=shadows,
             location=self.build_ctx.get_location(name),
         )
         self.build_ctx.graph.add_node(var_node)
         for cond in conditions or []:
             self.build_ctx.graph.add_edge(cond, var_node, rep.WHEN)
-        self._define_variable(name, revision, env_type, var_node, conditions)
+        self._define_variable(name, revision, env_type, var_node, conditions, shadows)
         return var_node
+
+    def _get_shadowed_revision(self, name: str) -> int | None:
+        """Get the revision of the same-named definition currently visible, if any."""
+        rec = self._envs.get_variable_definition(name)
+        return rec.revision if rec is not None else None
 
     def _define_variable(
         self,
@@ -97,6 +105,7 @@ class VariableManager:
         env_type: EnvironmentType,
         value: ast.AnyExpression | rep.Variable,
         conditions: Sequence[rep.DataNode] | None,
+        shadows: int | None,
     ) -> None:
         """Declare a variable, bound to the given value.
 
@@ -105,13 +114,6 @@ class VariableManager:
         """
         logger.debug(f"Defining variable {name!r} in env of type {env_type.name}")
 
-        # Store auxiliary information about which other variables are available
-        # at the time this variable is registered, i.e. the ones that are
-        # "visible" to the current definition.
-        self.build_ctx.visibility_information.set_info(
-            name, revision, self._envs.get_currently_visible_definitions()
-        )
-
         def_record = VariableDefinitionRecord(
             name,
             revision,
@@ -119,6 +121,7 @@ class VariableManager:
             env_type,
             tuple(conditions or []),
             self.build_ctx.get_location(name),
+            shadows,
         )
         self._envs.set_variable_definition(def_record)
 

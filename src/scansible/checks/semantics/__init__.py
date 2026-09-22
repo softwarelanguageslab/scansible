@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from scansible.pdg import Graph
-from scansible.pdg.builder.context import VisibilityInformation
 
 from .base import RuleResult
 from .override_unused_rule import UnusedOverriddenRule
@@ -21,5 +20,5 @@ ALL_RULES = [
 ]
 
 
-def run_all_checks(graph: Graph, visinfo: VisibilityInformation) -> list[RuleResult]:
-    return [res for rule in ALL_RULES for res in rule.scan(graph, visinfo)]
+def run_all_checks(graph: Graph) -> list[RuleResult]:
+    return [res for rule in ALL_RULES for res in rule.scan(graph)]

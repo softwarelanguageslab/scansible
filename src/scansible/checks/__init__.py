@@ -48,8 +48,6 @@ def run_all_checks(
     if enable_semantics:
         results.extend(
             CheckResult(f"{res.rule_category}: {res.rule_header}", res.location)
-            for res in semantics.run_all_checks(
-                build_context.graph, build_context.visibility_information
-            )
+            for res in semantics.run_all_checks(build_context.graph)
         )
     return results

@@ -21,7 +21,7 @@ type DatabaseValue = object
 
 SCHEMA = """
 CREATE NODE TABLE Task(node_id INT64, action STRING, name STRING, PRIMARY KEY (node_id));
-CREATE NODE TABLE Variable(node_id INT64, name STRING, version INT64, value_version INT64, scope_level INT64, PRIMARY KEY (node_id));
+CREATE NODE TABLE Variable(node_id INT64, name STRING, version INT64, value_version INT64, scope_level INT64, shadows INT64, PRIMARY KEY (node_id));
 CREATE NODE TABLE IntermediateValue(node_id INT64, identifier INT64, PRIMARY KEY (node_id));
 CREATE NODE TABLE ScalarLiteral(node_id INT64, type STRING, value STRING, PRIMARY KEY (node_id));
 CREATE NODE TABLE CompositeLiteral(node_id INT64, type STRING, PRIMARY KEY (node_id));

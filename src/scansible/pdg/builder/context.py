@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import cast
 
-import json
 import textwrap
 from collections import defaultdict
 from collections.abc import Generator, Sequence
@@ -16,41 +15,12 @@ from .. import representation as rep
 from .semantics import ExpressionManager, InclusionManager, VariableManager
 
 
-class VisibilityInformation:
-    def __init__(self) -> None:
-        self._store: dict[tuple[str, int], set[tuple[str, int]]] = {}
-
-    def set_info(
-        self, var_name: str, def_version: int, visible_definitions: set[tuple[str, int]]
-    ) -> None:
-        assert (var_name, def_version) not in self._store, (
-            f"Internal Error: Visibility information already set for {var_name}@{def_version}"
-        )
-        self._store[(var_name, def_version)] = visible_definitions
-
-    def get_info(self, var_name: str, def_version: int) -> set[tuple[str, int]]:
-        assert (var_name, def_version) in self._store, (
-            f"Internal Error: Visibility information not stored for {var_name}@{def_version}"
-        )
-        return self._store[(var_name, def_version)]
-
-    def dump(self) -> str:
-        """Dump to JSON."""
-        as_lists = [
-            [list(k), [list(v) for v in vals]] for k, vals in self._store.items()
-        ]
-        return json.dumps(as_lists)
-
-
 class BuildContext:
     vars: VariableManager
     expr: ExpressionManager
     graph: rep.Graph
     include_ctx: InclusionManager
     model_root: ast.Role | ast.Playbook
-    # Auxiliary information about variable visibility. We don't store this in
-    # the graph itself but in a companion file.
-    visibility_information: VisibilityInformation
     errors: list[tuple[str, Position | None]]
     _next_iv_id: int
 
@@ -71,7 +41,6 @@ class BuildContext:
         self.graph = graph
         self.model_root = model.root
         self.include_ctx = InclusionManager(model, role_search_paths, lenient=lenient)
-        self.visibility_information = VisibilityInformation()
         self._next_iv_id = 0
         self.errors = []
         self.handler_notifications = defaultdict(set)

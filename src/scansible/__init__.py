@@ -73,12 +73,6 @@ def cli(*, verbose: bool, quiet: bool) -> None:
     "--version", type=str, default="latest", help='Project version (default: "latest"")'
 )
 @click.option(
-    "--aux",
-    "aux_file",
-    type=click.File(mode="wt"),
-    help="File to write auxiliary information to (default: not written)",
-)
-@click.option(
     "--errors",
     "errors_file",
     type=click.File(mode="wt"),
@@ -106,7 +100,6 @@ def build_pdg(
     output: TextIO,
     output_format: str,
     project_type: str | None,
-    aux_file: TextIO | None,
     errors_file: TextIO | None,
     *,
     strict: bool,
@@ -135,8 +128,6 @@ def build_pdg(
 
     _ = output.write(dump_graph(output_format, pdg))
 
-    if aux_file is not None:
-        _ = aux_file.write(ctx.visibility_information.dump())
     if errors_file is not None:
         _ = errors_file.write(ctx.summarise_build_errors())
 

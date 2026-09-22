@@ -14,7 +14,7 @@ from scansible.pdg.representation import NodeLocation
 
 
 def run_all_checks(ctx: BuildContext) -> list[CheckResult]:
-    orig_results = orig_run_all_checks(ctx.graph, ctx.visibility_information)
+    orig_results = orig_run_all_checks(ctx.graph)
     return [
         CheckResult(f"{res.rule_category}: {res.rule_name}", res.location)
         for res in orig_results
