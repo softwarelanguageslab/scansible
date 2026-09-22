@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, final
+from typing import TYPE_CHECKING, cast, final
 
 from collections import defaultdict
 
@@ -25,25 +25,14 @@ class RecursiveDefinitionError(Exception):
 _ValRevisionMap = dict[VariableDefinitionRecord, int]
 
 
-_AST_TYPE_NAME_TO_BUILTIN_NAME: dict[str, rep.ValidTypeStr] = {
-    # FIXME: this can likely be parsed better
-    "IntLiteral": "int",
-    "StrLiteral": "str",
-    "SeqLiteral": "list",
-    "MapLiteral": "dict",
-    "FloatLiteral": "float",
-    "BoolLiteral": "bool",
-    "DateLiteral": "date",
-    "DatetimeLiteral": "datetime",
-    "NoneType": "NoneType",
-}
-
-
 def extract_type_name(value: ast.AnyExpression) -> rep.ValidTypeStr:
+    if value is None:
+        return "NoneType"
     if isinstance(value, ast.StrLiteral) and value.is_vaulted:
         return "VaultValue"
-    type_ = value.__class__.__name__
-    return _AST_TYPE_NAME_TO_BUILTIN_NAME[type_]
+
+    type_name = type(value).__name__.removesuffix("Literal").lower()
+    return cast(rep.ValidTypeStr, type_name)
 
 
 # TODO: Maybe simplify single-variable templates ("{{ var }}") to bypass

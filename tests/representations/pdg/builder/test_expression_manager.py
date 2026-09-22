@@ -100,7 +100,7 @@ def describe_evaluating_expressions():
             g,
             create_graph(
                 {
-                    "lit": CompositeLiteral(type="list"),
+                    "lit": CompositeLiteral(type="seq"),
                     "e1": ScalarLiteral(type="str", value="hello"),
                     "e2": ScalarLiteral(type="str", value="world"),
                 },
@@ -123,7 +123,7 @@ def describe_evaluating_expressions():
             g,
             create_graph(
                 {
-                    "lit": CompositeLiteral(type="dict"),
+                    "lit": CompositeLiteral(type="map"),
                     "world": ScalarLiteral(type="str", value="world"),
                     "value": ScalarLiteral(type="str", value="value"),
                 },
@@ -248,7 +248,7 @@ def describe_evaluating_expressions():
             g,
             create_graph(
                 {
-                    "lit": CompositeLiteral(type="list"),
+                    "lit": CompositeLiteral(type="seq"),
                     "e1": ScalarLiteral(type="str", value="hello"),
                     "expr": Expression(expr="{{ 1 + 1 }}"),
                     "e2": IntermediateValue(identifier=1),
@@ -373,10 +373,10 @@ def describe_reevaluating_expressions():
             g,
             create_graph(
                 {
-                    "lit": CompositeLiteral(type="list"),
+                    "lit": CompositeLiteral(type="seq"),
                     "e1": ScalarLiteral(type="str", value="hello"),
                     "e2": ScalarLiteral(type="str", value="world"),
-                    "lit2": CompositeLiteral(type="list"),
+                    "lit2": CompositeLiteral(type="seq"),
                     "e12": ScalarLiteral(type="str", value="hello"),
                     "e22": ScalarLiteral(type="str", value="world"),
                 },
@@ -402,10 +402,10 @@ def describe_reevaluating_expressions():
             g,
             create_graph(
                 {
-                    "lit": CompositeLiteral(type="dict"),
+                    "lit": CompositeLiteral(type="map"),
                     "world": ScalarLiteral(type="str", value="world"),
                     "value": ScalarLiteral(type="str", value="value"),
-                    "lit2": CompositeLiteral(type="dict"),
+                    "lit2": CompositeLiteral(type="map"),
                     "world2": ScalarLiteral(type="str", value="world"),
                     "value2": ScalarLiteral(type="str", value="value"),
                 },
@@ -577,11 +577,11 @@ def describe_reevaluating_expressions():
             g,
             create_graph(
                 {
-                    "lit": CompositeLiteral(type="list"),
+                    "lit": CompositeLiteral(type="seq"),
                     "e1": ScalarLiteral(type="str", value="hello"),
                     "expr": Expression(expr="{{ 1 + 1 }}"),
                     "e2": IntermediateValue(identifier=1),
-                    "lit2": CompositeLiteral(type="list"),
+                    "lit2": CompositeLiteral(type="seq"),
                     "e12": ScalarLiteral(type="str", value="hello"),
                     "expr2": Expression(expr="{{ 1 + 1 }}"),
                     "e22": IntermediateValue(identifier=2),

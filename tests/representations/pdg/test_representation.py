@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal, Protocol, cast
+from typing import Protocol, cast
 
 from itertools import product
 
@@ -112,8 +112,8 @@ def describe_literal() -> None:
     def factory() -> NodeFactory:
         return lambda loc: rep.ScalarLiteral(type="bool", value=True, location=loc)
 
-    @pytest.mark.parametrize("type_", ["bool", "str", "list"])
-    def should_have_type(type_: Literal["bool", "str", "list"]) -> None:
+    @pytest.mark.parametrize("type_", ["bool", "str", "seq"])
+    def should_have_type(type_: rep.ValidTypeStr) -> None:
         lit = rep.ScalarLiteral(type=type_, value=None)
 
         assert lit.type == type_
