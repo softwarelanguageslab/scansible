@@ -1,0 +1,84 @@
+# examples/checks_showcase.yml
+#
+# A single playbook that intentionally exercises every checking rule Scansible
+# implements: 8 security rules (SEC001-SEC008) and 4 semantic rules
+# (SEM001-SEM004). Each task/var below is annotated with the rule code it is
+# expected to trigger.
+#
+# Run:
+#   scansible check examples/checks_showcase.yml
+
+- hosts: webservers
+  vars:
+    deploy_env: staging
+    # Impure expression (`random` is re-evaluated on each lazy access), reused
+    # below in two separate tasks -> the two evaluations may disagree.
+    release_tag: "build-{{ 9999 | random }}"
+
+  tasks:
+    - name: Run deployment as the admin account
+      become: true
+      become_user: root  # SEC001: admin-by-default
+      command: /opt/app/deploy.sh
+
+    - name: Create service account for the app
+      user:
+        name: appsvc
+        password: ""  # SEC002: empty password
+
+    - name: Set database admin password
+      postgresql_user:
+        name: dbadmin
+        password: "CorrectHorseBatteryStaple"  # SEC003: hardcoded secret
+
+    - name: Notify monitoring endpoint of deployment start
+      uri:
+        url: "http://monitoring.internal.example.com/api/deploy-events"  # SEC004: plaintext HTTP
+        method: POST
+
+    - name: Download application release archive
+      get_url:
+        url: "https://cdn.example.com/releases/app-2.3.0.tar.gz"
+        dest: /opt/app/app-2.3.0.tar.gz  # SEC005: no checksum argument
+
+    - name: Configure app to listen on all interfaces
+      lineinfile:
+        path: /etc/app/app.conf
+        line: "listen_address=0.0.0.0"  # SEC006: unrestricted bind address
+
+    - name: Generate legacy checksum for compatibility with old clients
+      command: "md5sum /opt/app/app-2.3.0.tar.gz"  # SEC007: weak crypto (MD5)
+
+    - name: Install app dependencies from custom repo
+      yum:
+        name: app-runtime
+        disable_gpg_check: true  # SEC008: disabled integrity check
+
+    - name: Tag release artifact
+      debug:
+        msg: "Tagging as {{ release_tag }}"
+
+    - name: Record release tag in deployment log
+      debug:
+        msg: "Logged tag: {{ release_tag }}"  # SEM001: unsafe reuse of `release_tag`
+
+    - name: Fix application port
+      set_fact:
+        app_port: 8080  # SEM002: unnecessary set_fact (pure literal)
+
+    - name: Load database configuration
+      include_vars: vars/db_config.yml  # SEM003: unconditional include_vars
+
+    - name: Show resolved database host
+      debug:
+        msg: "Connecting to {{ db_host }}:{{ db_port }}"
+
+    - name: Log configured deployment environment
+      debug:
+        msg: "Configured for {{ deploy_env }}"
+
+    - name: Force production environment for this run
+      debug:
+        msg: "Overriding to {{ deploy_env }}"
+      vars:
+        deploy_env: production  # SEM004: unconditionally shadows `deploy_env` from vars
