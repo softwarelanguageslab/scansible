@@ -82,7 +82,10 @@ def _edge_to_dict(edge: EdgeValue) -> Mapping[str, DatabaseValue]:
     edge_serialised = {
         "from": source.node_id,
         "to": target.node_id,
-    } | edge_value.model_dump()
+    } | {
+        k: (_escape_string(v) if isinstance(v, str) else v)
+        for k, v in edge_value.model_dump().items()  # pyright: ignore[reportAny]
+    }
     return edge_serialised
 
 
