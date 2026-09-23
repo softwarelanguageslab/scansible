@@ -6,6 +6,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from itertools import pairwise
 
+from scansible.pdg.builder.semantics import EnvironmentType
 from scansible.pdg.representation import Graph, Variable
 
 from ..base import Finding
@@ -19,6 +20,9 @@ def _find_consecutive_values(
     """Yield consecutive (prev, next) value-version pairs of the same variable definition."""
     var_name_to_vars: dict[tuple[str, int], set[Variable]] = defaultdict(set)
     for node in var_nodes:
+        if node.scope_level == EnvironmentType.UNDEFINED.value:
+            # Ignore undefined variables.
+            continue
         var_name_to_vars[(node.name, node.version)].add(node)
 
     for nodes in var_name_to_vars.values():
