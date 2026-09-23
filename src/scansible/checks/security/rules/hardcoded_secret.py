@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from typing import final, override
 
-from .base import Rule, RuleQuery
+from .base import GraphDBRule, RuleQuery
 
 
 @final
-class HardcodedSecretRule(Rule):
-    description = 'Use "ansible-vault" instead of hardcoding secrets'
+class HardcodedSecretRule(GraphDBRule):
+    code = "SEC003"
+    description = "Use `ansible-vault` instead of hardcoding secrets"
 
     #: Substrings in variable or argument names that indicate secrets.
     TOKEN_REGEXES = (
@@ -65,5 +66,9 @@ class HardcodedSecretRule(Rule):
                 AND (NOT regexp_matches({key_getter}, $keyword_whitelist_regex))
                 AND source.value <> ''
                 AND source.type = 'str'
-            RETURN source.node_id, sink.node_id
+            RETURN source.node_id, sink.node_id, {key_getter}
         """
+
+    @override
+    def describe(self, label: str) -> str:
+        return f"`{label}` contains a hardcoded secret"

@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from enum import Enum
+from typing import NamedTuple
 
 from scansible.pdg.builder.semantics import EnvironmentType
 from scansible.pdg.representation import (
     ControlNode,
-    DataFlowEdge,
     Def,
     Expression,
     Graph,
@@ -50,6 +49,23 @@ def get_def_expression(
         f"Expected intermediate value defining {def_iv!r} to be defined by exactly one expression, but found {num_def_exprs}"
     )
     return def_exprs[0]
+
+
+def get_var_origin(graph: Graph, node: Variable) -> Expression | Literal | Task | None:
+    def_tasks = graph.get_predecessors(node, node_type=Task, edge_type=Def)
+    if def_tasks:
+        # register, not set_fact. For register, it's possible for the variable
+        # to have multiple DEFs (e.g. task itself and loop)
+        return def_tasks[0]
+
+    def_literal = graph.get_predecessors(node, node_type=Literal, edge_type=Def)
+    if def_literal:
+        assert len(def_literal) == 1, (
+            f"Expected {node!r} to be defined by one literal, found {len(def_literal)}"
+        )
+        return def_literal[0]
+
+    return get_def_expression(graph, node)
 
 
 def get_def_conditions(graph: Graph, v: Variable) -> list[Expression]:
@@ -99,6 +115,32 @@ def get_all_used_variables(graph: Graph, expr: Expression) -> list[Variable]:
     return direct_usages + indirect_usages
 
 
+def is_pure_expr(graph: Graph, expr: Expression) -> bool:
+    if not expr.is_pure:
+        return False
+
+    # Expression itself is pure, but perhaps its dependences aren't
+    used_vars = get_used_variables(graph, expr)
+    # Ignore dependences which themselves have been defined using set_fact or register,
+    # even though their expression might be impure, the variable value itself isn't
+    changeable_used_vars = [
+        uv
+        for uv in used_vars
+        if uv.scope_level != EnvironmentType.SET_FACTS_REGISTERED.value
+    ]
+    # Find definitions of uses
+    used_exprs: list[Expression] = [
+        def_expr
+        for used_node in changeable_used_vars
+        if isinstance((def_expr := get_var_origin(graph, used_node)), Expression)
+    ]
+
+    if not used_exprs:
+        return True
+
+    return all(is_pure_expr(graph, d) for d in used_exprs)
+
+
 def get_register_all_used_variables(graph: Graph, var: Variable) -> list[Variable]:
     """Like above, but for variables defined through register."""
     def_nodes = graph.get_predecessors(var, node_type=ControlNode, edge_type=Def)
@@ -116,119 +158,42 @@ def get_register_all_used_variables(graph: Graph, var: Variable) -> list[Variabl
     return usages
 
 
-def is_registered_variable(graph: Graph, var: Variable) -> bool:
-    return var.scope_level == EnvironmentType.SET_FACTS_REGISTERED.value and bool(
-        graph.get_predecessors(var, node_type=Task, edge_type=Def)
-    )
+class DependencyWalk(NamedTuple):
+    #: Whether the expression this walk started from is itself pure.
+    root_is_pure: bool
+    #: name -> the Variable (this value-version) transitively used to compute the root.
+    used_definitions: dict[str, Variable]
+    #: name -> purity of that Variable's own defining expression (True if it has none,
+    #: e.g. a literal or externally-supplied value).
+    definition_is_pure: dict[str, bool]
 
 
-def register_task_has_conditions(graph: Graph, var: Variable) -> bool:
-    task_nodes = graph.get_predecessors(var, node_type=Task, edge_type=Def)
-    assert len(task_nodes) == 1, (
-        f"Internal Error: Expected one task node found for registered variable {var!r}, found {len(task_nodes)}"
-    )
-    task_node = task_nodes[0]
-
-    return bool(graph.get_predecessors(task_node, edge_type=When))
-
-
-class ValueChangeReason(Enum):
-    EXPRESSION_IMPURE = 1
-    DEPENDENCY_REDEFINED = 2
-    DEPENDENCY_VALUE_CHANGED = 3
+def walk_data_dependencies(graph: Graph, expr: Expression) -> DependencyWalk:
+    """Transitively walk `expr`'s data dependencies (Use -> Variable -> Def -> Expression,
+    recursively), collecting every variable definition used and the purity of each one's
+    own defining expression, plus the purity of `expr` itself."""
+    used_definitions: dict[str, Variable] = {}
+    definition_is_pure: dict[str, bool] = {}
+    _walk_data_dependencies(graph, expr, used_definitions, definition_is_pure, set())
+    return DependencyWalk(expr.is_pure, used_definitions, definition_is_pure)
 
 
-def determine_value_version_change_reason(
-    graph: Graph, v1: Variable, v2: Variable
-) -> tuple[ValueChangeReason, Expression | tuple[Variable, Variable] | None]:
-    e1 = get_def_expression(graph, v1)
-    e2 = get_def_expression(graph, v2)
-    assert e1 is not None and e2 is not None, (
-        f"It should not be possible for variables {v1!r} and {v2!r} to not have been defined!"
-    )
-    assert e1.expr == e2.expr and e1.is_pure == e2.is_pure, (
-        f"Variables {v1!r} and {v2!r} use different expressions"
-    )
+def _walk_data_dependencies(
+    graph: Graph,
+    expr: Expression,
+    used_definitions: dict[str, Variable],
+    definition_is_pure: dict[str, bool],
+    visited: set[int],
+) -> None:
+    if expr.node_id in visited:
+        return
+    visited.add(expr.node_id)
 
-    if not e1.is_pure:
-        return ValueChangeReason.EXPRESSION_IMPURE, e1
-
-    e1_uses = set(get_used_variables(graph, e1))
-    e2_uses = set(get_used_variables(graph, e2))
-    assert len(e1_uses) == len(e2_uses), (
-        f"Expressions used by {v1!r} and {v2!r} use different number of values"
-    )
-    common_uses = e1_uses & e2_uses
-    assert len(common_uses) < len(e1_uses), (
-        f"Expressions used by {v1!r} and {v2!r} share all variable uses and are pure, yet still have different value versions"
-    )
-
-    unique_e1_uses = sorted(e1_uses - common_uses, key=lambda v: v.name)
-    unique_e2_uses = sorted(e2_uses - common_uses, key=lambda v: v.name)
-
-    diff_uses = list(zip(unique_e1_uses, unique_e2_uses, strict=True))
-
-    redefined = False
-    redefined_context: tuple[Variable, Variable] | None = None
-    diff_value_version = False
-    for e1_use, e2_use in diff_uses:
-        assert e1_use.name == e2_use.name, (
-            f"Expressions used by {v1!r} and {v2!r} should be identical, but use variables with different names: The former uses {e1_use.name}, the latter uses {e2_use.name}"
-        )
-        this_redefined = e1_use.version != e2_use.version
-        this_diff_value_version = (
-            not redefined and e1_use.value_version != e2_use.value_version
-        )
-
-        redefined = redefined or this_redefined
-        diff_value_version = diff_value_version or this_diff_value_version
-
-        if redefined:
-            redefined_context = (e1_use, e2_use)
-
-    assert redefined or diff_value_version, (
-        f"Could not find any difference between {v1!r} and {v2!r}"
-    )
-    if redefined:
-        assert redefined_context is not None
-        return ValueChangeReason.DEPENDENCY_REDEFINED, redefined_context
-    else:
-        return ValueChangeReason.DEPENDENCY_VALUE_CHANGED, None
-
-
-def find_variable_usages(
-    graph: Graph, variable: Variable, indirection_chain: list[str] | None = None
-) -> set[str]:
-    usages = graph.get_successors(variable, node_type=Expression, edge_type=Use)
-    if not usages:
-        assert not graph.has_successor(variable), (
-            f"Variable {variable!r} has successors but is not used in any expression"
-        )
-
-    usage_descriptions: set[str] = set()
-    for usage in usages:
-        expr_ivs = graph.get_successors(
-            usage, node_type=IntermediateValue, edge_type=Def
-        )
-        assert len(expr_ivs) >= 1, (
-            f"Variable {variable!r} is used in expression without defined intermediate values"
-        )
-        for iv in expr_ivs:
-            control_usages = graph.get_successors(
-                iv, node_type=ControlNode, edge_type=DataFlowEdge
+    for v in get_used_variables(graph, expr):
+        used_definitions[v.name] = v
+        sub_expr = get_def_expression(graph, v)
+        definition_is_pure[v.name] = sub_expr.is_pure if sub_expr is not None else True
+        if sub_expr is not None:
+            _walk_data_dependencies(
+                graph, sub_expr, used_definitions, definition_is_pure, visited
             )
-            indirect_usages = graph.get_successors(
-                iv, node_type=Variable, edge_type=Def
-            )
-
-            for control_usage in control_usages:
-                usage_descriptions.add(str(control_usage.location))
-
-            for indirect_usage in indirect_usages:
-                new_indirection_chain = indirection_chain or []
-                new_indirection_chain.append(indirect_usage.name)
-                usage_descriptions.update(
-                    find_variable_usages(graph, indirect_usage, new_indirection_chain)
-                )
-
-    return usage_descriptions

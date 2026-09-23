@@ -170,7 +170,7 @@ class ExpressionManager:
             version=vdef.revision,
             value_version=value_revision,
             scope_level=vdef.env_type.value,
-            shadows=vdef.shadows,
+            prior_version=vdef.prior_version,
             location=vdef.location,
         )
         self.build_ctx.graph.add_node(var_node)

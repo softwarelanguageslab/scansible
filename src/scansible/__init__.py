@@ -232,7 +232,7 @@ def check_all(
     """Check the project residing at PROJECT_PATH for smells in all files."""
     role_search_paths = list(role_search_path) + [Path(p) for p in DEFAULT_ROLES_PATH]
 
-    from .checks import CheckResult, TerminalReporter, run_all_checks
+    from .checks import Finding, TerminalReporter, run_all_checks
     from .pdg import build_pdg
     from .utils.entrypoints import find_entrypoints
 
@@ -241,7 +241,7 @@ def check_all(
         entrypoints = find_entrypoints(project_path)
     else:
         entrypoints = [(file_path, "playbook")]
-    results: list[CheckResult] = []
+    results: list[Finding] = []
     logger.remove()
 
     for entrypoint, project_type in entrypoints:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Protocol, Self, final
+from typing import Protocol, Self, cast, final
 
 import csv
 import json
@@ -21,7 +21,7 @@ type DatabaseValue = object
 
 SCHEMA = """
 CREATE NODE TABLE Task(node_id INT64, action STRING, name STRING, PRIMARY KEY (node_id));
-CREATE NODE TABLE Variable(node_id INT64, name STRING, version INT64, value_version INT64, scope_level INT64, shadows INT64, PRIMARY KEY (node_id));
+CREATE NODE TABLE Variable(node_id INT64, name STRING, version INT64, value_version INT64, scope_level INT64, prior_version INT64, PRIMARY KEY (node_id));
 CREATE NODE TABLE IntermediateValue(node_id INT64, identifier INT64, PRIMARY KEY (node_id));
 CREATE NODE TABLE ScalarLiteral(node_id INT64, type STRING, value STRING, PRIMARY KEY (node_id));
 CREATE NODE TABLE CompositeLiteral(node_id INT64, type STRING, PRIMARY KEY (node_id));
@@ -52,6 +52,11 @@ def _escape_string(v: str) -> str:
     # quotes so that the queries do not need to deal with them.
     # Also need to escape comma characters, otherwise Kuzu tries to parse them as CSV separators.
     return json.dumps(v)[1:-1].replace(",", "&#44;")
+
+
+def unescape_string(v: str) -> str:
+    """Reverse `_escape_string`, e.g. to display a queried node property to a user."""
+    return cast(str, json.loads(f'"{v.replace("&#44;", ",")}"'))
 
 
 def _node_to_dict(node: Node) -> Mapping[str, DatabaseValue]:

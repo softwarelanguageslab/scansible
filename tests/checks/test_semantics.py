@@ -4,22 +4,32 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
-from scansible.checks import CheckResult
-from scansible.checks.semantics import run_all_checks as orig_run_all_checks
+from scansible.checks.base import CheckContext, Finding
+from scansible.checks.semantics import get_all_rules
 from scansible.pdg import build_pdg
 from scansible.pdg.builder.context import BuildContext
-from scansible.pdg.representation import NodeLocation
-from scansible.utils import LineColumn
+
+#: A `Finding`, but with each `NodeLocation` collapsed down to its
+#: `path:line:column` string to avoid deep positioning checks in tests.
+type StringifiedResult = tuple[str, str, str, str | None]
 
 
-def run_all_checks(ctx: BuildContext) -> list[CheckResult]:
-    orig_results = orig_run_all_checks(ctx.graph)
+def _stringify(results: list[Finding]) -> list[StringifiedResult]:
     return [
-        CheckResult(f"{res.rule_category}: {res.rule_name}", res.location)
-        for res in orig_results
+        (
+            f.code,
+            f.summary,
+            str(f.location),
+            str(f.hint_location) if f.hint_location is not None else None,
+        )
+        for f in results
     ]
+
+
+def run_all_checks(ctx: BuildContext) -> list[StringifiedResult]:
+    context = CheckContext(graph=ctx.graph)
+    results = [finding for rule in get_all_rules() for finding in rule.check(context)]
+    return _stringify(results)
 
 
 def build_graph(path: Path) -> BuildContext:
@@ -51,17 +61,14 @@ def describe_unsafe_reuse_rules() -> None:
         results = run_all_checks(ctx)
 
         assert results == [
-            CheckResult(
-                "Unsafe reuse: Impure expression",
-                NodeLocation(
-                    path="pb.yml", start=LineColumn(4, 17), end=LineColumn(4, 20)
-                ),
+            (
+                "SEM001",
+                "Potentially unsafe reuse of variable `abc@0` due to an impure expression",
+                "pb.yml:4:17",
+                "pb.yml:4:22",
             )
         ]
 
-    @pytest.mark.xfail(
-        reason="check is broken, as all expressions now get evaluated all the time"
-    )
     def redefined_dependence(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_yaml(
@@ -86,19 +93,65 @@ def describe_unsafe_reuse_rules() -> None:
         results = run_all_checks(ctx)
 
         assert results == [
-            CheckResult(
-                "Unsafe reuse: Redefined dependence",
-                NodeLocation(
-                    path="pb.yml", start=LineColumn(5, 17), end=LineColumn(5, 17)
-                ),
+            (
+                "SEM001",
+                "Potentially unsafe reuse of variable `x@0` due to a redefined dependency",
+                "pb.yml:5:17",
+                "pb.yml:10:21",
             )
         ]
 
+    def no_change(tmp_path: Path) -> None:
+        pb_path = tmp_path / "pb.yml"
+        write_yaml(
+            """
+            - hosts: localhost
+              vars:
+                abc: 123
+                x: '{{ abc + 5 }}'
+              tasks:
+                - debug:
+                    msg: '{{ x }}'
+                - debug:
+                    msg: '{{ x }} again'
+        """,
+            pb_path,
+        )
+        ctx = build_graph(pb_path)
 
-@pytest.mark.xfail(
-    reason="check is broken, as unused variables are no longer added to the graph"
-)
-def describe_unintended_override_rules() -> None:
+        results = run_all_checks(ctx)
+
+        # x is reused with no redefinition of its dependencies and nothing impure
+        # involved, so the value-version bump alone must not be flagged.
+        assert not results
+
+    def eager_impure_dependency_reused(tmp_path: Path) -> None:
+        pb_path = tmp_path / "pb.yml"
+        write_yaml(
+            """
+            - hosts: localhost
+              vars:
+                y: '{{ abc }}'
+              tasks:
+                - set_fact:
+                    abc: '{{ 9999 | random }}'
+                - debug:
+                    msg: '{{ y }}'
+                - debug:
+                    msg: '{{ y }} again'
+        """,
+            pb_path,
+        )
+        ctx = build_graph(pb_path)
+
+        results = run_all_checks(ctx)
+
+        # abc is set_fact'ed (eager) so its value-version stays constant across
+        # reuses even though it's impure; y's own reuse must not be flagged.
+        assert not results
+
+
+def describe_variable_shadowing_rule() -> None:
     def unconditional(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
         write_yaml(
@@ -107,6 +160,7 @@ def describe_unintended_override_rules() -> None:
               vars:
                 abc: 123
               tasks:
+                - debug: msg={{ abc }}
                 - debug:
                     msg: '{{ abc }}'
                   vars:
@@ -119,39 +173,11 @@ def describe_unintended_override_rules() -> None:
         results = run_all_checks(ctx)
 
         assert results == [
-            CheckResult(
-                "Unintended override: Unconditional override",
-                NodeLocation(
-                    path="pb.yml", start=LineColumn(9, 21), end=LineColumn(9, 21)
-                ),
-            )
-        ]
-
-    def unusable(tmp_path: Path) -> None:
-        pb_path = tmp_path / "pb.yml"
-        write_yaml(
-            """
-            - hosts: localhost
-              tasks:
-                - set_fact:
-                    abc: '{{ 9999 | random }}'
-                - debug:
-                    msg: '{{ abc }}'
-                  vars:
-                    abc: 123
-        """,
-            pb_path,
-        )
-        ctx = build_graph(pb_path)
-
-        results = run_all_checks(ctx)
-
-        assert results == [
-            CheckResult(
-                "Unintended override: Unused because shadowed",
-                NodeLocation(
-                    path="pb.yml", start=LineColumn(9, 21), end=LineColumn(9, 21)
-                ),
+            (
+                "SEM004",
+                "Variable `abc@1` unconditionally shadows a previous definition",
+                "pb.yml:10:21",
+                "pb.yml:4:17",
             )
         ]
 
@@ -174,11 +200,11 @@ def describe_too_high_precedence_rules() -> None:
         results = run_all_checks(ctx)
 
         assert results == [
-            CheckResult(
-                "Unnecessarily high precedence: Unnecessary set_fact",
-                NodeLocation(
-                    path="pb.yml", start=LineColumn(5, 21), end=LineColumn(5, 24)
-                ),
+            (
+                "SEM002",
+                "Unnecessary use of set_fact for variable `abc@0`",
+                "pb.yml:5:21",
+                None,
             )
         ]
 
@@ -236,17 +262,10 @@ def describe_too_high_precedence_rules() -> None:
         results = run_all_checks(ctx)
 
         assert results == [
-            CheckResult(
-                "Unnecessarily high precedence: Unnecessary include_vars",
-                NodeLocation(
-                    path="vars.yml",
-                    start=LineColumn(1, 1),
-                    end=LineColumn(1, 2),
-                    includer_location=NodeLocation(
-                        path="pb.yml",
-                        start=LineColumn(4, 19),
-                        end=LineColumn(5, 17),
-                    ),
-                ),
+            (
+                "SEM003",
+                "Unnecessary use of include_vars for variable `a@0`",
+                "vars.yml:1:1\n\tvia pb.yml:4:19",
+                None,
             )
         ]

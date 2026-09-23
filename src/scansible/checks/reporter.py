@@ -7,20 +7,22 @@ import rich
 from scansible.pdg.representation import NodeLocation
 
 if TYPE_CHECKING:
-    from . import CheckResult
+    from .base import Finding
 
 
 class TerminalReporter:
-    def report_results(self, results: list[CheckResult]) -> None:
+    def report_results(self, results: list[Finding]) -> None:
         console = rich.console.Console(width=999)
         if not results:
             console.print("[green]No warnings found, keep it up!")
-        for name, loc in sorted(set(results), key=lambda p: str(p[1])):
+        for finding in sorted(set(results), key=lambda f: str(f.location)):
+            loc = finding.location
+            label = f"[bold red][{finding.code}][/bold red] {finding.summary}"
             if loc.is_synthetic:
-                console.print(f"[bold red]{name}[/bold red]", width=999)
+                console.print(label, width=999)
             else:
                 console.print(
-                    f"[gray]{loc.path}:{loc.start.line}:{loc.start.column}[/gray] - [bold red]{name}[/bold red]",
+                    f"[gray]{loc.path}:{loc.start.line}:{loc.start.column}[/gray] - {label}",
                     width=999,
                 )
                 if loc.includer_location is not None:

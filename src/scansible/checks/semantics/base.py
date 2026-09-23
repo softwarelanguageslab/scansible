@@ -1,22 +1,22 @@
 from __future__ import annotations
 
+from typing import override
+
 import abc
 
-from pydantic import BaseModel
+from scansible.pdg.representation import Graph
 
-from scansible.pdg.representation import Graph, NodeLocation
-
-
-class RuleResult(BaseModel, frozen=True, strict=True, extra="forbid"):
-    rule_category: str
-    rule_name: str
-    rule_subname: str
-    rule_header: str
-    rule_message: str
-
-    location: NodeLocation
+from ..base import CheckContext, Finding, RuleBase
 
 
-class Rule(abc.ABC):
+class TraversalRule(RuleBase, abc.ABC):
+    """Base class for semantics rules that detect issues through bespoke traversal of the PDG."""
+
     @abc.abstractmethod
-    def scan(self, graph: Graph) -> list[RuleResult]: ...
+    def detect(self, graph: Graph) -> list[Finding]:
+        """Traverse the graph and return any findings."""
+        raise NotImplementedError
+
+    @override
+    def check(self, context: CheckContext) -> list[Finding]:
+        return self.detect(context.graph)

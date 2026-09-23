@@ -8,7 +8,7 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from scansible.checks.security.rules.base import RuleResult
+from scansible.checks.base import Finding
 from scansible.pdg.representation import NodeLocation
 from scansible.sca.constants import HTML_CLASS_SEVERITY
 
@@ -20,7 +20,7 @@ def generate_report(
     output_dir: Path,
     dependencies: ProjectDependencies,
     dependency_vulnerabilities: dict[str, list[Vulnerability]],
-    smells_raw: list[RuleResult],
+    smells_raw: list[Finding],
 ) -> None:
     collections: list[dict[str, Any]] = []
     for coll in dependencies.collections:
@@ -88,13 +88,19 @@ def generate_report(
 
     smells: list[dict[str, Any]] = []
     for smell in smells_raw:
-        sm = smell._asdict()
-        sm["source_text"], sm["source_text_start"], sm["source_text_line"] = _read_code(
-            smell.source_location, 5
-        )
-        sm["sink_text"], sm["sink_text_start"], sm["sink_text_line"] = _read_code(
-            smell.sink_location, 5
-        )
+        sm: dict[str, Any] = {
+            "code": smell.code,
+            "summary": smell.summary,
+            "explanation": smell.explanation,
+            "location": smell.location,
+            "hint_location": smell.hint_location,
+            "hint_text": smell.hint_text,
+        }
+        sm["text"], sm["text_start"], sm["text_line"] = _read_code(smell.location, 5)
+        if smell.hint_location is not None:
+            sm["hint_code_text"], sm["hint_code_start"], sm["hint_code_line"] = (
+                _read_code(smell.hint_location, 5)
+            )
         smells.append(sm)
 
     env = Environment(

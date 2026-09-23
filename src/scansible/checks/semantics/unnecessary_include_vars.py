@@ -1,104 +1,51 @@
 from __future__ import annotations
 
-from typing import override
+from typing import final, override
 
 from collections import defaultdict
 
 from scansible.pdg.builder.semantics import EnvironmentType
-from scansible.pdg.representation import Def, Expression, Graph, Literal, Task, Variable
+from scansible.pdg.representation import Graph, Variable
 
-from .base import Rule, RuleResult
-from .utils import (
-    find_variable_usages,
-    get_def_conditions,
-    get_def_expression,
-    get_used_variables,
-)
+from ..base import Finding
+from .base import TraversalRule
+from .utils import get_def_conditions
 
 
-def get_var_origin(graph: Graph, node: Variable) -> Expression | Literal | Task | None:
-    def_tasks = graph.get_predecessors(node, node_type=Task, edge_type=Def)
-    if def_tasks:
-        # register, not set_fact. For register, it's possible for the variable
-        # to have multiple DEFs (e.g. task itself and loop)
-        return def_tasks[0]
+@final
+class UnnecessaryIncludeVarsRule(TraversalRule):
+    code = "SEM003"
 
-    def_literal = graph.get_predecessors(node, node_type=Literal, edge_type=Def)
-    if def_literal:
-        assert len(def_literal) == 1, (
-            f"Expected {node!r} to be defined by one literal, found {len(def_literal)}"
-        )
-        return def_literal[0]
-
-    return get_def_expression(graph, node)
-
-
-def is_pure_expr(graph: Graph, expr: Expression) -> bool:
-    if not expr.is_pure:
-        return False
-
-    # Expression itself is pure, but perhaps its dependences aren't
-    used_vars = get_used_variables(graph, expr)
-    # Ignore dependences which themselves have been defined using set_fact or register,
-    # even though their expression might be impure, the variable value itself isn't
-    changeable_used_vars = [
-        uv
-        for uv in used_vars
-        if uv.scope_level != EnvironmentType.SET_FACTS_REGISTERED.value
-    ]
-    # Find definitions of uses
-    used_exprs: list[Expression] = [
-        def_expr
-        for used_node in changeable_used_vars
-        if isinstance((def_expr := get_var_origin(graph, used_node)), Expression)
-    ]
-
-    if not used_exprs:
-        return True
-
-    return all(is_pure_expr(graph, d) for d in used_exprs)
-
-
-class UnnecessaryIncludeVarsRule(Rule):
     @override
-    def scan(self, graph: Graph) -> list[RuleResult]:
+    def detect(self, graph: Graph) -> list[Finding]:
         included_vars = [
             node
             for node in graph.get_nodes(Variable)
             if node.scope_level == EnvironmentType.INCLUDE_VARS.value
         ]
         # Group into unique definitions so we only emit a warning for the first value version
-        # We keep the other value versions so we can show all usages of this definition
         grouped_included_vars: dict[tuple[str, int], set[Variable]] = defaultdict(set)
         for v in included_vars:
             grouped_included_vars[(v.name, v.version)].add(v)
 
-        results: list[RuleResult] = []
+        results: list[Finding] = []
         for vs in grouped_included_vars.values():
-            vs_sorted = sorted(vs, key=lambda v: v.version)
-            v = vs_sorted[0]
+            v = min(vs, key=lambda v: v.version)
             conditions = get_def_conditions(graph, v)
 
             if not conditions:
-                warning_header = f'Unnecessary use of include_vars for variable "{v.name}@{v.version}"'
-                warning_body_lines = [
-                    f"Variable {v!r} is unconditionally included through include_vars.",
-                    "Variables included through include_vars have unusually high precedence, which makes tracing values difficult.",
-                    "Since this variable is unconditionally included, it can instead be placed into default variables, role variables, or a local scope, to prevent variable precedence issue.",
-                    f"All usages of {v.name}@{v.version}:",
-                ]
-                for vval in vs_sorted:
-                    warning_body_lines.extend(
-                        f"\t{usage}" for usage in find_variable_usages(graph, vval)
-                    )
-
+                summary = f"Unnecessary use of include_vars for variable `{v.name}@{v.version}`"
+                explanation = (
+                    "This variable is unconditionally included through include_vars, "
+                    "which has unusually high precedence and makes tracing values difficult. "
+                    "It can instead be placed into default variables, role variables, or a "
+                    "local scope, to avoid variable precedence issues."
+                )
                 results.append(
-                    RuleResult(
-                        rule_category="Unnecessarily high precedence",
-                        rule_name="Unnecessary include_vars",
-                        rule_subname="",
-                        rule_header=warning_header,
-                        rule_message="\n".join(warning_body_lines),
+                    Finding(
+                        code=self.code,
+                        summary=summary,
+                        explanation=explanation,
                         location=v.location,
                     )
                 )

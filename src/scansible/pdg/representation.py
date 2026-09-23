@@ -110,10 +110,11 @@ class Variable(DataNode):
     value_version: int = Field(frozen=True)
     scope_level: int = Field(frozen=True)
     #: Revision of the same-named definition that was visible when this one was
-    #: defined, if any.
+    #: defined, if any. Not necessarily the one this definition takes precedence
+    #: over, that depends on its `scope_level`.
     # FIXME: This is only used to detect suspicious overrides but should maybe
     # not be stored in the graph at all.
-    shadows: int | None = Field(default=None, frozen=True)
+    prior_version: int | None = Field(default=None, frozen=True)
 
 
 class IntermediateValue(DataNode):

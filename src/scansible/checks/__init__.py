@@ -1,20 +1,22 @@
 from __future__ import annotations
 
-from typing import NamedTuple
+from datetime import datetime
+
+from loguru import logger
 
 from scansible.pdg.builder.context import BuildContext
-from scansible.pdg.representation import NodeLocation
 
 from . import security as security
 from . import semantics as semantics
-from .reporter import *
+from .base import CheckContext, RuleBase
+from .base import Finding as Finding
+from .reporter import TerminalReporter as TerminalReporter
+from .security.db import GraphDatabase
+from .security.rules.base import GraphDBRule
 
 
-class CheckResult(NamedTuple):
-    #: The rule that was triggered.
-    rule_name: str
-    #: Location in the code of the smell
-    location: NodeLocation
+def get_all_rules() -> list[RuleBase]:
+    return [*security.get_all_rules(), *semantics.get_all_rules()]
 
 
 def run_all_checks(
@@ -22,17 +24,30 @@ def run_all_checks(
     *,
     enable_security: bool = True,
     enable_semantics: bool = True,
-) -> list[CheckResult]:
-    results: list[CheckResult] = []
-    if enable_security:
-        for res in security.run_all_checks(build_context.graph):
-            description = f"{res.rule_name}: {res.__class__.rule_description}"
-            results.append(CheckResult(description, res.sink_location))
-            if res.sink_location != res.source_location:
-                results.append(CheckResult(description, res.source_location))
-    if enable_semantics:
-        results.extend(
-            CheckResult(f"{res.rule_category}: {res.rule_header}", res.location)
-            for res in semantics.run_all_checks(build_context.graph)
-        )
-    return results
+) -> list[Finding]:
+    start_time = datetime.now()
+
+    rules = [
+        rule
+        for rule in get_all_rules()
+        if (enable_security if rule.code.startswith("SEC") else enable_semantics)
+    ]
+
+    graph = build_context.graph
+    if any(isinstance(rule, GraphDBRule) for rule in rules):
+        with GraphDatabase(graph) as db:
+            results = [
+                finding
+                for rule in rules
+                for finding in rule.check(CheckContext(graph, db))
+            ]
+    else:
+        results = [
+            finding for rule in rules for finding in rule.check(CheckContext(graph))
+        ]
+
+    logger.info(
+        f"Ran {len(rules)} checks in {(datetime.now() - start_time).total_seconds():.2f}s"
+    )
+
+    return sorted(results, key=lambda finding: str(finding.location))

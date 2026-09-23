@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from typing import final, override
 
-from .base import Rule, RuleQuery
+from .base import GraphDBRule, RuleQuery
 
 
 @final
-class EmptyPasswordRule(Rule):
+class EmptyPasswordRule(GraphDBRule):
+    code = "SEC002"
     description = "Never use empty passwords, these are easy to crack"
 
     # Variable or argument name tokens that indicate a password.
@@ -39,5 +40,9 @@ class EmptyPasswordRule(Rule):
             MATCH (source:ScalarLiteral)-[:e_Def|e_Input|e_DefLoopItem*0..]->()-{chain_tail}
             WHERE regexp_matches({key_getter}, $password_regex)
                 AND (source.type = 'NoneType' OR (source.type = 'str' AND (source.value = 'omit' OR source.value IS NULL)))
-            RETURN source.node_id, sink.node_id
+            RETURN source.node_id, sink.node_id, {key_getter}
         """
+
+    @override
+    def describe(self, label: str) -> str:
+        return f"`{label}` is set to an empty password"

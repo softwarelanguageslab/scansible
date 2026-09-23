@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from typing import ClassVar, final, override
 
-from .base import Rule, RuleQuery
+from .base import GraphDBRule, RuleQuery
 
 
 @final
-class AdminByDefaultRule(Rule):
+class AdminByDefaultRule(GraphDBRule):
+    code = "SEC001"
     description = (
         "Avoid using admin accounts, as this violates the principle of least privileges"
     )
@@ -24,10 +25,14 @@ class AdminByDefaultRule(Rule):
         query = """
             MATCH (source:ScalarLiteral)-[:e_Def|e_Input|e_DefLoopItem*0..]->()-[arg:e_Keyword]->(sink:Task)
             WHERE regexp_matches(arg.keyword, $user_role_regex) AND source.value IN $admin_name_list
-            RETURN source.node_id, sink.node_id
+            RETURN source.node_id, sink.node_id, arg.keyword
         """
         params = {
             "user_role_regex": self.USER_ROLE_REGEX,
             "admin_name_list": self.ADMIN_NAMES,
         }
         return query, params
+
+    @override
+    def describe(self, label: str) -> str:
+        return f"`{label}` is set to an administrator account"

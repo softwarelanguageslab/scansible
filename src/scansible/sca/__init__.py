@@ -20,8 +20,9 @@ from scansible.ast import (
     StrLiteral,
     TaskFile,
 )
-from scansible.checks.security import run_all_checks
-from scansible.checks.security.rules.base import RuleResult
+from scansible.checks.base import CheckContext, Finding
+from scansible.checks.security import get_all_rules
+from scansible.checks.security.db import GraphDatabase
 from scansible.constants import DEFAULT_ROLES_PATH
 from scansible.pdg.builder.main import build_pdg
 from scansible.sca.constants import (
@@ -172,9 +173,7 @@ def scan_project(
     generate_report(project.name, output_dir, project_deps, dep_vulns, smells)
 
 
-def _detect_smells(
-    project: Path, role_search_paths: list[Path]
-) -> Iterable[RuleResult]:
+def _detect_smells(project: Path, role_search_paths: list[Path]) -> Iterable[Finding]:
     role_search_paths = role_search_paths + list(map(Path, DEFAULT_ROLES_PATH))
 
     entrypoints = find_entrypoints(project)
@@ -186,7 +185,10 @@ def _detect_smells(
         ctx = build_pdg(entrypoint, role_search_paths, as_pb=as_pb)
 
         CONSOLE.print(f"Running checks on {project_type} {entrypoint}")
-        yield from run_all_checks(ctx.graph)
+        with GraphDatabase(ctx.graph) as db:
+            context = CheckContext(graph=ctx.graph, db=db)
+            for rule in get_all_rules():
+                yield from rule.check(context)
 
 
 def is_trivial_module(m: ModuleInfo) -> bool:

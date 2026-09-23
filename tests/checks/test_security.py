@@ -11,10 +11,13 @@ from pathlib import Path
 import pytest
 from loguru import logger
 
+from scansible.checks.base import CheckContext, Finding
 from scansible.checks.security import rules
 from scansible.checks.security.db import GraphDatabase
 from scansible.checks.security.rules.admin_by_default import AdminByDefaultRule
-from scansible.checks.security.rules.base import RuleResult
+from scansible.checks.security.rules.disabled_integrity_check import (
+    DisabledIntegrityCheckRule,
+)
 from scansible.checks.security.rules.empty_password import EmptyPasswordRule
 from scansible.checks.security.rules.hardcoded_secret import HardcodedSecretRule
 from scansible.checks.security.rules.http_without_ssl_tls import HTTPWithoutSSLTLSRule
@@ -29,52 +32,50 @@ from scansible.pdg import build_pdg
 
 
 @contextmanager
-def temp_import_pb(path: Path) -> Generator[GraphDatabase]:
+def temp_import_pb(path: Path) -> Generator[CheckContext]:
     logger.remove()
     pdg_ctx = build_pdg(path, [])
     _ = logger.add(sys.stderr, format="{level} {message}", level="DEBUG")
     with GraphDatabase(pdg_ctx.graph) as graph_db:
-        yield graph_db
+        yield CheckContext(graph=pdg_ctx.graph, db=graph_db)
 
 
 def write_pb(content: str, path: Path) -> None:
     _ = path.write_text(content)
 
 
-#: A `RuleResult`, but with each `NodeLocation` collapsed down to its
+#: A `Finding`, but with each `NodeLocation` collapsed down to its
 #: `path:line:column` string to avoid deep positioning checks in tests.
-type StringifiedResult = tuple[str, str, str, str]
+type StringifiedResult = tuple[str, str, str, str | None]
 
 
 def _make_result(
-    name: str, description: str, source: str, sink: str
+    code: str, summary: str, location: str, hint_location: str | None = None
 ) -> StringifiedResult:
-    return (name, description, source, sink)
+    return (code, summary, location, hint_location)
 
 
-def _stringify(results: list[RuleResult]) -> list[StringifiedResult]:
+def _stringify(results: list[Finding]) -> list[StringifiedResult]:
     return [
         _make_result(
-            r.rule_name,
-            r.rule_description,
-            str(r.source_location),
-            str(r.sink_location),
+            f.code,
+            f.summary,
+            str(f.location),
+            str(f.hint_location) if f.hint_location is not None else None,
         )
-        for r in results
+        for f in results
     ]
 
 
-def run_all_checks(db: GraphDatabase) -> list[StringifiedResult]:
-    results: list[RuleResult] = []
+def run_all_checks(context: CheckContext) -> list[StringifiedResult]:
+    results: list[Finding] = []
     for rule in rules.get_all_rules():
-        results.extend(rule.run(db))
+        results.extend(rule.check(context))
     return _stringify(results)
 
 
 def describe_hardcoded_secret_rule() -> None:
-    _result = partial(
-        _make_result, HardcodedSecretRule.name, HardcodedSecretRule.description
-    )
+    _result = partial(_make_result, HardcodedSecretRule.code)
 
     def matches_literal_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -89,10 +90,16 @@ def describe_hardcoded_secret_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(HardcodedSecretRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(HardcodedSecretRule().check(context))
 
-        assert results == [_result("pb.yml:7:31", "pb.yml:4:19")]
+        assert results == [
+            _result(
+                "`args.password` contains a hardcoded secret",
+                "pb.yml:4:19",
+                "pb.yml:7:31",
+            )
+        ]
 
     def matches_variable_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -109,10 +116,16 @@ def describe_hardcoded_secret_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(HardcodedSecretRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(HardcodedSecretRule().check(context))
 
-        assert results == [_result("pb.yml:4:24", "pb.yml:6:19")]
+        assert results == [
+            _result(
+                "`args.password` contains a hardcoded secret",
+                "pb.yml:6:19",
+                "pb.yml:4:24",
+            )
+        ]
 
     def matches_2_chain_variable_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -130,10 +143,16 @@ def describe_hardcoded_secret_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(HardcodedSecretRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(HardcodedSecretRule().check(context))
 
-        assert results == [_result("pb.yml:4:24", "pb.yml:7:19")]
+        assert results == [
+            _result(
+                "`args.password` contains a hardcoded secret",
+                "pb.yml:7:19",
+                "pb.yml:4:24",
+            )
+        ]
 
     def matches_variable_name_with_literal(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -147,10 +166,16 @@ def describe_hardcoded_secret_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(HardcodedSecretRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(HardcodedSecretRule().check(context))
 
-        assert results == [_result("pb.yml:4:34", "pb.yml:4:17")]
+        assert results == [
+            _result(
+                "`secret_password` contains a hardcoded secret",
+                "pb.yml:4:17",
+                "pb.yml:4:34",
+            )
+        ]
 
     def matches_indirect_variable_name(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -165,10 +190,16 @@ def describe_hardcoded_secret_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(HardcodedSecretRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(HardcodedSecretRule().check(context))
 
-        assert results == [_result("pb.yml:4:24", "pb.yml:5:17")]
+        assert results == [
+            _result(
+                "`secret_password` contains a hardcoded secret",
+                "pb.yml:5:17",
+                "pb.yml:4:24",
+            )
+        ]
 
     def does_not_match_update_password_flag_as_literal(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -182,8 +213,8 @@ def describe_hardcoded_secret_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(HardcodedSecretRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(HardcodedSecretRule().check(context))
 
         assert not results
 
@@ -201,8 +232,8 @@ def describe_hardcoded_secret_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(HardcodedSecretRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(HardcodedSecretRule().check(context))
 
         assert not results
 
@@ -218,8 +249,8 @@ def describe_hardcoded_secret_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(HardcodedSecretRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(HardcodedSecretRule().check(context))
 
         assert not results
 
@@ -235,8 +266,8 @@ def describe_hardcoded_secret_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(HardcodedSecretRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(HardcodedSecretRule().check(context))
 
         assert not results
 
@@ -253,16 +284,14 @@ def describe_hardcoded_secret_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(HardcodedSecretRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(HardcodedSecretRule().check(context))
 
         assert not results
 
 
 def describe_empty_password_rule() -> None:
-    _result = partial(
-        _make_result, EmptyPasswordRule.name, EmptyPasswordRule.description
-    )
+    _result = partial(_make_result, EmptyPasswordRule.code)
 
     def matches_literal_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -277,10 +306,16 @@ def describe_empty_password_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(EmptyPasswordRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(EmptyPasswordRule().check(context))
 
-        assert results == [_result("pb.yml:7:31", "pb.yml:4:19")]
+        assert results == [
+            _result(
+                "`args.password` is set to an empty password",
+                "pb.yml:4:19",
+                "pb.yml:7:31",
+            )
+        ]
 
     def matches_omit_literal_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -295,10 +330,16 @@ def describe_empty_password_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(EmptyPasswordRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(EmptyPasswordRule().check(context))
 
-        assert results == [_result("pb.yml:7:31", "pb.yml:4:19")]
+        assert results == [
+            _result(
+                "`args.password` is set to an empty password",
+                "pb.yml:4:19",
+                "pb.yml:7:31",
+            )
+        ]
 
     def matches_null_literal_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -313,10 +354,15 @@ def describe_empty_password_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(EmptyPasswordRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(EmptyPasswordRule().check(context))
 
-        assert results == [_result("pb.yml:4:19", "pb.yml:4:19")]
+        assert results == [
+            _result(
+                "`args.password` is set to an empty password",
+                "pb.yml:4:19",
+            )
+        ]
 
     def matches_variable_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -333,10 +379,16 @@ def describe_empty_password_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(EmptyPasswordRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(EmptyPasswordRule().check(context))
 
-        assert results == [_result("pb.yml:4:24", "pb.yml:6:19")]
+        assert results == [
+            _result(
+                "`args.password` is set to an empty password",
+                "pb.yml:6:19",
+                "pb.yml:4:24",
+            )
+        ]
 
     def matches_2_chain_variable_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -354,10 +406,16 @@ def describe_empty_password_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(EmptyPasswordRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(EmptyPasswordRule().check(context))
 
-        assert results == [_result("pb.yml:4:24", "pb.yml:7:19")]
+        assert results == [
+            _result(
+                "`args.password` is set to an empty password",
+                "pb.yml:7:19",
+                "pb.yml:4:24",
+            )
+        ]
 
     def matches_variable_name_with_literal(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -371,10 +429,16 @@ def describe_empty_password_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(EmptyPasswordRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(EmptyPasswordRule().check(context))
 
-        assert results == [_result("pb.yml:4:34", "pb.yml:4:17")]
+        assert results == [
+            _result(
+                "`secret_password` is set to an empty password",
+                "pb.yml:4:17",
+                "pb.yml:4:34",
+            )
+        ]
 
     def matches_indirect_variable_name(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -389,16 +453,20 @@ def describe_empty_password_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(EmptyPasswordRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(EmptyPasswordRule().check(context))
 
-        assert results == [_result("pb.yml:4:24", "pb.yml:5:17")]
+        assert results == [
+            _result(
+                "`secret_password` is set to an empty password",
+                "pb.yml:5:17",
+                "pb.yml:4:24",
+            )
+        ]
 
 
 def describe_admin_by_default_rule() -> None:
-    _result = partial(
-        _make_result, AdminByDefaultRule.name, AdminByDefaultRule.description
-    )
+    _result = partial(_make_result, AdminByDefaultRule.code)
 
     def matches_literal_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -411,10 +479,16 @@ def describe_admin_by_default_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(AdminByDefaultRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(AdminByDefaultRule().check(context))
 
-        assert results == [_result("pb.yml:5:32", "pb.yml:4:19")]
+        assert results == [
+            _result(
+                "`become_user` is set to an administrator account",
+                "pb.yml:4:19",
+                "pb.yml:5:32",
+            )
+        ]
 
     def matches_variable_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -429,16 +503,20 @@ def describe_admin_by_default_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(AdminByDefaultRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(AdminByDefaultRule().check(context))
 
-        assert results == [_result("pb.yml:4:28", "pb.yml:6:19")]
+        assert results == [
+            _result(
+                "`become_user` is set to an administrator account",
+                "pb.yml:6:19",
+                "pb.yml:4:28",
+            )
+        ]
 
 
 def describe_http_without_tls_or_ssl_rule() -> None:
-    _result = partial(
-        _make_result, HTTPWithoutSSLTLSRule.name, HTTPWithoutSSLTLSRule.description
-    )
+    _result = partial(_make_result, HTTPWithoutSSLTLSRule.code)
 
     def matches_literal_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -451,10 +529,16 @@ def describe_http_without_tls_or_ssl_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(HTTPWithoutSSLTLSRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(HTTPWithoutSSLTLSRule().check(context))
 
-        assert results == [_result("pb.yml:5:26", "pb.yml:4:19")]
+        assert results == [
+            _result(
+                "`args.url` is set to an insecure HTTP URL",
+                "pb.yml:4:19",
+                "pb.yml:5:26",
+            )
+        ]
 
     def matches_variable_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -469,10 +553,16 @@ def describe_http_without_tls_or_ssl_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(HTTPWithoutSSLTLSRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(HTTPWithoutSSLTLSRule().check(context))
 
-        assert results == [_result("pb.yml:4:27", "pb.yml:6:19")]
+        assert results == [
+            _result(
+                "`args.url` is set to an insecure HTTP URL",
+                "pb.yml:6:19",
+                "pb.yml:4:27",
+            )
+        ]
 
     def matches_expression_creating_url(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -487,10 +577,16 @@ def describe_http_without_tls_or_ssl_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(HTTPWithoutSSLTLSRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(HTTPWithoutSSLTLSRule().check(context))
 
-        assert results == [_result("pb.yml:7:26", "pb.yml:6:19")]
+        assert results == [
+            _result(
+                "`args.url` is set to an insecure HTTP URL",
+                "pb.yml:6:19",
+                "pb.yml:7:26",
+            )
+        ]
 
     def matches_transitive_expression_creating_url(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -506,10 +602,16 @@ def describe_http_without_tls_or_ssl_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(HTTPWithoutSSLTLSRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(HTTPWithoutSSLTLSRule().check(context))
 
-        assert results == [_result("pb.yml:5:22", "pb.yml:7:19")]
+        assert results == [
+            _result(
+                "`args.url` is set to an insecure HTTP URL",
+                "pb.yml:7:19",
+                "pb.yml:5:22",
+            )
+        ]
 
     def does_not_match_localhost(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -522,8 +624,8 @@ def describe_http_without_tls_or_ssl_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(HTTPWithoutSSLTLSRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(HTTPWithoutSSLTLSRule().check(context))
 
         assert not results
 
@@ -538,8 +640,8 @@ def describe_http_without_tls_or_ssl_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(HTTPWithoutSSLTLSRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(HTTPWithoutSSLTLSRule().check(context))
 
         assert not results
 
@@ -554,8 +656,8 @@ def describe_http_without_tls_or_ssl_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(HTTPWithoutSSLTLSRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(HTTPWithoutSSLTLSRule().check(context))
 
         assert not results
 
@@ -573,8 +675,8 @@ def describe_http_without_tls_or_ssl_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(HTTPWithoutSSLTLSRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(HTTPWithoutSSLTLSRule().check(context))
 
         assert not results
 
@@ -589,8 +691,8 @@ def describe_http_without_tls_or_ssl_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(HTTPWithoutSSLTLSRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(HTTPWithoutSSLTLSRule().check(context))
 
         assert not results
 
@@ -613,18 +715,20 @@ def describe_http_without_tls_or_ssl_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(HTTPWithoutSSLTLSRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(HTTPWithoutSSLTLSRule().check(context))
 
-        assert results == [_result("pb.yml:4:22", "pb.yml:10:19")]
+        assert results == [
+            _result(
+                "`args.url` is set to an insecure HTTP URL",
+                "pb.yml:10:19",
+                "pb.yml:4:22",
+            )
+        ]
 
 
 def describe_missing_integrity_check_rule() -> None:
-    _result = partial(
-        _make_result,
-        MissingIntegrityCheckRule.name,
-        MissingIntegrityCheckRule.description,
-    )
+    _result = partial(_make_result, MissingIntegrityCheckRule.code)
 
     def matches_literal_url_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -637,10 +741,16 @@ def describe_missing_integrity_check_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(MissingIntegrityCheckRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(MissingIntegrityCheckRule().check(context))
 
-        assert results == [_result("pb.yml:5:26", "pb.yml:4:19")]
+        assert results == [
+            _result(
+                "`args.url` downloads content without an integrity check",
+                "pb.yml:4:19",
+                "pb.yml:5:26",
+            )
+        ]
 
     def matches_variable_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -655,10 +765,16 @@ def describe_missing_integrity_check_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(MissingIntegrityCheckRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(MissingIntegrityCheckRule().check(context))
 
-        assert results == [_result("pb.yml:4:27", "pb.yml:6:19")]
+        assert results == [
+            _result(
+                "`args.url` downloads content without an integrity check",
+                "pb.yml:6:19",
+                "pb.yml:4:27",
+            )
+        ]
 
     def matches_expression_creating_url(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -673,10 +789,53 @@ def describe_missing_integrity_check_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(MissingIntegrityCheckRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(MissingIntegrityCheckRule().check(context))
 
-        assert results == [_result("pb.yml:7:26", "pb.yml:6:19")]
+        assert results == [
+            _result(
+                "`args.url` downloads content without an integrity check",
+                "pb.yml:6:19",
+                "pb.yml:7:26",
+            )
+        ]
+
+    def does_not_match_url_with_checksum(tmp_path: Path) -> None:
+        pb_path = tmp_path / "pb.yml"
+        write_pb(
+            """
+            - hosts: localhost
+              tasks:
+                - get_url:
+                    url: https://example.com/source.tar.gz
+                    checksum: test
+        """,
+            pb_path,
+        )
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(MissingIntegrityCheckRule().check(context))
+
+        assert not results
+
+    def does_not_match_non_source_url(tmp_path: Path) -> None:
+        pb_path = tmp_path / "pb.yml"
+        write_pb(
+            """
+            - hosts: localhost
+              tasks:
+                - get_url:
+                    url: 'http://127.0.0.1/test'
+        """,
+            pb_path,
+        )
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(MissingIntegrityCheckRule().check(context))
+
+        assert not results
+
+
+def describe_disabled_integrity_check_rule() -> None:
+    _result = partial(_make_result, DisabledIntegrityCheckRule.code)
 
     def matches_disabled_gpgcheck(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -690,10 +849,16 @@ def describe_missing_integrity_check_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(MissingIntegrityCheckRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(DisabledIntegrityCheckRule().check(context))
 
-        assert results == [_result("pb.yml:6:31", "pb.yml:4:19")]
+        assert results == [
+            _result(
+                "`args.gpgcheck` disables the integrity check",
+                "pb.yml:4:19",
+                "pb.yml:6:31",
+            )
+        ]
 
     def matches_inverted_disabled_gpgcheck(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -707,10 +872,16 @@ def describe_missing_integrity_check_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(MissingIntegrityCheckRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(DisabledIntegrityCheckRule().check(context))
 
-        assert results == [_result("pb.yml:6:40", "pb.yml:4:19")]
+        assert results == [
+            _result(
+                "`args.disable_gpg_check` disables the integrity check",
+                "pb.yml:4:19",
+                "pb.yml:6:40",
+            )
+        ]
 
     def matches_disabled_gpgcheck_indirectly(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -726,10 +897,16 @@ def describe_missing_integrity_check_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(MissingIntegrityCheckRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(DisabledIntegrityCheckRule().check(context))
 
-        assert results == [_result("pb.yml:4:25", "pb.yml:6:19")]
+        assert results == [
+            _result(
+                "`args.gpgcheck` disables the integrity check",
+                "pb.yml:6:19",
+                "pb.yml:4:25",
+            )
+        ]
 
     def does_not_match_enabled_gpgcheck(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -743,8 +920,8 @@ def describe_missing_integrity_check_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(MissingIntegrityCheckRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(DisabledIntegrityCheckRule().check(context))
 
         assert not results
 
@@ -760,51 +937,14 @@ def describe_missing_integrity_check_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(MissingIntegrityCheckRule().run(graph_db))
-
-        assert not results
-
-    def does_not_match_url_with_checksum(tmp_path: Path) -> None:
-        pb_path = tmp_path / "pb.yml"
-        write_pb(
-            """
-            - hosts: localhost
-              tasks:
-                - get_url:
-                    url: https://example.com/source.tar.gz
-                    checksum: test
-        """,
-            pb_path,
-        )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(MissingIntegrityCheckRule().run(graph_db))
-
-        assert not results
-
-    def does_not_match_non_source_url(tmp_path: Path) -> None:
-        pb_path = tmp_path / "pb.yml"
-        write_pb(
-            """
-            - hosts: localhost
-              tasks:
-                - get_url:
-                    url: 'http://127.0.0.1/test'
-        """,
-            pb_path,
-        )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(MissingIntegrityCheckRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(DisabledIntegrityCheckRule().check(context))
 
         assert not results
 
 
 def describe_unrestricted_ip_address_rule() -> None:
-    _result = partial(
-        _make_result,
-        UnrestrictedIPAddressRule.name,
-        UnrestrictedIPAddressRule.description,
-    )
+    _result = partial(_make_result, UnrestrictedIPAddressRule.code)
 
     def matches_literal_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -817,10 +957,16 @@ def describe_unrestricted_ip_address_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(UnrestrictedIPAddressRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(UnrestrictedIPAddressRule().check(context))
 
-        assert results == [_result("pb.yml:5:27", "pb.yml:4:19")]
+        assert results == [
+            _result(
+                "`args.bind` binds to an unrestricted IP address",
+                "pb.yml:4:19",
+                "pb.yml:5:27",
+            )
+        ]
 
     def matches_indirect_literal_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -835,10 +981,16 @@ def describe_unrestricted_ip_address_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(UnrestrictedIPAddressRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(UnrestrictedIPAddressRule().check(context))
 
-        assert results == [_result("pb.yml:4:31", "pb.yml:6:19")]
+        assert results == [
+            _result(
+                "`args.bind` binds to an unrestricted IP address",
+                "pb.yml:6:19",
+                "pb.yml:4:31",
+            )
+        ]
 
     def does_not_match_10_0_0_0(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -853,16 +1005,14 @@ def describe_unrestricted_ip_address_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(UnrestrictedIPAddressRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(UnrestrictedIPAddressRule().check(context))
 
         assert not results
 
 
 def describe_weak_crypto_rule() -> None:
-    _result = partial(
-        _make_result, WeakCryptoAlgorithmRule.name, WeakCryptoAlgorithmRule.description
-    )
+    _result = partial(_make_result, WeakCryptoAlgorithmRule.code)
 
     def matches_literal_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -876,10 +1026,16 @@ def describe_weak_crypto_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(WeakCryptoAlgorithmRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(WeakCryptoAlgorithmRule().check(context))
 
-        assert results == [_result("pb.yml:6:31", "pb.yml:4:19")]
+        assert results == [
+            _result(
+                "`args.checksum` uses a weak cryptographic algorithm",
+                "pb.yml:4:19",
+                "pb.yml:6:31",
+            )
+        ]
 
     def matches_indirect_literal_on_task(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -895,10 +1051,16 @@ def describe_weak_crypto_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(WeakCryptoAlgorithmRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(WeakCryptoAlgorithmRule().check(context))
 
-        assert results == [_result("pb.yml:4:32", "pb.yml:6:19")]
+        assert results == [
+            _result(
+                "`args.checksum` uses a weak cryptographic algorithm",
+                "pb.yml:6:19",
+                "pb.yml:4:32",
+            )
+        ]
 
     def matches_usage_in_expressions(tmp_path: Path) -> None:
         pb_path = tmp_path / "pb.yml"
@@ -912,10 +1074,16 @@ def describe_weak_crypto_rule() -> None:
         """,
             pb_path,
         )
-        with temp_import_pb(pb_path) as graph_db:
-            results = _stringify(WeakCryptoAlgorithmRule().run(graph_db))
+        with temp_import_pb(pb_path) as context:
+            results = _stringify(WeakCryptoAlgorithmRule().check(context))
 
-        assert results == [_result("pb.yml:6:31", "pb.yml:4:19")]
+        assert results == [
+            _result(
+                "`args.password` uses a weak cryptographic algorithm",
+                "pb.yml:4:19",
+                "pb.yml:6:31",
+            )
+        ]
 
 
 def describe_glitch_test_cases() -> None:
@@ -932,15 +1100,15 @@ def describe_glitch_test_cases() -> None:
             pb_path,
         )
 
-        with temp_import_pb(pb_path) as graph_db:
-            results = run_all_checks(graph_db)
+        with temp_import_pb(pb_path) as context:
+            results = run_all_checks(context)
 
         assert results == [
             _make_result(
-                AdminByDefaultRule.name,
-                AdminByDefaultRule.description,
-                "pb.yml:5:32",
+                AdminByDefaultRule.code,
+                "`become_user` is set to an administrator account",
                 "pb.yml:4:19",
+                "pb.yml:5:32",
             )
         ]
 
@@ -968,14 +1136,13 @@ def describe_glitch_test_cases() -> None:
             pb_path,
         )
 
-        with temp_import_pb(pb_path) as graph_db:
-            results = run_all_checks(graph_db)
+        with temp_import_pb(pb_path) as context:
+            results = run_all_checks(context)
 
         assert results == [
             _make_result(
-                EmptyPasswordRule.name,
-                EmptyPasswordRule.description,
-                "pb.yml:4:19",
+                EmptyPasswordRule.code,
+                "`args.password` is set to an empty password",
                 "pb.yml:4:19",
             )
         ]
@@ -1004,15 +1171,15 @@ def describe_glitch_test_cases() -> None:
             pb_path,
         )
 
-        with temp_import_pb(pb_path) as graph_db:
-            results = run_all_checks(graph_db)
+        with temp_import_pb(pb_path) as context:
+            results = run_all_checks(context)
 
         assert results == [
             _make_result(
-                HardcodedSecretRule.name,
-                HardcodedSecretRule.description,
-                "pb.yml:10:33",
+                HardcodedSecretRule.code,
+                "`args.password` contains a hardcoded secret",
                 "pb.yml:4:19",
+                "pb.yml:10:33",
             )
         ]
 
@@ -1040,15 +1207,15 @@ def describe_glitch_test_cases() -> None:
             pb_path,
         )
 
-        with temp_import_pb(pb_path) as graph_db:
-            results = run_all_checks(graph_db)
+        with temp_import_pb(pb_path) as context:
+            results = run_all_checks(context)
 
         assert results == [
             _make_result(
-                HTTPWithoutSSLTLSRule.name,
-                HTTPWithoutSSLTLSRule.description,
-                "pb.yml:6:26",
+                HTTPWithoutSSLTLSRule.code,
+                "`args.url` is set to an insecure HTTP URL",
                 "pb.yml:4:19",
+                "pb.yml:6:26",
             )
         ]
 
@@ -1071,8 +1238,8 @@ def describe_glitch_test_cases() -> None:
             pb_path,
         )
 
-        with temp_import_pb(pb_path) as graph_db:
-            results = run_all_checks(graph_db)
+        with temp_import_pb(pb_path) as context:
+            results = run_all_checks(context)
 
         # False positive
         assert not results
@@ -1095,15 +1262,15 @@ def describe_glitch_test_cases() -> None:
             pb_path,
         )
 
-        with temp_import_pb(pb_path) as graph_db:
-            results = run_all_checks(graph_db)
+        with temp_import_pb(pb_path) as context:
+            results = run_all_checks(context)
 
         assert results == [
             _make_result(
-                UnrestrictedIPAddressRule.name,
-                UnrestrictedIPAddressRule.description,
-                "pb.yml:6:39",
+                UnrestrictedIPAddressRule.code,
+                "`args.bind` binds to an unrestricted IP address",
                 "pb.yml:4:19",
+                "pb.yml:6:39",
             )
         ]
 
@@ -1129,23 +1296,23 @@ def describe_glitch_test_cases() -> None:
             pb_path,
         )
 
-        with temp_import_pb(pb_path) as graph_db:
-            results = run_all_checks(graph_db)
+        with temp_import_pb(pb_path) as context:
+            results = run_all_checks(context)
 
         assert sorted(results) == sorted(
             [
                 _make_result(
-                    WeakCryptoAlgorithmRule.name,
-                    WeakCryptoAlgorithmRule.description,
+                    WeakCryptoAlgorithmRule.code,
+                    "`args._raw_params` uses a weak cryptographic algorithm",
+                    "pb.yml:8:19",
                     "pb.yml:6:38",
-                    "pb.yml:8:19",
                 ),
-                # Due to the variable name also being matched.
+                # Due to the whole shell command expression containing "md5" as a substring.
                 _make_result(
-                    WeakCryptoAlgorithmRule.name,
-                    WeakCryptoAlgorithmRule.description,
-                    "pb.yml:9:26",
+                    WeakCryptoAlgorithmRule.code,
+                    "`args._raw_params` uses a weak cryptographic algorithm",
                     "pb.yml:8:19",
+                    "pb.yml:9:26",
                 ),
             ]
         )

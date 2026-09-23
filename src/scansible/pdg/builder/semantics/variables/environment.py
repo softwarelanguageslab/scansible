@@ -91,7 +91,7 @@ class VariableDefinitionRecord:
     #: The location where the variable is defined.
     location: rep.NodeLocation
     #: Revision of the same-named definition visible when this one was registered, if any.
-    shadows: int | None = None
+    prior_version: int | None = None
 
 
 class Environment(abc.ABC):

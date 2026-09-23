@@ -62,9 +62,9 @@ class VariableManager:
         """
         revision = self._get_next_def_revision(name)
         logger.debug(f"Selected revision {revision} for {name}")
-        shadows = self._get_shadowed_revision(name)
+        prior_version = self._get_prior_version(name)
         self._define_variable(
-            name, revision, env_type, initialiser, conditions, shadows
+            name, revision, env_type, initialiser, conditions, prior_version
         )
 
     def define_eager_variable(
@@ -80,22 +80,24 @@ class VariableManager:
         """
         revision = self._get_next_def_revision(name)
         logger.debug(f"Selected revision {revision} for {name}")
-        shadows = self._get_shadowed_revision(name)
+        prior_version = self._get_prior_version(name)
         var_node = rep.Variable(
             name=name,
             version=revision,
             value_version=0,
             scope_level=env_type.value,
-            shadows=shadows,
+            prior_version=prior_version,
             location=self.build_ctx.get_location(name),
         )
         self.build_ctx.graph.add_node(var_node)
         for cond in conditions or []:
             self.build_ctx.graph.add_edge(cond, var_node, rep.WHEN)
-        self._define_variable(name, revision, env_type, var_node, conditions, shadows)
+        self._define_variable(
+            name, revision, env_type, var_node, conditions, prior_version
+        )
         return var_node
 
-    def _get_shadowed_revision(self, name: str) -> int | None:
+    def _get_prior_version(self, name: str) -> int | None:
         """Get the revision of the same-named definition currently visible, if any."""
         rec = self._envs.get_variable_definition(name)
         return rec.revision if rec is not None else None
@@ -107,7 +109,7 @@ class VariableManager:
         env_type: EnvironmentType,
         value: ast.AnyExpression | rep.Variable,
         conditions: Sequence[rep.DataNode] | None,
-        shadows: int | None,
+        prior_version: int | None,
     ) -> None:
         """Declare a variable, bound to the given value.
 
@@ -123,7 +125,7 @@ class VariableManager:
             env_type,
             tuple(conditions or []),
             self.build_ctx.get_location(name),
-            shadows,
+            prior_version,
         )
         self._envs.set_variable_definition(def_record)
 

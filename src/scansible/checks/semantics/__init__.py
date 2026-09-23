@@ -1,24 +1,16 @@
 from __future__ import annotations
 
-from scansible.pdg import Graph
-
-from .base import RuleResult
-from .override_unused_rule import UnusedOverriddenRule
-from .reuse_changed_rule import ReuseChangedVariableRule
-from .reuse_impure_expression_rule import ReuseImpureExpressionRule
-from .unconditional_override_rule import UnconditionalOverrideRule
+from .base import TraversalRule as TraversalRule
 from .unnecessary_include_vars import UnnecessaryIncludeVarsRule
 from .unnecessary_set_fact import UnnecessarySetFactRule
-
-ALL_RULES = [
-    ReuseImpureExpressionRule(),
-    ReuseChangedVariableRule(),
-    UnnecessarySetFactRule(),
-    UnnecessaryIncludeVarsRule(),
-    UnconditionalOverrideRule(),
-    UnusedOverriddenRule(),
-]
+from .unsafe_reuse_rule import UnsafeReuseRule
+from .variable_shadowing_rule import VariableShadowingRule
 
 
-def run_all_checks(graph: Graph) -> list[RuleResult]:
-    return [res for rule in ALL_RULES for res in rule.scan(graph)]
+def get_all_rules() -> list[TraversalRule]:
+    return [
+        UnsafeReuseRule(),
+        UnnecessarySetFactRule(),
+        UnnecessaryIncludeVarsRule(),
+        VariableShadowingRule(),
+    ]
