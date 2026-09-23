@@ -129,19 +129,19 @@ def _get_inlined_candidates(
     """
     var_inits = var_ctx.get_initialisers(var_ref.name, expr.var_mappings)
     if not var_inits:
-        logger.debug(f"Cannot simplify reference {var_ref!r}, no initialisers found")
+        logger.trace(f"Cannot simplify reference {var_ref!r}, no initialisers found")
         yield None
         return
 
     for var_init, new_var_mappings, new_conditions in var_inits:
         if not isinstance(var_init, ast.Expression):
             if isinstance(var_init, (ast.SeqLiteral, ast.MapLiteral)):
-                logger.debug(
+                logger.trace(
                     f"Cannot simplify reference {var_ref!r}, initialiser is composite"
                 )
                 yield None
             else:
-                logger.debug(f"Simplified reference {var_ref!r} to {var_init!r}")
+                logger.trace(f"Simplified reference {var_ref!r} to {var_init!r}")
                 yield SimplifiedExpression(
                     nodes.Output([nodes.TemplateData(str(var_init))]),
                     # collections.abc.Mapping doesn't support the | merge operator.
@@ -150,7 +150,7 @@ def _get_inlined_candidates(
                 )
             continue
 
-        logger.debug(
+        logger.trace(
             f"Performing nested simplification of reference {var_ref!r}'s initialiser {var_init!r}"
         )
         ref_ast = TemplateExpressionAST(var_init)

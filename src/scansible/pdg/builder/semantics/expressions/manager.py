@@ -103,7 +103,7 @@ class ExpressionManager:
 
     def _build_expression(self, ast: TemplateExpressionAST) -> rep.DataNode:
         """Parse a template, add required nodes to the graph, and return the record."""
-        logger.debug(f"Building expression {ast.raw!r}")
+        logger.trace(f"Building expression {ast.raw!r}")
 
         used_variables = [
             self._resolve_variable_reference(var_name)
@@ -116,7 +116,7 @@ class ExpressionManager:
             location=self.build_ctx.get_location(ast.raw),
         )
         iv = rep.IntermediateValue(identifier=self.build_ctx.next_iv_id())
-        logger.debug(f"Using IV {iv!r}")
+        logger.trace(f"Using IV {iv!r}")
         self.build_ctx.graph.add_node(en)
         self.build_ctx.graph.add_node(iv)
         self.build_ctx.graph.add_edge(en, iv, rep.DEF)
@@ -147,20 +147,20 @@ class ExpressionManager:
         If the variable is defined, will return a variable and evaluate its
         initializer, if necessary.
         """
-        logger.debug(f"Resolving variable {name}")
+        logger.trace(f"Resolving variable {name}")
         vdef = self.build_ctx.vars.lookup_variable(name)
 
         if vdef is None:
             return self._get_undefined_variable_value(name)
 
-        logger.debug(f"Found existing variable {vdef!r}")
+        logger.trace(f"Found existing variable {vdef!r}")
 
         if isinstance(vdef.value, rep.Variable):
             return vdef.value
 
         # Evaluate the expression and assign it to the variable.
         value_revision = self._get_next_val_revision(vdef)
-        logger.debug(
+        logger.trace(
             f"Creating new value for {vdef.name!r} with value revision {value_revision}"
         )
 
@@ -181,7 +181,7 @@ class ExpressionManager:
         return var_node
 
     def _get_undefined_variable_value(self, name: str) -> rep.Variable:
-        logger.debug(f"Variable {name} has not yet been defined")
+        logger.trace(f"Variable {name} has not yet been defined")
         return rep.Variable(
             name=name,
             version=0,

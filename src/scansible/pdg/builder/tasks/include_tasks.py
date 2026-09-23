@@ -5,8 +5,6 @@ from typing import final, override
 from collections.abc import Sequence
 from contextlib import AbstractContextManager
 
-from loguru import logger
-
 from scansible import ast
 from scansible.utils import actions
 
@@ -35,7 +33,7 @@ class IncludeTaskBuilder(DynamicIncludesBuilder[ast.TaskFile]):
 
     @override
     def _get_filename_candidates(self, included_name_pattern: str) -> set[str]:
-        logger.warning("Conditions for include_tasks not fully set yet!")
+        # FIXME: Conditions for include_tasks not fully set yet!
         return self.context.include_ctx.find_matching_task_files(included_name_pattern)
 
     @override
@@ -45,7 +43,7 @@ class IncludeTaskBuilder(DynamicIncludesBuilder[ast.TaskFile]):
     @override
     def _check_conditions(self) -> None:
         if actions.is_import_tasks(self.task.action) and self.context.active_conditions:
-            self.logger.warning(
+            self.logger.debug(
                 "Conditions active during static include, semantics unknown!"
             )
 

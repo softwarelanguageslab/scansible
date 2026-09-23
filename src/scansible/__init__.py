@@ -19,11 +19,16 @@ from scansible.constants import DEFAULT_ROLES_PATH
 
 
 @click.group
-@click.option("-v", "--verbose", is_flag=True, default=False, help="Print debug output")
+@click.option(
+    "-v",
+    "--verbose",
+    count=True,
+    help="Print debug output (-v) or trace output (-vv)",
+)
 @click.option(
     "-q", "--quiet", is_flag=True, default=False, help="Print only warnings and errors"
 )
-def cli(*, verbose: bool, quiet: bool) -> None:
+def cli(*, verbose: int, quiet: bool) -> None:
     """Static Code Analysis for Ansible."""
     if verbose and quiet:
         raise click.BadOptionUsage(
@@ -31,7 +36,15 @@ def cli(*, verbose: bool, quiet: bool) -> None:
         )
     # Set up logging
     logger.remove()
-    desired_level = "DEBUG" if verbose else "WARNING" if quiet else "INFO"
+    desired_level = (
+        "TRACE"
+        if verbose >= 2
+        else "DEBUG"
+        if verbose == 1
+        else "WARNING"
+        if quiet
+        else "INFO"
+    )
     _ = logger.add(sys.stderr, level=desired_level)
 
 
@@ -242,7 +255,6 @@ def check_all(
     else:
         entrypoints = [(file_path, "playbook")]
     results: list[Finding] = []
-    logger.remove()
 
     for entrypoint, project_type in entrypoints:
         as_pb = project_type == "playbook"

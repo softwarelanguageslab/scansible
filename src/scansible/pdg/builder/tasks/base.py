@@ -79,7 +79,7 @@ class TaskBuilder(abc.ABC):
         loop_var_name = self.task.loop_control.loop_var
         for loop_control_k in self.task.loop_control.model_directives_set:
             if loop_control_k != "loop_var":
-                self.logger.warning(
+                self.logger.debug(
                     f"I cannot handle loop_control option {loop_control_k} yet!"
                 )
 
@@ -97,6 +97,6 @@ class TaskBuilder(abc.ABC):
     def warn_remaining_kws(self, action: str = "") -> None:
         for other_kw in self.task.model_directives_set:
             if other_kw not in self.supported_task_attributes():
-                self.logger.warning(
+                self.logger.debug(
                     f"Cannot handle {other_kw} on {action or self.task.action} yet!"
                 )

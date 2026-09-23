@@ -110,7 +110,7 @@ class DynamicIncludesBuilder[Content](TaskBuilder, abc.ABC):
                 self.logger.error(f"{self.CONTENT_TYPE} not found: {included_name}")
                 return self._create_placeholder_task(included_name, predecessors)
 
-            self.logger.info(
+            self.logger.trace(
                 f"Following include of {self.CONTENT_TYPE} {included_name}"
             )
             return self._build_included_content(included_content, predecessors)

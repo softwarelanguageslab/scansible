@@ -71,7 +71,7 @@ class RoleBuilder:
                 ).build_tasks(result.next_predecessors)
                 result = result.chain(tf_result)
             else:
-                logger.warning("No main task file")
+                logger.debug("No main task file")
 
             # TODO: These should somehow be linked to tasks.
             if (hf := self.role.main_handlers_file) is not None:

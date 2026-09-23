@@ -114,7 +114,7 @@ class BlockBuilder:
 
         for kw in self.block.model_directives_set:
             if kw not in self.SUPPORTED_BLOCK_ATTRIBUTES:
-                self.logger.warning(f"Unsupported block keyword {kw!r}!")
+                self.logger.debug(f"Unsupported block keyword {kw!r}!")
 
         return result
 

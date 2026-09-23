@@ -61,7 +61,7 @@ class VariableManager:
         The variable node will be added to the graph on-demand when dereferenced.
         """
         revision = self._get_next_def_revision(name)
-        logger.debug(f"Selected revision {revision} for {name}")
+        logger.trace(f"Selected revision {revision} for {name}")
         prior_version = self._get_prior_version(name)
         self._define_variable(
             name, revision, env_type, initialiser, conditions, prior_version
@@ -79,7 +79,7 @@ class VariableManager:
         Callers are responsible for linking the defining node, if any.
         """
         revision = self._get_next_def_revision(name)
-        logger.debug(f"Selected revision {revision} for {name}")
+        logger.trace(f"Selected revision {revision} for {name}")
         prior_version = self._get_prior_version(name)
         var_node = rep.Variable(
             name=name,
@@ -116,7 +116,7 @@ class VariableManager:
         The value is either an actual variable node, in case the variable is injected with an eagerly-evaluated
         value, or an expression to be lazily evaluated when the variable is dereferenced.
         """
-        logger.debug(f"Defining variable {name!r} in env of type {env_type.name}")
+        logger.trace(f"Defining variable {name!r} in env of type {env_type.name}")
 
         def_record = VariableDefinitionRecord(
             name,

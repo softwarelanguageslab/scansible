@@ -267,7 +267,7 @@ class InclusionManager:
         base_search_dirs = self._get_file_search_dirs(base_dir)
 
         for search_path in base_search_dirs:
-            logger.debug(f"Checking whether {short_path} exists in {search_path}")
+            logger.trace(f"Checking whether {short_path} exists in {search_path}")
             if not self._is_in_project(search_path.absolute / short_path):
                 logger.warning(
                     f"Blocked attempted path traversal on {search_path.absolute / short_path}"
@@ -276,7 +276,7 @@ class InclusionManager:
 
             found_path = find_file(search_path, short_path)
             if found_path is not None:
-                logger.debug(f"Found file: {found_path}")
+                logger.trace(f"Found file: {found_path}")
                 return found_path
 
         return None
@@ -311,7 +311,7 @@ class InclusionManager:
         base_search_dirs = self._get_role_search_dirs()
 
         for search_path in base_search_dirs:
-            logger.debug(f"Checking whether role {role_name} exists in {search_path}")
+            logger.trace(f"Checking whether role {role_name} exists in {search_path}")
             candidate_path = Path(normpath(search_path / role_name))
             if not candidate_path.is_relative_to(search_path):
                 logger.warning(f"Blocked attempted path traversal on {candidate_path}")
@@ -319,7 +319,7 @@ class InclusionManager:
             candidate_path = candidate_path.resolve()
 
             if candidate_path.is_dir():
-                logger.debug(f"Found role: {candidate_path}")
+                logger.trace(f"Found role: {candidate_path}")
                 # TODO: Are we sure we want to create a new root path here?
                 return ProjectPath.from_root(candidate_path)
 

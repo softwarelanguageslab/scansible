@@ -284,13 +284,13 @@ class EnvironmentStack:
 
     def get_variable_definition(self, name: str) -> VariableDefinitionRecord | None:
         """Look up and return the highest precedence variable definition for the given name, or None if not defined."""
-        logger.debug(f"Looking up variable definition for {name!r}")
+        logger.trace(f"Looking up variable definition for {name!r}")
         result = self._get_highest_precedence_variable_definition(name)
         if result is None:
-            logger.debug("Miss!")
+            logger.trace("Miss!")
             return None
 
-        logger.debug(f"Hit! Found {result[0]!r} in {result[1]!r}")
+        logger.trace(f"Hit! Found {result[0]!r} in {result[1]!r}")
         return result[0]
 
     def set_variable_definition(self, rec: VariableDefinitionRecord) -> None:
@@ -302,9 +302,9 @@ class EnvironmentStack:
         if env_type not in LOCAL_ENV_TYPES:
             raise ValueError("Attempted to enter a global environment")
         self._local_environment_stack.append(_make_environment(env_type))
-        logger.debug(f"Entered {self.environment_stack[-1]}")
+        logger.trace(f"Entered {self.environment_stack[-1]}")
 
     def exit_scope(self) -> None:
         """Exit the most local environment and pop it from the stack."""
-        logger.debug(f"Leaving {self.environment_stack[-1]}")
+        logger.trace(f"Leaving {self.environment_stack[-1]}")
         _ = self._local_environment_stack.pop()
