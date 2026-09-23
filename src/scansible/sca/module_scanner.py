@@ -11,6 +11,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import ansible  # pyright: ignore[reportMissingTypeStubs]
+from loguru import logger
 
 from scansible.sca.constants import (
     ANSIBLE_BUILTIN_IGNORES,
@@ -136,12 +137,12 @@ def _extract_collection_dependencies(
         try:
             input_file = _prepare_input(coll_fqn, d)
         except CollectionNotFoundError:
-            print(f"Collection {coll_fqn} not in dataset!")
+            logger.warning(f"Collection {coll_fqn} not in dataset!")
             return {}
 
         output_file = d / "output.csv"
 
-        print(f"Processing {coll_fqn}")
+        logger.debug(f"Processing {coll_fqn}")
         try:
             completed_proc = subprocess.run(  # noqa: S603
                 [  # noqa: S607
@@ -159,13 +160,12 @@ def _extract_collection_dependencies(
                 check=True,
             )
         except subprocess.TimeoutExpired:
-            print(f"{coll_fqn} timed out!")
+            logger.warning(f"{coll_fqn} timed out!")
             return {}
         try:
             completed_proc.check_returncode()
         except subprocess.CalledProcessError:
-            print(f"{coll_fqn} failed!")
-            print(completed_proc.stderr)
+            logger.error(f"{coll_fqn} failed!\n{completed_proc.stderr}")
             return {}
 
         return _parse_output(output_file)

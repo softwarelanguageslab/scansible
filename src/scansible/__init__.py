@@ -6,15 +6,14 @@ from __future__ import annotations
 from typing import TextIO
 
 import csv
-import sys
 from collections.abc import Sequence
 from pathlib import Path
 
 import click
-import rich.console
 import rich.progress
 from loguru import logger
 
+from scansible.console import configure_logging, make_console
 from scansible.constants import DEFAULT_ROLES_PATH
 
 
@@ -34,8 +33,6 @@ def cli(*, verbose: int, quiet: bool) -> None:
         raise click.BadOptionUsage(
             "verbose", "--verbose and --quiet are mutually exclusive"
         )
-    # Set up logging
-    logger.remove()
     desired_level = (
         "TRACE"
         if verbose >= 2
@@ -45,7 +42,7 @@ def cli(*, verbose: int, quiet: bool) -> None:
         if quiet
         else "INFO"
     )
-    _ = logger.add(sys.stderr, level=desired_level)
+    configure_logging(desired_level)
 
 
 @cli.command
@@ -132,7 +129,6 @@ def build_pdg(
 
     ctx = build_pdg(project_path, role_search_paths, as_pb=as_pb, lenient=not strict)
     pdg = ctx.graph
-    logger.info(f"Built PDG of {pdg.num_nodes} nodes and {pdg.num_edges} edges")
 
     # if canonicalize:
     #     assert module_kb_path
@@ -196,8 +192,9 @@ def check(
     ctx = build_pdg(project_path, role_search_paths, as_pb=as_pb, lenient=not strict)
 
     from .checks import TerminalReporter, run_all_checks
+    from .utils import ProjectPath
 
-    reporter = TerminalReporter()
+    reporter = TerminalReporter(ProjectPath.from_root(project_path).root)
     results = run_all_checks(
         ctx, enable_security=enable_security, enable_semantics=enable_semantics
     )
@@ -247,6 +244,7 @@ def check_all(
 
     from .checks import Finding, TerminalReporter, run_all_checks
     from .pdg import build_pdg
+    from .utils import ProjectPath
     from .utils.entrypoints import find_entrypoints
 
     # FIXME: Why does this check exist?
@@ -254,22 +252,28 @@ def check_all(
         entrypoints = find_entrypoints(project_path)
     else:
         entrypoints = [(file_path, "playbook")]
-    results: list[Finding] = []
+
+    matched_results: list[Finding] = []
+    matched_root: Path | None = None
 
     for entrypoint, project_type in entrypoints:
         as_pb = project_type == "playbook"
         ctx = build_pdg(entrypoint, role_search_paths, as_pb=as_pb, lenient=not strict)
+        entrypoint_root = ProjectPath.from_root(entrypoint).root
 
-        results.extend(
-            run_all_checks(
-                ctx, enable_security=enable_security, enable_semantics=enable_semantics
-            )
-        )
+        for result in run_all_checks(
+            ctx, enable_security=enable_security, enable_semantics=enable_semantics
+        ):
+            if result.location.is_synthetic:
+                continue
+            if (entrypoint_root / result.location.path).resolve() == file_path:
+                matched_results.append(result)
+                matched_root = entrypoint_root
 
-    reporter = TerminalReporter()
-    reporter.report_results(
-        [result for result in results if result.location.path == str(file_path)]
+    reporter = TerminalReporter(
+        matched_root or ProjectPath.from_root(project_path).root
     )
+    reporter.report_results(matched_results)
 
 
 # @cli.command()
@@ -405,7 +409,7 @@ def bulk_build(
             failed_out_f, fieldnames=["repo", "relative_path", "type"]
         )
         failed_out_csv.writeheader()
-        error_console = rich.console.Console(file=error_log_f)
+        error_console = make_console(file=error_log_f)
 
         for entrypoint in rich.progress.track(
             entrypoints, description=f"Building PDGs for {len(entrypoints)} entrypoints"
@@ -427,9 +431,6 @@ def bulk_build(
                     as_pb=entrypoint["type"] == "playbook",
                 )
                 pdg = ctx.graph
-                logger.info(
-                    f"Built PDG of {pdg.num_nodes} nodes and {pdg.num_edges} edges"
-                )
 
                 # if canonicalize:
                 #     pdg = canonicalize_pdg(pdg, module_kb)

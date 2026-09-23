@@ -130,9 +130,8 @@ class VariableShadowingRule(TraversalRule):
 
         summary = f"Variable `{name}@{shadowing.version}` unconditionally shadows a previous definition"
         explanation = (
-            f"{shadowing!r} shadows the previous definition {shadowed!r}. "
-            f"Neither its initialiser nor its conditions reference {shadowed!r}, "
-            "and both are defined under unrelated conditions."
+            f"Neither its initialiser nor its conditions reference "
+            f"`{name}@{shadowed.version}`, and both are defined under unrelated conditions."
         )
 
         yield Finding(

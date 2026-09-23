@@ -8,6 +8,8 @@ import os
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
 
+from loguru import logger
+
 from scansible.constants import YAML_EXTENSIONS
 
 from .collections import FrozenDict
@@ -135,7 +137,7 @@ def find_all_files(dir_path: ProjectPath) -> list[ProjectPath]:
             try:
                 results.extend(find_all_files(child_path))
             except RecursionError:
-                print(child)
                 # TODO: Why can this spin in an infinite loop??
+                logger.warning(f"Hit recursion limit while walking {child}")
 
     return results

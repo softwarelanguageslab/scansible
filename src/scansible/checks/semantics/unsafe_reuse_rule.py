@@ -87,9 +87,11 @@ class UnsafeReuseRule(TraversalRule):
                 continue
 
             reasons: list[str] = []
-            explanation_parts = [
-                f"This variable was previously used as {v1!r}, but now as {v2!r}."
-            ]
+            first_part = (
+                f"This is value version {v2.value_version} of `{v2.name}@{v2.version}`; "
+                f"the previous evaluation was value version {v1.value_version}."
+            )
+            explanation_parts = [first_part]
             if is_root_impure or impure_deps:
                 reasons.append("an impure expression")
             if changed:

@@ -5,6 +5,7 @@ from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from pathlib import Path
 
+import rich.progress
 from loguru import logger
 from pydantic import ValidationError
 from rich.markup import escape
@@ -21,14 +22,15 @@ from scansible.ast import (
     TaskFile,
 )
 from scansible.checks.base import CheckContext, Finding
+from scansible.checks.reporter import TerminalReporter
 from scansible.checks.security import get_all_rules
 from scansible.checks.security.db import GraphDatabase
+from scansible.console import console, error_console
 from scansible.constants import DEFAULT_ROLES_PATH
 from scansible.pdg.builder.main import build_pdg
 from scansible.sca.constants import (
     ANSIBLE_ROLE_INCLUDE_MODULES,
     ANSIBLE_TRIVIAL_MODULES,
-    CONSOLE,
 )
 from scansible.utils import Location, ProjectPath
 from scansible.utils.entrypoints import find_entrypoints
@@ -120,25 +122,25 @@ def _extract_project_dependencies(project: Path) -> ProjectDependencies:
 
 
 def _print_dependencies(project_deps: ProjectDependencies) -> None:
+    console.print("[bold]Dependencies[/bold]")
     for usage in sorted(
         project_deps.modules, key=lambda x: len(x.usages), reverse=True
     ):
-        CONSOLE.print(f"[bold green]{usage.name}")
+        console.print(f"  [bold green]{escape(usage.name)}[/bold green]")
         for deps in sorted(
             project_deps.module_dependencies[usage.name], key=lambda dep: dep.name
         ):
-            CONSOLE.print(
-                f"\tDepends on: [bold]{deps.name}[/bold] {deps.type} {'package' if deps.type == 'Python' else 'binary'}"
-            )
+            kind = f"{deps.type} package" if deps.type == "Python" else "binary"
+            console.print(f"    depends on [bold]{escape(deps.name)}[/bold] ({kind})")
         for loc in usage.usages:
-            CONSOLE.print(f"\t[blue]{loc}")
+            console.print(f"    [blue]{escape(loc)}[/blue]")
 
 
 def scan_project(
     project: Path, output_dir: Path, role_search_paths: list[Path]
 ) -> None:
     smells = list(_detect_smells(project, role_search_paths))
-    CONSOLE.print(smells)
+    TerminalReporter(ProjectPath.from_root(project).root).report_results(smells)
 
     project_deps = _extract_project_dependencies(project)
 
@@ -154,20 +156,20 @@ def scan_project(
 
     _print_dependencies(project_deps)
 
-    CONSOLE.print("")
-    CONSOLE.print("[bold]Dependencies")
+    console.print()
+    console.print("[bold]CVEs[/bold]")
     for dep_name, vulns in sorted(dep_vulns.items()):
         cves = [vuln for vuln in vulns if vuln.id.startswith("CVE")]
         if cves:
-            CONSOLE.print(
-                f"{dep_name}: Possibly affected by {len(cves)} CVEs. Most recent:"
+            console.print(
+                f"  {escape(dep_name)}: {len(cves)} known CVEs, most recent:"
             )
         else:
-            CONSOLE.print(f"{dep_name}: No known CVEs.")
+            console.print(f"  {escape(dep_name)}: no known CVEs.")
         for cve in sorted(cves, key=lambda x: x.id, reverse=True)[:5]:
-            CONSOLE.print(
-                f"\t[bold red]{cve.id}[/bold red] (severity: {cve.severity}): {escape((cve.summary or cve.description).split('\n')[0])}"
-            )
+            summary = escape((cve.summary or cve.description).split("\n")[0])
+            cve_line = f"    [bold red]{escape(cve.id)}[/bold red] ({escape(cve.severity)})  {summary}"
+            console.print(cve_line)
 
     output_dir.mkdir(exist_ok=True, parents=True)
     generate_report(project.name, output_dir, project_deps, dep_vulns, smells)
@@ -178,13 +180,18 @@ def _detect_smells(project: Path, role_search_paths: list[Path]) -> Iterable[Fin
 
     entrypoints = find_entrypoints(project)
     logger.remove()
-    _ = logger.add(CONSOLE.print, level="ERROR")
+    _ = logger.add(
+        error_console.print,
+        level="ERROR",
+        format="<level>{level: <8}</level> {message}",
+    )
 
-    for entrypoint, project_type in entrypoints:
+    for entrypoint, project_type in rich.progress.track(
+        entrypoints, description="Scanning entrypoints", console=console
+    ):
         as_pb = project_type == "playbook"
         ctx = build_pdg(entrypoint, role_search_paths, as_pb=as_pb)
 
-        CONSOLE.print(f"Running checks on {project_type} {entrypoint}")
         with GraphDatabase(ctx.graph) as db:
             context = CheckContext(graph=ctx.graph, db=db)
             for rule in get_all_rules():

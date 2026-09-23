@@ -8,12 +8,10 @@ import json
 from pathlib import Path
 
 import requests
+from rich.markup import escape
 
-from scansible.sca.constants import (
-    CONSOLE,
-    DEBIAN_NAME_MAPPINGS,
-    ECOSYSTEMS_SEVERITY_MAPPING,
-)
+from scansible.console import error_console
+from scansible.sca.constants import DEBIAN_NAME_MAPPINGS, ECOSYSTEMS_SEVERITY_MAPPING
 from scansible.sca.types import Vulnerability
 
 CACHE_PATH = Path("cache")
@@ -96,9 +94,8 @@ def _find_debian_vulnerabilities(package_name: str) -> list[Vulnerability]:
 def _find_pypi_vulnerabilities(package_name: str) -> list[Vulnerability]:
     package_meta = _search_ecosystems(ecosystem="pypi.org", package=package_name)
     if package_meta is None:
-        CONSOLE.print(
-            f"[bold yellow]WARNING:[/bold yellow] Could not resolve package {package_name}"
-        )
+        message = f"[bold yellow]WARNING:[/bold yellow] Could not resolve package {escape(package_name)}"
+        error_console.print(message)
         return []
     return [
         _build_vuln_from_ecosystems(package_name, adv)

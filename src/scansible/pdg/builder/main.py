@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import cast, final
 
 from collections.abc import Sequence
+from datetime import datetime
 from pathlib import Path
 
 import loguru
@@ -38,6 +39,8 @@ def build_pdg(
 
     :returns:   The build context resulting from build process.
     """
+    start_time = datetime.now()
+
     if as_pb is None:
         as_pb = not _project_is_role(path)
 
@@ -46,7 +49,15 @@ def build_pdg(
     else:
         model = ast.extract_role(path, lenient=lenient, extract_all=False)
 
-    return PDGBuilder(model, role_search_paths, lenient=lenient).build()
+    context = PDGBuilder(model, role_search_paths, lenient=lenient).build()
+
+    elapsed = (datetime.now() - start_time).total_seconds()
+    graph = context.graph
+    logger.info(
+        f"Built PDG of {graph.num_nodes} nodes and {graph.num_edges} edges in {elapsed:.2f}s"
+    )
+
+    return context
 
 
 def _project_is_role(path: Path) -> bool:
