@@ -64,7 +64,7 @@ def _find_role(name: str) -> Path | None:
 def _extend_role_usages(
     role_path: Path, r: RoleUsage, module_usages: list[ModuleUsage]
 ) -> None:
-    role_modules = extract_modules(role_path, return_relative_paths=False)
+    role_modules = extract_modules(role_path)
 
     for mod in role_modules:
         existing_mod = next(
@@ -102,7 +102,7 @@ def _extract_project_dependencies(project: Path) -> ProjectDependencies:
             continue
 
         _extend_role_usages(role_path, r, module_usages)
-        new_ru = extract_roles(role_path, return_relative_paths=False)
+        new_ru = extract_roles(role_path)
         for ru in new_ru:
             ex_ru = next((ru2 for ru2 in role_usages if ru.name == ru2.name), None)
             if ex_ru is None:
@@ -206,9 +206,7 @@ def is_trivial_module(m: ModuleInfo) -> bool:
     return mname in ANSIBLE_TRIVIAL_MODULES
 
 
-def extract_roles(
-    project: Path, *, return_relative_paths: bool = True
-) -> list[RoleUsage]:
+def extract_roles(project: Path) -> list[RoleUsage]:
     first_party_roles = {
         path.name for path, etype in find_entrypoints(project) if etype == "role"
     }
@@ -221,14 +219,6 @@ def extract_roles(
     role_to_usage: dict[str, list[str]] = defaultdict(list)
     for r, loc in third_party_roles:
         role_to_usage[r].append(str(loc))
-
-    if return_relative_paths:
-        return [
-            RoleUsage(
-                r, [str(Path(loc).relative_to(project)) for loc in locs], set(), set()
-            )
-            for r, locs in role_to_usage.items()
-        ]
 
     return [RoleUsage(r, locs, set(), set()) for r, locs in role_to_usage.items()]
 
@@ -265,9 +255,7 @@ def _extract_role_includes(project: Path) -> Iterable[tuple[str, Location]]:
                     yield str(item.args[StrLiteral("name")]), item.location
 
 
-def extract_modules(
-    project: Path, *, return_relative_paths: bool = True
-) -> list[ModuleUsage]:
+def extract_modules(project: Path) -> list[ModuleUsage]:
     all_tasks = extract_all_tasks(project)
     collection_index = get_collection_index()
     modules = [
@@ -284,11 +272,6 @@ def extract_modules(
         mname = f"{m.collection}.{m.name}"
         usages[mname].append(str(t.__location__))
 
-    if return_relative_paths:
-        return [
-            ModuleUsage(name, [str(Path(loc).relative_to(project)) for loc in locs])
-            for name, locs in usages.items()
-        ]
     return [ModuleUsage(name, locs) for name, locs in usages.items()]
 
 
