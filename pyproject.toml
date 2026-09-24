@@ -74,9 +74,9 @@ extend-ignore = [
 "scripts/*" = ["INP001"]
 "src/scansible/utils/module_type_info.py" = ["ERA001"]
 "src/scansible/pdg/canonical.py" = ["ERA001"]
-# ERA001: commented-out CLI options kept for later; PLC0415: commands import lazily for startup performance;
+# PLC0415: commands import lazily for startup performance;
 # PLR0913/PLR0917: one CLI flag per parameter is the interface, not accidental complexity
-"src/scansible/__init__.py" = ["ERA001", "PLC0415", "PLR0913", "PLR0917"]
+"src/scansible/__init__.py" = ["PLC0415", "PLR0913", "PLR0917"]
 
 [tool.ruff.lint.isort]
 required-imports = ["from __future__ import annotations"]
