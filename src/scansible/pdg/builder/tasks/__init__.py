@@ -1,15 +1,20 @@
 from __future__ import annotations
 
-from scansible.ast import BaseTask
+from typing import TYPE_CHECKING
+
 from scansible.utils import actions
 
-from ..context import BuildContext
-from .base import TaskBuilder
 from .generic import GenericTaskBuilder
 from .include_role import IncludeRoleBuilder
 from .include_tasks import IncludeTaskBuilder
 from .include_vars import IncludeVarsTaskBuilder
 from .set_fact import SetFactTaskBuilder
+
+if TYPE_CHECKING:
+    from scansible.ast import BaseTask
+
+    from ..context import BuildContext
+    from .base import TaskBuilder
 
 
 def task_builder_factory(context: BuildContext, task: BaseTask) -> TaskBuilder:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from collections.abc import Callable
 from pathlib import Path
@@ -12,7 +12,6 @@ from graph_matchers import (  # pyright: ignore[reportImplicitRelativeImport]
     assert_graphs_match,
     create_graph,
 )
-from pytest_mock import MockerFixture
 
 from scansible import ast
 from scansible.pdg import (
@@ -32,6 +31,9 @@ from scansible.pdg.builder.semantics import (
     VariableManager,
 )
 from scansible.pdg.representation import Composition
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 ContextCreator = Callable[[], tuple[ExpressionManager, VariableManager, Graph]]
 

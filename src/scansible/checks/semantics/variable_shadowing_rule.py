@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from typing import final, override
+from typing import TYPE_CHECKING, final, override
 
 from collections import defaultdict
-from collections.abc import Iterable
 
 from scansible.pdg.builder.semantics import EnvironmentType
 from scansible.pdg.representation import Graph, Variable
@@ -17,6 +16,9 @@ from .utils import (
     get_register_all_used_variables,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
 
 def _find_shadowing_pairs(
     var_nodes: Iterable[Variable],
@@ -28,7 +30,7 @@ def _find_shadowing_pairs(
     for node in var_nodes:
         var_value_list = var_name_to_vars[node.name][node.version]
         var_name_to_vars[node.name][node.version] = sorted(
-            var_value_list + [node], key=lambda v: v.value_version
+            [*var_value_list, node], key=lambda v: v.value_version
         )
 
     for name, nodes in var_name_to_vars.items():

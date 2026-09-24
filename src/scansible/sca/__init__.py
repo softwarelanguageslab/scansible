@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import json
 from collections import defaultdict
-from collections.abc import Iterable, Sequence
 from pathlib import Path
 
 import rich.progress
@@ -46,6 +47,9 @@ from .types import (
     RoleUsage,
 )
 from .vulnerabilities import find_vulnerabilities
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
 
 
 def _find_role(name: str) -> Path | None:
@@ -161,9 +165,7 @@ def scan_project(
     for dep_name, vulns in sorted(dep_vulns.items()):
         cves = [vuln for vuln in vulns if vuln.id.startswith("CVE")]
         if cves:
-            console.print(
-                f"  {escape(dep_name)}: {len(cves)} known CVEs, most recent:"
-            )
+            console.print(f"  {escape(dep_name)}: {len(cves)} known CVEs, most recent:")
         else:
             console.print(f"  {escape(dep_name)}: no known CVEs.")
         for cve in sorted(cves, key=lambda x: x.id, reverse=True)[:5]:
@@ -227,8 +229,8 @@ def extract_roles(
             )
             for r, locs in role_to_usage.items()
         ]
-    else:
-        return [RoleUsage(r, locs, set(), set()) for r, locs in role_to_usage.items()]
+
+    return [RoleUsage(r, locs, set(), set()) for r, locs in role_to_usage.items()]
 
 
 def _extract_role_includes(project: Path) -> Iterable[tuple[str, Location]]:
@@ -287,8 +289,7 @@ def extract_modules(
             ModuleUsage(name, [str(Path(loc).relative_to(project)) for loc in locs])
             for name, locs in usages.items()
         ]
-    else:
-        return [ModuleUsage(name, locs) for name, locs in usages.items()]
+    return [ModuleUsage(name, locs) for name, locs in usages.items()]
 
 
 def extract_all_tasks(project: Path) -> list[Task]:

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from typing import cast, override
-
-from collections.abc import Sequence
+from typing import TYPE_CHECKING, cast, override
 
 from scansible import ast
 
@@ -10,6 +8,9 @@ from ... import representation as rep
 from ..result import BuildResult
 from ..semantics import EnvironmentType, RecursiveDefinitionError
 from .base import TaskBuilder
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class GenericTaskBuilder(TaskBuilder):
@@ -106,8 +107,10 @@ class GenericTaskBuilder(TaskBuilder):
         for arg_name, arg_value in self.task.args.items():
             try:
                 arg_node = self.context.expr.build_expression(arg_value)
-            except RecursiveDefinitionError as e:
-                self.logger.error(e)
+            except RecursiveDefinitionError:
+                self.logger.exception(
+                    f"Failed to build expression for argument {arg_name!r}"
+                )
                 continue
             self.context.graph.add_edge(
                 arg_node, tn, rep.Keyword(keyword=f"args.{arg_name}")
@@ -120,17 +123,8 @@ class GenericTaskBuilder(TaskBuilder):
         for notified_handler in self.task.notify or []:
             self.context.handler_notifications[notified_handler].add(tn)
 
-        misc_kws = {"check_mode", "become", "become_user", "become_method"}
-        for misc_kw in misc_kws:
-            if misc_kw in self.task.model_fields_set:
-                try:
-                    val_node = self.context.expr.build_expression(
-                        cast(ast.AnyExpression, getattr(self.task, misc_kw))
-                    )
-                except RecursiveDefinitionError as e:
-                    self.logger.error(e)
-                    continue
-                self.context.graph.add_edge(val_node, tn, rep.Keyword(keyword=misc_kw))
+        for misc_kw in ("check_mode", "become", "become_user", "become_method"):
+            self._link_misc_keyword(misc_kw, tn)
 
         result = BuildResult.single(tn)
         # If the task is executed conditionally, the next predecessor may also
@@ -138,6 +132,19 @@ class GenericTaskBuilder(TaskBuilder):
         if condition_nodes:
             result = result.add_next_predecessors(predecessors)
         return result
+
+    def _link_misc_keyword(self, misc_kw: str, tn: rep.Task) -> None:
+        """Link a miscellaneous keyword to the task node."""
+        if misc_kw not in self.task.model_fields_set:
+            return
+        try:
+            val_node = self.context.expr.build_expression(
+                cast(ast.AnyExpression, getattr(self.task, misc_kw))
+            )
+        except RecursiveDefinitionError:
+            self.logger.exception(f"Failed to build expression for keyword {misc_kw!r}")
+            return
+        self.context.graph.add_edge(val_node, tn, rep.Keyword(keyword=misc_kw))
 
     def _define_registered_var(self, task: rep.Task) -> None:
         if not self.task.register_var:

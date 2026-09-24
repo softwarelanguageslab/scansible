@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal, cast, override
+from typing import TYPE_CHECKING, Annotated, Literal, cast, override
 
 from collections.abc import Sequence
 
 from pydantic import Discriminator, Field, Tag, field_validator, model_validator
 
 from scansible.cst import parse_file
-from scansible.utils import ProjectPath
 from scansible.utils.actions import is_import_playbook
 
 from ..common import ExtractionContext, RawDirectives
@@ -28,7 +27,10 @@ from .expression import (
     StrLiteral,
 )
 from .role_meta import RoleRequirement
-from .task import HandlerOrBlock, TaskOrBlock
+from .task import HandlerOrBlock, TaskOrBlock  # noqa: TC001 -- For Pydantic
+
+if TYPE_CHECKING:
+    from scansible.utils import ProjectPath
 
 
 class VarsPrompt(ASTNode, frozen=True):
@@ -134,9 +136,7 @@ class Play(ASTNode, CommonDirectives, frozen=True):
         # remove the "accelerate" key if present. It was removed in 2.4
         _ = value.pop("accelerate", None)
 
-        value = cls._normalize_user(value)
-
-        return value
+        return cls._normalize_user(value)
 
     @classmethod
     def _normalize_user(cls, ds: RawDirectives) -> RawDirectives:
@@ -158,9 +158,12 @@ class Play(ASTNode, CommonDirectives, frozen=True):
             value = [value]
         new_value = []
         for entry in value:
-            if not isinstance(entry, Sequence) or isinstance(entry, str):
-                entry = [entry]
-            new_value.append(entry)  # pyright: ignore[reportUnknownMemberType]
+            normalized_entry = (
+                [entry]
+                if not isinstance(entry, Sequence) or isinstance(entry, str)
+                else entry
+            )
+            new_value.append(normalized_entry)  # pyright: ignore[reportUnknownMemberType]
         return new_value  # pyright: ignore[reportUnknownVariableType]
 
     @field_validator("hosts", mode="after")

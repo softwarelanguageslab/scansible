@@ -7,10 +7,11 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel
 
-from scansible.pdg import Graph
-from scansible.pdg.representation import NodeLocation
+from scansible.pdg.representation import NodeLocation  # noqa: TC001 -- For Pydantic
 
 if TYPE_CHECKING:
+    from scansible.pdg import Graph
+
     from .security.db import GraphDatabase
 
 

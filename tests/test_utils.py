@@ -2,19 +2,12 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import pytest
 
 from scansible.ast import TaskFile
-from scansible.utils import (
-    ProjectPath,
-    SourceFileMap,
-    capture_output,
-    find_all_files,
-    find_file,
-)
+from scansible.utils import ProjectPath, SourceFileMap, find_all_files, find_file
 
 
 def describe_source_file_map() -> None:
@@ -174,7 +167,7 @@ def describe_project_path():
         @pytest.mark.xfail(reason="not implemented any longer")
         def should_reject_child_with_different_parent():
             rpp = ProjectPath.from_root(Path("meta").absolute())
-            with pytest.raises(Exception):  # noqa: B017
+            with pytest.raises(Exception):  # noqa: B017, PT011
                 _ = rpp.join(Path("tasks/main.yml").absolute())
 
 
@@ -227,24 +220,3 @@ def describe_find_all_files():
         result = find_all_files(rp)
 
         assert not result
-
-
-def describe_capture_output():
-    def should_capture_output_to_stdout():
-        with capture_output() as out:
-            print("hello world")
-
-        assert out.getvalue() == "hello world\n"
-
-    def should_capture_output_to_stderr():
-        with capture_output() as out:
-            print("hello world", file=sys.stderr)
-
-        assert out.getvalue() == "hello world\n"
-
-    def should_capture_output_to_stdout_and_stderr():
-        with capture_output() as out:
-            print("hello", file=sys.stderr)
-            print("world")
-
-        assert out.getvalue() == "hello\nworld\n"

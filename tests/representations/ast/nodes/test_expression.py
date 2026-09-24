@@ -7,7 +7,7 @@ from datetime import UTC, date, datetime
 import pytest
 from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImport]
 from jinja2 import nodes as j2_nodes
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 
 from scansible.ast import ExtractionContext, Task
 from scansible.ast.nodes.expression import (
@@ -158,7 +158,7 @@ def describe_identifier():
         ],
     )
     def rejects_invalid_identifiers(value: str):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             _ = TypeAdapter(Identifier).validate_python(value)
 
 
@@ -200,7 +200,7 @@ def describe_literals():
                 _ = TypeAdapter(IntLiteral).validate_python("1.5")
 
         def rejects_non_numeric_strings():
-            with pytest.raises(ValueError):
+            with pytest.raises(ValidationError):
                 _ = TypeAdapter(IntLiteral).validate_python("abc")
 
     def describe_float_literal():
@@ -208,7 +208,7 @@ def describe_literals():
             assert TypeAdapter(FloatLiteral).validate_python(3) == 3.0
 
         def rejects_uncoercible_values():
-            with pytest.raises(ValueError):
+            with pytest.raises(ValidationError):
                 _ = TypeAdapter(FloatLiteral).validate_python(None)
 
     def describe_percent_literal():
@@ -246,7 +246,7 @@ def describe_literals():
             assert hash(result) == hash(True)  # noqa: FBT003
 
         def rejects_uncoercible_values():
-            with pytest.raises(ValueError):
+            with pytest.raises(ValidationError):
                 _ = TypeAdapter(BoolLiteral).validate_python("maybe")
 
     def describe_date_literal():
@@ -256,7 +256,7 @@ def describe_literals():
             assert TypeAdapter(DateLiteral).validate_python(value) == value
 
         def rejects_non_dates():
-            with pytest.raises(ValueError):
+            with pytest.raises(ValidationError):
                 _ = TypeAdapter(DateLiteral).validate_python("2026-01-01")
 
     def describe_datetime_literal():
@@ -266,7 +266,7 @@ def describe_literals():
             assert TypeAdapter(DatetimeLiteral).validate_python(value) == value
 
         def rejects_non_datetimes():
-            with pytest.raises(ValueError):
+            with pytest.raises(ValidationError):
                 _ = TypeAdapter(DatetimeLiteral).validate_python("2026-01-01T01:02:03")
 
     def describe_seq_literal():
@@ -284,7 +284,7 @@ def describe_literals():
             assert TypeAdapter(LenientSeqLiteral[int]).validate_python(None) == ()
 
         def rejects_a_bare_scalar():
-            with pytest.raises(ValueError):
+            with pytest.raises(ValidationError):
                 _ = TypeAdapter(LenientSeqLiteral[int]).validate_python(5)
 
         def passes_through_a_real_sequence():
@@ -295,7 +295,7 @@ def describe_literals():
         def raises_on_invalid_items_when_strict():
             ctx = ExtractionContext(lenient=False)
 
-            with pytest.raises(ValueError):
+            with pytest.raises(ValidationError):
                 _ = TypeAdapter(LenientSeqLiteral[int]).validate_python(
                     [1, "nope", 3],
                     context=ctx,  # pyright: ignore[reportArgumentType]
@@ -351,7 +351,7 @@ def describe_literals():
             assert TypeAdapter(MapLiteral[str, int]).validate_python(None) == {}
 
         def rejects_non_mappings():
-            with pytest.raises(ValueError):
+            with pytest.raises(ValidationError):
                 _ = TypeAdapter(MapLiteral[str, int]).validate_python([1, 2])
 
         def passes_through_a_real_mapping():
@@ -390,7 +390,7 @@ def describe_literals():
             )
 
             d = TypeAdapter(BoolLiteral).validate_python(values["d"])
-            assert d == True
+            assert d == True  # noqa: E712
             assert d.__location__ == Location(
                 path="test.yaml", start=LineColumn(5, 4), end=LineColumn(5, 7)
             )

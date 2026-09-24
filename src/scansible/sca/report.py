@@ -2,48 +2,44 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from scansible.checks.base import Finding
-from scansible.pdg.representation import NodeLocation
 from scansible.sca.constants import HTML_CLASS_SEVERITY
 
-from .types import ProjectDependencies, Vulnerability
+if TYPE_CHECKING:
+    from scansible.checks.base import Finding
+    from scansible.pdg.representation import NodeLocation
+
+    from .types import ProjectDependencies, Vulnerability
 
 
-def generate_report(
-    project_name: str,
-    output_dir: Path,
+def _build_collections(dependencies: ProjectDependencies) -> list[dict[str, Any]]:
+    return [
+        {
+            "name": coll.name,
+            "modules": [
+                mod._asdict()
+                | {
+                    "num_usages": len(mod.usages),
+                    "dependencies": dependencies.module_dependencies.get(mod.name, []),
+                }
+                for mod in coll.modules
+            ],
+            "num_modules": len(coll.modules),
+            "num_usages": sum(len(mod.usages) for mod in coll.modules),
+        }
+        for coll in dependencies.collections
+    ]
+
+
+def _build_module_dependencies(
     dependencies: ProjectDependencies,
     dependency_vulnerabilities: dict[str, list[Vulnerability]],
-    smells_raw: list[Finding],
-) -> None:
-    collections: list[dict[str, Any]] = []
-    for coll in dependencies.collections:
-        collections.append(  # noqa: PERF401
-            {
-                "name": coll.name,
-                "modules": [
-                    mod._asdict()
-                    | {
-                        "num_usages": len(mod.usages),
-                        "dependencies": dependencies.module_dependencies.get(
-                            mod.name, []
-                        ),
-                    }
-                    for mod in coll.modules
-                ],
-                "num_modules": len(coll.modules),
-                "num_usages": sum(len(mod.usages) for mod in coll.modules),
-            }
-        )
-
-    modules = [mod for coll in collections for mod in coll["modules"]]
-
+) -> dict[str, dict[str, Any]]:
     all_module_dependencies: dict[str, dict[str, Any]] = {}
     for mod, deps in dependencies.module_dependencies.items():
         for dep in deps:
@@ -66,14 +62,22 @@ def generate_report(
             )
             if vuln["severity"] not in HTML_CLASS_SEVERITY:
                 vuln["severity"] = "unknown"
+    return all_module_dependencies
 
+
+def _build_vulnerabilities(
+    dependency_vulnerabilities: dict[str, list[Vulnerability]],
+) -> list[dict[str, str]]:
     vulnerabilities: list[dict[str, str]] = []
     for vulns in dependency_vulnerabilities.values():
         vulnerabilities.extend(vuln._asdict() for vuln in vulns)
     for vuln in vulnerabilities:
         if vuln["severity"] not in HTML_CLASS_SEVERITY:
             vuln["severity"] = "unknown"
+    return vulnerabilities
 
+
+def _build_pages() -> list[tuple[str, str]]:
     pages = [("index", "Dashboard")]
     pages.extend(
         (page_name, page_name.title())
@@ -85,7 +89,10 @@ def generate_report(
             "weaknesses",
         )
     )
+    return pages
 
+
+def _build_smells(smells_raw: list[Finding]) -> list[dict[str, Any]]:
     smells: list[dict[str, Any]] = []
     for smell in smells_raw:
         sm: dict[str, Any] = {
@@ -102,6 +109,24 @@ def generate_report(
                 _read_code(smell.hint_location, 5)
             )
         smells.append(sm)
+    return smells
+
+
+def generate_report(
+    project_name: str,
+    output_dir: Path,
+    dependencies: ProjectDependencies,
+    dependency_vulnerabilities: dict[str, list[Vulnerability]],
+    smells_raw: list[Finding],
+) -> None:
+    collections = _build_collections(dependencies)
+    modules = [mod for coll in collections for mod in coll["modules"]]
+    all_module_dependencies = _build_module_dependencies(
+        dependencies, dependency_vulnerabilities
+    )
+    vulnerabilities = _build_vulnerabilities(dependency_vulnerabilities)
+    pages = _build_pages()
+    smells = _build_smells(smells_raw)
 
     env = Environment(
         loader=FileSystemLoader("src/scansible/sca/html"),

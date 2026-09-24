@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
-from typing import NamedTuple, Protocol, Self, override, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    NamedTuple,
+    Protocol,
+    Self,
+    override,
+    runtime_checkable,
+)
 
 from dataclasses import dataclass
 
-from ruamel.yaml import StreamMark
+if TYPE_CHECKING:
+    from ruamel.yaml import StreamMark
 
 
 class LineColumn(NamedTuple):
@@ -51,4 +59,5 @@ class Location:
 class HasLocation(Protocol):
     """Mixin for elements with a code location."""
 
+    __slots__: tuple[str, ...] = ()
     __location__: Location

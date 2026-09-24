@@ -116,7 +116,7 @@ def find_file(dir_path: ProjectPath, file_name: str) -> ProjectPath | None:
 
     :raises AssertionError: When multiple files were found.
     """
-    candidates = [f"{file_name}{ext}" for ext in [""] + YAML_EXTENSIONS]
+    candidates = [f"{file_name}{ext}" for ext in ["", *YAML_EXTENSIONS]]
     for candidate in candidates:
         if (dir_path.absolute / candidate).is_file():
             return dir_path.join(candidate)

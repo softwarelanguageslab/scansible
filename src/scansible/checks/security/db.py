@@ -1,18 +1,21 @@
 from __future__ import annotations
 
-from typing import Protocol, Self, cast, final
+from typing import TYPE_CHECKING, Protocol, Self, cast, final
 
 import csv
 import json
 import tempfile
 from collections import defaultdict
-from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 
 import kuzu
 
-from scansible.pdg import Graph
 from scansible.pdg.representation import Edge, Node, NodeLocation
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator, Mapping, Sequence
+
+    from scansible.pdg import Graph
 
 type DatabaseValue = object
 
@@ -60,17 +63,14 @@ def unescape_string(v: str) -> str:
 
 
 def _node_to_dict(node: Node) -> Mapping[str, DatabaseValue]:
-    node_dict = {
+    return {
         k: (_escape_string(v) if isinstance(v, str) else v)
         for k, v in node.model_dump(exclude={"location"}).items()  # pyright: ignore[reportAny]
     }
 
-    return node_dict
-
 
 def _nodes_to_dicts(nodes: Sequence[Node]) -> Sequence[Mapping[str, DatabaseValue]]:
-    nodes_serialised = list(map(_node_to_dict, nodes))
-    return nodes_serialised
+    return list(map(_node_to_dict, nodes))
 
 
 type EdgeType = tuple[str, str, str]
@@ -79,19 +79,17 @@ type EdgeValue = tuple[Node, Node, Edge]
 
 def _edge_to_dict(edge: EdgeValue) -> Mapping[str, DatabaseValue]:
     source, target, edge_value = edge
-    edge_serialised = {
+    return {
         "from": source.node_id,
         "to": target.node_id,
     } | {
         k: (_escape_string(v) if isinstance(v, str) else v)
         for k, v in edge_value.model_dump().items()  # pyright: ignore[reportAny]
     }
-    return edge_serialised
 
 
 def _edges_to_dicts(edges: list[EdgeValue]) -> Sequence[Mapping[str, DatabaseValue]]:
-    edges_serialised = list(map(_edge_to_dict, edges))
-    return edges_serialised
+    return list(map(_edge_to_dict, edges))
 
 
 class DatabaseResultConverter[T](Protocol):

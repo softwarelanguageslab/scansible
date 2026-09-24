@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import TextIO, cast
+from typing import TYPE_CHECKING, TextIO, cast
 
 import csv
 import re
@@ -23,13 +23,15 @@ import rich.console
 import rich.progress
 from loguru import logger
 from pydantic import ValidationError
-from pydantic_core import ErrorDetails
 from rich.panel import Panel
 from rich.syntax import Syntax
 from ruamel.yaml import YAMLError
 
 from scansible import ast
 from scansible.utils import HasLocation
+
+if TYPE_CHECKING:
+    from pydantic_core import ErrorDetails
 
 #: Rules to ignore known-genuine validation errors, as (field-path regex,
 #: error-detail regex) pairs. A ValidationError is only ignored if every one
@@ -291,7 +293,7 @@ def _extract(path: Path, entrypoint_type: str) -> ast.AST:
     show_default=True,
     help="Stop after this many un-ignored errors and exit non-zero.",
 )
-def main(entrypoints_csv: TextIO, data_dir: Path, fail_after: int) -> None:
+def main(entrypoints_csv: TextIO, data_dir: Path, fail_after: int) -> None:  # noqa: C901, PLR0912, PLR0915
     """Stress-test the AST builder against a real dataset of playbooks/roles.
 
     ENTRYPOINTS_CSV: CSV with fields `repo`, `relative_path`, `type`.

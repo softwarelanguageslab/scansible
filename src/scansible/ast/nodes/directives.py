@@ -106,8 +106,7 @@ class CommonDirectives(BaseModel, frozen=True):
         Assumes that the provided data structure is a copy of the original and can be mutated.
         """
         ds = cls._transform_old_become(ds)
-        ds = cls._transform_old_always_run(ds)
-        return ds
+        return cls._transform_old_always_run(ds)
 
     @classmethod
     def _transform_old_become(cls, ds: RawDirectives) -> RawDirectives:

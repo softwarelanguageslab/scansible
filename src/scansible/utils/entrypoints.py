@@ -2,18 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Literal, cast
-
-from collections.abc import Iterable
-from pathlib import Path
+from typing import TYPE_CHECKING, Literal, cast
 
 from ruamel.yaml import YAMLError
 
 from scansible.cst import parse_file
 from scansible.utils import ProjectPath
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from pathlib import Path
 
-def is_entrypoint(path: Path) -> bool:
+
+def is_entrypoint(path: Path) -> bool:  # noqa: PLR0911
     """Check whether a file or directory is an Ansible entrypoint.
 
     If `path` is a directory and this returns True, then the entrypoint is a

@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Self, final, overload, override
+from typing import TYPE_CHECKING, Annotated, Self, final, overload, override
 from typing import Literal as LiteralT
 
 import abc
 import operator
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Sequence  # noqa: TC003 -- For Pydantic
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime  # noqa: TC003
 from functools import partial
 
 import rustworkx as rx
@@ -22,6 +22,9 @@ from pydantic import (
 )
 
 from scansible.utils import Location
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
 
 type ValidTypeStr = LiteralT[
     "str",
@@ -315,10 +318,9 @@ def _edge_matcher(
 
     if edge is not None:
         return partial(operator.eq, edge)
-    elif edge_type is not None:
+    if edge_type is not None:
         return lambda e: isinstance(e, edge_type)
-    else:
-        raise TypeError("one of edge and edge_type must be provided")
+    raise TypeError("one of edge and edge_type must be provided")
 
 
 @overload
@@ -397,9 +399,10 @@ class Graph:
             _ = self._graph.find_adjacent_node_by_edge(
                 node.node_id, _edge_matcher(edge, edge_type)
             )
-            return True
         except rx.NoSuitableNeighbors:
             return False
+
+        return True
 
     def has_predecessor(
         self,
@@ -419,9 +422,10 @@ class Graph:
             _ = self._graph.find_predecessor_node_by_edge(
                 node.node_id, _edge_matcher(edge, edge_type)
             )
-            return True
         except rx.NoSuitableNeighbors:
             return False
+
+        return True
 
     @overload
     def get_successors[T: Node](
@@ -649,11 +653,12 @@ class Graph:
         """
         try:
             edges = self._graph.get_all_edge_data(n1.node_id, n2.node_id)
-            if edge_type is not None:
-                edges = [edge for edge in edges if isinstance(edge, edge_type)]
-            return edges
         except rx.NoEdgeBetweenNodes:
             return []
+
+        if edge_type is not None:
+            edges = [edge for edge in edges if isinstance(edge, edge_type)]
+        return edges
 
     @property
     def num_nodes(self) -> int:

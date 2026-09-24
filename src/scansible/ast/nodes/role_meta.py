@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import cast, override
+from typing import TYPE_CHECKING, cast, override
 
 from collections.abc import Sequence
 
@@ -17,7 +17,6 @@ from pydantic import (
 )
 
 from scansible.cst import parse_file
-from scansible.utils import ProjectPath
 
 from ..common import BrokenTask, ExtractionContext, RawDirectives
 from .base import ASTFile, ASTNode
@@ -32,6 +31,9 @@ from .expression import (
     SeqLiteral,
     StrLiteral,
 )
+
+if TYPE_CHECKING:
+    from scansible.utils import ProjectPath
 
 
 class Platform(ASTNode, frozen=True):
@@ -133,8 +135,7 @@ class MetaRoleRequirement(RoleRequirement, frozen=True):
 
         # Need to make sure these run in the correct order.
         value = cls._parse_from_string(value)
-        value = cls._extract_role_name_from_src(value)
-        return value
+        return cls._extract_role_name_from_src(value)
 
     @classmethod
     def _parse_from_string(cls, value: object) -> object:
@@ -236,7 +237,9 @@ class MetaBlock(ASTNode, frozen=True, extra="ignore"):
     def _hoist_platforms(cls, value: object) -> object:
         """Hoist `galaxy_info.platforms` to a top-level key before validation."""
 
-        if not (isinstance(value, dict) and value.get("galaxy_info") != None):
+        if not (
+            isinstance(value, dict) and value.get("galaxy_info") != None  # noqa: E711 -- could be YamlNone
+        ):
             return value
 
         galaxy_info = value["galaxy_info"]

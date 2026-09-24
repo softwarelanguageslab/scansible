@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImport]
+from pydantic import ValidationError
 
 from scansible.ast import ExtractionContext, Handler, HandlerBlock
 from scansible.ast.nodes.expression import BoolLiteral, Condition
@@ -117,7 +118,7 @@ def describe_extracting_handler_blocks():
         """
         ctx = ExtractionContext(lenient=False)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             _ = HandlerBlock.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def rejects_handler_blocks_without_block():
@@ -127,7 +128,7 @@ def describe_extracting_handler_blocks():
         """
         ctx = ExtractionContext(lenient=False)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             _ = HandlerBlock.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def rejects_rescue_with_empty_handler_block():
@@ -138,5 +139,5 @@ def describe_extracting_handler_blocks():
         """
         ctx = ExtractionContext(lenient=False)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             _ = HandlerBlock.model_validate(parse_yaml_dict(yaml), context=ctx)

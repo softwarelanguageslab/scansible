@@ -1,16 +1,18 @@
 from __future__ import annotations
 
-from typing import final, override
-
-from collections.abc import Sequence
-from contextlib import AbstractContextManager
+from typing import TYPE_CHECKING, final, override
 
 from scansible import ast
 from scansible.utils import actions
 
-from ... import representation as rep
-from ..result import BuildResult
 from ._dynamic_includes import DynamicIncludesBuilder
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from contextlib import AbstractContextManager
+
+    from ... import representation as rep
+    from ..result import BuildResult
 
 
 @final

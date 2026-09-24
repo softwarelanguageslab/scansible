@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from scansible.utils import ProjectPath
 
 from . import nodes
 from .common import ExtractionContext
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def extract_playbook(path: Path, *, lenient: bool = True) -> nodes.AST:

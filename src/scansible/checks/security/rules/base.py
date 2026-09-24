@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import ClassVar, override
+from typing import TYPE_CHECKING, ClassVar, override
 
 import abc
 from collections.abc import Mapping
@@ -9,10 +9,11 @@ from textwrap import dedent
 from loguru import logger
 from pydantic import TypeAdapter
 
-from scansible.pdg.representation import NodeLocation
-
 from ...base import CheckContext, Finding, RuleBase
 from ..db import DatabaseResultConverter, DatabaseValue, GraphDatabase, unescape_string
+
+if TYPE_CHECKING:
+    from scansible.pdg.representation import NodeLocation
 
 type RuleParameters = Mapping[str, DatabaseValue]
 type RuleQuery = tuple[str, RuleParameters]

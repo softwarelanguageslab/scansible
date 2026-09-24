@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from typing import Self, override
+from typing import TYPE_CHECKING, Self, override
 
-from collections.abc import Iterable
 from datetime import date, datetime
 
 from scansible.utils import HasLocation, Location
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 
 def _get_location(location: Location | None, value: object) -> Location:
@@ -22,12 +24,16 @@ def _get_location(location: Location | None, value: object) -> Location:
 class YamlNode(HasLocation):
     """Base class for YAML nodes."""
 
+    __slots__: tuple[str, ...] = ()
     __location__: Location
 
 
 ## Custom YAML subclasses
 class YamlStr(str, YamlNode):
     """String originating from a YAML document, with location information."""
+
+    __slots__: tuple[str, ...] = ("__location__",)
+    __location__: Location
 
     def __new__(cls, value: str, *, location: Location | None = None) -> Self:
         # ruamel.yaml inserts <BEL> (0x07, \a) characters in multi-line folded strings to indicate
@@ -41,6 +47,9 @@ class YamlStr(str, YamlNode):
 class YamlInt(int, YamlNode):
     """Integer originating from a YAML document, with location information."""
 
+    # int subclasses can't use __slots__ for extra attributes (CPython restriction),
+    # so this ends up with a __dict__ unlike its siblings.
+
     def __new__(cls, value: int, *, location: Location | None = None) -> Self:
         obj = int.__new__(cls, value)
         obj.__location__ = _get_location(location, value)
@@ -53,9 +62,10 @@ class YamlBool(YamlNode):
     Note that this is NOT a subclass of `bool`.
     """
 
-    _real_bool: bool
+    __slots__: tuple[str, ...] = ("__location__", "_real_bool")
 
     __location__: Location
+    _real_bool: bool
 
     def __init__(
         self,
@@ -87,6 +97,9 @@ class YamlBool(YamlNode):
 class YamlFloat(float, YamlNode):
     """Float originating from a YAML document, with location information."""
 
+    __slots__: tuple[str, ...] = ("__location__",)
+    __location__: Location
+
     def __new__(cls, value: float, *, location: Location | None = None) -> Self:
         obj = float.__new__(cls, value)
         obj.__location__ = _get_location(location, value)
@@ -96,6 +109,9 @@ class YamlFloat(float, YamlNode):
 class YamlDate(date, YamlNode):
     """Date originating from a YAML document, with location information."""
 
+    __slots__: tuple[str, ...] = ("__location__",)
+    __location__: Location
+
     def __new__(cls, value: date, *, location: Location | None = None) -> Self:
         obj = date.__new__(cls, value.year, value.month, value.day)
         obj.__location__ = _get_location(location, value)
@@ -104,6 +120,9 @@ class YamlDate(date, YamlNode):
 
 class YamlDatetime(datetime, YamlNode):
     """Datetime originating from a YAML document, with location information."""
+
+    __slots__: tuple[str, ...] = ("__location__",)
+    __location__: Location
 
     def __new__(cls, value: datetime, *, location: Location | None = None) -> Self:
         obj = datetime.__new__(
@@ -124,6 +143,9 @@ class YamlDatetime(datetime, YamlNode):
 class YamlVaultValue(str, YamlNode):
     """Vault-encrypted value originating from a YAML document, with location information."""
 
+    __slots__: tuple[str, ...] = ("__location__",)
+    __location__: Location
+
     def __new__(cls, value: str, *, location: Location | None = None) -> Self:
         obj = str.__new__(cls, value)
         obj.__location__ = _get_location(location, value)
@@ -134,6 +156,9 @@ class YamlUnsafeStr(str, YamlNode):
     """Unsafe string originating from a YAML document, with location information.
 
     Unsafe strings should not be templated."""
+
+    __slots__: tuple[str, ...] = ("__location__",)
+    __location__: Location
 
     def __new__(cls, value: str, *, location: Location | None = None) -> Self:
         obj = str.__new__(cls, value)
@@ -148,6 +173,7 @@ class YamlNone(YamlNode):
     Compare using `==` rather than `is None`.
     """
 
+    __slots__: tuple[str, ...] = ("__location__",)
     __location__: Location
 
     def __init__(self, *, location: Location | None = None) -> None:
@@ -172,6 +198,7 @@ class YamlNone(YamlNode):
 class YamlSeq[T: YamlValue](list[T], YamlNode):
     """Sequence originating from a YAML document, with location information."""
 
+    __slots__: tuple[str, ...] = ("__location__",)
     __location__: Location
 
     def __init__(
@@ -190,6 +217,7 @@ class YamlSeq[T: YamlValue](list[T], YamlNode):
 class YamlMap[K: YamlScalar, V: YamlValue](dict[K, V], YamlNode):
     """Mapping originating from a YAML document, with location information."""
 
+    __slots__: tuple[str, ...] = ("__location__",)
     __location__: Location
 
     def __init__(

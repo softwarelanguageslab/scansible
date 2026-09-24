@@ -80,10 +80,10 @@ def describe_dump_node():
         )
 
     def should_dump_literal_string():
-        l = ScalarLiteral(type="str", value="literal value")
-        l.node_id = 0
+        lit = ScalarLiteral(type="str", value="literal value")
+        lit.node_id = 0
 
-        result = dump_node(l)
+        result = dump_node(lit)
 
         assert (
             result
@@ -106,10 +106,10 @@ def describe_dump_node():
     def should_dump_literal_non_string(
         type_: LiteralT["int", "float", "bool"], value: float | bool
     ):
-        l = ScalarLiteral(type=type_, value=value)
-        l.node_id = 0
+        lit = ScalarLiteral(type=type_, value=value)
+        lit.node_id = 0
 
-        result = dump_node(l)
+        result = dump_node(lit)
 
         assert (
             result

@@ -1,17 +1,19 @@
 from __future__ import annotations
 
-from typing import final
-
-from collections.abc import Sequence
+from typing import TYPE_CHECKING, final
 
 from loguru import logger
 
 from scansible import ast
 
 from .. import representation as rep
-from .context import BuildContext
 from .result import BuildResult
 from .tasks import task_builder_factory
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from .context import BuildContext
 
 
 @final

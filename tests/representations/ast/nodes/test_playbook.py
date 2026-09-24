@@ -7,6 +7,7 @@ from textwrap import dedent
 
 import pytest
 from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImport]
+from pydantic import ValidationError
 
 from scansible.ast import (
     Block,
@@ -146,7 +147,7 @@ def describe_extracting_plays():
         """
         ctx = ExtractionContext(lenient=False)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             _ = Play.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def rejects_play_with_empty_hosts():
@@ -425,7 +426,7 @@ def describe_extracting_import_playbook():
         """
         ctx = ExtractionContext(lenient=False)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             _ = ImportPlaybook.model_validate(parse_yaml_dict(yaml), context=ctx)
 
 

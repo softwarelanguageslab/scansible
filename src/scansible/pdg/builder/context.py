@@ -1,16 +1,21 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import textwrap
 from collections import defaultdict
-from collections.abc import Generator, Sequence
 from contextlib import contextmanager
-from pathlib import Path
 
-from scansible import ast
 from scansible.utils import HasLocation, Location, join_sequences
 
 from .. import representation as rep
 from .semantics import ExpressionManager, InclusionManager, VariableManager
+
+if TYPE_CHECKING:
+    from collections.abc import Generator, Sequence
+    from pathlib import Path
+
+    from scansible import ast
 
 
 class BuildContext:

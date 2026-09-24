@@ -41,10 +41,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.ruff.lint]
-# FIXME: The aim is to enable "ALL" and selectively disable the ones we don't want, but there are a lot of existing issues to fix still,
-# so some classes of issues are still disabled.
-extend-select = ["I", "ERA", "YTT", "ANN", "ASYNC", "S", "BLE", "FBT", "B", "A", "COM", "C4", "DTZ", "T10", "EXE", "FA", "INT", "ISC", "ICN", "LOG", "G", "INP", "PIE", "PYI", "PT",
-    "Q", "RSE", "SLF", "SIM", "PTH", "FLY", "PERF", "N", "PGH", "UP", "FURB", "TD", "F", "PLC"]
+select = ["ALL"]
 extend-ignore = [
     # F403/F405 complain about star imports and being unable to resolve them,
     # ignore these as they're handled properly by basedpyright
@@ -57,19 +54,29 @@ extend-ignore = [
     "ANN401",
     # Confuses loguru logger with standard one
     "PLE1205",
+    # Ignore docstrings for now
+    "D",
+    # Relative imports are our convention
+    "TID252",
+    # Overkill, wants exception messages moved into a variable or custom exception class
+    "TRY003", "EM101", "EM102",
+    # False positives galore: flags unused params required by external interfaces
+    "ARG002", "ARG003",
+    # tuple subclasses can't define __slots__ for extra attributes (CPython restriction)
+    "SLOT001",
     # Various unnecessary ones.
     "DTZ005", "S101", "COM812", "CPY", "FIX", "ISC003", "G004", "E501", "TD003", "TD002", "TD001", "TC006",
-    # FIXME
-    "PT011"
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"**/tests/*" = ["D", "INP001", "S", "PLR2004", "FBT001", "ANN201", "ANN202", "PLR0915"]
+"**/tests/*" = ["D", "INP001", "S", "PLR2004", "FBT001", "ANN201", "ANN202", "PLR0915", "C901"]
 "!**/tests/*" = ["PT"]
 "scripts/*" = ["INP001"]
 "src/scansible/utils/module_type_info.py" = ["ERA001"]
 "src/scansible/pdg/canonical.py" = ["ERA001"]
-"src/scansible/__init__.py" = ["ERA001"]
+# ERA001: commented-out CLI options kept for later; PLC0415: commands import lazily for startup performance;
+# PLR0913/PLR0917: one CLI flag per parameter is the interface, not accidental complexity
+"src/scansible/__init__.py" = ["ERA001", "PLC0415", "PLR0913", "PLR0917"]
 
 [tool.ruff.lint.isort]
 required-imports = ["from __future__ import annotations"]

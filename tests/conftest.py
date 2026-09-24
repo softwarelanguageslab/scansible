@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import sys
-from collections.abc import Sequence
 
 import pytest
 from graph_matchers import create_graph  # pyright: ignore[reportImplicitRelativeImport]
 from loguru import logger
 
-from scansible.pdg import Graph
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from scansible.pdg import Graph
 
 logger.remove()
 _ = logger.add(sys.stderr, format="{level} {message}", level="DEBUG")

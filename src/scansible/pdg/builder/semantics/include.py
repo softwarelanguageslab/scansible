@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from typing import cast, final
+from typing import TYPE_CHECKING, cast, final
 
 import re
-from collections.abc import Generator, Iterable, Sequence
 from contextlib import contextmanager
 from os.path import normpath
 from pathlib import Path
@@ -15,9 +14,12 @@ from pydantic import ValidationError
 from ruamel.yaml import YAMLError
 
 from scansible import ast
-from scansible.utils import ProjectPath, capture_output, find_all_files, find_file
+from scansible.utils import ProjectPath, find_all_files, find_file
 
-from ... import representation as rep
+if TYPE_CHECKING:
+    from collections.abc import Generator, Iterable, Sequence
+
+    from ... import representation as rep
 
 
 @final
@@ -118,10 +120,7 @@ class InclusionManager:
 
         struct_ctx = ast.ExtractionContext(lenient=self.lenient)
         try:
-            with capture_output() as output:
-                task_file = ast.TaskFile.load(real_path, struct_ctx)
-            if logged_output := output.getvalue():
-                logger.warning(logged_output)
+            task_file = ast.TaskFile.load(real_path, struct_ctx)
         except (ValidationError, YAMLError) as e:
             logger.error(e)
             yield None
@@ -185,12 +184,9 @@ class InclusionManager:
             return
 
         try:
-            with capture_output() as output:
-                var_file = ast.VariableFile.load(
-                    real_path, ast.ExtractionContext(lenient=self.lenient)
-                )
-            if logged_output := output.getvalue():
-                logger.warning(logged_output)
+            var_file = ast.VariableFile.load(
+                real_path, ast.ExtractionContext(lenient=self.lenient)
+            )
         except (ValidationError, YAMLError) as e:
             logger.error(e)
             yield None

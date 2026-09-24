@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-from typing import final
+from typing import TYPE_CHECKING, final
 
 from loguru import logger
 
 from scansible import ast
 
-from .context import BuildContext
 from .result import BuildResult
-from .semantics import EnvironmentType
+
+if TYPE_CHECKING:
+    from .context import BuildContext
+    from .semantics import EnvironmentType
 
 
 @final

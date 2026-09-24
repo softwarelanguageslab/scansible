@@ -3,22 +3,24 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal
 
 import abc
-from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 
 from loguru import logger
 
-from scansible import ast
-
-from ... import representation as rep
-from ..context import BuildContext
-from ..result import BuildResult
 from ..semantics import EnvironmentType, RecursiveDefinitionError
 from ..variables import VariablesBuilder
 
 if TYPE_CHECKING:
+    from collections.abc import Generator, Sequence
+
     # Not exported outside of stub files.
     from loguru import Logger
+
+    from scansible import ast
+
+    from ... import representation as rep
+    from ..context import BuildContext
+    from ..result import BuildResult
 
 TaskVarsScopeLevel = Literal[EnvironmentType.TASK_VARS, EnvironmentType.INCLUDE_PARAMS]
 
@@ -52,8 +54,8 @@ class TaskBuilder(abc.ABC):
             # Create an IV for each condition and link it to the conditional node.
             try:
                 condition_value_node = self.context.expr.build_expression(condition)
-            except RecursiveDefinitionError as e:
-                self.logger.error(e)
+            except RecursiveDefinitionError:
+                self.logger.exception("Failed to build expression for task condition")
                 continue
 
             condition_value_nodes.append(condition_value_node)
@@ -69,12 +71,11 @@ class TaskBuilder(abc.ABC):
 
         try:
             loop_source_var = self.context.expr.build_expression(loop_expr)
-        except RecursiveDefinitionError as e:
-            self.logger.error(e)
+        except RecursiveDefinitionError:
+            self.logger.exception("Failed to build expression for loop")
             if self.context.include_ctx.lenient:
                 return None
-            else:
-                raise
+            raise
 
         loop_var_name = self.task.loop_control.loop_var
         for loop_control_k in self.task.loop_control.model_directives_set:

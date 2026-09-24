@@ -1,20 +1,22 @@
 from __future__ import annotations
 
-from typing import final
-
-from collections.abc import Sequence
+from typing import TYPE_CHECKING, final
 
 from loguru import logger
 
 from scansible import ast
 
-from .context import BuildContext
 from .handler_lists import HandlerListBuilder
-from .result import BuildResult
 from .role_dependencies import build_role_dependency
 from .semantics import EnvironmentType
 from .task_lists import TaskListBuilder
 from .variables import VariablesBuilder
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from .context import BuildContext
+    from .result import BuildResult
 
 
 @final
@@ -62,10 +64,13 @@ class PlaybookBuilder:
                         continue
 
                     # vars_files entries can themselves be lists, works as the first_found lookup.
-                    if isinstance(vars_file_list, str):
-                        vars_file_list = [vars_file_list]
+                    resolved_vars_file_list = (
+                        [vars_file_list]
+                        if isinstance(vars_file_list, str)
+                        else vars_file_list
+                    )
 
-                    for vars_file in vars_file_list:
+                    for vars_file in resolved_vars_file_list:
                         # TODO: There should be some form of conditional definition in here.
                         with self.context.include_ctx.load_and_enter_var_file(
                             vars_file, self.context.get_location(vars_file)

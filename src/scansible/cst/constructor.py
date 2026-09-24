@@ -7,14 +7,12 @@ This constructor creates objects while keeping track of their locations in the f
 
 from __future__ import annotations
 
-from typing import override
+from typing import TYPE_CHECKING, override
 
-from collections.abc import Iterable
 from datetime import date, datetime
 
 from ruamel.yaml import YAML
 from ruamel.yaml.constructor import SafeConstructor
-from ruamel.yaml.nodes import Node
 from ruamel.yaml.resolver import BaseResolver
 from yaml.resolver import Resolver as _PyYAMLResolver
 
@@ -35,6 +33,11 @@ from .nodes import (
     YamlVaultValue,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from ruamel.yaml.nodes import Node
+
 
 class CustomConstructor(SafeConstructor):
     """Custom YAML object constructor that constructs the CST subclasses."""
@@ -53,32 +56,27 @@ class CustomConstructor(SafeConstructor):
     @override
     def construct_yaml_str(self, node: Node) -> YamlStr:
         value = super().construct_yaml_str(node)
-        obj = YamlStr(value, location=self._get_location(node))
-        return obj
+        return YamlStr(value, location=self._get_location(node))
 
     @override
     def construct_yaml_int(self, node: Node) -> YamlInt:
         value = super().construct_yaml_int(node)
-        obj = YamlInt(value, location=self._get_location(node))
-        return obj
+        return YamlInt(value, location=self._get_location(node))
 
     @override
     def construct_yaml_float(self, node: Node) -> YamlFloat:
         value = super().construct_yaml_float(node)
-        obj = YamlFloat(value, location=self._get_location(node))
-        return obj
+        return YamlFloat(value, location=self._get_location(node))
 
     @override
     def construct_yaml_bool(self, node: Node) -> YamlBool:  # pyright: ignore[reportIncompatibleMethodOverride]
         value = super().construct_yaml_bool(node)
-        obj = YamlBool(value, location=self._get_location(node))
-        return obj
+        return YamlBool(value, location=self._get_location(node))
 
     @override
     def construct_yaml_null(self, node: Node) -> YamlNone:
         super().construct_yaml_null(node)
-        obj = YamlNone(location=self._get_location(node))
-        return obj
+        return YamlNone(location=self._get_location(node))
 
     @override
     def construct_yaml_timestamp(self, node: Node, values: object = None) -> YamlNode:
@@ -107,16 +105,14 @@ class CustomConstructor(SafeConstructor):
 
     def construct_vault_value(self, node: Node) -> YamlVaultValue:
         value = self.construct_scalar(node)
-        obj = YamlVaultValue(value, location=self._get_location(node))
-        return obj
+        return YamlVaultValue(value, location=self._get_location(node))
 
     def construct_unsafe_value(self, node: Node) -> YamlUnsafeStr:
         # FIXME: This is a modifier rather than a new data type, so maybe we should instead add an attribute
         # to each YamlNode indicating whether it's unsafe, and set the attribute for any contained value?
         # FIXME: This might also contain other data types?
         value = self.construct_scalar(node)
-        obj = YamlUnsafeStr(value, location=self._get_location(node))
-        return obj
+        return YamlUnsafeStr(value, location=self._get_location(node))
 
 
 CustomConstructor.add_constructor(

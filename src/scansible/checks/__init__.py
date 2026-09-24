@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from datetime import datetime
 
 from loguru import logger
-
-from scansible.pdg.builder.context import BuildContext
 
 from . import security as security
 from . import semantics as semantics
@@ -13,6 +13,9 @@ from .base import Finding as Finding
 from .reporter import TerminalReporter as TerminalReporter
 from .security.db import GraphDatabase
 from .security.rules.base import GraphDBRule
+
+if TYPE_CHECKING:
+    from scansible.pdg.builder.context import BuildContext
 
 
 def get_all_rules() -> list[RuleBase]:

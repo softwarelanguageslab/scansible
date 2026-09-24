@@ -21,14 +21,17 @@ def _match_node(n1: Node, n2: Node, match_locations: bool) -> bool:
     )
 
 
-# FIXME: Could we instead use graph queries? They might be more interpretable.
-def assert_graphs_match(g1: Graph, g2: Graph, *, match_locations: bool = False) -> None:
-    __tracebackhide__ = True
+def _match_regular_nodes(
+    nodes1: set[Node],
+    nodes2: set[Node],
+    correspondences: dict[Node, Node],
+    *,
+    match_locations: bool,
+) -> None:
+    """Match up every non-IV node of g1 with a corresponding node in g2.
 
-    # Compare nodes
-    nodes1 = set(g1.nodes)
-    nodes2 = set(g2.nodes)
-    correspondences: dict[Node, Node] = {}
+    Matched g2 nodes are removed from `nodes2`. Correspondences are recorded in-place.
+    """
     for n1 in sorted(nodes1, key=operator.attrgetter("node_id")):
         if isinstance(n1, IntermediateValue):
             continue
@@ -45,9 +48,20 @@ def assert_graphs_match(g1: Graph, g2: Graph, *, match_locations: bool = False) 
         if not isinstance(n2, IntermediateValue):
             raise AssertionError(f"Missing node {n2!r} in first graph")
 
-    # Construct correspondences between intermediate values.
-    # For every n1 in g1, find a node n2 in g2 whose neighbours all correspond
-    # to n1's neighbors.
+
+def _match_intermediate_values(
+    g1: Graph,
+    g2: Graph,
+    nodes1: set[Node],
+    nodes2: set[Node],
+    correspondences: dict[Node, Node],
+) -> None:
+    """Match up every IV node of g1 with a corresponding IV node in g2.
+
+    For every n1 in g1, find a node n2 in g2 whose neighbours all correspond to
+    n1's neighbors. Matched g2 nodes are removed from `nodes2`, correspondences
+    are recorded in-place.
+    """
     for n1 in nodes1:
         if n1 in correspondences:
             continue
@@ -93,7 +107,9 @@ def assert_graphs_match(g1: Graph, g2: Graph, *, match_locations: bool = False) 
     for n2 in nodes2:
         raise AssertionError(f"Missing intermediate value {n2!r} in first graph")
 
-    # Compare edges
+
+def _match_edges(g1: Graph, g2: Graph, correspondences: dict[Node, Node]) -> None:
+    """Verify that g1's edges correspond exactly to g2's edges, via `correspondences`."""
     edges1 = set(g1.edges)
     edges2 = set(g2.edges)
     for e1_src, e1_target, e1_edge in edges1:
@@ -110,6 +126,21 @@ def assert_graphs_match(g1: Graph, g2: Graph, *, match_locations: bool = False) 
         raise AssertionError(
             f"Missing edge {e2_src!r} -[{e2_edge}]-> {e2_target!r} in first graph"
         )
+
+
+# FIXME: Could we instead use graph queries? They might be more interpretable.
+def assert_graphs_match(g1: Graph, g2: Graph, *, match_locations: bool = False) -> None:
+    __tracebackhide__ = True
+
+    nodes1 = set(g1.nodes)
+    nodes2 = set(g2.nodes)
+    correspondences: dict[Node, Node] = {}
+
+    _match_regular_nodes(
+        nodes1, nodes2, correspondences, match_locations=match_locations
+    )
+    _match_intermediate_values(g1, g2, nodes1, nodes2, correspondences)
+    _match_edges(g1, g2, correspondences)
 
 
 NodeSpecs = dict[str, Node]

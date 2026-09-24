@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 from scansible.utils import ensure_sequence, join_sequences
 
-from ..representation import ControlNode
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from ..representation import ControlNode
 
 
 class BuildResult:

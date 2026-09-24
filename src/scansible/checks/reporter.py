@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pathlib import Path
-
 from rich.markup import escape
 from rich.text import Text
 
 from scansible.console import console
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from scansible.pdg.representation import NodeLocation
 
     from .base import Finding
@@ -80,8 +80,7 @@ class TerminalReporter:
         except OSError:
             return []
 
-        start_line, start_col = location.start
-        end_line, end_col = location.end
+        start_line, _ = location.start
         if not (1 <= start_line <= len(source_lines)):
             return []
 
@@ -98,24 +97,17 @@ class TerminalReporter:
             rows.append(row)
 
             if lineno == start_line:
-                rows.append(
-                    self._build_caret_row(
-                        gutter_width, source, start_line, start_col, end_line, end_col
-                    )
-                )
+                rows.append(self._build_caret_row(gutter_width, source, location))
 
         rows.append(blank_gutter)
         return rows
 
     def _build_caret_row(
-        self,
-        gutter_width: int,
-        source: str,
-        start_line: int,
-        start_col: int,
-        end_line: int,
-        end_col: int,
+        self, gutter_width: int, source: str, location: NodeLocation
     ) -> Text:
+        start_line, start_col = location.start
+        end_line, end_col = location.end
+
         # `end` is exclusive, so the span is `end_col - start_col` columns wide.
         # For a span crossing multiple lines, only underline from the
         # start column to the end of this (first) line.

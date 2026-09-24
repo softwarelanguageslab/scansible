@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from typing import overload
+from typing import TYPE_CHECKING, overload
 
 import csv
 import json
 import subprocess
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -22,6 +21,9 @@ from scansible.sca.constants import (
     PYTHON_BUILTINS,
 )
 from scansible.sca.types import ModuleDependency
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
 
 
 class Cache:

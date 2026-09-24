@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
-from typing import override
+from typing import TYPE_CHECKING, override
 
 from pydantic import Field
 
 from scansible.cst import parse_file
-from scansible.utils import ProjectPath
 
-from ..common import ExtractionContext
 from .base import ASTFile
 from .expression import AnyExpression, MapLiteral, ScalarLiteral
+
+if TYPE_CHECKING:
+    from scansible.utils import ProjectPath
+
+    from ..common import ExtractionContext
 
 
 class VariableFile(ASTFile, frozen=True):

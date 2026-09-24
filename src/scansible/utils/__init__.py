@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-import io
-from collections.abc import Generator
-from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
-
 from .collections import FrozenDict as FrozenDict
 from .collections import ensure_sequence as ensure_sequence
 from .collections import first as first
@@ -18,26 +14,3 @@ from .files import find_file as find_file
 from .location import HasLocation as HasLocation
 from .location import LineColumn as LineColumn
 from .location import Location as Location
-
-
-@contextmanager
-def capture_output() -> Generator[io.StringIO]:
-    r"""Context manager which, while active, captures all printed output.
-
-    Useful to capture Ansible logs that otherwise get printed to the terminal.
-    The captured output will be available as the variable in the `with`
-    statement.
-
-    Example:
-        ```python
-        with capture_output() as output:
-            print("hello world")
-            sys.stderr.write("test\n")
-        output.getvalue()  # "hello world\ntest\n"
-        ```
-    """
-    buffer = io.StringIO()
-    with ExitStack() as stack:
-        _ = stack.enter_context(redirect_stderr(buffer))
-        _ = stack.enter_context(redirect_stdout(buffer))
-        yield buffer

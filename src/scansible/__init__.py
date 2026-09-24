@@ -1,12 +1,8 @@
-# ruff: disable[PLC0415] - We import modules in the commands themselves for performance reasons: Several packages take a long time to import,
-# importing them top-level would slow down the commands that don't use them.
-
 from __future__ import annotations
 
-from typing import TextIO
+from typing import TYPE_CHECKING, TextIO
 
 import csv
-from collections.abc import Sequence
 from pathlib import Path
 
 import click
@@ -15,6 +11,9 @@ from loguru import logger
 
 from scansible.console import configure_logging, make_console
 from scansible.constants import DEFAULT_ROLES_PATH
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 @click.group
@@ -35,7 +34,7 @@ def cli(*, verbose: int, quiet: bool) -> None:
         )
     desired_level = (
         "TRACE"
-        if verbose >= 2
+        if verbose >= 2  # noqa: PLR2004
         else "DEBUG"
         if verbose == 1
         else "WARNING"

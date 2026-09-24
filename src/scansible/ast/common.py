@@ -8,7 +8,7 @@ from pydantic import BaseModel, ValidationError
 
 from scansible.cst import YamlValue
 
-from ._validators import RelativePath
+from ._validators import RelativePath  # noqa: TC001 -- For Pydantic
 
 #: Raw dictionaries of Ansible entities.
 type RawDirectives = dict[str, YamlValue]

@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from typing import ClassVar, override
+from typing import TYPE_CHECKING, ClassVar, override
 
 import abc
 import re
-from collections.abc import Iterable, Sequence
-from contextlib import AbstractContextManager
 from functools import reduce
 
 from jinja2 import nodes
@@ -16,14 +14,19 @@ from scansible import ast
 from ... import representation as rep
 from ..result import BuildResult
 from ..semantics.expressions import TemplateExpressionAST, simplify_expression
-from ..semantics.expressions.simplification import SimplifiedExpression
 from ..semantics.variables import EnvironmentType
 from .base import TaskBuilder, TaskVarsScopeLevel
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
+    from contextlib import AbstractContextManager
+
+    from ..semantics.expressions.simplification import SimplifiedExpression
 
 
 def _is_too_general_filename_pattern(pattern: str) -> bool:
     parts = pattern.split(re.escape("."))
-    return len(parts) <= 2 and parts[0] in (".+", "(.+)")
+    return len(parts) <= 2 and parts[0] in (".+", "(.+)")  # noqa: PLR2004
 
 
 class DynamicIncludesBuilder[Content](TaskBuilder, abc.ABC):

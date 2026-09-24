@@ -1,15 +1,19 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 from loguru import logger
 
 from scansible import ast
 
-from .. import representation as rep
-from .context import BuildContext
 from .result import BuildResult
 from .semantics import EnvironmentType
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from .. import representation as rep
+    from .context import BuildContext
 
 
 # TODO: Distinguish between public and private role includes.

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import re
-from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
 from jinja2 import nodes
@@ -12,8 +11,12 @@ from loguru import logger
 from scansible import ast
 from scansible.utils import FrozenDict, first, join_sequences
 
-from ..variables import VariableManager
 from .templates import TemplateExpressionAST
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping, Sequence
+
+    from ..variables import VariableManager
 
 
 @dataclass(frozen=True)

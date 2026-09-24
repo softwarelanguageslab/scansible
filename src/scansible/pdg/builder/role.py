@@ -1,21 +1,23 @@
 from __future__ import annotations
 
-from typing import final
-
-from collections.abc import Sequence
+from typing import TYPE_CHECKING, final
 
 from loguru import logger
 
-from scansible import ast
-
-from .. import representation as rep
-from .context import BuildContext
 from .handler_lists import HandlerListBuilder
 from .result import BuildResult
 from .role_dependencies import build_role_dependency
 from .semantics import EnvironmentType
 from .task_lists import TaskListBuilder
 from .variables import VariablesBuilder
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from scansible import ast
+
+    from .. import representation as rep
+    from .context import BuildContext
 
 
 @final

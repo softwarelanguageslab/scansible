@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast, final
 
 from collections import defaultdict
-from collections.abc import Generator, Iterable, Mapping, Sequence
 from contextlib import contextmanager
 
 from ansible.module_utils.facts.system.distribution import (  # pyright: ignore[reportMissingTypeStubs]
@@ -22,6 +21,8 @@ from .environment import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Generator, Iterable, Mapping, Sequence
+
     from ...context import BuildContext
 
 
@@ -102,7 +103,7 @@ class VariableManager:
         rec = self._envs.get_variable_definition(name)
         return rec.revision if rec is not None else None
 
-    def _define_variable(
+    def _define_variable(  # noqa: PLR0913, PLR0917
         self,
         name: str,
         revision: int,

@@ -19,6 +19,8 @@ def first_where[T](it: Iterable[T], predicate: Callable[[T], bool]) -> T | None:
 
 
 class FrozenDict[K, V](dict[K, V]):
+    __slots__: tuple[str, ...] = ()
+
     @override
     def __setitem__(self, k: K, v: V) -> None:
         raise RuntimeError("immutable")

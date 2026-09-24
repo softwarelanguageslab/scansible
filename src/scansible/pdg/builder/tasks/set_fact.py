@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from typing import final, override
-
-from collections.abc import Sequence
+from typing import TYPE_CHECKING, final, override
 
 from scansible import ast
 
@@ -10,6 +8,9 @@ from ... import representation as rep
 from ..result import BuildResult
 from ..semantics import EnvironmentType, RecursiveDefinitionError
 from .base import TaskBuilder
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 @final
@@ -44,8 +45,10 @@ class SetFactTaskBuilder(TaskBuilder):
                     name_to_value[var_name] = self.context.expr.build_expression(
                         var_value
                     )
-                except RecursiveDefinitionError as e:
-                    self.logger.error(e)
+                except RecursiveDefinitionError:
+                    self.logger.exception(
+                        f"Failed to build expression for variable {var_name!r}"
+                    )
                     continue
 
             for var_name, value_node in name_to_value.items():

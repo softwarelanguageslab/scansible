@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import override
+from typing import TYPE_CHECKING, override
 
 import abc
 
-from scansible.pdg.representation import Graph
-
 from ..base import CheckContext, Finding, RuleBase
+
+if TYPE_CHECKING:
+    from scansible.pdg.representation import Graph
 
 
 class TraversalRule(RuleBase, abc.ABC):

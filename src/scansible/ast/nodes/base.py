@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import ClassVar, Self, Unpack, override
+from typing import TYPE_CHECKING, ClassVar, Self, Unpack, override
 
 from abc import ABC, abstractmethod
 
@@ -11,8 +11,10 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from scansible.cst import YamlMap
 from scansible.utils import Location, ProjectPath
 
-from .._validators import RelativePath
-from ..common import ExtractionContext
+from .._validators import RelativePath  # noqa: TC001 -- For Pydantic
+
+if TYPE_CHECKING:
+    from ..common import ExtractionContext
 
 
 class ASTEntity(BaseModel, strict=True, frozen=True, extra="forbid"):

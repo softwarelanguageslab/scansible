@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
-from collections.abc import Mapping, Sequence
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
 
 
 class ModuleInfo(NamedTuple):

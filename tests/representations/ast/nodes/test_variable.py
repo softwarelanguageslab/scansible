@@ -7,6 +7,7 @@ from pathlib import Path
 from textwrap import dedent
 
 import pytest
+from pydantic import ValidationError
 
 from scansible.ast import ExtractionContext, VariableFile
 from scansible.ast.nodes.expression import (
@@ -124,7 +125,7 @@ def describe_extracting_variables():
         assert c == 4.0
         assert isinstance(c, FloatLiteral)
         assert isinstance(d, BoolLiteral)
-        assert d == True
+        assert d == True  # noqa: E712
         assert isinstance(e, DateLiteral)
         assert e == date(2026, 1, 1)
         assert isinstance(f, DatetimeLiteral)
@@ -151,5 +152,5 @@ def describe_extracting_variables():
         _ = (tmp_path / "main.yml").write_text(content)
         ctx = ExtractionContext(lenient=False)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             _ = VariableFile.load(ProjectPath(tmp_path, "main.yml"), ctx)

@@ -2,18 +2,20 @@
 
 from __future__ import annotations
 
-from typing import final
+from typing import TYPE_CHECKING, final
 
-from collections.abc import Container, Iterable, Sequence
 from functools import cached_property
 
 from jinja2 import nodes
 from jinja2.compiler import DependencyFinderVisitor
 from jinja2.visitor import NodeVisitor
 
-from scansible import ast
-
 from .constants import ANSIBLE_GLOBALS, PURE_FILTERS, PURE_LOOKUP_PLUGINS, PURE_TESTS
+
+if TYPE_CHECKING:
+    from collections.abc import Container, Iterable, Sequence
+
+    from scansible import ast
 
 
 class FindUndeclaredVariablesVisitor(NodeVisitor):

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Sequence  # noqa: TC003 -- For Pydantic
 
 from pydantic import BaseModel
 
-from .._validators import AbsolutePath
-from ..common import BrokenFile, BrokenTask
+from .._validators import AbsolutePath  # noqa: TC001
+from ..common import BrokenFile, BrokenTask  # noqa: TC001
 
 # Re-export public AST node types.
 from .base import *

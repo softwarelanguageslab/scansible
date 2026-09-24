@@ -8,9 +8,7 @@ from Ansible's various shorthand and obsoleted syntaxes.
 
 from __future__ import annotations
 
-from typing import Annotated, Any, ClassVar, Self, cast, override
-
-from collections.abc import Callable, Mapping
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Self, cast, override
 
 from ansible.errors import AnsibleParserError  # pyright: ignore[reportMissingTypeStubs]
 from ansible.parsing.splitter import (  # pyright: ignore[reportMissingTypeStubs]
@@ -39,6 +37,9 @@ from .expression import (
     SeqLiteral,
     StrLiteral,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping
 
 
 class LoopControl(ASTNode, frozen=True):
@@ -159,9 +160,7 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
         value = cls._parse_task_action(value)
         value = cls._transform_includes(value)
         value = cls._transform_loop(value)
-        value = cls._validate_include_directives(value)
-
-        return value
+        return cls._validate_include_directives(value)
 
     @classmethod
     def _parse_task_action(cls, ds: RawDirectives) -> RawDirectives:
@@ -322,13 +321,14 @@ class BaseTask(ASTNode, CommonDirectives, frozen=True):
         """Merge multiple argument sources into one dict, lowest to highest priority."""
         combined_args = YamlMap[YamlScalar, YamlValue]()
         for args in arg_list:
-            if isinstance(args, str):
-                args = cls._parse_args(action, args)
-            if args == None:  # could be YamlNone
+            parsed_args = (
+                cls._parse_args(action, args) if isinstance(args, str) else args
+            )
+            if parsed_args == None:  # noqa: E711 -- could be YamlNone
                 continue
-            if not isinstance(args, dict):
+            if not isinstance(parsed_args, dict):
                 raise ValueError("Expected args to be a dictionary")
-            combined_args.update(args)
+            combined_args.update(parsed_args)
 
         return combined_args
 

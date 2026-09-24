@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImport]
+from pydantic import ValidationError
 
 from scansible.ast import Block, ExtractionContext, Task
 from scansible.ast.nodes.expression import BoolLiteral, Condition
@@ -123,7 +124,7 @@ def describe_extracting_blocks():
         """
         ctx = ExtractionContext(lenient=False)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             _ = Block.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def rejects_blocks_without_block():
@@ -133,7 +134,7 @@ def describe_extracting_blocks():
         """
         ctx = ExtractionContext(lenient=False)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             _ = Block.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def rejects_rescue_with_empty_block():
@@ -144,5 +145,5 @@ def describe_extracting_blocks():
         """
         ctx = ExtractionContext(lenient=False)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             _ = Block.model_validate(parse_yaml_dict(yaml), context=ctx)

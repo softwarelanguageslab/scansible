@@ -4,15 +4,13 @@
 
 from __future__ import annotations
 
-from typing import Any, cast, final
+from typing import TYPE_CHECKING, Any, cast, final
 
 import json
 import subprocess
 import tempfile
-from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from pathlib import Path
-from pprint import pprint
 from textwrap import dedent
 
 import jinja2
@@ -33,6 +31,9 @@ from scansible.pdg.builder import build_pdg
 from scansible.pdg.builder.semantics import EnvironmentType
 from scansible.pdg.builder.semantics.expressions.templates import TemplateExpressionAST
 from scansible.pdg.io.neo4j import dump_graph
+
+if TYPE_CHECKING:
+    from collections.abc import Generator, Iterable
 
 _considered_scopes = [
     EnvironmentType.TASK_VARS,
@@ -66,7 +67,6 @@ class Block:
         return self._all_var_deps(0)
 
     def _all_var_deps(self, level: int) -> dict[str, set[str]]:
-        print(f"{level} {self.block_name}: {self.var_deps}")
         if self.parent is None:
             return self.var_deps
         return {**self.parent._all_var_deps(level + 1), **self.var_deps}  # noqa: SLF001
@@ -397,11 +397,12 @@ class CodeGen:
 
         files: list[tuple[Path, str]] = []
         for fp, content in self._files.items():
-            if fp.parent.name != "tasks" and content:
-                content = content[0]
-            if not content:
+            resolved_content = (
+                content[0] if fp.parent.name != "tasks" and content else content
+            )
+            if not resolved_content:
                 continue
-            files.append((fp, yaml.dump(content, Dumper=Dumper)))
+            files.append((fp, yaml.dump(resolved_content, Dumper=Dumper)))
 
         return files
 
@@ -441,8 +442,8 @@ def test_inferred_dataflow_matches_actual(playbooks: list[PlaybookFile]) -> None
 
             assert inferred_dataflow == actual_dataflow
         except:
-            print(playbooks)
-            print(dump_graph(graph))
+            print(playbooks)  # noqa: T201
+            print(dump_graph(graph))  # noqa: T201
             raise
 
 
@@ -569,7 +570,6 @@ def _observe_dataflow(playbook_dir: Path) -> Dataflow:
     out = json.loads(proc.stdout)
     result: list[str] = []
 
-    pprint(out["plays"][0]["tasks"])
     for t in out["plays"][0]["tasks"]:
         task_res = t["hosts"]["localhost"]
         if task_res["action"] != "debug":

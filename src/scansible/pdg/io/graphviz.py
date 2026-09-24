@@ -29,25 +29,22 @@ def get_node_attributes(n: rep.Node) -> dict[str, str]:
 
 
 def get_node_label(n: rep.Node) -> str:
-    if isinstance(n, rep.Expression):
-        return n.expr
-
-    if isinstance(n, rep.ScalarLiteral):
-        return f"{n.type}:{n.value}"
-
-    if isinstance(n, rep.Literal):
-        return f"{n.type}"
-
-    if isinstance(n, rep.IntermediateValue):
-        return f"${n.identifier}"
-
-    if isinstance(n, rep.Variable):
-        return f"{n.name}@{n.version},{n.value_version}"
-
-    if isinstance(n, rep.Task):
-        return f"<<B>{n.action}</B>>"
-
-    return n.__class__.__name__
+    match n:
+        case rep.Expression():
+            label = n.expr
+        case rep.ScalarLiteral():
+            label = f"{n.type}:{n.value}"
+        case rep.Literal():
+            label = f"{n.type}"
+        case rep.IntermediateValue():
+            label = f"${n.identifier}"
+        case rep.Variable():
+            label = f"{n.name}@{n.version},{n.value_version}"
+        case rep.Task():
+            label = f"<<B>{n.action}</B>>"
+        case _:
+            label = n.__class__.__name__
+    return label
 
 
 def dump_node(n: rep.Node, dot: gv.Digraph) -> None:

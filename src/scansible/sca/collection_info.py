@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import json
 from collections import defaultdict
-from collections.abc import Collection, Mapping
 
 from .constants import COLLECTION_CONTENT_PATH
 from .types import CollectionContent, ModuleInfo
+
+if TYPE_CHECKING:
+    from collections.abc import Collection, Mapping
 
 
 def get_module_match_score(module: ModuleInfo, args: Collection[str]) -> int:

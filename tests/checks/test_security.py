@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import sys
-from collections.abc import Generator
 from contextlib import contextmanager
 from functools import partial
-from pathlib import Path
 
 import pytest
 from loguru import logger
@@ -29,6 +29,10 @@ from scansible.checks.security.rules.unrestricted_ip_address import (
 )
 from scansible.checks.security.rules.weak_crypto import WeakCryptoAlgorithmRule
 from scansible.pdg import build_pdg
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+    from pathlib import Path
 
 
 @contextmanager

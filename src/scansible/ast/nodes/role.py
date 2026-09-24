@@ -104,9 +104,8 @@ class Role(ASTFile, frozen=True, arbitrary_types_allowed=True):
 
             if extract_all:
                 return find_all_files(dir_path)
-            else:
-                main_file = find_file(dir_path, "main")
-                return [main_file] if main_file is not None else []
+            main_file = find_file(dir_path, "main")
+            return [main_file] if main_file is not None else []
 
         task_files = _safe_extract_all(
             TaskFile.load, gather_files(path.join("tasks")), context

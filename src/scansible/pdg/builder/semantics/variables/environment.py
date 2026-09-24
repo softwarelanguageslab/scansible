@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal, final, get_args, override
+from typing import TYPE_CHECKING, Literal, final, get_args, override
 
 import abc
 import operator
@@ -12,12 +12,14 @@ from itertools import chain
 
 from loguru import logger
 
-from scansible import ast
-from scansible.pdg import representation as rep
 from scansible.pdg.representation import NodeLocation, Variable
 from scansible.utils import first, first_where
 
 from .constants import MAGIC_VAR_NAMES, UNQUALIFIED_HOST_FACT_NAMES
+
+if TYPE_CHECKING:
+    from scansible import ast
+    from scansible.pdg import representation as rep
 
 
 class EnvironmentType(Enum):

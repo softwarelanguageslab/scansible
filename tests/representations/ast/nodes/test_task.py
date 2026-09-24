@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 from _utils import parse_yaml_dict  # pyright: ignore[reportImplicitRelativeImport]
+from pydantic import ValidationError
 
 from scansible.ast import ExtractionContext, Handler, Task
 from scansible.ast.nodes.expression import (
@@ -187,7 +188,7 @@ def describe_extracting_tasks():
         """
         ctx = ExtractionContext(lenient=False)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def extracts_task_with_literal_boolean_when():
@@ -269,7 +270,7 @@ def describe_extracting_tasks():
         """
         ctx = ExtractionContext(lenient=False)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def rejects_tasks_with_invalid_postvalidated_attribute_values():
@@ -281,7 +282,7 @@ def describe_extracting_tasks():
         """
         ctx = ExtractionContext(lenient=False)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def rejects_tasks_with_no_action():
@@ -290,7 +291,7 @@ def describe_extracting_tasks():
         """
         ctx = ExtractionContext(lenient=False)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def rejects_tasks_with_multiple_actions():
@@ -303,7 +304,7 @@ def describe_extracting_tasks():
         """
         ctx = ExtractionContext(lenient=False)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
 
@@ -500,7 +501,7 @@ def describe_parsing_action():
         ],
     )
     def rejects_invalid_actions(task: dict[str, object]):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             _ = Task.model_validate(task)
 
 
@@ -656,7 +657,7 @@ def describe_validation():
         """
         ctx = ExtractionContext(lenient=False)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)
 
     def rejects_include_tasks_marked_static():
@@ -795,5 +796,5 @@ def describe_vars():
         """
         ctx = ExtractionContext(lenient=False)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             _ = Task.model_validate(parse_yaml_dict(yaml), context=ctx)

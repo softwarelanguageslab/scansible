@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from typing import cast, final
+from typing import TYPE_CHECKING, cast, final
 
-from collections.abc import Sequence
 from datetime import datetime
-from pathlib import Path
 
 import loguru
 from loguru import logger
@@ -16,6 +14,10 @@ from .. import representation as rep
 from .context import BuildContext
 from .playbook import PlaybookBuilder
 from .role import RoleBuilder
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from pathlib import Path
 
 
 def build_pdg(

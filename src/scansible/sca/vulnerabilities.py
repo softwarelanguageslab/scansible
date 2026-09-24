@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import functools
+import http
 import json
 from pathlib import Path
 
@@ -15,8 +17,6 @@ from scansible.sca.constants import DEBIAN_NAME_MAPPINGS, ECOSYSTEMS_SEVERITY_MA
 from scansible.sca.types import Vulnerability
 
 CACHE_PATH = Path("cache")
-
-_debian_advisories_cache: dict[str, dict[str, Any]] | None = None
 
 
 class EcosystemsCache:
@@ -51,17 +51,15 @@ ECOSYSTEMS_CACHE = EcosystemsCache()
 
 
 def find_vulnerabilities(package_name: str, package_type: str) -> list[Vulnerability]:
-    if package_type == "OS":
-        return _find_debian_vulnerabilities(package_name)
-    else:
-        return _find_pypi_vulnerabilities(package_name)
+    return (
+        _find_debian_vulnerabilities(package_name)
+        if package_type == "OS"
+        else _find_pypi_vulnerabilities(package_name)
+    )
 
 
+@functools.cache
 def _get_debian_advisories() -> dict[str, dict[str, Any]]:
-    global _debian_advisories_cache
-    if _debian_advisories_cache is not None:
-        return _debian_advisories_cache
-
     adv_path = CACHE_PATH / "debian_advisories.json"
     if not adv_path.is_file():
         resp = requests.get(
@@ -71,9 +69,7 @@ def _get_debian_advisories() -> dict[str, dict[str, Any]]:
         _ = adv_path.write_text(resp.text)
 
     with adv_path.open("rt") as f:
-        content = json.load(f)
-        _debian_advisories_cache = content
-        return content
+        return json.load(f)
 
 
 def _find_debian_vulnerabilities(package_name: str) -> list[Vulnerability]:
@@ -146,7 +142,7 @@ def _search_ecosystems(ecosystem: str, package: str) -> dict[str, Any] | None:
         f"https://packages.ecosyste.ms/api/v1/registries/{ecosystem}/packages/{package}",
         timeout=15,
     )
-    if resp.status_code == 404:
+    if resp.status_code == http.HTTPStatus.NOT_FOUND:
         return None
     resp.raise_for_status()
     result = resp.json()

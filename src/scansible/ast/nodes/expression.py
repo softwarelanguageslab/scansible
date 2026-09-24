@@ -147,6 +147,7 @@ class Condition(Expression, frozen=True):
 class Identifier(str, HasLocation):
     """AST node representing an identifier, e.g., a variable name."""
 
+    __slots__: tuple[str, ...] = ("__location__",)
     __location__: Location
 
     def __new__(cls, value: str, *, location: Location = _SYNTHETIC_LOCATION) -> Self:
@@ -181,6 +182,7 @@ class Identifier(str, HasLocation):
 class Literal(HasLocation, Protocol):
     """AST node representing a literal value."""
 
+    __slots__: tuple[str, ...] = ()
     __location__: Location
 
     @classmethod
@@ -220,8 +222,7 @@ class Literal(HasLocation, Protocol):
 
         def validator(value: object) -> Self:
             validated_value = cls._validate(value)
-            wrapped = cls._construct_and_wrap(value, validated_value)
-            return wrapped
+            return cls._construct_and_wrap(value, validated_value)
 
         return validator
 
@@ -242,13 +243,15 @@ class StrLiteral(str, Literal):
     approximate it as a string.
     """
 
+    __slots__: tuple[str, ...] = ("__location__", "is_vaulted")
     __location__: Location
     #: Whether this string is in fact a vault-encrypted value.
-    is_vaulted: Final[bool] = False
+    is_vaulted: bool
 
     def __new__(cls, value: str, *, location: Location = _SYNTHETIC_LOCATION) -> Self:
         obj = str.__new__(cls, value)
         obj.__location__ = location
+        obj.is_vaulted = False
         return obj
 
     @classmethod
@@ -257,7 +260,7 @@ class StrLiteral(str, Literal):
         cls, original_value: object, coerced_value: str, location: Location
     ) -> Self:
         obj = cls(coerced_value, location=location)
-        obj.is_vaulted = isinstance(original_value, YamlVaultValue)  # pyright: ignore[reportAttributeAccessIssue]
+        obj.is_vaulted = isinstance(original_value, YamlVaultValue)
         return obj
 
     @classmethod
@@ -277,6 +280,8 @@ class StrLiteral(str, Literal):
 class IntLiteral(int, Literal):
     """AST node representing a literal integer."""
 
+    # int subclasses can't use __slots__ for extra attributes (CPython restriction),
+    # so this ends up with a __dict__ unlike its siblings.
     __location__: Location
 
     def __new__(cls, value: int, *, location: Location = _SYNTHETIC_LOCATION) -> Self:
@@ -305,6 +310,7 @@ class IntLiteral(int, Literal):
 class FloatLiteral(float, Literal):
     """AST node representing a literal float."""
 
+    __slots__: tuple[str, ...] = ("__location__",)
     __location__: Location
 
     def __new__(cls, value: float, *, location: Location = _SYNTHETIC_LOCATION) -> Self:
@@ -325,6 +331,7 @@ class FloatLiteral(float, Literal):
 class PercentLiteral(float, Literal):
     """AST node representing a literal percentage."""
 
+    __slots__: tuple[str, ...] = ("__location__",)
     __location__: Location
 
     def __new__(cls, value: float, *, location: Location = _SYNTHETIC_LOCATION) -> Self:
@@ -350,6 +357,7 @@ class BoolLiteral(Literal):
     Note that this is NOT a subclass of `bool`.
     """
 
+    __slots__: tuple[str, ...] = ("__location__", "_real_bool")
     _real_bool: bool
     __location__: Location
 
@@ -391,7 +399,7 @@ class BoolLiteral(Literal):
 
         if value in ("y", "yes", "on", "1", "true", "t", 1, 1.0):
             return True
-        elif value in ("n", "no", "off", "0", "false", "f", 0, 0.0):
+        if value in ("n", "no", "off", "0", "false", "f", 0, 0.0):
             return False
 
         raise ValueError("Value cannot be coerced to a boolean")
@@ -400,6 +408,7 @@ class BoolLiteral(Literal):
 class DateLiteral(date, Literal):
     """AST node representing a literal date."""
 
+    __slots__: tuple[str, ...] = ("__location__",)
     __location__: Location
 
     def __new__(cls, value: date, *, location: Location = _SYNTHETIC_LOCATION) -> Self:
@@ -419,6 +428,7 @@ class DateLiteral(date, Literal):
 class DatetimeLiteral(datetime, Literal):
     """AST node representing a literal datetime."""
 
+    __slots__: tuple[str, ...] = ("__location__",)
     __location__: Location
 
     def __new__(
@@ -463,7 +473,7 @@ class SeqLiteral[T](tuple[T, ...], Literal):
     @override
     def _validate(cls, value: object) -> Sequence[object]:
         """Coerce the given value to a sequence, like Ansible does."""
-        if value == None:  # Could be YamlNone
+        if value == None:  # noqa: E711 -- could be YamlNone
             return ()
         if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
             value = (value,)
@@ -498,7 +508,7 @@ class LenientSeqLiteral[T](SeqLiteral[T]):
     @classmethod
     @override
     def _validate(cls, value: object) -> Sequence[object]:
-        if value == None:  # could be YamlNone
+        if value == None:  # noqa: E711 -- could be YamlNone
             return ()
         if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
             raise ValueError("Expected a sequence")
@@ -545,6 +555,7 @@ class LenientSeqLiteral[T](SeqLiteral[T]):
 class MapLiteral[K, V](FrozenDict[K, V], Literal):
     """AST node representing a literal mapping."""
 
+    __slots__: tuple[str, ...] = ("__location__",)
     __location__: Location
 
     def __init__(
@@ -563,7 +574,7 @@ class MapLiteral[K, V](FrozenDict[K, V], Literal):
     @override
     def _validate(cls, value: object) -> Mapping[object, object]:
         """Coerce the given value to a mapping, like Ansible does."""
-        if value == None:
+        if value == None:  # noqa: E711 -- could be YamlNone
             return {}
         if not isinstance(value, Mapping):
             raise ValueError("Cannot coerce value to mapping")
@@ -593,7 +604,7 @@ def _get_literal_type_tag(obj: object) -> str:
     # Special case composite types as there may be several concrete types.
     if isinstance(obj, Mapping):
         return "map"
-    elif isinstance(obj, Sequence) and not isinstance(obj, (str, bytes)):
+    if isinstance(obj, Sequence) and not isinstance(obj, (str, bytes)):
         return "seq"
 
     # For scalars, use the input type name as the discriminator, also for CST nodes.

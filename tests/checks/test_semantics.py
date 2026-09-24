@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from scansible.checks.base import CheckContext, Finding
 from scansible.checks.semantics import get_all_rules
 from scansible.pdg import build_pdg
-from scansible.pdg.builder.context import BuildContext
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from scansible.pdg.builder.context import BuildContext
 
 #: A `Finding`, but with each `NodeLocation` collapsed down to its
 #: `path:line:column` string to avoid deep positioning checks in tests.

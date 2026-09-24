@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Protocol, cast
+from typing import TYPE_CHECKING, Protocol, cast
 
 from itertools import product
 
 import pytest
-from _pytest.fixtures import FixtureRequest
+from pydantic import ValidationError
 from pytest_describe import behaves_like
 
 from scansible.pdg import representation as rep
 from scansible.utils import LineColumn
+
+if TYPE_CHECKING:
+    from _pytest.fixtures import FixtureRequest
 
 FAKE_LOC = rep.NodeLocation(
     path="test.yml", start=LineColumn(1, 1), end=LineColumn(1, 1)
@@ -84,7 +87,7 @@ def describe_task() -> None:
 
     @pytest.mark.parametrize("action", [None, 1, ["action"], ""])
     def should_reject_invalid_actions(action: object) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             _ = rep.Task(action=action, name="test")  # pyright: ignore[reportArgumentType]
 
     @pytest.mark.parametrize("name", ["test", "ensure something", None])
@@ -110,7 +113,7 @@ def describe_variable() -> None:
 
     @pytest.mark.parametrize("name", [None, 1, ["name"], ""])
     def should_reject_invalid_names(name: object) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             _ = rep.Variable(name=name, version=1, value_version=1, scope_level=1)  # pyright: ignore[reportArgumentType]
 
 
@@ -127,7 +130,7 @@ def describe_literal() -> None:
         assert lit.type == type_
 
     def should_reject_invalid_types() -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             _ = rep.ScalarLiteral(type="not_a_type", value=None)  # pyright: ignore[reportArgumentType]
 
     @pytest.mark.parametrize("value", [None, 1, "value", 1.0, False])
@@ -138,7 +141,7 @@ def describe_literal() -> None:
     def scalar_should_reject_composite_values(
         value: list[str] | dict[str, str],
     ) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             _ = rep.ScalarLiteral(type="str", value=value)  # pyright: ignore[reportArgumentType]
 
 
@@ -156,7 +159,7 @@ def describe_expression() -> None:
 
     @pytest.mark.parametrize("expr", [[], "", 1])
     def should_reject_invalid_expr(expr: object) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             _ = rep.Expression(expr=expr)  # pyright: ignore[reportArgumentType]
 
 

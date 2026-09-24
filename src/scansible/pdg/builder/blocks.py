@@ -1,17 +1,19 @@
 from __future__ import annotations
 
-from typing import cast, final
-
-from collections.abc import Sequence
+from typing import TYPE_CHECKING, cast, final
 
 from loguru import logger
 
 from scansible import ast
 
 from .. import representation as rep
-from .context import BuildContext
-from .result import BuildResult
 from .semantics import EnvironmentType, RecursiveDefinitionError
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from .context import BuildContext
+    from .result import BuildResult
 
 
 @final
@@ -82,41 +84,47 @@ class BlockBuilder:
             )
 
         for misc_kw in ("become", "become_user", "become_method"):
-            if misc_kw not in self.block.model_fields_set:
-                # Default
-                continue
-            kw_val = cast(ast.AnyExpression, getattr(self.block, misc_kw))
-
-            prev_value: rep.DataNode | None = None
-
-            for ctrl_node in result.added_control_nodes:
-                if not isinstance(ctrl_node, rep.Task):
-                    continue
-
-                # Don't add inherited keywords if the child overrides it.
-                if self.context.graph.has_predecessor(
-                    ctrl_node, edge=rep.Keyword(keyword=misc_kw)
-                ):
-                    continue
-
-                try:
-                    value = prev_value or self.context.expr.build_expression(kw_val)
-                except RecursiveDefinitionError as e:
-                    self.logger.error(e)
-                    continue
-
-                if isinstance(value, rep.Literal):
-                    prev_value = value
-
-                self.context.graph.add_edge(
-                    value, ctrl_node, rep.Keyword(keyword=misc_kw)
-                )
+            self._propagate_inherited_keyword(misc_kw, result.added_control_nodes)
 
         for kw in self.block.model_directives_set:
             if kw not in self.SUPPORTED_BLOCK_ATTRIBUTES:
                 self.logger.debug(f"Unsupported block keyword {kw!r}!")
 
         return result
+
+    def _propagate_inherited_keyword(
+        self, misc_kw: str, control_nodes: Sequence[rep.ControlNode]
+    ) -> None:
+        """Propagate a block-level keyword to child tasks that don't override it."""
+        if misc_kw not in self.block.model_fields_set:
+            # Default
+            return
+        kw_val = cast(ast.AnyExpression, getattr(self.block, misc_kw))
+
+        prev_value: rep.DataNode | None = None
+
+        for ctrl_node in control_nodes:
+            if not isinstance(ctrl_node, rep.Task):
+                continue
+
+            # Don't add inherited keywords if the child overrides it.
+            if self.context.graph.has_predecessor(
+                ctrl_node, edge=rep.Keyword(keyword=misc_kw)
+            ):
+                continue
+
+            try:
+                value = prev_value or self.context.expr.build_expression(kw_val)
+            except RecursiveDefinitionError:
+                self.logger.exception(
+                    f"Failed to build expression for inherited keyword {misc_kw!r}"
+                )
+                continue
+
+            if isinstance(value, rep.Literal):
+                prev_value = value
+
+            self.context.graph.add_edge(value, ctrl_node, rep.Keyword(keyword=misc_kw))
 
     def _build_children(
         self,

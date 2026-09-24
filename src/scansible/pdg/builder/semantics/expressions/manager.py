@@ -54,10 +54,9 @@ class ExpressionManager:
             return self._build_expression(TemplateExpressionAST(expr))
         if isinstance(expr, ast.SeqLiteral):
             return self._build_sequence_expression(expr)
-        elif isinstance(expr, ast.MapLiteral):
+        if isinstance(expr, ast.MapLiteral):
             return self._build_mapping_expression(expr)
-        else:
-            return self._build_scalar_literal(expr)
+        return self._build_scalar_literal(expr)
 
     def _build_mapping_expression(
         self, expr: ast.MapLiteral[ast.ScalarLiteral, ast.AnyExpression]
