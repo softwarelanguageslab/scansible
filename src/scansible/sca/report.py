@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from pathlib import Path
-
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from scansible.sca.constants import HTML_CLASS_SEVERITY
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from scansible.checks.base import Finding
     from scansible.pdg.representation import NodeLocation
 
@@ -92,28 +92,34 @@ def _build_pages() -> list[tuple[str, str]]:
     return pages
 
 
-def _build_smells(smells_raw: list[Finding]) -> list[dict[str, Any]]:
+def _build_smells(
+    smells_raw: list[Finding], project_root: Path
+) -> list[dict[str, Any]]:
     smells: list[dict[str, Any]] = []
     for smell in smells_raw:
         sm: dict[str, Any] = {
             "code": smell.code,
             "summary": smell.summary,
             "explanation": smell.explanation,
-            "location": smell.location,
-            "hint_location": smell.hint_location,
+            "location": str(smell.location),
+            "hint_location": str(smell.hint_location)
+            if smell.hint_location is not None
+            else None,
             "hint_text": smell.hint_text,
         }
-        sm["text"], sm["text_start"], sm["text_line"] = _read_code(smell.location, 5)
+        sm["text"], sm["text_start"], sm["text_line"] = _read_code(
+            smell.location, 5, project_root
+        )
         if smell.hint_location is not None:
             sm["hint_code_text"], sm["hint_code_start"], sm["hint_code_line"] = (
-                _read_code(smell.hint_location, 5)
+                _read_code(smell.hint_location, 5, project_root)
             )
         smells.append(sm)
     return smells
 
 
 def generate_report(
-    project_name: str,
+    project_root: Path,
     output_dir: Path,
     dependencies: ProjectDependencies,
     dependency_vulnerabilities: dict[str, list[Vulnerability]],
@@ -126,14 +132,14 @@ def generate_report(
     )
     vulnerabilities = _build_vulnerabilities(dependency_vulnerabilities)
     pages = _build_pages()
-    smells = _build_smells(smells_raw)
+    smells = _build_smells(smells_raw, project_root)
 
     env = Environment(
         loader=FileSystemLoader("src/scansible/sca/html"),
         autoescape=select_autoescape(),
     )
     env.globals = {  # pyright: ignore[reportAttributeAccessIssue]
-        "project_name": project_name,
+        "project_name": project_root.name,
         "collections": collections,
         "modules": modules,
         "roles": dependencies.roles,
@@ -149,12 +155,14 @@ def generate_report(
         _ = (output_dir / f"{html_file}.html").write_text(content)
 
 
-def _read_code(loc: NodeLocation, num_lines: int) -> tuple[str, int, int]:
+def _read_code(
+    loc: NodeLocation, num_lines: int, project_root: Path
+) -> tuple[str, int, int]:
     if loc.is_synthetic:
         return "NOT FOUND!", 0, 0
 
     lineno = loc.start.line - 1
-    file_path = Path(loc.path)
+    file_path = project_root / loc.path
     try:
         text = file_path.read_text()
     except OSError:

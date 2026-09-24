@@ -97,9 +97,9 @@
       info: style.getPropertyValue('--info'),
       warning: style.getPropertyValue('--warning'),
       danger: style.getPropertyValue('--danger'),
-      light: style.getPropertyValue('--light'),
       dark: style.getPropertyValue('--dark'),
       muted: style.getPropertyValue('--gray'),
+      light: style.getPropertyValue('--light'),
     };
 
     new Chart(document.getElementById("chart-dependencies"), {
@@ -151,21 +151,17 @@
     });
 
     let smells = {{ smells | tojson }};
-    let smell_labels = [...new Set(smells.map(s => s.rule_name))];
+    let smell_labels = [...new Set(smells.map(s => s.code))];
+    // Cycle through the whole theme palette instead of a fixed-length list, so
+    // there's always a color regardless of how many distinct rule codes fired.
+    let smell_colors = Object.values(theme);
     new Chart(document.getElementById("chart-smells"), {
       type: "doughnut",
       data: {
         labels: smell_labels,
         datasets: [{
-          data: smell_labels.map(l => smells.filter(s => s.rule_name == l).length),
-          backgroundColor: [
-            theme.primary,
-            theme.success,
-            theme.warning,
-            theme.danger,
-            theme.secondary,
-            theme.muted,
-          ],
+          data: smell_labels.map(l => smells.filter(s => s.code == l).length),
+          backgroundColor: smell_labels.map((_, i) => smell_colors[i % smell_colors.length]),
           borderColor: "transparent"
         }]
       },

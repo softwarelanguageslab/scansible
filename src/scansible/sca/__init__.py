@@ -174,7 +174,7 @@ def scan_project(
             console.print(cve_line)
 
     output_dir.mkdir(exist_ok=True, parents=True)
-    generate_report(project.name, output_dir, project_deps, dep_vulns, smells)
+    generate_report(project, output_dir, project_deps, dep_vulns, smells)
 
 
 def _detect_smells(project: Path, role_search_paths: list[Path]) -> Iterable[Finding]:
