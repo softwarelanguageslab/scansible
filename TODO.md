@@ -10,13 +10,6 @@
   Afterwards, it'll also be possible to remove the dependency on `ansible` and
   depend solely on `ansible-core`, which doesn't include the collections.
 
-- SCAnsible heavily relies on Ansible to parse and validate code, as well as for
-  several other utilities. This is a rather heavy dependency, and importing Ansible
-  slows down SCAnsible's initial start. Moreover, the parsing logic is full of hacks
-  to work around issues arising from the reliance on Ansible.
-  FIX: We should reduce and ideally remove the dependency on Ansible. For starters,
-  parsing and validating can be reimplemented to avoid the hacks.
-
 - SCAnsible writes many cache files to the `cache` directory in the current working
   directory. These are not project-specific, are not refreshed, and should likely be
   stored elsewhere.
