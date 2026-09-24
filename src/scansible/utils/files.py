@@ -75,9 +75,14 @@ class ProjectPath:
             file_path = Path(file_path)
 
         if file_path.is_absolute():
-            self.relative = Path(os.path.relpath(file_path, root_path))
+            relative = Path(os.path.relpath(file_path, root_path))
         else:
-            self.relative = file_path
+            relative = file_path
+
+        resolved = (self.root / relative).resolve()
+        if not resolved.is_relative_to(self.root):
+            raise ValueError(f"Path {file_path} escapes project root {self.root}")
+        self.relative = relative
 
     @override
     def __str__(self) -> str:
@@ -98,7 +103,7 @@ class ProjectPath:
     def join(self, other: Path | str) -> ProjectPath:
         """Join the current path with another path.
 
-        :raises AssertionError: When the two project paths have different roots.
+        :raises ValueError: When the resulting path escapes the project root.
         """
         if isinstance(other, str):
             other = Path(other)

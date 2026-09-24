@@ -135,6 +135,44 @@ def describe_project_path():
             with pytest.raises(ValueError, match="absolute path"):
                 _ = ProjectPath(Path(), "test.yml")
 
+        def should_reject_absolute_child_outside_root(tmp_path: Path):
+            root = tmp_path / "root"
+            root.mkdir()
+            outside = tmp_path / "outside" / "secret.yml"
+
+            with pytest.raises(ValueError, match="escapes project root"):
+                _ = ProjectPath(root, outside)
+
+        def should_reject_relative_child_escaping_root(tmp_path: Path):
+            root = tmp_path / "root"
+            root.mkdir()
+
+            with pytest.raises(ValueError, match="escapes project root"):
+                _ = ProjectPath(root, "../outside/secret.yml")
+
+        def should_reject_deeply_nested_relative_escape(tmp_path: Path):
+            root = tmp_path / "root"
+            root.mkdir()
+
+            with pytest.raises(ValueError, match="escapes project root"):
+                _ = ProjectPath(root, "a/b/../../../outside/secret.yml")
+
+        def should_accept_relative_child_that_stays_within_root(tmp_path: Path):
+            root = tmp_path / "root"
+            root.mkdir()
+
+            pp = ProjectPath(root, "subdir/../main.yml")
+
+            assert pp.absolute == root / "main.yml"
+
+        def should_accept_child_resolving_to_root_itself(tmp_path: Path):
+            root = tmp_path / "root"
+            root.mkdir()
+
+            pp = ProjectPath(root, "subdir/..")
+
+            assert pp.absolute == root
+
     def describe_from_root():
         def should_construct_correct_path():
             pp = ProjectPath.from_root(Path().absolute())
@@ -163,12 +201,31 @@ def describe_project_path():
             assert pp2.root == rpp.root
             assert pp2.relative == Path("meta/main.yml")
 
-        # FIXME: not implemented any longer? Either remove test or fix behaviour
-        @pytest.mark.xfail(reason="not implemented any longer")
-        def should_reject_child_with_different_parent():
-            rpp = ProjectPath.from_root(Path("meta").absolute())
-            with pytest.raises(Exception):  # noqa: B017, PT011
-                _ = rpp.join(Path("tasks/main.yml").absolute())
+        def should_reject_child_escaping_root(tmp_path: Path):
+            root = tmp_path / "root"
+            root.mkdir()
+            outside = tmp_path / "outside" / "main.yml"
+
+            rpp = ProjectPath.from_root(root)
+            with pytest.raises(ValueError, match="escapes project root"):
+                _ = rpp.join(outside)
+
+        def should_reject_relative_escape_from_nested_path(tmp_path: Path):
+            root = tmp_path / "root"
+            root.mkdir()
+
+            rpp = ProjectPath.from_root(root).join("tasks")
+            with pytest.raises(ValueError, match="escapes project root"):
+                _ = rpp.join("../../outside/main.yml")
+
+        def should_accept_relative_escape_that_stays_within_root(tmp_path: Path):
+            root = tmp_path / "root"
+            root.mkdir()
+
+            rpp = ProjectPath.from_root(root).join("tasks")
+            pp = rpp.join("../vars/main.yml")
+
+            assert pp.absolute == root / "vars" / "main.yml"
 
 
 def describe_find_file():
