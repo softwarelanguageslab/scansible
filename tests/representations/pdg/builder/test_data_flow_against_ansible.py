@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, cast, final
 
 import json
+import shutil
 import subprocess
 import tempfile
 from contextlib import contextmanager
@@ -55,6 +56,10 @@ _ansible_file_names = st.text(alphabet="abcdef", min_size=1)
 
 PlaybookFile = tuple[Path, str]
 Dataflow = list[str]
+
+_ANSIBLE_PLAYBOOK = (
+    shutil.which("ansible-playbook") or "/usr/local/bin/ansible-playbook"
+)
 
 
 @final
@@ -437,9 +442,16 @@ def test_inferred_dataflow_matches_actual(playbooks: list[PlaybookFile]) -> None
             return
 
         try:
-            inferred_dataflow = _infer_dataflow(graph)
             actual_dataflow = _observe_dataflow(playbook_dir)
+        except subprocess.CalledProcessError:
+            # Ansible itself couldn't run this generated example (e.g. genuinely
+            # cyclic variable references), so there is nothing meaningful to compare it
+            # against.
+            _ = assume(False)  # noqa: FBT003
+            return
 
+        try:
+            inferred_dataflow = _infer_dataflow(graph)
             assert inferred_dataflow == actual_dataflow
         except:
             print(playbooks)  # noqa: T201
@@ -459,9 +471,9 @@ def _setup_env(playbooks: list[PlaybookFile]) -> Generator[Path]:
         _ = (tmpdir / "pb.yml").write_text(
             dedent("""
             - gather_facts: no
-            connection: local
-            hosts: localhost
-            tasks:
+              connection: local
+              hosts: localhost
+              tasks:
                 - include_role:
                     name: test
             """)
@@ -491,7 +503,7 @@ def _yield_debug_tasks(graph: rep.Graph) -> Iterable[rep.Task]:
 def _get_expected_output(printer: rep.Task, graph: rep.Graph) -> str:
     expr = _get_printed_expr(printer, graph)
     if printer.name and printer.name.endswith("is defined?"):
-        use_node = graph.get_predecessors(expr, edge=rep.USE)[0]
+        use_node = graph.get_predecessors(expr, edge_type=rep.Use)[0]
         # Defined, get the value
         if isinstance(use_node, rep.IntermediateValue):
             return _resolve_iv_to_value(graph, use_node)
@@ -518,7 +530,7 @@ def _get_printed_expr(printer: rep.Task, graph: rep.Graph) -> rep.Expression:
 
 def _resolve_expr_to_value(g: rep.Graph, expr: rep.Expression) -> str:
     # Should only use one data node
-    used_data = g.get_predecessors(expr, edge=rep.USE)[0]
+    used_data = g.get_predecessors(expr, edge_type=rep.Use)[0]
     if isinstance(used_data, rep.ScalarLiteral):
         data = used_data.value
     elif isinstance(used_data, rep.IntermediateValue):
@@ -559,7 +571,7 @@ def _resolve_var_to_value(g: rep.Graph, v: rep.Variable) -> str | None:
 
 def _observe_dataflow(playbook_dir: Path) -> Dataflow:
     proc = subprocess.run(
-        ["/usr/local/bin/ansible-playbook", "pb.yml", "--connection=local"],
+        [_ANSIBLE_PLAYBOOK, "pb.yml", "--connection=local"],
         capture_output=True,
         text=True,
         env={"ANSIBLE_STDOUT_CALLBACK": "json"},
