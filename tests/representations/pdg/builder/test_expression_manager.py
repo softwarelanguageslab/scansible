@@ -685,69 +685,16 @@ def describe_reevaluating_expressions():
             ),
         )
 
-
-# FIXME: These test cases are disabled pending a large rewrite of the data flow semantics, and should
-# be fixed/moved later on.
-
-
-def _describe_scoping() -> None:
-
-    def should_not_hoist_template_if_overridden(create_context: ContextCreator) -> None:
-        ctx, var, g = create_context()
-
-        # Difference to 'should_use_most_specific_scope': Same template here,
-        # different template there
-        var.define_lazy_variable(ident("a"), EnvironmentType.HOST_FACTS, strlit("1"))
-        _ = ctx.build_expression(expr("1 {{ a }}"))
-        with var.enter_scope(EnvironmentType.TASK_VARS):
-            var.define_lazy_variable(ident("a"), EnvironmentType.TASK_VARS, strlit("2"))
-            _ = ctx.build_expression(expr("1 {{ a }}"))
-        _ = ctx.build_expression(expr("1 {{ a }}"))
-
-        assert_graphs_match(
-            g,
-            create_graph(
-                {
-                    "aouter": Variable(
-                        name="a",
-                        version=0,
-                        value_version=0,
-                        scope_level=EnvironmentType.HOST_FACTS.value,
-                    ),
-                    "1": ScalarLiteral(type="str", value="1"),
-                    "e1": Expression(expr="1 {{ a }}"),
-                    "iv1": IntermediateValue(identifier=1),
-                    "ainner": Variable(
-                        name="a",
-                        version=1,
-                        value_version=0,
-                        scope_level=EnvironmentType.TASK_VARS.value,
-                    ),
-                    "2": ScalarLiteral(type="str", value="2"),
-                    "e2": Expression(expr="1 {{ a }}"),
-                    "iv2": IntermediateValue(identifier=2),
-                },
-                [
-                    ("1", "aouter", DEF),
-                    ("aouter", "e1", Input()),
-                    ("e1", "iv1", DEF),
-                    ("2", "ainner", DEF),
-                    ("ainner", "e2", Input()),
-                    ("e2", "iv2", DEF),
-                ],
-            ),
-        )
-
     def should_evaluate_var_into_template_scope(create_context: ContextCreator) -> None:
         ctx, var, g = create_context()
 
         var.define_lazy_variable(
-            ident("a"), EnvironmentType.HOST_FACTS, expr("{{ b }}")
+            ident("a"), EnvironmentType.PB_GROUP_VARS, expr("{{ b }}")
         )
         with var.enter_scope(EnvironmentType.TASK_VARS):
             var.define_lazy_variable(ident("b"), EnvironmentType.TASK_VARS, strlit("1"))
             _ = ctx.build_expression(expr("{{ a }}"))
-        var.define_lazy_variable(ident("b"), EnvironmentType.HOST_FACTS, strlit("2"))
+        var.define_lazy_variable(ident("b"), EnvironmentType.PB_GROUP_VARS, strlit("2"))
         _ = ctx.build_expression(expr("{{ a }}"))
 
         assert_graphs_match(
@@ -758,7 +705,7 @@ def _describe_scoping() -> None:
                         name="a",
                         version=0,
                         value_version=0,
-                        scope_level=EnvironmentType.HOST_FACTS.value,
+                        scope_level=EnvironmentType.PB_GROUP_VARS.value,
                     ),
                     "aei": Expression(expr="{{ b }}"),
                     "aeiv": IntermediateValue(identifier=0),
@@ -775,7 +722,7 @@ def _describe_scoping() -> None:
                         name="b",
                         version=1,
                         value_version=0,
-                        scope_level=EnvironmentType.HOST_FACTS.value,
+                        scope_level=EnvironmentType.PB_GROUP_VARS.value,
                     ),
                     "bol": ScalarLiteral(type="str", value="2"),
                     "eo": Expression(expr="{{ a }}"),
@@ -784,7 +731,7 @@ def _describe_scoping() -> None:
                         name="a",
                         version=0,
                         value_version=1,
-                        scope_level=EnvironmentType.HOST_FACTS.value,
+                        scope_level=EnvironmentType.PB_GROUP_VARS.value,
                     ),
                     "aeo": Expression(expr="{{ b }}"),
                     "aeov": IntermediateValue(identifier=2),
@@ -803,261 +750,5 @@ def _describe_scoping() -> None:
                     ("bouter", "aeo", Input()),
                     ("bol", "bouter", DEF),
                 ],
-            ),
-        )
-
-    def should_reuse_nested_templates(create_context: ContextCreator) -> None:
-        ctx, var, g = create_context()
-
-        with var.enter_scope(EnvironmentType.TASK_VARS):
-            var.define_lazy_variable(
-                ident("a"), EnvironmentType.TASK_VARS, expr("{{ 'hello' | reverse }}")
-            )
-            var.define_lazy_variable(
-                ident("b"), EnvironmentType.TASK_VARS, expr("{{ c | reverse }}")
-            )
-            var.define_lazy_variable(
-                ident("c"), EnvironmentType.TASK_VARS, strlit("world")
-            )
-            _ = ctx.build_expression(expr("{{ b }} {{ a }}"))
-        var.define_lazy_variable(
-            ident("a"), EnvironmentType.HOST_FACTS, expr("{{ 'hello' | reverse }}")
-        )
-        _ = ctx.build_expression(expr("{{ b }} {{ a }}"))
-
-        assert_graphs_match(
-            g,
-            create_graph(
-                {
-                    "c": Variable(
-                        name="c",
-                        version=0,
-                        value_version=0,
-                        scope_level=EnvironmentType.TASK_VARS.value,
-                    ),
-                    "cl": ScalarLiteral(type="str", value="world"),
-                    "bie": Expression(expr="{{ c | reverse }}"),
-                    "biv": IntermediateValue(identifier=0),
-                    "binner": Variable(
-                        name="b",
-                        version=0,
-                        value_version=0,
-                        scope_level=EnvironmentType.TASK_VARS.value,
-                    ),
-                    "ae": Expression(expr="{{ 'hello' | reverse }}"),
-                    "aiv": IntermediateValue(identifier=1),
-                    "ai": Variable(
-                        name="a",
-                        version=0,
-                        value_version=0,
-                        scope_level=EnvironmentType.TASK_VARS.value,
-                    ),
-                    "ie": Expression(expr="{{ b }} {{ a }}"),
-                    "iev": IntermediateValue(identifier=2),
-                    "bouter": Variable(
-                        name="b",
-                        version=1,
-                        value_version=0,
-                        scope_level=EnvironmentType.UNDEFINED.value,
-                    ),
-                    "ao": Variable(
-                        name="a",
-                        version=1,
-                        value_version=0,
-                        scope_level=EnvironmentType.HOST_FACTS.value,
-                    ),
-                    "oe": Expression(expr="{{ b }} {{ a }}"),
-                    "oev": IntermediateValue(identifier=3),
-                },
-                [
-                    ("cl", "c", DEF),
-                    ("c", "bie", Input()),
-                    ("bie", "biv", DEF),
-                    ("biv", "binner", DEF),
-                    ("ae", "aiv", DEF),
-                    ("aiv", "ai", DEF),
-                    ("binner", "ie", Input()),
-                    ("ai", "ie", Input()),
-                    ("ie", "iev", DEF),
-                    ("aiv", "ao", DEF),
-                    ("bouter", "oe", Input()),
-                    ("ao", "oe", Input()),
-                    ("oe", "oev", DEF),
-                ],
-            ),
-        )
-
-    def should_hoist_variable_binding(create_context: ContextCreator) -> None:
-        ctx, var, g = create_context()
-
-        var.define_lazy_variable(
-            ident("a"), EnvironmentType.HOST_FACTS, expr("{{ b }}")
-        )
-        with var.enter_scope(EnvironmentType.TASK_VARS):
-            var.define_lazy_variable(ident("b"), EnvironmentType.TASK_VARS, strlit("1"))
-            with var.enter_scope(EnvironmentType.TASK_VARS):
-                _ = ctx.build_expression(expr("{{ a }}"))
-            _ = ctx.build_expression(expr("{{ a }}"))  # Should reuse above expr
-
-        assert_graphs_match(
-            g,
-            create_graph(
-                {
-                    "a": Variable(
-                        name="a",
-                        version=0,
-                        value_version=0,
-                        scope_level=EnvironmentType.HOST_FACTS.value,
-                    ),
-                    "b": Variable(
-                        name="b",
-                        version=0,
-                        value_version=0,
-                        scope_level=EnvironmentType.TASK_VARS.value,
-                    ),
-                    "lb": ScalarLiteral(type="str", value="1"),
-                    "ae": Expression(expr="{{ b }}"),
-                    "aei": IntermediateValue(identifier=0),
-                    "te": Expression(expr="{{ a }}"),
-                    "tei": IntermediateValue(identifier=1),
-                },
-                [
-                    ("lb", "b", DEF),
-                    ("aei", "a", DEF),
-                    ("ae", "aei", DEF),
-                    ("b", "ae", Input()),
-                    ("a", "te", Input()),
-                    ("te", "tei", DEF),
-                ],
-            ),
-        )
-
-    def should_respect_precedence(create_context: ContextCreator) -> None:
-        ctx, var, g = create_context()
-
-        ln = ScalarLiteral(type="int", value=1)
-        g.add_node(ln)
-        vn = var.define_eager_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
-        g.add_edge(ln, vn, DEF)
-
-        with var.enter_scope(EnvironmentType.TASK_VARS):
-            var.define_lazy_variable(ident("b"), EnvironmentType.TASK_VARS, strlit("2"))
-            _ = ctx.build_expression(expr("{{ b }}"))
-
-        assert_graphs_match(
-            g,
-            create_graph(
-                {
-                    "1": ScalarLiteral(type="int", value=1),
-                    "2": ScalarLiteral(type="str", value="2"),
-                    "bsf": Variable(
-                        name="b",
-                        version=0,
-                        value_version=0,
-                        scope_level=EnvironmentType.SET_FACTS_REGISTERED.value,
-                    ),
-                    "bt": Variable(
-                        name="b",
-                        version=1,
-                        value_version=0,
-                        scope_level=EnvironmentType.TASK_VARS.value,
-                    ),
-                    "be": Expression(expr="{{ b }}"),
-                    "beiv": IntermediateValue(identifier=0),
-                },
-                {
-                    ("1", "bsf", DEF),
-                    ("2", "bt", DEF),
-                    ("bsf", "be", Input()),
-                    ("be", "beiv", DEF),
-                },
-            ),
-        )
-
-    def should_respect_precedence_register_element(
-        create_context: ContextCreator,
-    ) -> None:
-        ctx, var, g = create_context()
-
-        with var.enter_scope(EnvironmentType.TASK_VARS):
-            var.define_lazy_variable(ident("b"), EnvironmentType.TASK_VARS, strlit("1"))
-        ln = ScalarLiteral(type="int", value=2)
-        g.add_node(ln)
-        vn = var.define_eager_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
-        g.add_edge(ln, vn, DEF)
-
-        _ = ctx.build_expression(expr("{{ b }}"))
-
-        assert_graphs_match(
-            g,
-            create_graph(
-                {
-                    "1": ScalarLiteral(type="str", value="1"),
-                    "2": ScalarLiteral(type="int", value=2),
-                    "binner": Variable(
-                        name="b",
-                        version=0,
-                        value_version=0,
-                        scope_level=EnvironmentType.TASK_VARS.value,
-                    ),
-                    "b": Variable(
-                        name="b",
-                        version=1,
-                        value_version=0,
-                        scope_level=EnvironmentType.SET_FACTS_REGISTERED.value,
-                    ),
-                    "be": Expression(expr="{{ b }}"),
-                    "beiv": IntermediateValue(identifier=0),
-                },
-                {
-                    ("1", "binner", DEF),
-                    ("2", "b", DEF),
-                    ("b", "be", Input()),
-                    ("be", "beiv", DEF),
-                },
-            ),
-        )
-
-    def should_respect_precedence_overriding_in_template(
-        create_context: ContextCreator,
-    ) -> None:
-        ctx, var, g = create_context()
-
-        with var.enter_scope(EnvironmentType.TASK_VARS):
-            var.define_lazy_variable(ident("b"), EnvironmentType.TASK_VARS, strlit("1"))
-            ln = ScalarLiteral(type="int", value=2)
-            g.add_node(ln)
-            vn = var.define_eager_variable("b", EnvironmentType.SET_FACTS_REGISTERED)
-            g.add_edge(ln, vn, DEF)
-            _ = ctx.build_expression(expr("{{ b }}"))
-        _ = ctx.build_expression(expr("{{ b }}"))  # Should reuse above expr
-
-        assert_graphs_match(
-            g,
-            create_graph(
-                {
-                    "1": ScalarLiteral(type="str", value="1"),
-                    "2": ScalarLiteral(type="int", value=2),
-                    "b1": Variable(
-                        name="b",
-                        version=0,
-                        value_version=0,
-                        scope_level=EnvironmentType.TASK_VARS.value,
-                    ),
-                    "b": Variable(
-                        name="b",
-                        version=1,
-                        value_version=0,
-                        scope_level=EnvironmentType.SET_FACTS_REGISTERED.value,
-                    ),
-                    "be": Expression(expr="{{ b }}"),
-                    "beiv": IntermediateValue(identifier=0),
-                },
-                {
-                    ("1", "b1", DEF),
-                    ("2", "b", DEF),
-                    ("b", "be", Input()),
-                    ("be", "beiv", DEF),
-                },
             ),
         )
