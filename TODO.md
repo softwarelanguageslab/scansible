@@ -26,3 +26,12 @@
   This may not be appropriate for packages on other Linux distros.
   FIX: Need to map OS binaries to correct distros and use the appropriate
   advisory database.
+
+- The PDG builder has known gaps around conditional execution:
+
+  - `include_tasks`, `include_role`, and `include_vars` don't yet attach the including
+    task's own conditions (`when:`) to the candidate file-resolution edges they build.
+  - Variables that are defined conditionally are dereferenced as if they always exist.
+  - Handler blocks are only superficially supported: `rescue`/`always` sections are
+    flattened and built as if they were normal handlers, even though real Ansible never
+    executes them for handler blocks.
