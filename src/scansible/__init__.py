@@ -219,7 +219,7 @@ def check_all(
     from .utils import ProjectPath
     from .utils.entrypoints import find_entrypoints
 
-    # FIXME: Why does this check exist?
+    # Files in the root folder can occur inside of Docker containers -> Don't recursively scan the root.
     if project_path.parent != project_path:
         entrypoints = find_entrypoints(project_path)
     else:
