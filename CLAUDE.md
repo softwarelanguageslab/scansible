@@ -89,7 +89,7 @@ the separate Scala/sbt `DependencyPatternMatcher` subproject, built via `sbt ass
   (property-based testing, including differential testing against real `ansible` subprocess runs
   for data-flow correctness). No golden-file/snapshot fixtures — expected results are built
   programmatically and compared via custom graph-matcher helpers
-  (`tests/helpers/graph_matchers.py`). Tests marked `slow` only run with `--slow`.
+  (`tests/graph_matchers.py`). Tests marked `slow` only run with `--slow`.
 
 ## Conventions
 
