@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, override
 
 from datetime import date, datetime
 
+from loguru import logger
 from ruamel.yaml import YAML
 from ruamel.yaml.constructor import SafeConstructor
 from ruamel.yaml.resolver import BaseResolver
@@ -52,6 +53,17 @@ class CustomConstructor(SafeConstructor):
         start = LineColumn.from_yaml_mark(node.start_mark)
         end = LineColumn.from_yaml_mark(node.end_mark)
         return Location(path=self.loader.current_file_name, start=start, end=end)
+
+    @override
+    def check_mapping_key(
+        self, node: Node, key_node: Node, mapping: object, key: object, value: object
+    ) -> bool:
+        is_unique = super().check_mapping_key(node, key_node, mapping, key, value)
+        if not is_unique:
+            logger.warning(
+                f"Duplicate key {key!r} at {self._get_location(key_node)}, ignoring"
+            )
+        return is_unique
 
     @override
     def construct_yaml_str(self, node: Node) -> YamlStr:
@@ -192,8 +204,8 @@ class CustomYAML(YAML):
     ) -> None:
         super().__init__(typ=typ, pure=pure, output=output, plug_ins=plug_ins)
         self.current_file_name = file_name
-        # The YAML parser raises on duplicate keys, Ansible warns but allows it, so ignore duplicate keys.
-        # TODO: We should perhaps log keep track of duplicate keys and warn about it too.
+        # The YAML parser raises on duplicate keys, Ansible allows it but emits a warning.
+        # We'll allow them too, and emit a warning in CustomConstructor.check_mapping_key.
         self.allow_duplicate_keys: bool = True
         self.Resolver: type[AnsibleResolver] = AnsibleResolver
         self.Constructor: type[CustomConstructor] = CustomConstructor
