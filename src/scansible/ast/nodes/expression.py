@@ -191,6 +191,15 @@ class Literal(HasLocation, Protocol):
         """Validate the given value and coerce it to a value used to construct an instance of this literal."""
         ...
 
+    @property
+    def __value__(self) -> object:
+        """This literal's value, as its underlying Python primitive type.
+
+        For common cases, the value _is_ the underlying Python primitive, and can be
+        returned directly.
+        """
+        return self
+
     @classmethod
     def _construct(
         cls,
@@ -371,6 +380,11 @@ class BoolLiteral(Literal):
         self.__location__ = location
 
     def __bool__(self) -> bool:
+        return self._real_bool
+
+    @property
+    @override
+    def __value__(self) -> bool:
         return self._real_bool
 
     @override

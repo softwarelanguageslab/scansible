@@ -91,12 +91,11 @@ class ExpressionManager:
         location = self.build_ctx.get_location(expr)
         type_ = extract_type_name(expr)
 
-        # FIXME: Hack
-        if isinstance(expr, ast.BoolLiteral):
-            lit = rep.ScalarLiteral(type=type_, value=bool(expr), location=location)
-        else:
-            lit = rep.ScalarLiteral(type=type_, value=expr, location=location)
-
+        lit = rep.ScalarLiteral(
+            type=type_,
+            value=cast(rep.ScalarValue, expr.__value__ if expr is not None else None),
+            location=location,
+        )
         self.build_ctx.graph.add_node(lit)
         return lit
 

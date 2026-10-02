@@ -9,7 +9,7 @@ import abc
 import operator
 from collections.abc import Sequence  # noqa: TC003 -- For Pydantic
 from dataclasses import dataclass
-from datetime import date, datetime  # noqa: TC003
+from datetime import date, datetime
 from functools import partial
 
 import rustworkx as rx
@@ -39,6 +39,8 @@ type ValidTypeStr = LiteralT[
     "date",
     "datetime",
 ]
+
+type ScalarValue = str | int | bool | float | date | datetime | None
 
 
 class _BaseRepresentation(BaseModel, strict=True, extra="forbid"):
@@ -134,7 +136,7 @@ class Literal(DataNode):
 
 
 class ScalarLiteral(Literal):
-    value: str | int | bool | float | date | datetime | None = Field(frozen=True)
+    value: ScalarValue = Field(frozen=True)
 
 
 class CompositeLiteral(Literal):
