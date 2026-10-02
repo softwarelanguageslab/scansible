@@ -103,7 +103,7 @@ class Role(ASTFile, frozen=True, arbitrary_types_allowed=True):
                 return []
 
             if extract_all:
-                return find_all_files(dir_path)
+                return list(find_all_files(dir_path))
             main_file = find_file(dir_path, "main")
             return [main_file] if main_file is not None else []
 

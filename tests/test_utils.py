@@ -276,4 +276,4 @@ def describe_find_all_files():
 
         result = find_all_files(rp)
 
-        assert not result
+        assert not list(result)

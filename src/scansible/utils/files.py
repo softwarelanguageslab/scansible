@@ -8,8 +8,6 @@ import os
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
 
-from loguru import logger
-
 from scansible.constants import YAML_EXTENSIONS
 
 from .collections import FrozenDict
@@ -129,20 +127,22 @@ def find_file(dir_path: ProjectPath, file_name: str) -> ProjectPath | None:
     return None
 
 
-def find_all_files(dir_path: ProjectPath) -> list[ProjectPath]:
-    """Recursively find all YAML files in a project directory."""
-    results: list[ProjectPath] = []
-    for child in dir_path.absolute.iterdir():
-        child_path = dir_path.join(child)
-        if child.is_symlink():
-            continue
-        if child.is_file() and child.suffix in (".yml", ".yaml", ".json"):
-            results.append(child_path)
-        elif child.is_dir():
-            try:
-                results.extend(find_all_files(child_path))
-            except RecursionError:
-                # TODO: Why can this spin in an infinite loop??
-                logger.warning(f"Hit recursion limit while walking {child}")
+def find_all_files(dir_path: ProjectPath) -> Iterator[ProjectPath]:
+    """Find all YAML files in a project directory, recursively."""
 
-    return results
+    def _reraise(error: OSError) -> None:
+        raise error
+
+    for current_dir, _dirnames, filenames in os.walk(
+        dir_path.absolute, onerror=_reraise
+    ):
+        rel_dir = Path(current_dir).relative_to(dir_path.absolute)
+        for filename in filenames:
+            file_path = Path(current_dir) / filename
+            if file_path.is_symlink() or file_path.suffix not in (
+                ".yml",
+                ".yaml",
+                ".json",
+            ):
+                continue
+            yield dir_path.join(rel_dir / filename)
