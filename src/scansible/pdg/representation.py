@@ -13,6 +13,7 @@ from datetime import date, datetime  # noqa: TC003
 from functools import partial
 
 import rustworkx as rx
+from loguru import logger
 from pydantic import (
     BaseModel,
     Field,
@@ -364,8 +365,11 @@ class Graph:
         edge.raise_if_disallowed(n1, n2)
 
         # Prevent duplicate edges.
-        # FIXME: Warn and fix builder to not add duplicate edges instead.
+        # FIXME: Fix builder to not add duplicate edges instead of dropping them here.
         if self.has_edge(n1, n2, edge):
+            logger.warning(
+                f"Dropping duplicate edge {edge!r} between {n1!r} and {n2!r}"
+            )
             return
 
         self._dirty = True
