@@ -69,6 +69,40 @@ def test_matches_variable_on_task(tmp_path: Path) -> None:
     ]
 
 
+def test_does_not_match_non_admin_user(tmp_path: Path) -> None:
+    pb_path = tmp_path / "pb.yml"
+    write_pb(
+        """
+            - hosts: localhost
+              tasks:
+                - debug: msg=test
+                  become_user: joe
+        """,
+        pb_path,
+    )
+    with temp_import_pb(pb_path) as context:
+        results = stringify(AdminByDefaultRule().check(context))
+
+    assert not results
+
+
+def test_does_not_match_admin_in_non_user_keyword(tmp_path: Path) -> None:
+    pb_path = tmp_path / "pb.yml"
+    write_pb(
+        """
+            - hosts: localhost
+              tasks:
+                - debug:
+                    msg: admin
+        """,
+        pb_path,
+    )
+    with temp_import_pb(pb_path) as context:
+        results = stringify(AdminByDefaultRule().check(context))
+
+    assert not results
+
+
 def test_glitch_admin_by_default(tmp_path: Path) -> None:
     pb_path = tmp_path / "pb.yml"
     write_pb(

@@ -91,6 +91,29 @@ def test_does_not_match_10_0_0_0(tmp_path: Path) -> None:
     assert not results
 
 
+def test_matches_unused_variable(tmp_path: Path) -> None:
+    pb_path = tmp_path / "pb.yml"
+    write_pb(
+        """
+            - hosts: localhost
+              tasks:
+                - set_fact:
+                    bind_address: 0.0.0.0
+        """,
+        pb_path,
+    )
+    with temp_import_pb(pb_path) as context:
+        results = stringify(UnrestrictedIPAddressRule().check(context))
+
+    assert results == [
+        _result(
+            "`bind_address` binds to an unrestricted IP address",
+            "pb.yml:5:21",
+            "pb.yml:5:35",
+        )
+    ]
+
+
 @pytest.mark.xfail(reason="unsupported literal type")
 def test_glitch_unrestricted_ip_address(tmp_path: Path) -> None:
     pb_path = tmp_path / "pb.yml"

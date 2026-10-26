@@ -95,6 +95,47 @@ def test_matches_usage_in_expressions(tmp_path: Path) -> None:
     ]
 
 
+def test_does_not_match_strong_algorithm(tmp_path: Path) -> None:
+    pb_path = tmp_path / "pb.yml"
+    write_pb(
+        """
+            - hosts: localhost
+              tasks:
+                - get_url:
+                    url: https://example.com/source.tar.gz
+                    checksum: 'sha256:abcdef'
+        """,
+        pb_path,
+    )
+    with temp_import_pb(pb_path) as context:
+        results = stringify(WeakCryptoAlgorithmRule().check(context))
+
+    assert not results
+
+
+def test_matches_unused_variable(tmp_path: Path) -> None:
+    pb_path = tmp_path / "pb.yml"
+    write_pb(
+        """
+            - hosts: localhost
+              tasks:
+                - set_fact:
+                    unused: 'md5:123456'
+        """,
+        pb_path,
+    )
+    with temp_import_pb(pb_path) as context:
+        results = stringify(WeakCryptoAlgorithmRule().check(context))
+
+    assert results == [
+        _result(
+            "`unused` uses a weak cryptographic algorithm",
+            "pb.yml:5:21",
+            "pb.yml:5:29",
+        )
+    ]
+
+
 def test_glitch_weak_crypto(tmp_path: Path) -> None:
     pb_path = tmp_path / "pb.yml"
     write_pb(
