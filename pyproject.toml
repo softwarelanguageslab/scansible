@@ -93,13 +93,14 @@ useLibraryCodeForTypes = true
 reportImportCycles = "none"
 
 [tool.pytest.ini_options]
-addopts = "--cov=. --cov-report html"
+addopts = "--cov --cov-report html"
 markers = [
     "slow: marks tests as slow (run with --slow)",
 ]
 
 [tool.coverage.run]
 branch = true
+source = ["src/scansible"]
 
 [tool.coverage.report]
 exclude_lines = [
